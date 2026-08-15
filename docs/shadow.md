@@ -2,13 +2,21 @@
 
 Deze pagina toont de onafhankelijke shadowmetingen van de Energy Manager en M7. **Geen van deze gegevens stuurt apparaten aan.** De shadowflows rekenen alleen uit wat de toekomstige energieregeling *zou* doen en bewaren die uitkomst voor analyse.
 
+!!! info "Homey-flow en website horen bij elkaar"
+    Wanneer een Homey-flow wordt gewijzigd, wordt ook de bijbehorende flowbeschrijving op deze website gecontroleerd en bijgewerkt. Daarbij worden onder andere trigger, frequentie, inputs, logica, outputs, afhankelijkheden, status en websitepublicatie meegenomen. De website hoort dus de **actueel geïmplementeerde Homey-situatie** te beschrijven en niet een oudere ontwerpversie.
+
 ## Wat draait er in shadow mode?
 
 ### Baseline v0.1 — Energie Manager PV
 
-Dit is de **nulmeting** van de Energy Manager. De flow kijkt naar P1/netvermogen, Tesla/Easee en boiler en berekent welk Tesla-laadniveau en welke boilerbeslissing bij het beschikbare PV-overschot zouden passen. Hij schakelt niets. Maximaal 720 twee-minutensamples worden lokaal bewaard.
+Dit is de **nulmeting** van de Energy Manager. De flow kijkt naar P1/netvermogen, Tesla/Easee en boiler en berekent welk Tesla-laadniveau en welke boilerbeslissing bij het beschikbare PV-overschot zouden passen. Hij schakelt niets.
 
-Dezelfde HomeyScript-kaart die deze samples bezit publiceert ongeveer iedere 15 minuten naar `shadow-baseline-v01.json`.
+Baseline heeft twee onafhankelijke takken binnen dezelfde Advanced Flow:
+
+- een **2-minuten sampler** die maximaal 720 samples lokaal bewaart in `EM_SHADOW_STATE` en niets naar GitHub schrijft;
+- een **15-minuten publisher** die de actuele P1-, Tesla- en boilerstatus opnieuw uitleest, zelfstandig één baselinebeslissing berekent en die publiceert naar `shadow-baseline-v01.json`.
+
+De websitehistorie is daardoor niet afhankelijk van kaart-lokale HomeyScript `get()/set()`-state.
 
 ### Shadow v0.2 — Energie Manager PV + Quooker
 
@@ -19,7 +27,7 @@ v0.2 voegt aan de basislogica toe:
 - warmwatergarantie van **240 minuten vóór 19:00**;
 - dynamische catch-up, waarbij de warmwatergarantie voorrang krijgt wanneer uitstel niet meer mogelijk is.
 
-Deze versie blijft volledig read-only en publiceert na activatie zijn eigen lokale state naar `shadow-v02-quooker.json`.
+Deze versie blijft volledig read-only en publiceert na activatie ongeveer iedere 15 minuten naar `shadow-v02-quooker.json`.
 
 ### M7 Opportunity Score — prijs + PV-forecast
 
@@ -30,7 +38,7 @@ M7 is een **aparte parallelle analyselaag**. Vier relatieve signalen worden iede
 - `priceExpensiveNext4h` — nu is relatief duur versus komende vier uur;
 - `pvTop4h` — huidig uur behoort tot de vier beste verwachte PV-uren tussen 09:00 en 18:00.
 
-M7 combineert deze context met de werkelijke net-, Tesla-, boiler- en Quookerstatus. De uitkomst bestaat uit een **Opportunity Score**, advies, kandidaat en tekstuele reden. Maximaal 672 kwartiersamples worden in GitHub bewaard in `m7-opportunity.json`.
+M7 combineert deze context met de werkelijke net-, Tesla-, boiler- en Quookerstatus. De uitkomst bestaat uit een **Opportunity Score**, advies, kandidaat en tekstuele reden. Iedere kwartier-run voegt rechtstreeks één sample toe aan `m7-opportunity.json`; maximaal 672 kwartiersamples worden daar als persistente websitehistorie bewaard.
 
 ## Waarom drie gescheiden reeksen?
 
@@ -44,7 +52,17 @@ Door de datasets gescheiden te houden kunnen we achteraf dezelfde momenten verge
 
 ## Publicatiearchitectuur
 
-De centrale shadow-sync is niet meer nodig. De actieve shadowflows publiceren hun eigen dataset rechtstreeks naar GitHub. De GitHub-JSON-bestanden vormen daarbij de persistente websitehistorie.
+Er is geen centrale shadow-poller meer nodig. Iedere actieve analyselaag publiceert op zijn eigen ritme. **Lokale Homey-state, gedeelde Logic-state en GitHub-historie hebben daarbij verschillende functies:**
+
+| Opslag | Functie |
+|---|---|
+| HomeyScript lokale state | tijdelijke runtime-/analysehistorie binnen dezelfde scriptkaart |
+| Homey Logic | informatie die betrouwbaar tussen verschillende flows moet worden gedeeld |
+| GitHub JSON | persistente historie voor analyse en deze website |
+
+Dit ontwerp beperkt Homey API-belasting: de 2-minuten baseline-sampling veroorzaakt geen 2-minuten GitHub-publicatie; de persistente baselinehistorie wordt slechts iedere 15 minuten bijgewerkt.
+
+De algemene **Live status** op de homepage en de timestamps hieronder zijn onafhankelijk. `homey-status.json` toont de algemene Homey-sync; iedere shadowdataset toont zijn eigen laatste publicatie. Verschillende timestamps zijn dus normaal zolang ze bij het ingestelde ritme passen.
 
 ## Live verzamelde shadowdata
 
