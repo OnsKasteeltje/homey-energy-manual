@@ -30,7 +30,7 @@ M7 is een **aparte parallelle analyselaag**. Vier relatieve signalen worden iede
 - `priceExpensiveNext4h` — nu is relatief duur versus komende vier uur;
 - `pvTop4h` — huidig uur behoort tot de vier beste verwachte PV-uren tussen 09:00 en 18:00.
 
-M7 combineert deze context met de werkelijke net-, Tesla-, boiler- en Quookerstatus. De uitkomst bestaat uit een **Opportunity Score**, advies, kandidaat en tekstuele reden. Maximaal 672 kwartiersamples worden lokaal bewaard en door dezelfde scriptkaart gepubliceerd naar `m7-opportunity.json`.
+M7 combineert deze context met de werkelijke net-, Tesla-, boiler- en Quookerstatus. De uitkomst bestaat uit een **Opportunity Score**, advies, kandidaat en tekstuele reden. Maximaal 672 kwartiersamples worden in GitHub bewaard in `m7-opportunity.json`.
 
 ## Waarom drie gescheiden reeksen?
 
@@ -44,7 +44,7 @@ Door de datasets gescheiden te houden kunnen we achteraf dezelfde momenten verge
 
 ## Publicatiearchitectuur
 
-De centrale shadow-sync is niet meer nodig. HomeyScript `get()/set()`-state is kaart-lokaal; daarom publiceert **iedere state-eigenaar zijn eigen dataset**. GitHub-publicatiefouten worden afgevangen, zodat een websiteprobleem de shadowmeting nooit stillegt.
+De centrale shadow-sync is niet meer nodig. De actieve shadowflows publiceren hun eigen dataset rechtstreeks naar GitHub. De GitHub-JSON-bestanden vormen daarbij de persistente websitehistorie.
 
 ## Live verzamelde shadowdata
 
@@ -89,6 +89,7 @@ De centrale shadow-sync is niet meer nodig. HomeyScript `get()/set()`-state is k
       const latestTimes = [baseline?.generated_at, v02?.generated_at, m7?.generated_at].filter(Boolean).map(x => new Date(x).getTime()).filter(Number.isFinite);
       const latestSync = latestTimes.length ? new Date(Math.max(...latestTimes)).toISOString() : null;
       const ml = m7?.latest || null, samples = m7?.samples || [], ctx = ml?.context || null;
+      const recentRows = samples.slice(-24).reverse().map(x => `<tr><td>${esc(fmt(x.ts))}</td><td>${esc(x.score)}</td><td>${esc(x.advice)}</td><td>${esc(x.candidate)}</td><td>${esc(x.actual?.exportW > 0 ? x.actual.exportW + ' W export' : (x.actual?.importW ?? '–') + ' W import')}</td><td>${esc(x.reason)}</td></tr>`).join('');
       root.innerHTML = `
         <p><strong>Laatste shadowpublicatie:</strong> ${esc(fmt(latestSync))}</p>
         <div class="grid cards" markdown="0">
@@ -102,7 +103,7 @@ De centrale shadow-sync is niet meer nodig. HomeyScript `get()/set()`-state is k
         <h2>Laatste baselinebeslissing</h2>${latestTable(baseline?.latest)}
         <h2>Laatste v0.2-beslissing</h2>${latestTable(v02?.latest)}
         <h2>Recente M7-samples</h2>
-        ${samples.length ? `<div style="overflow:auto"><table><thead><tr><th>Tijd</th><th>Score</th><th>Advies</th><th>Kandidaat</th><th>Net</th><th>Reden</th></tr></thead><tbody>${samples.slice(-24).reverse().map(x => `<tr><td>${esc(fmt(x.ts))}</td><td>${esc(x.score)}</td><td>${esc(x.advice)}</td><td>${esc(x.candidate)}</td><td>${esc(x.actual?.exportW > 0 ? x.actual.exportW + ' W export' : (x.actual?.importW ?? '–') + ' W import')}</td><td>${esc(x.reason)}</td></tr>`).join('')}</tbody></table></div>` : '<em>Nog geen M7-samples gepubliceerd.</em>'}`;
+        ${samples.length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Tijd</th><th>Score</th><th>Advies</th><th>Kandidaat</th><th>Net</th><th>Reden</th></tr></thead><tbody>${recentRows}</tbody></table></div>` : '<em>Nog geen M7-samples gepubliceerd.</em>'}`;
     } catch (e) {
       root.innerHTML = `<div class="admonition warning"><p class="admonition-title">Shadowdata kon niet volledig worden geladen</p><p>${esc(e.message)}</p></div>`;
     }
