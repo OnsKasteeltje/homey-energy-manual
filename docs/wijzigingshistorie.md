@@ -1,5 +1,13 @@
 # Wijzigingshistorie
 
+## v2.3 — 16 augustus 2026
+
+- **Live energiestroom** uitgebreid met een uitsplitsing onder **Huishouden** voor **Wasmachine**, **Droger**, **Vaatwasser** en **Overig huishouden**.
+- Er wordt bewust geen extra Homey-polling of nieuwe meetflow toegevoegd; de visualisatie gebruikt uitsluitend reeds gepubliceerde data.
+- Een grootverbruiker krijgt alleen een eigen live wattage zodra dat vermogen daadwerkelijk in de bestaande publicatiedata beschikbaar is.
+- Zolang een afzonderlijk vermogen ontbreekt, toont de kaart expliciet **niet afzonderlijk gemeten** in plaats van een waarde af te leiden of te verzinnen.
+- **Overig huishouden** blijft de sluitpost, zodat de totale huishoudelijke energiebalans intact blijft.
+
 ## v2.2 — 16 augustus 2026
 
 - Nieuwe actieve Homey-flow **`Energie Manager PV - Shadow Mode v1.6.5`** toegevoegd; v1.6.4 is uitgeschakeld zodat slechts één versie van deze flowfamilie actief is.
