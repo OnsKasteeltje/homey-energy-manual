@@ -1,68 +1,116 @@
-# M7 – Opportunity Score Shadow
+# M7 – Opportunity Shadow
 
 **Status:** 🟡 Actief in shadow mode  
-**Actieve flow:** `M7 - Opportunity Score - Shadow v1.3`  
-**Vorige versie:** `M7 - Opportunity Score - Shadow v1.2` (uitgeschakeld)
-
-De flow draait iedere 15 minuten en stuurt geen apparaten aan.
+**Actieve Homey-flow:** `M7 Opportunity Shadow v1.2`  
+**Frequentie:** iedere 5 minuten  
+**Aansturing:** geen — volledig read-only
 
 ## Doel
-Deze flow onderzoekt onafhankelijk of prijs- en PV-forecastinformatie daadwerkelijk extra waarde toevoegt aan de bestaande Energy Manager. Hij draait parallel aan de baseline/shadowflow en verandert die dataset niet.
 
-## Trigger
-Iedere 15 minuten.
+M7 meet of er momenten zijn waarop de boiler op basis van de actuele energiesituatie zinvol met beschikbaar PV-vermogen had kunnen worden verwarmd. De flow observeert alleen en grijpt niet in. Daarmee kunnen we eerst aantonen of de opportuniteitslogica voldoende waarde toevoegt voordat deze ooit onderdeel wordt van actieve aansturing.
+
+M7 is nu aangesloten op de gevalideerde statusinformatie uit de Energy Manager en op de Easee/Equalizer-safetycontext.
+
+## Stap 2 – huidige implementatie
+
+De actieve implementatie is `M7 Opportunity Shadow v1.2`. Deze draait iedere 5 minuten en maakt per run een read-only beoordeling.
+
+Een **M7-kans** wordt alleen geregistreerd wanneer tegelijkertijd aan alle volgende voorwaarden wordt voldaan:
+
+- het tijdstip ligt tussen **09:30 en 18:00**;
+- de boiler staat elektrisch **uit**;
+- de semantische boilerstatus is niet `OP_TEMPERATUUR` en er is dus nog een potentiële warmtevraag;
+- het berekende beschikbare PV-vermogen is minimaal **2,1 kW**;
+- de Easee/Equalizer-context is stabiel en staat niet op `LIMITED`, `PAUSED_OR_BLOCKED` of `ONBEKEND`.
+
+Hiermee voorkomt M7 dat een theoretisch PV-overschot als kans wordt geregistreerd terwijl de boiler al warm is of de laad-/netcontext onzeker of begrensd is.
 
 ## Inputs
-- vier gedeelde Homey Logic-booleans uit M7 Prijs & PV Forecast;
-- P1/netpositie;
-- Tesla/Easee-status en laadvermogen;
-- de semantische boilerstatus uit de Energy Manager en het actuele boilervermogen;
-- Quookerstatus.
 
-De vier contextvariabelen zijn `M7_Price_Negative`, `M7_Price_Cheap_Next4h`, `M7_Price_Expensive_Next4h` en `M7_PV_Top4h`.
+M7 gebruikt rechtstreeks actuele Homey-informatie:
 
-De gevalideerde boilerstatus wordt gelezen uit de meest recente publicatie in `docs/data/shadow-baseline-v01.json`. M7 dupliceert de boiler-state-machine dus niet.
+- P1 totaalvermogen;
+- P1 vermogen per fase L1/L2/L3;
+- Tesla/Easee laadvermogen;
+- gevraagde laadstroom;
+- actuele boilerstand en boilervermogen;
+- `EM Shadow Boiler status` uit de Energy Manager;
+- `EM Shadow Equalizer status` uit de Energy Manager.
 
-## Logica
-De flow berekent een **Opportunity Score** en vertaalt die naar een advies, kandidaat en leesbare reden. Voorbeelden zijn `NEUTRAL`, `USE_PV_SURPLUS`, `SHIFT_FLEX_LOAD_NOW` en `DEFER_FLEX_LOAD`.
+De boilerstatus wordt daarmee niet opnieuw door M7 afgeleid. De Energy Manager blijft eigenaar van de boiler-state-machine.
 
-De score combineert forecastcontext met de werkelijke net- en apparaatstatus. Eén forecastsignaal schakelt dus nooit rechtstreeks een apparaat.
+## Boilerstatus
 
-### Boilerlogica vanaf v1.3
-De elektrische schakelstand `boilerOn` is niet langer voldoende om te bepalen of de boiler werkelijk een flexibele kandidaat is. De gevalideerde semantische status is leidend:
+De belangrijkste semantische toestand is `OP_TEMPERATUUR`. Zodra de Energy Manager deze status rapporteert, kan M7 geen boilerkans registreren, ongeacht de elektrische schakelstand.
 
-- `OP_TEMPERATUUR`: geen start- of uitstelkandidaat; de boiler is warm, ook wanneer de schakelaar nog aan staat;
-- `AFKOELEN_WACHT`: geen kandidaat zolang de eindstatus nog wordt bevestigd;
-- `VERWARMEN`: kan bij dure netimport als uitstelbare boilerbelasting worden herkend;
-- `UIT`: kan, wanneer de overige M7-condities daarvoor aanleiding geven, als startkandidaat worden gebruikt;
-- `AAN_WACHT` en `ONBEKEND`: conservatief geen boilerkandidaat.
+Andere toestanden kunnen aangeven dat nog warmte nodig kan zijn. M7 combineert dat altijd met de actuele elektrische boilerstand, het beschikbare PV-vermogen, het tijdvenster en de Equalizer-safetycontext.
 
-De boilerstatus moet bovendien maximaal 25 minuten oud zijn. Is de publicatie ouder, dan gebruikt M7 de boiler uit veiligheid niet als kandidaat.
+## Easee / Equalizer safety
 
-## Outputs
-Per kwartier wordt een nieuw sample rechtstreeks toegevoegd aan `docs/data/m7-opportunity.json`. GitHub is daarmee de persistente historie voor de website; maximaal 672 kwartiersamples worden bewaard.
+M7 gebruikt de door de Energy Manager gepubliceerde Equalizer-status. Bij:
+
+- `LIMITED`;
+- `PAUSED_OR_BLOCKED`;
+- `ONBEKEND`;
+
+wordt geen M7-kans geregistreerd. De reden wordt dan vastgelegd als `EQUALIZER_STABILISATIE`.
+
+Dit is bewust conservatief: M7 mag een onzekere of begrensde EV/nettoestand niet interpreteren als vrij beschikbaar vermogen.
+
+## Beschikbaar PV-vermogen
+
+Voor de opportunity-beoordeling wordt een actuele benadering gebruikt op basis van P1, Tesla-laadvermogen en boilervermogen. De drempel voor een boilerkans is momenteel **2.100 W**.
+
+Deze waarde is een shadow-parameter: de verzamelde resultaten moeten aantonen of deze grens in de praktijk goed gekozen is voordat actieve boilersturing wordt overwogen.
+
+## Redencodes
+
+Iedere beoordeling krijgt een leesbare reden. De huidige codes zijn:
+
+- `BUITEN_VENSTER`;
+- `BOILER_OP_TEMPERATUUR`;
+- `BOILER_REEDS_AAN`;
+- `EQUALIZER_STABILISATIE`;
+- `ONVOLDOENDE_PV`;
+- `M7_KANS`.
+
+Daardoor kunnen we achteraf niet alleen tellen hoeveel kansen zijn gevonden, maar ook analyseren waarom op andere momenten bewust géén kans is geregistreerd.
+
+## Logging
+
+De runtimehistorie wordt in Homey bijgehouden in `M7 Opportunity Runtime v1.2`.
 
 Per sample worden onder andere opgeslagen:
-- Opportunity Score;
-- advies;
-- kandidaat;
-- reden;
-- gebruikte M7-signalen;
-- werkelijke import/export en apparaatcontext;
-- `boilerState`, tijdstip en leeftijd van de status;
-- `boilerStateFresh`, `boilerCanStart` en `boilerCanDefer`.
 
-## Homey API-belasting
-Per kwartier gebruikt deze flow één gezamenlijke device-uitlezing en één gezamenlijke Logic-uitlezing. Daarnaast leest v1.3 één keer de meest recente Energy Manager-baseline uit GitHub om de semantische boilerstatus te gebruiken. De Logic-uitlezing levert de vier M7-contextwaarden en het GitHub-token.
+- tijdstip;
+- wel/geen opportunity;
+- reden;
+- berekend beschikbaar PV-vermogen;
+- P1 totaal en L1/L2/L3;
+- Tesla-laadvermogen en gevraagde ampères;
+- Equalizer-status;
+- boilervermogen;
+- elektrische boilerstand;
+- semantische boilerstatus.
+
+Er worden maximaal **576 samples** bewaard, overeenkomend met circa 48 uur bij een interval van 5 minuten.
+
+Daarnaast publiceert de flow tags voor de actuele opportunity, reden en het beschikbare PV-vermogen.
 
 ## Aangestuurde apparaten
-**Geen.** Volledig read-only/shadow.
 
-## Validatie v1.3
-Op 16 augustus 2026 is v1.3 direct na de succesvolle end-to-end boilercyclus getest. Het testsample las `OP_TEMPERATUUR` als actuele boilerstatus, met een statusleeftijd van 5 minuten. M7 zette daarom zowel `boilerCanStart` als `boilerCanDefer` op `false` en koos bij het advies `DEFER_FLEX_LOAD` terecht kandidaat `NONE` in plaats van de warme boiler.
+**Geen.** `M7 Opportunity Shadow v1.2` is volledig read-only. De flow schakelt de boiler, Tesla/Easee of andere apparaten niet.
 
-## Status
-v1.3 is actief. v1.2 is uitgeschakeld zodat maar één versie van deze flow actief publiceert. De resultaten worden rechtstreeks door de actieve flow naar de tab **Schaduw** gepubliceerd.
+## Architectuur
 
-## Afhankelijkheden
-M7 – Prijs & PV Forecast, Energy Manager PV – Shadow Mode v1.6.4 (of een opvolger die dezelfde boilerstatus publiceert), P1, Tesla/Easee, boiler, Quooker en `GH_Status_Token`.
+De verantwoordelijkheden zijn bewust gescheiden:
+
+**Energy Manager** → bepaalt en publiceert betrouwbare apparaat- en safety-statussen.  
+**M7 Opportunity Shadow** → beoordeelt met die statusinformatie of er een gemiste PV/boilerkans bestaat.  
+**Toekomstige actieve optimalisatie** → pas na voldoende shadow-validatie en expliciete besluitvorming.
+
+Deze scheiding past bij de doelarchitectuur richting Victron: betrouwbare metingen en statusbepaling onderin, optimalisatielogica daarboven en daadwerkelijke actuatorsturing pas nadat de beslislogica aantoonbaar veilig en nuttig is.
+
+## Huidige status
+
+Stap 2 is uitgevoerd: `M7 Opportunity Shadow v1.2` is actief in Homey en is niet broken. De flow verzamelt vanaf nu iedere 5 minuten data waarmee we de opportunity-logica kunnen beoordelen en later kunnen fine-tunen.
