@@ -1,5 +1,10 @@
 # Warm water optimalisatie — PV boiler + CV advies
 
+**Status:** 🟢 Actief  
+**Flow:** `Warm water optimalisatie - PV boiler + CV advies`
+
+De flow draait iedere 5 minuten en stuurt de elektrische boiler aan; de CV-omschakeling blijft handmatig.
+
 Deze pagina beschrijft niet alleen *wat* de flow doet, maar ook waarom de gekozen regeling zo is ingericht en welke wijzigingen nog gepland zijn.
 
 ## 1. Doel en uitgangspunt
