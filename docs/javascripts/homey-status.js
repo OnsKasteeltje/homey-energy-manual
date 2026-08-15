@@ -14,6 +14,18 @@
   const statusClass = (s) =>
     ["active", "shadow", "off", "error"].includes(s) ? `status-${s}` : "status-unknown";
 
+  // Koppeling tussen Homey-flows op de hoofdpagina en hun functionele documentatie.
+  // Nieuwe flows krijgen voortaan bij voorkeur meteen een documentatielink.
+  const flowDocs = {
+    "Warm water optimalisatie - PV boiler + CV advies": "warm-water/",
+    "Energie Manager PV - Shadow Mode": "energie-manager/",
+    "Energie Manager PV - Shadow Mode v0.2 Quooker": "energie-manager/",
+    "M7 - Prijs en PV forecast context - read only": "m7-prijs-pv-forecast/",
+    "M7 - Opportunity Score - Shadow": "m7-opportunity-shadow/",
+    "Energie Manager - omschakeling v0.2 - 16 aug 00:00": "energie-manager/",
+    "GitHub status sync - Homey lokaal": "github-sync-flows/"
+  };
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -50,11 +62,18 @@
         const status = flow.status || (flow.broken ? "error" : flow.enabled ? "active" : "off");
         const card = document.createElement("article");
         card.className = `flow-card ${statusClass(status)}`;
+        const docPath = flowDocs[flow.name];
+        const title = docPath
+          ? `<a href="${escapeHtml(docPath)}" title="Open flowbeschrijving">${escapeHtml(flow.name)}</a>`
+          : escapeHtml(flow.name);
+        const docLink = docPath
+          ? `<div class="flow-doc-link"><a href="${escapeHtml(docPath)}">Bekijk flowbeschrijving →</a></div>`
+          : "";
         card.innerHTML = `
           <div class="flow-card-header">
             <div>
               <div class="flow-category">${escapeHtml(flow.category || "Flow")}</div>
-              <div class="flow-card-title">${escapeHtml(flow.name)}</div>
+              <div class="flow-card-title">${title}</div>
             </div>
             <span class="status-pill ${statusClass(status)}">● ${escapeHtml(statusLabels[status] || statusLabels.unknown)}</span>
           </div>
@@ -63,6 +82,7 @@
             <span>Enabled: <strong>${flow.enabled ? "ja" : "nee"}</strong></span>
             <span>Broken: <strong>${flow.broken ? "ja" : "nee"}</strong></span>
           </div>
+          ${docLink}
         `;
         dashboard.appendChild(card);
       }
