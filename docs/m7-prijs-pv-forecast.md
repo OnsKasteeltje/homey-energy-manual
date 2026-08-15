@@ -1,5 +1,10 @@
 # M7 – Prijs & PV Forecast
 
+**Status:** 🟡 Actief als read-only contextflow  
+**Flow:** `M7 - Prijs en PV forecast context - read only`
+
+De flow draait iedere 15 minuten en stuurt geen apparaten aan.
+
 ## Doel
 M7 voegt voorspellende context toe aan de Energy Orchestrator. De flow bepaalt niet zelf welk apparaat moet schakelen, maar levert relatieve signalen over elektriciteitsprijs en verwachte PV-productie.
 
