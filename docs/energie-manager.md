@@ -24,3 +24,15 @@ PV beschikbaar = max(0, -P1 + werkelijk Tesla-vermogen + werkelijk boilervermoge
 | ≥ 7.590 W | 11 A |
 
 Boiler wordt alleen toegestaan als na Tesla-reservering minimaal circa **2,1 kW** resteert.
+
+## Shadowstate
+Iedere 2 minuten wordt een sample toegevoegd aan de kaart-lokale `EM_SHADOW_STATE`. Er worden maximaal 720 samples bewaard, ongeveer 24 uur.
+
+Omdat HomeyScript `get()/set()`-state niet betrouwbaar tussen verschillende scriptkaarten gedeeld wordt, publiceert **dezelfde scriptkaart die `EM_SHADOW_STATE` bezit** ongeveer iedere 15 minuten zijn eigen state naar GitHub:
+
+`docs/data/shadow-baseline-v01.json`
+
+Een GitHub-publicatiefout wordt afgevangen en stopt de shadowmeting niet.
+
+## Volgende versie
+`Energie Manager PV - Shadow Mode v0.2 Quooker` voegt Quooker-context, Tesla-sessieregistratie en de warmwatergarantie van 240 minuten vóór 19:00 toe. Deze versie publiceert na activatie op dezelfde manier naar `docs/data/shadow-v02-quooker.json`.
