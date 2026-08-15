@@ -13,3 +13,8 @@ Er staat ook een zichtbare kopie in de hoofdmap:
 `pages-workflow-reference.yml`
 
 Die zichtbare kopie is alleen ter controle; GitHub Actions gebruikt uitsluitend het bestand in `.github/workflows/`.
+
+
+## Dynamisch dashboard
+
+Zie `DYNAMIC_STATUS_SETUP.md` voor de Homey-statuskoppeling.
