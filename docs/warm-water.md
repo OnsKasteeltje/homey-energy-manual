@@ -5,7 +5,7 @@
 
 De flow draait iedere 5 minuten en stuurt de elektrische boiler aan; de CV-omschakeling blijft handmatig.
 
-Deze pagina beschrijft niet alleen *wat* de flow doet, maar ook waarom de gekozen regeling zo is ingericht en welke wijzigingen nog gepland zijn.
+Deze pagina maakt onderscheid tussen de **huidige actieve warmwaterregeling**, de **harde comfortconstraint voor boilermodus** en de **geplande integratie met Energy Manager, M7, Quooker en Victron ESS**.
 
 ## 1. Doel en uitgangspunt
 
@@ -14,116 +14,85 @@ De warmwaterregeling combineert twee bestaande warmtebronnen:
 | Onderdeel | Uitgangspunt |
 |---|---|
 | Elektrische boiler | **Stiebel Eltron HSTP 200**, 200 liter |
-| Gemeten boilervermogen | circa **1,95–2,0 kW** tijdens verwarmen |
-| Typisch gemeten boilerverbruik | circa **7–8 kWh per dag** |
-| CV-ketel | **Vaillant ecoTEC exclusive**; exacte VHR 25-35/5-7 of 35-45/5-7 nog te bevestigen |
-| Gasprijs 2026 | **€ 1,19265/m³** incl. btw |
-| Elektriciteit normaal | **€ 0,23790/kWh** incl. btw |
-| Elektriciteit dal | **€ 0,23548/kWh** incl. btw |
+| Gemeten boilervermogen tijdens werkelijk verwarmen | circa **1,95–2,0 kW** |
+| CV-ketel | **Vaillant ecoTEC exclusive** |
 | PV-meetbasis | netto P1-import/-export van de gehele woning |
 | CV ↔ boiler omschakeling | **handmatig** |
 
-Het doel is niet simpelweg *zomer = boiler* en *winter = CV*. De regeling probeert vast te stellen wanneer voldoende eigen PV beschikbaar is om de boiler economisch aantrekkelijk te gebruiken.
+De elektrische boiler wordt automatisch aan/uit gestuurd. De Vaillant CV-ketel wordt **niet** automatisch omgeschakeld. Homey geeft alleen advies over de gewenste warmwaterbron.
 
-De elektrische boiler wordt automatisch aan/uit gestuurd. De Vaillant CV-ketel wordt **niet** automatisch omgeschakeld. Homey geeft alleen een seizoensadvies.
+## 2. Huidige actieve regeling
 
----
+De actieve warmwaterflow gebruikt nog de bestaande PV-regeling. Een verwarmingscyclus mag starten wanneer:
 
-## 2. Dagelijkse regeling — huidige actieve implementatie
+- `WW_Boilermodus = JA`;
+- het tijdstip binnen het huidige startvenster ligt;
+- gedurende minimaal 5 minuten ongeveer **2,1 kW netto P1-export** beschikbaar is.
 
-De Advanced Flow draait **iedere 5 minuten**.
+Na inschakelen geldt een minimumlooptijd van ongeveer **30 minuten**. Daarna mag de boiler worden uitgeschakeld wanneer gedurende circa **10 minuten meer dan 0,5 kW netto uit het net wordt afgenomen**.
 
-### Beslislogica
+De huidige actieve tijdvensters zijn nog:
 
-```text
-WW_Boilermodus = JA?
-        │
-        ├─ NEE → boiler UIT houden; CV is fysiek geselecteerd
-        │
-        └─ JA
-             │
-             ├─ tijd tussen 09:30 en 14:30?
-             │
-             └─ ≥ 2,1 kW netto P1-teruglevering
-                 gedurende minimaal 5 minuten?
-                       │
-                       └─ JA → BOILER AAN
-                                  │
-                                  ├─ minimaal 30 minuten draaien
-                                  │
-                                  └─ daarna:
-                                      > 0,5 kW netto netafname
-                                      gedurende 10 minuten?
-                                           │
-                                           ├─ JA → BOILER UIT
-                                           └─ NEE → doorverwarmen
-```
+| Regeling | Huidig actief |
+|---|---:|
+| Nieuwe start mogelijk | **09:30–14:30** |
+| Hard einde | **15:30** |
 
-### Starten op PV, niet op een vaste kloktijd
+!!! warning "Belangrijk"
+    Deze tijden zijn de **huidige actieve implementatie**, maar ze voldoen nog niet volledig aan de inmiddels vastgestelde comfortconstraint voor boilermodus. Die constraint wordt hieronder apart beschreven en wordt eerst via shadow-validatie in de centrale orchestrator voorbereid.
 
-Een nieuwe verwarmingscyclus mag momenteel starten tussen **09:30 en 14:30**. De oude vaste starttijd is vervallen.
+## 3. Harde comfortconstraint in boilermodus
 
-Homey wacht tot de P1-meter gedurende vijf minuten minimaal **2,1 kW netto export** meet. Omdat de P1-meter het saldo van de hele woning meet, is het normale huishoudelijke verbruik dan al van de PV-productie afgetrokken.
+Wanneer de woning in **boilermodus** staat (`WW_Boilermodus = JA`), moet de elektrische boiler dagelijks voldoende gelegenheid krijgen om warm water te leveren.
 
-De boiler gebruikt daardoor primair energie die anders naar het elektriciteitsnet zou worden teruggeleverd.
+De nieuwe harde randvoorwaarde is:
 
-### Minimumlooptijd van 30 minuten
+> De boiler moet per dag **minimaal 4 uur beschikbaar/ingeschakeld kunnen zijn** en deze 4 uur moeten **uiterlijk om 19:00** zijn gerealiseerd.
 
-Na inschakelen blijft de boiler minimaal **30 minuten** aan. Dit voorkomt pendelen bij:
+Deze randvoorwaarde is belangrijker dan pure PV-optimalisatie. Een dag met weinig zon mag er dus niet toe leiden dat de boiler structureel te weinig gelegenheid krijgt om op temperatuur te komen.
 
-- voorbijtrekkende bewolking;
-- kortstondig hoger huishoudelijk verbruik;
-- kleine schommelingen rond de PV-drempel.
+In CV-modus (`WW_Boilermodus = NEE`) geldt deze 4-uursvoorwaarde niet, omdat warm tapwater dan door de CV-ketel wordt geleverd.
 
-### Stoppen bij structurele netafname
+### Gevolg voor toekomstige logica
 
-Na de minimumlooptijd mag de boiler worden uitgeschakeld wanneer gedurende **10 minuten meer dan 0,5 kW netto uit het net wordt afgenomen**.
+De orchestrator moet daarom niet alleen kijken naar huidig PV-overschot, maar ook naar **resterende tijd tot 19:00** en **hoeveel boilertijd vandaag al is gehaald**.
 
-Een korte dip in de PV-productie schakelt de boiler dus niet onmiddellijk uit.
-
-### Herstart
-
-Na uitschakelen kan een nieuwe cyclus beginnen wanneer opnieuw voldoende PV beschikbaar is, zolang het nog vóór **14:30** is.
-
-### Hard einde
-
-In de huidige actieve versie wordt de boiler uiterlijk om **15:30** uitgeschakeld.
-
----
-
-## 3. Waarom het boilervenster waarschijnlijk langer moet worden
-
-Uit de analyse kwam een belangrijk verschil tussen Tesla en boiler naar voren.
-
-De boiler heeft ongeveer **2 kW** nodig. De Tesla heeft bij de minimale 3-fase laadstroom van 6 A ongeveer **4,14 kW** nodig.
-
-Daardoor ontstaat later op de dag regelmatig deze situatie:
+Conceptueel:
 
 ```text
-PV beschikbaar: bijvoorbeeld 2,5–4,0 kW
-                  │
-                  ├─ te weinig voor zinvol Tesla-laden op 3×6 A
-                  │
-                  └─ wél voldoende voor de circa 2 kW boiler
+boilermodus = JA
+      │
+      ├─ voldoende boilertijd vóór 19:00 al gehaald?
+      │       ├─ JA → flexibel optimaliseren op PV/prijs
+      │       └─ NEE
+      │            ├─ nog ruim tijd → zoveel mogelijk op gunstige PV/prijs
+      │            └─ deadline nadert → boiler steeds hogere prioriteit geven
+      │
+      └─ uiterlijk 19:00 moet de minimale 4 uur zijn veiliggesteld
 ```
 
-Daarom is het huidige einde om 15:30 waarschijnlijk te vroeg.
+## 4. Boiler aan betekent niet automatisch werkelijk verwarmen
 
-### Huidig versus doelbeeld
+Onze Homey-write-test heeft bevestigd dat de boiler vanuit Homey betrouwbaar **aan/uit** kan worden gezet. Tegelijk zagen we een belangrijk verschil tussen schakelstatus en werkelijk elektrisch vermogen:
 
-| Regeling | Huidig actief | Doelbeeld na validatie |
-|---|---:|---:|
-| Eerste nieuwe start | 09:30 | 09:30 |
-| Laatste nieuwe start | 14:30 | **16:30** |
-| Lopende cyclus uiterlijk uit | 15:30 | **18:00** |
+- `onoff = true` kan betekenen dat de boiler beschikbaar/ingeschakeld is;
+- het gemeten vermogen kan toch **0 W** zijn wanneer het interne thermostaat/contact geen warmte meer vraagt;
+- tijdens werkelijk opwarmen verwachten we ongeveer **1,95–2,0 kW**.
 
-Het langere venster wordt nog niet blind ingevoerd. Eerst wordt met de centrale Energie Manager in **shadow mode** gecontroleerd of deze prioritering in de praktijk correct uitpakt.
+Dit onderscheid wordt voortaan expliciet gebruikt in de analyse. Alleen naar `onoff` kijken is onvoldoende om vast te stellen of de boiler nog energie nodig heeft.
 
----
+Een belangrijk toekomstig afgeleid signaal wordt daarom:
 
-## 4. Samenwerking met Tesla
+```text
+boiler ingeschakeld + vermogen ~0 W
+        → waarschijnlijk op temperatuur / geen actuele warmtevraag
+```
 
-De gewenste centrale PV-prioriteit is:
+Dit moet nog verder worden gevalideerd met langere meetreeksen voordat het als harde regel wordt gebruikt.
+
+## 5. Samenwerking met Tesla
+
+De centrale PV-prioriteit blijft als uitgangspunt:
 
 ```text
 1. Huishoudelijk verbruik
@@ -135,137 +104,119 @@ De gewenste centrale PV-prioriteit is:
 4. Teruglevering
 ```
 
-**Tesla krijgt dus voorrang boven de boiler**, maar alleen wanneer er voldoende vermogen beschikbaar is om de Tesla daadwerkelijk zinvol te laden.
+Daarbij geldt één belangrijke nuance: de boiler heeft een **comfortdeadline**. Zolang er voldoende tijd over is tot 19:00 kan Tesla voorrang krijgen. Naarmate de boiler zijn minimale 4 uur nog niet heeft gehaald en de deadline dichterbij komt, moet de boilerprioriteit toenemen.
 
-De boiler vervult daarna twee functies:
+De boiler is daarnaast nuttig voor PV-overschotten die te klein zijn voor zinvol 3-fase Tesla-laden maar wel groot genoeg zijn voor ongeveer 2 kW boilervermogen.
 
-1. resterend PV-overschot benutten wanneer Tesla al voldoende krijgt;
-2. PV benutten dat **te klein is voor Tesla**, maar groot genoeg is voor de boiler.
+## 6. Rol van de Energy Manager shadowlagen
 
-Dit is precies waarom het geplande late boilervenster belangrijk is.
+De actieve warmwaterflow wordt nu nog niet direct vervangen door de centrale orchestrator. De overgang wordt stapsgewijs voorbereid met onafhankelijke shadowlagen.
 
-De flow **Energie Manager PV - Shadow Mode** simuleert deze centrale beslissing momenteel zonder Tesla of boiler daadwerkelijk vanuit de Energie Manager aan te sturen.
+### Baseline v0.1
 
----
+`Energie Manager PV - Shadow Mode` simuleert de bestaande PV-prioritering en schrijft geen apparaten aan.
 
-## 5. `WW_Boilermodus` — welke bron is werkelijk geselecteerd?
+### Shadow v0.2 + Quooker
 
-De fysieke omschakeling tussen CV en elektrische boiler blijft bewust handmatig.
+`Energie Manager PV - Shadow Mode v0.2 Quooker` voegt Quookerstatus en bestaande Quooker-tijdvensters toe aan de context, nog steeds zonder apparaten vanuit de shadowflow te sturen.
 
-Homey moet daarom weten welke bron de gebruiker heeft geselecteerd:
+### M7 Opportunity Shadow
+
+`M7 - Opportunity Score - Shadow` voegt prijs- en PV-forecastcontext toe en berekent per kwartier een Opportunity Score, advies, kandidaat en reden. Deze dataset blijft volledig gescheiden van de baseline.
+
+Het doel is eerst aantonen dat de nieuwere logica betere keuzes zou maken voordat zij de actieve warmwaterflow mag vervangen of overrulen.
+
+## 7. Quooker als aanvullende comfortconstraint
+
+De Quooker wordt via bestaande Homey-flows aangestuurd. Die bestaande flows en tijdvensters blijven voorlopig leidend.
+
+De centrale orchestrator gebruikt Quooker in eerste instantie alleen als context:
+
+- staat de Quooker aan of uit;
+- bevindt het huidige tijdstip zich binnen een toegestaan Quooker-venster;
+- kan flexibel vermogen beter naar Tesla, boiler, batterij of Quooker gaan zonder comfort te verstoren.
+
+De warmwaterflow zelf verandert de Quooker-regeling niet.
+
+## 8. M7 prijs- en PV-forecast
+
+M7 voegt voorspellende context toe zonder apparaten aan te sturen. De huidige signalen zijn:
+
+| Signaal | Betekenis |
+|---|---|
+| `priceNegative` | actuele prijs is negatief |
+| `priceCheapNext4h` | nu is relatief goedkoop t.o.v. komende vier uur |
+| `priceExpensiveNext4h` | nu is relatief duur t.o.v. komende vier uur |
+| `pvTop4h` | huidig uur hoort tot de vier beste verwachte PV-uren tussen 09:00 en 18:00 |
+
+Voor warm water betekent dit dat de orchestrator straks kan afwegen of de boiler beter **nu**, **later op verwachte PV** of — als de 19:00-deadline nadert — **ongeacht de forecast** moet draaien.
+
+## 9. Toekomstige Victron ESS-integratie
+
+De toekomstige Victron ESS-laag verandert de rolverdeling niet:
+
+- **Homey** wordt economische/comfort-orchestrator;
+- **Cerbo/Victron** blijft de snelle ESS- en batterijregelaar;
+- Homey bepaalt bijvoorbeeld wanneer batterijcapaciteit strategisch moet worden benut voor PV, goedkope stroom, Tesla of warm water;
+- Homey vervangt geen BMS-, ESS- of elektrische beveiligingen.
+
+Voor de warmwaterlogica kan Victron later relevant worden wanneer goedkope netstroom of batterijcapaciteit wordt ingezet om de 19:00-warmwaterconstraint slimmer te halen.
+
+## 10. `WW_Boilermodus`
+
+De fysieke omschakeling tussen CV en elektrische boiler blijft handmatig.
 
 | `WW_Boilermodus` | Betekenis |
 |---|---|
 | **JA** | warm tapwater via elektrische boiler |
 | **NEE** | warm tapwater via Vaillant CV |
 
-In CV-modus houdt de warmwaterflow de elektrische boiler uit. Homey schakelt de CV zelf niet om.
+In CV-modus houdt de warmwaterflow de elektrische boiler uit. Na fysieke omschakeling moet `WW_Boilermodus` daarom ook worden bijgewerkt.
 
-Na een fysieke omschakeling moet dus ook `WW_Boilermodus` worden aangepast.
+## 11. Seizoensadvies
 
----
+Het bestaande seizoensadvies blijft voorlopig onderdeel van de warmwaterflow. Homey beoordeelt meerdere dagen en adviseert wanneer handmatig omschakelen tussen CV en boiler logisch is.
 
-## 6. Seizoensadvies: wanneer van boiler naar CV en terug?
+Dit advies wordt later opnieuw geëvalueerd zodra M7-forecastdata en de centrale orchestrator voldoende meetgeschiedenis hebben. Tot die tijd blijft de huidige advieslogica leidend.
 
-Eén slechte zomerdag mag niet betekenen dat we meteen naar gas overschakelen. Andersom mag één zonnige winterdag ook niet meteen tot boilerbedrijf leiden.
+## 12. Fail-safe en veiligheid
 
-Daarom beoordeelt Homey steeds **zeven volledige meetdagen**.
+De regeling blijft bewust conservatief:
 
-Voor 2026 geldt een dag als een **goede PV-dag voor warm water** wanneer binnen het regelvenster ongeveer **5,8 kWh bruikbaar PV-potentieel** voor de boiler beschikbaar was.
-
-### Omschakelregels
-
-| Huidige modus | Laatste 7 dagen | Homey-advies |
-|---|---|---|
-| Boiler | **3 of minder** goede PV-dagen | handmatig naar **CV** |
-| CV | **5 of meer** goede PV-dagen | handmatig naar **boiler** |
-| Beide | tussen deze grenzen | huidige modus behouden |
-
-Het verschil tussen 3 en 5 dagen is bewust. Deze **hysterese** voorkomt dat het systeem bij wisselvallig voor- of najaarsweer steeds heen en weer adviseert.
-
----
-
-## 7. Wat gebeurt er bij een omschakeladvies?
-
-Homey verandert de warmwaterbron niet zelf.
-
-Bij een advies stuurt Homey een pushmelding expliciet naar **Mr Horizon**. De melding geeft aan:
-
-- naar welke bron moet worden omgeschakeld;
-- dat dit **handmatig** moet gebeuren;
-- dat daarna `WW_Boilermodus` moet worden aangepast.
-
-Wanneer de pushmelding technisch niet lukt, wordt een Homey Timeline-melding gebruikt als fallback.
-
----
-
-## 8. Waarom de regels vanaf 2027 veranderen
-
-Vanaf 2027 veranderen de opgegeven contractcondities. Een teruggeleverde PV-kWh heeft dan minder economische waarde. Het wordt daardoor aantrekkelijker om PV direct in warm water om te zetten, zelfs wanneer daarvoor tijdelijk een klein deel netstroom nodig is.
-
-Het script voorziet daarom automatisch in soepelere drempels:
-
-| Parameter | 2026 | Vanaf 1-1-2027 |
-|---|---:|---:|
-| Startdrempel netto export | **2,1 kW** | **1,4 kW** |
-| Toegestane structurele netafname | **0,5 kW** | **0,8 kW** |
-| Grens goede PV-dag | **ca. 5,8 kWh** | **4,5 kWh** |
-
-Het uitgangspunt verschuift daarmee van *bijna uitsluitend eigen PV gebruiken* naar *PV zoveel mogelijk zelf benutten wanneer teruglevering weinig oplevert*.
-
----
-
-## 9. Variabelen, tags en meetpunten
-
-| Naam | Type | Functie |
-|---|---|---|
-| `WW_Boilermodus` | Logic boolean | JA = boiler; NEE = CV |
-| WW PV-potentieel vandaag kWh | Flow-tag | geschatte bruikbare PV voor boiler |
-| WW Boiler verbruik vandaag kWh | Flow-tag | gemeten boilerenergie |
-| WW Boiler PV-aandeel vandaag % | Flow-tag | geschat direct PV-aandeel |
-| WW Goede PV-dagen laatste 7 | Flow-tag | basis voor seizoensadvies |
-| WW Advies | Flow-tag | GEEN / CV / BOILER |
-| WW Modus | Flow-tag | geregistreerde warmwatermodus |
-| P1-meter | apparaat | netto import/export woning |
-| Boiler | apparaat | automatische aan/uit-sturing |
-
----
-
-## 10. Fail-safe en veiligheid
-
-De regeling is bewust conservatief:
-
-- in CV-modus houdt Homey de elektrische boiler uit;
+- in CV-modus blijft de elektrische boiler uit;
 - Homey schakelt de Vaillant CV niet automatisch om;
-- wanneer P1-meter of boiler niet kan worden gevonden, stopt het script met een fout in plaats van verder te regelen op aannames;
-- minimumlooptijd en vertragingen voorkomen snel aan/uit schakelen;
-- de oude flows **Boiler aan**, **Boiler uit** en **Boiler opwarmen** staan uit om dubbele aansturing te voorkomen;
-- de nieuwe centrale Energie Manager blijft eerst in shadow mode totdat de beslissingen voldoende zijn gevalideerd.
+- bij ontbrekende kritieke meetdata moet de regeling stoppen in plaats van gokken;
+- minimumlooptijden en vertragingen voorkomen onrustig schakelen;
+- legacy-boilerflows blijven uit om dubbele aansturing te voorkomen;
+- shadowflows sturen geen apparaten aan;
+- de 4-uursvoorwaarde vóór 19:00 wordt eerst gecontroleerd in shadowlogica voordat actieve orchestratie wordt aangepast.
 
----
-
-## 11. Actuele status
+## 13. Actuele status
 
 | Onderdeel | Status |
 |---|---|
 | Warm water optimalisatie | 🟢 **Actief** |
-| Oude `Boiler aan` flow | ⚫ Uit |
-| Oude `Boiler uit` flow | ⚫ Uit |
-| Oude `Boiler opwarmen` flow | ⚫ Uit |
-| Nieuwe starts huidig | **09:30–14:30** |
-| Hard einde huidig | **15:30** |
-| Geplande nieuwe starts | **09:30–16:30** |
-| Gepland hard einde | **18:00** |
-| Tesla-prioritering | 🟡 Validatie via Energie Manager shadow mode |
-| Seizoensadvies | na 7 volledige meetdagen |
-| Fysieke CV ↔ boiler omschakeling | handmatig |
-| Adviesmelding | naar **Mr Horizon** |
+| `WW_Boilermodus` | actief als bronkeuze |
+| Boiler Homey on/off write | ✅ gevalideerd |
+| Boiler werkelijk vermogen na inschakelen | 🟡 verder valideren; 0 W kan optreden ondanks `onoff=true` |
+| Huidige startvenster | **09:30–14:30** |
+| Huidig hard einde | **15:30** |
+| Minimale boilertijd in boilermodus | **4 uur/dag** |
+| Deadline minimale boilertijd | **19:00** |
+| Baseline Energy Manager | 🟡 Shadow |
+| Shadow v0.2 + Quooker | 🟡 gereed voor overgang na baseline |
+| M7 prijs/PV-context | 🟡 read-only/shadow |
+| M7 Opportunity Score | 🟡 parallelle shadowanalyse |
+| Quookerregeling | bestaande Homey-flows blijven leidend |
+| Victron ESS | toekomstig; nog niet geïnstalleerd |
+| CV ↔ boiler omschakeling | handmatig |
 
-!!! note "Belangrijk"
-    De tijden **09:30–16:30 / 18:00 zijn nog het doelbeeld**, niet de huidige actieve warmwaterregeling. De actieve flow gebruikt nog **09:30–14:30 / 15:30** totdat de shadow-validatie voldoende vertrouwen geeft.
+## 14. Volgende optimalisatiestap
 
-## 12. Volgende optimalisatiestap
+Na voldoende shadowdata vergelijken we drie dingen:
 
-Na voldoende shadow-data beoordelen we of **Tesla eerst → boiler daarna** inderdaad meer eigen PV benut zonder onnodige netafname.
+1. wat de huidige actieve warmwaterregeling werkelijk deed;
+2. wat de Energy Manager baseline/v0.2 zou hebben gedaan;
+3. wat M7 met prijs- en PV-forecast zou hebben geadviseerd.
 
-Bij een positief resultaat wordt de warmwaterflow aangepast naar het langere tijdvenster. Die wijziging wordt vervolgens zowel hier als in de Homey Flow Manual vastgelegd.
+Pas daarna wordt besloten hoe de actieve warmwaterflow wordt aangepast. De eerste harde ontwerpvoorwaarde voor die toekomstige versie is al duidelijk: **in boilermodus moet de 4-uurswarmwaterconstraint uiterlijk om 19:00 gegarandeerd zijn**.
