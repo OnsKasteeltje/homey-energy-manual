@@ -1,5 +1,16 @@
 # Wijzigingshistorie
 
+## v2.2 — 16 augustus 2026
+
+- Nieuwe actieve Homey-flow **`Energie Manager PV - Shadow Mode v1.6.5`** toegevoegd; v1.6.4 is uitgeschakeld zodat slechts één versie van deze flowfamilie actief is.
+- v1.6.5 blijft volledig **shadow/read-only** en stuurt geen apparaten aan.
+- Energy Manager-observatie uitgebreid met **P1 L1/L2/L3**, Easee `target_charger_current`, werkelijk Tesla-laadvermogen, geschatte werkelijke laadstroom en geleverd/gevraagd-verhouding.
+- Nieuwe afgeleide `equalizerState` toegevoegd met conservatieve statussen `NOT_APPLICABLE`, `NOT_LIMITED`, `LIMITED` en `PAUSED_OR_BLOCKED`.
+- `LIMITED` wordt alleen gebruikt wanneer Tesla werkelijk laadt, minimaal 6 A target zichtbaar is en minder dan 82% van het bijbehorende 3-fase vermogen wordt geleverd.
+- Een gepauzeerde Tesla wordt bewust **niet automatisch** als Equalizer-begrenzing geïnterpreteerd.
+- Nieuwe Flow-tags toegevoegd: `EM Shadow Tesla gevraagd A`, `EM Shadow Tesla werkelijk A est` en `EM Shadow Equalizer status`.
+- De eerste v1.6.5-run is succesvol gepubliceerd in `shadow-baseline-v01.json`; de praktijktest van een echte Equalizer-terugregeling staat nog open voor een volgende Tesla-laadsessie met extra huishoudelijke belasting.
+
 ## v2.1 — 16 augustus 2026
 
 - **Easee Equalizer** expliciet vastgelegd als harde lokale load-balancing-/veiligheidslaag die altijd voorrang heeft boven Homey-orchestratie.
