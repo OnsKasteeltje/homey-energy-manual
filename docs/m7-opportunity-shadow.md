@@ -1,5 +1,10 @@
 # M7 – Opportunity Score Shadow
 
+**Status:** 🟡 Actief in shadow mode  
+**Flow:** `M7 - Opportunity Score - Shadow`
+
+De flow draait iedere 15 minuten en stuurt geen apparaten aan.
+
 ## Doel
 Deze flow onderzoekt onafhankelijk of prijs- en PV-forecastinformatie daadwerkelijk extra waarde toevoegt aan de bestaande Energy Manager. Hij draait parallel aan de baseline/shadowflow en verandert die dataset niet.
 
