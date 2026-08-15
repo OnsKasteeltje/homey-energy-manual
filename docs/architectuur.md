@@ -283,6 +283,7 @@ Na voldoende validatie kan de centrale Energie Manager stapsgewijs delen overnem
 | Shadow mode | centrale manager stuurt nog geen apparaten |
 | P1 beschikbaarheid | zonder P1 geen centrale vermogensbeslissing |
 | Device beschikbaarheid | ontbrekend apparaat → fout/fail-safe |
+| Flowversionering | per functionele flowfamilie maximaal één actieve versie |
 
 ---
 
@@ -327,6 +328,7 @@ Na voldoende validatie kan de centrale Energie Manager stapsgewijs delen overnem
         7-daagse seizoenshysterese
         Shadow-validatie vóór centrale aansturing
         Fail-safe bij ontbrekende P1/device-data
+        Maximaal één actieve versie per flowfamilie
 ```
 
 ---
@@ -361,7 +363,36 @@ Victron wordt de primaire laag voor batterij- en netoptimalisatie.
 
 ---
 
-## 12. Ontwerpprincipes
+## 12. Flowversionering en wijzigingsbeheer
+
+Vanaf 15 augustus 2026 geldt voor iedere Homey-flowfamilie:
+
+```text
+inhoudelijke wijziging
+      ↓
+nieuwe flow met hoger versienummer
+      ↓
+validatie
+      ↓
+nieuwe versie actief
+oude versie inactief
+```
+
+Naamgeving:
+
+```text
+<functionele flownaam> vX.Y
+```
+
+Een normale wijziging verhoogt de subversie. Oude versies worden als rollback-/referentiepunt behouden, maar van dezelfde functionele flowfamilie mag **maximaal één versie actief** zijn.
+
+Bestaande ongenummerde flows blijven bestaan tot hun eerstvolgende inhoudelijke wijziging. Op dat moment wordt een nieuwe genummerde opvolger aangemaakt in plaats van de bestaande flow in-place te wijzigen.
+
+De websitebeschrijving en wijzigingshistorie worden tegelijk met de nieuwe Homey-versie aangepast.
+
+---
+
+## 13. Ontwerpprincipes
 
 De architectuur volgt deze principes:
 
@@ -374,4 +405,7 @@ De architectuur volgt deze principes:
 - handmatige fysieke omschakelingen expliciet documenteren;
 - fail-safe boven agressieve optimalisatie;
 - eerst shadow mode, daarna gecontroleerde migratie;
-- alle Homey-wijzigingen vastleggen in Flow Manual en website.
+- iedere inhoudelijke flowwijziging maakt een nieuwe genummerde flowversie;
+- van één functionele flowfamilie is maximaal één versie actief;
+- oude flowversies blijven beschikbaar voor rollback/referentie;
+- alle Homey-wijzigingen tegelijk vastleggen in Flow Manual en website.
