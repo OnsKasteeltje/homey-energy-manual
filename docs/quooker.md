@@ -1,5 +1,10 @@
 # Quooker-regeling
 
+**Status:** 🟢 Actief via bestaande Quooker-flows  
+**Flow:** `Quooker`-flowfolder (meerdere flows)
+
+De Quooker-flows reageren op de bestaande tijdvensters en sturen de Quooker aan; de shadowintegratie leest alleen mee en stuurt niets extra aan.
+
 ## Doel
 De bestaande Quooker-flows bepalen wanneer de Quooker beschikbaar mag zijn. Binnen de energiearchitectuur wordt deze regeling als comfortconstraint meegenomen, zodat toekomstige optimalisatie de bestaande gebruiksvensters respecteert.
 
