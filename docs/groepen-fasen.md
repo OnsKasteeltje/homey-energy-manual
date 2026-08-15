@@ -27,9 +27,9 @@ Deze pagina is een **levend overzicht van de elektrische indeling van de woning*
 | Koffiezetapparaat | Nog te bepalen | Nog te bepalen | **Open** | Fasekoppeling nog niet betrouwbaar bevestigd. |
 | Quooker | Nog te bepalen | Nog te bepalen | **Open** | Nog te valideren. |
 | Quatt warmtepomp / CV-installatie | Nog te bepalen | Nog te bepalen | **Open** | Nog te valideren. |
-| SolarEdge SE3680H | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.0`. |
-| GoodWe GW4200D-NS | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.0`. |
-| GoodWe GW2000-XS | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.0`. |
+| SolarEdge SE3680H | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.0`; 24-uursresultaat wordt gepubliceerd via `Fase 24h publicatie v1.0`. |
+| GoodWe GW4200D-NS | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.0`; 24-uursresultaat wordt gepubliceerd via `Fase 24h publicatie v1.0`. |
+| GoodWe GW2000-XS | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.0`; 24-uursresultaat wordt gepubliceerd via `Fase 24h publicatie v1.0`. |
 | Schuurvoeding | **L1 + L2 + L3** | **Groep 14, 3-polig B16** | **Bevestigd** | Op 15-08-2026 fysiek in de meterkast gecontroleerd: groep 14 is de 3-fase voeding naar de schuur. |
 
 ## Automatische PV-fasemonitor
@@ -46,7 +46,18 @@ Iedere **2 minuten** wordt gelijktijdig vastgelegd:
 
 De meetreeks wordt maximaal **36 uur** opgeslagen in de aparte Homey Logic-state **`PV Fase Monitor v1.0`**. Door natuurlijke productievariaties van iedere omvormer te correleren met veranderingen op L1/L2/L3 kan de meest waarschijnlijke aansluitfase per omvormer worden bepaald zonder de omvormers actief te schakelen.
 
+Op **16 augustus 2026** is daarnaast de Advanced Flow **`Fase 24h publicatie v1.0`** geactiveerd. Deze leest uitsluitend de meetstate en publiceert iedere **15 minuten** de laatste 24 uur naar `docs/data/pv-phase-24h.json`. Daarbij worden per omvormer zowel de gewone Pearson-correlatie als de correlatie van opeenvolgende vermogensveranderingen (Δ-correlatie) met L1/L2/L3 berekend. De flow schakelt niets en valt daarom onder logging/observability.
+
 De status wordt pas van **Meetfase actief** naar **Bevestigd** gewijzigd wanneer de correlatie voldoende eenduidig is of aanvullend met een gecontroleerde test is gevalideerd.
+
+## Live 24-uurs fase-analyse
+
+<div id="pv-phase-24h">
+  <p><em>Live fase-analyse wordt geladen…</em></p>
+</div>
+
+!!! note "Interpretatie"
+    **Beste fase** is de fase met de sterkste gemeten samenhang. **Confidence** is een indicatie op basis van de absolute correlatiescore én de marge ten opzichte van de nummer twee. Een automatische uitkomst wordt niet zonder aanvullende beoordeling als fysiek bevestigd beschouwd.
 
 ## Wat is nu al zeker?
 
@@ -78,6 +89,6 @@ Nieuwe betrouwbare inzichten over **fase- of groepindeling** worden direct op de
 
 ## Open vervolgstappen
 
-De actieve PV-fasemonitor verzamelt nu de data waarmee de fase van de drie omvormers kan worden bepaald. Daarnaast blijven vaatwasser, kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt nog open. Voor reeds geïdentificeerde apparaten moeten de exacte installatieautomaten nog fysiek worden gekoppeld. **Groep 14 als schuurvoeding is niet langer een open punt.**
+De actieve PV-fasemonitor verzamelt nu de data waarmee de fase van de drie omvormers kan worden bepaald. De 24-uurs publisher maakt deze analyse live zichtbaar voor beoordeling. Daarnaast blijven vaatwasser, kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt nog open. Voor reeds geïdentificeerde apparaten moeten de exacte installatieautomaten nog fysiek worden gekoppeld. **Groep 14 als schuurvoeding is niet langer een open punt.**
 
-> Laatste inhoudelijke update: 15 augustus 2026, avond. Groep 14 is nu door fysieke controle in de meterkast bevestigd als de 3-polige B16-schuurvoeding.
+> Laatste inhoudelijke update: 16 augustus 2026. Live 24-uurs PV-fasepublicatie toegevoegd; bestaande bevestigde fase- en groepinformatie ongewijzigd.
