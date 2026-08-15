@@ -1,41 +1,43 @@
 # GitHub status- en shadow-sync
 
-**Status:** 🟡 Deels actief / shadow-sync nog in validatie  
+**Status:** 🟢 Reguliere status-sync actief; centrale shadow-sync uitgeschakeld  
 **Flows:** `GitHub status sync - Homey lokaal` en `GitHub shadow sync - Homey lokaal`
 
-De reguliere status-sync draait periodiek; de dedicated shadow-sync is ingesteld op iedere 15 minuten. Geen van beide stuurt apparaten aan.
+De reguliere status-sync blijft periodiek actief. De aparte `GitHub shadow sync - Homey lokaal` staat nu **uit**, omdat shadowdata voortaan door de flows die de state zelf bezitten rechtstreeks wordt gepubliceerd. Geen van deze synchronisaties stuurt apparaten aan.
 
 ## Doel
-Deze flows publiceren alleen geselecteerde Homey-statusinformatie naar de documentatiesite. De website hoeft daardoor geen inkomende verbinding met Homey te maken.
+De website ontvangt geselecteerde Homey-status- en shadowinformatie via uitgaande GitHub-writes. Er is geen inkomende verbinding naar Homey nodig.
 
-## Trigger
-- Reguliere status-sync: periodiek vanuit Homey.
-- Dedicated shadow-sync: iedere 15 minuten.
+## Reguliere status-sync
+`GitHub status sync - Homey lokaal` publiceert de algemene flowstatus naar:
 
-## Inputs
-### Status-sync
-Geselecteerde live Homey-statussen die voor de website nodig zijn.
-
-### Shadow-sync
-- baseline shadowstate;
-- Shadow v0.2 + Quooker-state;
-- `M7_CONTEXT`;
-- `M7_SHADOW_ANALYSIS`.
-
-## Logica
-Homey bouwt een beperkte JSON-payload en schrijft die uitgaand naar de GitHub-repository. Voor shadowmonitoring is bewust een aparte writer voorzien, zodat een probleem in de algemene status-sync de shadowpublicatie niet hoeft te blokkeren.
-
-## Outputs
 - `docs/data/homey-status.json`
-- `docs/data/shadow-status.json`
 
-De Schaduw-pagina leest de shadow-JSON rechtstreeks uit de repository, zodat iedere kwartierupdate geen volledige GitHub Pages-build nodig heeft.
+Dit bestand voedt de flowkaarten en de live synchronisatietijd op de homepage.
+
+## Shadowpublicatie — state-eigenaarprincipe
+HomeyScript `get()/set()`-state blijkt lokaal aan de betreffende scriptkaart gekoppeld. Daarom kan een centrale syncscript die state niet betrouwbaar uitlezen.
+
+De architectuur is daarom aangepast:
+
+| State-eigenaar | Publicatiebestand | Ritme |
+| --- | --- | --- |
+| `Energie Manager PV - Shadow Mode` | `docs/data/shadow-baseline-v01.json` | circa iedere 15 minuten |
+| `Energie Manager PV - Shadow Mode v0.2 Quooker` | `docs/data/shadow-v02-quooker.json` | circa iedere 15 minuten wanneer actief |
+| `M7 - Opportunity Score - Shadow` | `docs/data/m7-opportunity.json` | iedere 15 minuten |
+
+De **zelfde HomeyScript-kaart die de lokale state opbouwt** publiceert dus ook die state. Daardoor is geen kaart-overstijgende HomeyScript-state nodig.
+
+## Foutisolatie
+GitHub-publicatie staat in een `try/catch`. Als GitHub tijdelijk niet bereikbaar is, blijft de shadowflow gewoon meten en lokaal samples bewaren. Een websiteprobleem mag de energiemeting dus niet stoppen.
+
+## Homey API-belasting
+De baseline- en v0.2-flows halen het GitHub-token alleen op wanneer een publicatie nodig is, ongeveer eens per kwartier. M7 gebruikt één gezamenlijke Logic-uitlezing per kwartier voor zowel de contextvariabelen als het token.
+
+De voormalige centrale `GitHub shadow sync - Homey lokaal` staat uit en veroorzaakt daardoor geen periodieke extra Homey-calls meer.
 
 ## Aangestuurde apparaten
 **Geen.** Dit is uitsluitend publicatie/telemetrie.
 
-## Status
-De website en het bootstrapbestand voor `shadow-status.json` zijn aanwezig. De dedicated Homey shadow-writer wordt nog gevalideerd; zolang die nog niet succesvol schrijft, toont de Schaduw-tab 0 samples.
-
 ## Afhankelijkheden
-HomeyScript, een GitHub-token in Homey en de repository `OnsKasteeltje/homey-energy-manual`.
+HomeyScript, `GH_Status_Token` en de repository `OnsKasteeltje/homey-energy-manual`.
