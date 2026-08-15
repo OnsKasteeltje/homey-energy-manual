@@ -1,5 +1,10 @@
 # GitHub status- en shadow-sync
 
+**Status:** 🟡 Deels actief / shadow-sync nog in validatie  
+**Flows:** `GitHub status sync - Homey lokaal` en `GitHub shadow sync - Homey lokaal`
+
+De reguliere status-sync draait periodiek; de dedicated shadow-sync is ingesteld op iedere 15 minuten. Geen van beide stuurt apparaten aan.
+
 ## Doel
 Deze flows publiceren alleen geselecteerde Homey-statusinformatie naar de documentatiesite. De website hoeft daardoor geen inkomende verbinding met Homey te maken.
 
