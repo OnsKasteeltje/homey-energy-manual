@@ -1,5 +1,19 @@
 # Wijzigingshistorie
 
+## v2.0 — 16 augustus 2026
+
+- Nieuwe hoofdtab **Live energiestroom** toegevoegd.
+- Visualisatie architectonisch gecorrigeerd: de **Energy Manager** is een besturings-/orchestratie-laag en ligt nadrukkelijk **niet in het elektrische stroompad**.
+- De live plaat bestaat nu uit twee gescheiden lagen: **Besturing / orchestratie** en **Fysieke / boekhoudkundige energiestroom**.
+- Fysieke energielaag opgebouwd rond **PV-bronnen → huisbus ↔ Grid/P1 → huishouden / Tesla / boiler**.
+- Dunne stuurlijnen vanuit de Energy Manager worden visueel onderscheiden van de dikkere energiestroomlijnen.
+- Lijndikte van energiestromen schaalt mee met het actuele vermogen; import en export worden richtinggevoelig weergegeven.
+- De bestaande prioriteitslogica **huishouden → Tesla → boiler → net** blijft zichtbaar, met expliciete vermelding dat de individuele PV-toewijzing boekhoudkundig wordt afgeleid.
+- Nieuwe 24-uurs fasevisualisatie toegevoegd voor **L1, L2 en L3** op de pagina **Groepen & fasen**.
+- Fase-monitor en fasepublisher geversioneerd naar **v1.1**; oudere v1.0-versies uitgeschakeld zodat per functie slechts één versie actief is.
+- Architectuurprincipe aangescherpt: **Homey zo licht mogelijk houden**; historische analyse, correlatie en visualisatie zoveel mogelijk uitvoeren vanuit reeds gepubliceerde data op GitHub/de website.
+- Nachtelijke boileracceptatietest als **GESLAAGD** gedocumenteerd, inclusief de gevalideerde keten `VERWARMEN → AFKOELEN_WACHT → OP_TEMPERATUUR → boiler-cycles.json`.
+
 ## v1.9 — 15 augustus 2026
 
 - Opmaak van de volledige wijzigingshistorie geüniformeerd.
