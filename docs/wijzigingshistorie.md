@@ -12,3 +12,8 @@
 
 - Warmwaterpagina uitgebreid tot volledige functionele handleiding.
 - Dagelijkse beslislogica, Tesla-prioriteit, seizoensadvies, 2027-regels, fail-safe gedrag en huidig versus gepland tijdvenster expliciet beschreven.
+
+
+## v1.5 — 15 augustus 2026
+
+- Architectuuroverzicht uitgebreid met volledige energieprioriteit, constraints, Quooker-vensters, warmwaterbronselectie, Tesla-laadmonitoring, shadow/actief onderscheid, fail-safe regels en toekomstige Victron-laag.
