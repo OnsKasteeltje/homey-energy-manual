@@ -30,9 +30,8 @@
         const href=flowDocs[flow.name]||null;
         const card=document.createElement("article");
         card.className=`flow-card ${statusClass(status)}`;
-        const title=href?`<a class="flow-title-link" href="${escapeHtml(href)}">${escapeHtml(flow.name)}</a>`:escapeHtml(flow.name);
-        const more=href?`<div class="flow-doc-link"><a href="${escapeHtml(href)}">Bekijk flowbeschrijving →</a></div>`:"";
-        card.innerHTML=`<div class="flow-card-header"><div><div class="flow-category">${escapeHtml(flow.category||"Flow")}</div><div class="flow-card-title">${title}</div></div><span class="status-pill ${statusClass(status)}">● ${escapeHtml(statusLabels[status]||statusLabels.unknown)}</span></div><div class="flow-detail">${escapeHtml(flow.detail||"")}</div><div class="flow-meta"><span>Enabled: <strong>${flow.enabled?"ja":"nee"}</strong></span><span>Broken: <strong>${flow.broken?"ja":"nee"}</strong></span></div>${more}`;
+        const title=href?`<a class="flow-title-link" href="${escapeHtml(href)}" title="Open flowbeschrijving">${escapeHtml(flow.name)}</a>`:escapeHtml(flow.name);
+        card.innerHTML=`<div class="flow-card-header"><div><div class="flow-category">${escapeHtml(flow.category||"Flow")}</div><div class="flow-card-title">${title}</div></div><span class="status-pill ${statusClass(status)}">● ${escapeHtml(statusLabels[status]||statusLabels.unknown)}</span></div><div class="flow-detail">${escapeHtml(flow.detail||"")}</div><div class="flow-meta"><span>Enabled: <strong>${flow.enabled?"ja":"nee"}</strong></span><span>Broken: <strong>${flow.broken?"ja":"nee"}</strong></span></div>`;
         dashboard.appendChild(card);
       }
       const dt=data.generated_at?new Date(data.generated_at):null;
