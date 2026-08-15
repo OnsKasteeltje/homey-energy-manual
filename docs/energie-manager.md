@@ -2,10 +2,10 @@
 
 **Modus:** Shadow / read-only  
 **Homey-status:** 🟢 Actief  
-**Actieve flow:** `Energie Manager PV - Shadow Mode v1.6.5`  
-**Voorgaande flow:** `Energie Manager PV - Shadow Mode v1.6.4` — 🔴 Inactief
+**Actieve flow:** `Energie Manager PV - Shadow Mode v1.6.6`  
+**Voorgaande flow:** `Energie Manager PV - Shadow Mode v1.6.5` — 🔴 Inactief
 
-De actuele v1.6.5-flow is in Homey ingeschakeld. De flow werkt volledig in shadow/read-only-modus en stuurt geen Tesla, laadpaal of boiler aan. Hij observeert en berekent de gewenste energiesturing, houdt de boilerstatus en boilercycli bij, observeert de Easee/Equalizer-context en publiceert meetdata naar GitHub.
+De actuele v1.6.6-flow is in Homey ingeschakeld. De flow werkt volledig in shadow/read-only-modus en stuurt geen Tesla, laadpaal, boiler, wasmachine of droger aan. Hij observeert en berekent de gewenste energiesturing, houdt de boilerstatus en boilercycli bij, observeert de Easee/Equalizer-context en publiceert meetdata naar GitHub.
 
 ## Berekening
 
@@ -47,9 +47,9 @@ Tesla / boiler
 
 Wanneer bijvoorbeeld tijdens Tesla-laden een oven of andere grote belasting wordt ingeschakeld, mag de Equalizer de Tesla-laadstroom zelfstandig verlagen of het laden pauzeren om overbelasting te voorkomen.
 
-### Observer actief in v1.6.5
+### Equalizer-observer
 
-v1.6.5 voegt deze observatie daadwerkelijk toe zonder de laadpaal aan te sturen. Iedere run registreert aanvullend:
+De observer registreert iedere run:
 
 - totaal P1-vermogen;
 - **P1 L1, L2 en L3 afzonderlijk**;
@@ -59,7 +59,7 @@ v1.6.5 voegt deze observatie daadwerkelijk toe zonder de laadpaal aan te sturen.
 - verhouding tussen geleverd en gevraagd laadvermogen;
 - afgeleide `equalizerState`.
 
-De observer gebruikt voorlopig bewust conservatieve statussen:
+De observer gebruikt bewust conservatieve statussen:
 
 | Status | Betekenis |
 |---|---|
@@ -68,16 +68,13 @@ De observer gebruikt voorlopig bewust conservatieve statussen:
 | `LIMITED` | Tesla laadt werkelijk, ≥6 A target is zichtbaar en minder dan 82% van het daarbij horende 3-fase vermogen wordt geleverd |
 | `PAUSED_OR_BLOCKED` | ≥6 A target zichtbaar, maar de laadstatus is gepauzeerd; dit wordt **niet automatisch** aan de Equalizer toegeschreven |
 
-De eerste v1.6.5-run is technisch geslaagd. Daarbij werden onder andere **L1/L2/L3**, Easee-target en werkelijk Tesla-vermogen gepubliceerd. De Tesla stond op dat moment `plugged_in_paused`, zodat terecht `PAUSED_OR_BLOCKED` is geregistreerd. Een echte `LIMITED`-situatie moet nog worden gevalideerd tijdens een laadsessie waarin de Equalizer aantoonbaar terugregelt.
+Een echte `LIMITED`-situatie moet nog worden gevalideerd tijdens een laadsessie waarin de Equalizer aantoonbaar terugregelt.
 
 ### Gevraagd versus werkelijk Tesla-vermogen
 
-De Energy Manager maakt hiermee expliciet onderscheid tussen:
+De Energy Manager maakt expliciet onderscheid tussen **gevraagde laadstroom / doelvermogen** en **werkelijke laadstroom / werkelijk vermogen** dat Easee na load balancing daadwerkelijk levert.
 
-- **gevraagde laadstroom / doelvermogen**;
-- **werkelijke laadstroom / werkelijk vermogen** dat Easee na load balancing daadwerkelijk levert.
-
-De nieuwe Flow-tags zijn:
+De Flow-tags zijn:
 
 - `EM Shadow Tesla gevraagd A`;
 - `EM Shadow Tesla werkelijk A est`;
@@ -99,44 +96,50 @@ geen directe poging om een veiligheidsbegrenzing te overrulen
 
 ### Geen foutieve herverdeling naar boiler
 
-Wanneer de Equalizer Tesla terugregelt, wordt het ogenschijnlijk vrijgekomen vermogen **niet automatisch direct aan de boiler toegewezen**. Eerst moet opnieuw worden beoordeeld:
-
-- totaal P1-netvermogen;
-- L1/L2/L3-fasebelasting;
-- werkelijk Tesla-vermogen;
-- boilerstatus en boilerconstraint;
-- resterende veilige marge.
+Wanneer de Equalizer Tesla terugregelt, wordt het ogenschijnlijk vrijgekomen vermogen **niet automatisch direct aan de boiler toegewezen**. Eerst worden totaal P1-netvermogen, L1/L2/L3-fasebelasting, werkelijk Tesla-vermogen, boilerstatus en resterende veilige marge opnieuw beoordeeld.
 
 ### Hysterese na Equalizer-ingreep
 
-Voor de toekomstige actieve orchestratie geldt als ontwerpregel een korte stabilisatieperiode na onverwacht terugregelen of pauzeren van Tesla. Richtwaarde is **1–2 minuten** voordat vrijgekomen vermogen opnieuw aan een flexibele belasting wordt toegewezen.
+Voor de toekomstige actieve orchestratie geldt als ontwerpregel een korte stabilisatieperiode na onverwacht terugregelen of pauzeren van Tesla. Richtwaarde is **1–2 minuten** voordat vrijgekomen vermogen opnieuw aan een flexibele belasting wordt toegewezen. De definitieve tijd wordt vóór activering in shadow mode gevalideerd.
 
-De definitieve tijd wordt vóór activering in shadow mode gevalideerd.
+## Grootverbruikers-observatie in v1.6.6
+
+v1.6.6 breidt de bestaande baseline-publicatie uit met de Homey-apparaatstatus van **Wasmachine** en **Droger**, zonder extra pollingflow en zonder fysieke aansturing.
+
+De nieuwe velden zijn:
+
+- `washerActive` — `true` uitsluitend wanneer Homey voor de wasmachine `measure_applianceState = RUNNING` rapporteert;
+- `dryerActive` — `true` uitsluitend wanneer Homey voor de droger `measure_applianceState = RUNNING` rapporteert.
+
+De Homey-apparaten leveren op dit moment geen individueel `measure_power`. Daarom wordt voor deze apparaten **geen wattage afgeleid of verzonnen**. De status wordt uitsluitend gebruikt om op de Live energiestroom-pagina zichtbaar te maken dat een bekende grootverbruiker actief is.
+
+Bekende fasekoppeling:
+
+- Wasmachine: **L2**;
+- Droger: **L3**.
+
+De vaatwasser blijft voorbereid in de visualisatie, maar krijgt pas een live status zodra een betrouwbare statusbron in de bestaande publicatie is opgenomen.
 
 ## Boiler-observer en cyclusregistratie
 
-De actuele v1.6.5-flow observeert de boiler zonder deze te schakelen. Een vermogen boven **1,5 kW** wordt als `VERWARMEN` beschouwd. Na minimaal 15 minuten bevestigd verwarmen en vervolgens minder dan **100 W gedurende 10 minuten** doorloopt de observer `AFKOELEN_WACHT` naar `OP_TEMPERATUUR`.
+De actuele v1.6.6-flow observeert de boiler zonder deze te schakelen. Een vermogen boven **1,5 kW** wordt als `VERWARMEN` beschouwd. Na minimaal 15 minuten bevestigd verwarmen en vervolgens minder dan **100 W gedurende 10 minuten** doorloopt de observer `AFKOELEN_WACHT` naar `OP_TEMPERATUUR`.
 
-Boilercycli worden op basis van de 2-minutenmetingen bijgehouden en afgeronde cycli worden gepubliceerd naar:
-
-`docs/data/boiler-cycles.json`
+Boilercycli worden op basis van de 2-minutenmetingen bijgehouden en afgeronde cycli worden gepubliceerd naar `docs/data/boiler-cycles.json`.
 
 ## 2-minuten sampler
 
-De actieve v1.6.5-flow wordt iedere 2 minuten uitgevoerd. De persistente runtime-state staat in de eigen Homey Logic-string **`EM Shadow Runtime State v1.6.5`**.
+De actieve v1.6.6-flow wordt iedere 2 minuten uitgevoerd. Om de lopende boiler-state-machine en historische cyclusregistratie niet te onderbreken, hergebruikt v1.6.6 bewust de bestaande Homey Logic-string **`EM Shadow Runtime State v1.6.5`**.
 
 ## 15-minuten websitepublicatie
 
-Dezelfde Advanced Flow heeft daarnaast een 15-minuten trigger. De actuele baseline wordt gepubliceerd naar:
-
-`docs/data/shadow-baseline-v01.json`
+Dezelfde Advanced Flow heeft daarnaast een 15-minuten trigger. De actuele baseline wordt gepubliceerd naar `docs/data/shadow-baseline-v01.json`.
 
 De GitHub-JSON vormt een persistente websitehistorie van maximaal 720 gepubliceerde samples. Daarnaast worden afgeronde dagen compact bewaard in `docs/data/energy-daily-history.json`.
 
 ## Aangestuurde apparaten
 
-**Geen.** v1.6.5 is volledig read-only/shadow. De flow observeert en registreert, maar voert geen fysieke schakelingen uit. De Easee Equalizer blijft autonoom de harde load-balancing-/veiligheidslaag.
+**Geen.** v1.6.6 is volledig read-only/shadow. De flow observeert en registreert, maar voert geen fysieke schakelingen uit. De Easee Equalizer blijft autonoom de harde load-balancing-/veiligheidslaag.
 
 ## Versiebeheer
 
-`Energie Manager PV - Shadow Mode v1.6.4` is uitgeschakeld. De actuele operationele shadow-versie is `Energie Manager PV - Shadow Mode v1.6.5`. Daarmee is binnen deze flowfamilie maximaal één versie actief.
+`Energie Manager PV - Shadow Mode v1.6.5` is uitgeschakeld. De actuele operationele shadow-versie is `Energie Manager PV - Shadow Mode v1.6.6`. Daarmee is binnen deze flowfamilie maximaal één versie actief.
