@@ -9,6 +9,7 @@ Deze pagina toont de onafhankelijke shadowmetingen van de Energy Manager en M7. 
 <script>
 (function () {
   const root = document.getElementById('shadow-monitor');
+  const DATA_URL = 'https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/shadow-status.json';
   const esc = v => String(v ?? '–').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt = ts => ts ? new Date(ts).toLocaleString('nl-NL') : '–';
   const yesno = v => v ? 'ACTIEF' : 'INACTIEF';
@@ -18,7 +19,7 @@ Deze pagina toont de onafhankelijke shadowmetingen van de Energy Manager en M7. 
   }
   async function load() {
     try {
-      const r = await fetch('data/shadow-status.json?ts=' + Date.now(), {cache:'no-store'});
+      const r = await fetch(DATA_URL + '?ts=' + Date.now(), {cache:'no-store'});
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const d = await r.json(), c = d.collection || {}, m = d.m7_opportunity?.latest || c.m7_opportunity?.latest || {};
       const samples = d.m7_opportunity?.samples || [];
@@ -37,7 +38,7 @@ Deze pagina toont de onafhankelijke shadowmetingen van de Energy Manager en M7. 
         <h2>Recente M7-samples</h2>
         <div style="overflow:auto"><table><thead><tr><th>Tijd</th><th>Score</th><th>Advies</th><th>Kandidaat</th><th>Net</th><th>Reden</th></tr></thead><tbody>${samples.slice(-24).reverse().map(x => `<tr><td>${esc(fmt(x.ts))}</td><td>${esc(x.score)}</td><td>${esc(x.advice)}</td><td>${esc(x.candidate)}</td><td>${esc(x.actual?.exportW > 0 ? '-' + x.actual.exportW + ' W export' : (x.actual?.importW ?? '–') + ' W import')}</td><td>${esc(x.reason)}</td></tr>`).join('')}</tbody></table></div>`;
     } catch (e) {
-      root.innerHTML = `<div class="admonition warning"><p class="admonition-title">Shadowdata nog niet beschikbaar</p><p>${esc(e.message)}. De Homey-sync moet docs/data/shadow-status.json publiceren.</p></div>`;
+      root.innerHTML = `<div class="admonition warning"><p class="admonition-title">Shadowdata nog niet beschikbaar</p><p>${esc(e.message)}. De dedicated Homey shadow-sync publiceert docs/data/shadow-status.json.</p></div>`;
     }
   }
   load(); setInterval(load, 60000);
