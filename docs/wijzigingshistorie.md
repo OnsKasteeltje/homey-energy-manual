@@ -1,5 +1,15 @@
 # Wijzigingshistorie
 
+## v2.1 — 16 augustus 2026
+
+- **Easee Equalizer** expliciet vastgelegd als harde lokale load-balancing-/veiligheidslaag die altijd voorrang heeft boven Homey-orchestratie.
+- Regelhiërarchie toegevoegd: **installatieveiligheid / 3×25 A → Easee Equalizer → Victron grid/batterijregeling (later) → Homey Energy Manager → flexibele verbruikers**.
+- Vastgelegd dat de Energy Manager onderscheid moet maken tussen **gevraagde Tesla-laadstroom** en **werkelijk door Easee geleverd vermogen**.
+- Vervolgbeslissingen moeten worden gebaseerd op werkelijke Tesla-belasting en actuele **P1/L1/L2/L3**-waarden, niet alleen op het Homey-setpoint.
+- Regel toegevoegd dat een Equalizer-ingreep niet automatisch mag leiden tot directe herverdeling van vermogen naar de boiler.
+- Ontwerpregel toegevoegd voor **1–2 minuten stabilisatie/hysterese** na onverwacht terugregelen of pauzeren van Tesla; definitieve waarde wordt vóór actieve orchestratie in shadow mode gevalideerd.
+- De actieve `Energie Manager PV - Shadow Mode v1.6.4` is hiervoor **niet functioneel gewijzigd**; dit is vastgelegd als doelarchitectuur en constraint voor de toekomstige actieve regeling.
+
 ## v2.0 — 16 augustus 2026
 
 - Nieuwe hoofdtab **Live energiestroom** toegevoegd.
