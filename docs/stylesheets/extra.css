@@ -37,6 +37,23 @@
 .status-pill.status-unknown, .health-unknown { background:rgba(90,90,90,.12); color:#666; }
 .legend { display:flex; flex-wrap:wrap; gap:.5rem; margin:.75rem 0; }
 
+.phase-chart-meta { display:flex; justify-content:space-between; gap:1rem; align-items:baseline; margin:.5rem 0 .65rem; }
+.phase-chart-meta span { font-size:.82rem; opacity:.72; }
+.phase-chart-wrap { width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--md-default-fg-color--lightest); border-radius:.75rem; background:var(--md-default-bg-color); }
+.phase-chart { display:block; width:100%; min-width:680px; height:auto; }
+.phase-grid { stroke:currentColor; opacity:.12; stroke-width:1; }
+.phase-grid-x { opacity:.07; }
+.phase-zero { stroke:currentColor; opacity:.45; stroke-width:1.5; stroke-dasharray:6 5; }
+.phase-zero-label,.phase-axis-label { fill:currentColor; opacity:.68; font-size:22px; }
+.phase-line { stroke-width:3; vector-effect:non-scaling-stroke; stroke-linejoin:round; stroke-linecap:round; }
+.phase-legend { display:flex; flex-wrap:wrap; gap:.65rem 1.1rem; margin:.7rem 0 .4rem; }
+.phase-legend span { display:flex; align-items:center; gap:.38rem; }
+.phase-legend i { width:.8rem; height:.8rem; border-radius:50%; display:inline-block; }
+.phase-analysis-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.7rem; margin:1rem 0; }
+.phase-analysis-card { border:1px solid var(--md-default-fg-color--lightest); border-radius:.7rem; padding:.75rem; }
+.phase-analysis-card div { margin-top:.25rem; font-size:.88rem; }
+.phase-warning { padding:.55rem .7rem; border-radius:.5rem; background:rgba(249,168,37,.12); }
+
 /*
  * Mobile-only improvements.
  * Desktop/tablet layouts >= 768px intentionally remain untouched.
@@ -100,6 +117,10 @@
   .health-badge {
     white-space:normal;
   }
+
+  .phase-chart-meta { flex-direction:column; gap:.2rem; }
+  .phase-chart { min-width:620px; }
+  .phase-legend { gap:.5rem .85rem; }
 
   /*
    * MkDocs Material already wraps most Markdown tables in a scroll container.
