@@ -1,5 +1,8 @@
 
 (function () {
+  const LIVE_STATUS_URL =
+    "https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/homey-status.json";
+
   const statusLabels = {
     active: "Actief",
     shadow: "Shadow/Test",
@@ -8,10 +11,8 @@
     unknown: "Onbekend"
   };
 
-  const statusClass = (s) => {
-    if (["active", "shadow", "off", "error"].includes(s)) return `status-${s}`;
-    return "status-unknown";
-  };
+  const statusClass = (s) =>
+    ["active", "shadow", "off", "error"].includes(s) ? `status-${s}` : "status-unknown";
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -22,18 +23,27 @@
       .replaceAll("'", "&#039;");
   }
 
+  async function fetchJson(url) {
+    const u = new URL(url, document.baseURI);
+    u.searchParams.set("_", Date.now());
+    const response = await fetch(u, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  }
+
   async function loadStatus() {
     const dashboard = document.getElementById("homey-flow-dashboard");
     const update = document.getElementById("homey-last-update");
     const health = document.getElementById("homey-sync-health");
     if (!dashboard) return;
 
+    let data;
     try {
-      const url = new URL("data/homey-status.json", document.baseURI);
-      url.searchParams.set("_", Date.now());
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+      try {
+        data = await fetchJson(LIVE_STATUS_URL);
+      } catch (_) {
+        data = await fetchJson("data/homey-status.json");
+      }
 
       dashboard.innerHTML = "";
       for (const flow of (data.flows || [])) {

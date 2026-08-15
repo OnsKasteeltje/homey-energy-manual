@@ -15,6 +15,12 @@ Er staat ook een zichtbare kopie in de hoofdmap:
 Die zichtbare kopie is alleen ter controle; GitHub Actions gebruikt uitsluitend het bestand in `.github/workflows/`.
 
 
-## Dynamisch dashboard
 
-Zie `DYNAMIC_STATUS_SETUP.md` voor de Homey-statuskoppeling.
+## Dynamische status
+
+De actuele Flow-status wordt lokaal door Homey iedere 15 minuten naar
+`docs/data/homey-status.json` geschreven.
+
+Zie `LOCAL_STATUS_SETUP.md`.
+
+De oude GitHub→Homey polling-workflow is verwijderd.
