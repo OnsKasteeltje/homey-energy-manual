@@ -35,3 +35,12 @@
 - Statusweergave aangescherpt zodat duidelijk onderscheid wordt gemaakt tussen een **bevestigde fase** en een nog **open groep/automaat**.
 - Beheerregel vastgelegd: nieuwe betrouwbare inzichten over fase- of groepindeling worden voortaan direct op de website verwerkt.
 - Versiebeheerregel aangescherpt: iedere inhoudelijke websitewijziging krijgt voortaan direct een nieuwe website-subversie; automatische JSON-/status-/sample-updates verhogen het websiteversienummer niet.
+
+
+## v1.8 — 15 augustus 2026
+
+- De drie bestaande PV-omvormers zijn als afzonderlijke apparaten aan **Groepen & fasen** toegevoegd: **SolarEdge SE3680H**, **GoodWe GW4200D-NS** en **GoodWe GW2000-XS**.
+- Per omvormer worden voortaan afzonderlijk fase, groep/automaat en betrouwbaarheidsstatus bijgehouden.
+- Vastgelegd dat de SolarEdge SE3680H en GoodWe GW4200D-NS in de schuuropstelling zitten en de GoodWe GW2000-XS op een andere locatie in de woning staat.
+- De huidige fase- en groepkoppeling van de drie omvormers blijft **Open** totdat deze met een gerichte fase- of uitschakeltest is bevestigd.
+- Meetmethode uitgebreid met de werkwijze voor fase-identificatie van PV-omvormers.
