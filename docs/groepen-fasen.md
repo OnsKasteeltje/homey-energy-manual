@@ -6,7 +6,7 @@ Deze pagina is een **levend overzicht van de elektrische indeling van de woning*
 
 | Status | Betekenis |
 |---|---|
-| **Bevestigd** | De fase of groep is in een afzonderlijke praktijktest duidelijk vastgesteld. |
+| **Bevestigd** | De fase of groep is in een afzonderlijke praktijktest of fysieke controle duidelijk vastgesteld. |
 | **Waarschijnlijk** | De koppeling past bij het gemeten gedrag, de technische aansluiting of de groepenkastfoto, maar is nog niet afzonderlijk elektrisch gevalideerd. |
 | **Open** | Nog onvoldoende informatie om een fase of groep toe te wijzen. |
 
@@ -30,7 +30,7 @@ Deze pagina is een **levend overzicht van de elektrische indeling van de woning*
 | SolarEdge SE3680H | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.0`. |
 | GoodWe GW4200D-NS | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.0`. |
 | GoodWe GW2000-XS | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.0`. |
-| Schuurvoeding | **L1 + L2 + L3** | **Groep 14, 3-polig B16** | **Waarschijnlijk** | Op basis van groepenkastfoto; uitschakeltest blijft nodig. |
+| Schuurvoeding | **L1 + L2 + L3** | **Groep 14, 3-polig B16** | **Bevestigd** | Op 15-08-2026 fysiek in de meterkast gecontroleerd: groep 14 is de 3-fase voeding naar de schuur. |
 
 ## Automatische PV-fasemonitor
 
@@ -53,9 +53,9 @@ De status wordt pas van **Meetfase actief** naar **Bevestigd** gewijzigd wanneer
 - **L2:** wasmachine, elektrische boiler en waterkoker;
 - **L3:** droger;
 - **L1 + L2 + L3:** Tesla/Easee-lader;
-- **groep 14:** waarschijnlijk de 3-polige B16-schuurvoeding.
+- **groep 14:** **bevestigd** als 3-polige B16-schuurvoeding.
 
-Voor de huishoudelijke apparaten is het exacte installatieautomaatnummer nog niet bewezen.
+Voor de overige huishoudelijke apparaten is het exacte installatieautomaatnummer nog niet bewezen.
 
 ## Meetmethode voor fase
 
@@ -78,6 +78,6 @@ Nieuwe betrouwbare inzichten over **fase- of groepindeling** worden direct op de
 
 ## Open vervolgstappen
 
-De actieve PV-fasemonitor verzamelt nu de data waarmee de fase van de drie omvormers kan worden bepaald. Daarnaast blijven vaatwasser, kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt nog open. Voor reeds geïdentificeerde apparaten moeten de exacte installatieautomaten nog fysiek worden gekoppeld.
+De actieve PV-fasemonitor verzamelt nu de data waarmee de fase van de drie omvormers kan worden bepaald. Daarnaast blijven vaatwasser, kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt nog open. Voor reeds geïdentificeerde apparaten moeten de exacte installatieautomaten nog fysiek worden gekoppeld. **Groep 14 als schuurvoeding is niet langer een open punt.**
 
-> Laatste inhoudelijke update: 15 augustus 2026, avond. Toegevoegd: actieve `PV omvormers fase-monitor v1.0`, 2-minutenmeetinterval, 36-uurs meetbuffer en meetstatus van alle drie PV-omvormers.
+> Laatste inhoudelijke update: 15 augustus 2026, avond. Groep 14 is nu door fysieke controle in de meterkast bevestigd als de 3-polige B16-schuurvoeding.
