@@ -1,5 +1,16 @@
 # Wijzigingshistorie
 
+## v2.4 — 16 augustus 2026
+
+- Nieuwe actieve Homey-flow **`Energie Manager PV - Shadow Mode v1.6.6`** gedocumenteerd; v1.6.5 is uitgeschakeld zodat binnen deze flowfamilie slechts één versie actief is.
+- v1.6.6 blijft volledig **shadow/read-only** en voegt geen fysieke apparaatsturing toe.
+- De bestaande baseline-publicatie is uitgebreid met `washerActive` en `dryerActive`.
+- `washerActive` en `dryerActive` worden uitsluitend `true` wanneer Homey `measure_applianceState = RUNNING` rapporteert.
+- De bestaande runtime-state **`EM Shadow Runtime State v1.6.5`** wordt bewust hergebruikt om de boiler-state-machine en een eventueel lopende cyclus niet te onderbreken bij de versieovergang.
+- De Live energiestroom-documentatie is bijgewerkt: **Wasmachine (L2)** en **Droger (L3)** kunnen nu als `ACTIEF`/`idle` worden weergegeven zonder extra Homey-polling.
+- Omdat de Homey-apparaten van wasmachine en droger geen individueel live vermogen leveren, wordt bewust geen wattage afgeleid of verzonnen; hun verbruik blijft onderdeel van de huishoudelijke sluitpost.
+- **Vaatwasser** blijft in de visualisatie voorbereid en krijgt een live status zodra een betrouwbare statusbron in de bestaande publicatie wordt opgenomen.
+
 ## v2.3 — 16 augustus 2026
 
 - **Live energiestroom** uitgebreid met een uitsplitsing onder **Huishouden** voor **Wasmachine**, **Droger**, **Vaatwasser** en **Overig huishouden**.
