@@ -37,145 +37,59 @@
 .status-pill.status-unknown, .health-unknown { background:rgba(90,90,90,.12); color:#666; }
 .legend { display:flex; flex-wrap:wrap; gap:.5rem; margin:.75rem 0; }
 
-.phase-chart-meta { display:flex; justify-content:space-between; gap:1rem; align-items:baseline; margin:.5rem 0 .65rem; }
-.phase-chart-meta span { font-size:.82rem; opacity:.72; }
+.phase-live-meta,.phase-current { margin:.5rem 0 .75rem; font-size:.88rem; opacity:.82; }
 .phase-chart-wrap { width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--md-default-fg-color--lightest); border-radius:.75rem; background:var(--md-default-bg-color); }
 .phase-chart { display:block; width:100%; min-width:680px; height:auto; }
 .phase-grid { stroke:currentColor; opacity:.12; stroke-width:1; }
-.phase-grid-x { opacity:.07; }
-.phase-zero { stroke:currentColor; opacity:.45; stroke-width:1.5; stroke-dasharray:6 5; }
-.phase-zero-label,.phase-axis-label { fill:currentColor; opacity:.68; font-size:22px; }
-.phase-line { stroke-width:3; vector-effect:non-scaling-stroke; stroke-linejoin:round; stroke-linecap:round; }
-.phase-legend { display:flex; flex-wrap:wrap; gap:.65rem 1.1rem; margin:.7rem 0 .4rem; }
-.phase-legend span { display:flex; align-items:center; gap:.38rem; }
-.phase-legend i { width:.8rem; height:.8rem; border-radius:50%; display:inline-block; }
-.phase-analysis-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.7rem; margin:1rem 0; }
-.phase-analysis-card { border:1px solid var(--md-default-fg-color--lightest); border-radius:.7rem; padding:.75rem; }
-.phase-analysis-card div { margin-top:.25rem; font-size:.88rem; }
-.phase-warning { padding:.55rem .7rem; border-radius:.5rem; background:rgba(249,168,37,.12); }
+.phase-zero { stroke:currentColor; opacity:.5; stroke-width:1.5; stroke-dasharray:6 5; }
+.phase-axis-label { fill:currentColor; opacity:.7; font-size:14px; }
+.phase-series { fill:none; stroke-width:3; vector-effect:non-scaling-stroke; stroke-linejoin:round; stroke-linecap:round; }
+.phase-l1 { stroke:#1976d2; }
+.phase-l2 { stroke:#ef6c00; }
+.phase-l3 { stroke:#7b1fa2; }
+.phase-legend { display:flex; flex-wrap:wrap; gap:.65rem 1.1rem; margin:.7rem 0 .4rem; font-size:.88rem; }
+.phase-l1-key { color:#1976d2; }.phase-l2-key { color:#ef6c00; }.phase-l3-key { color:#7b1fa2; }
+.phase-table-wrap { overflow-x:auto; }
 
-/*
- * Mobile-only improvements.
- * Desktop/tablet layouts >= 768px intentionally remain untouched.
- */
+.energy-topline { display:flex; justify-content:space-between; gap:1rem; margin:.5rem 0 .8rem; font-size:.88rem; }
+.energy-ok { color:#2e7d32; font-weight:700; }.energy-stale { color:#c62828; font-weight:700; }
+.energy-svg { width:100%; height:auto; border:1px solid var(--md-default-fg-color--lightest); border-radius:.9rem; background:var(--md-default-bg-color); }
+.energy-node rect { fill:var(--md-default-bg-color); stroke:var(--md-default-fg-color--lightest); stroke-width:2; }
+.energy-title { fill:currentColor; font-weight:700; font-size:17px; }
+.energy-value { fill:currentColor; font-weight:700; font-size:20px; }
+.energy-sub { fill:currentColor; opacity:.68; font-size:12px; }
+.energy-path { stroke:#2e7d32; fill:none; stroke-linecap:round; opacity:.85; }
+.energy-path.is-idle { stroke:currentColor; opacity:.18; stroke-dasharray:5 8; }
+.energy-arrow { fill:#2e7d32; }
+.energy-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.75rem; margin:1rem 0; }
+.energy-summary>div { border:1px solid var(--md-default-fg-color--lightest); border-radius:.7rem; padding:.75rem; text-align:center; }
+.energy-footnote { font-size:.82rem; opacity:.72; }
+
+/* Mobile-only improvements. Desktop/tablet layouts >= 768px intentionally remain untouched. */
 @media (max-width: 767px) {
-  /* Slightly more usable content width on phones. */
-  .md-content__inner {
-    margin: 0 .15rem;
-  }
-
-  /* Keep headings readable without consuming most of a small screen. */
-  .md-typeset h1 {
-    font-size: 1.65rem;
-    line-height: 1.2;
-    margin-bottom: .8rem;
-  }
-  .md-typeset h2 {
-    font-size: 1.35rem;
-    line-height: 1.25;
-    margin-top: 1.5rem;
-  }
-  .md-typeset h3 {
-    font-size: 1.15rem;
-    line-height: 1.3;
-  }
-
-  /* Prevent long technical identifiers and URLs from forcing page overflow. */
-  .md-typeset p,
-  .md-typeset li,
-  .flow-card-title,
-  .flow-detail,
-  .flow-meta {
-    overflow-wrap: anywhere;
-    word-break: normal;
-  }
-
-  /* Status/flow cards stack cleanly to one column. */
-  .status-toolbar {
-    align-items:flex-start;
-    flex-direction:column;
-    padding:.85rem;
-    gap:.65rem;
-  }
-  .flow-grid {
-    grid-template-columns:minmax(0,1fr);
-    gap:.75rem;
-  }
-  .flow-card {
-    min-width:0;
-    padding:.85rem;
-  }
-  .flow-card-header {
-    flex-direction:column;
-    gap:.5rem;
-  }
-  .flow-meta {
-    flex-wrap:wrap;
-    gap:.35rem .8rem;
-  }
-  .status-pill,
-  .health-badge {
-    white-space:normal;
-  }
-
-  .phase-chart-meta { flex-direction:column; gap:.2rem; }
+  .md-content__inner { margin: 0 .15rem; }
+  .md-typeset h1 { font-size: 1.65rem; line-height: 1.2; margin-bottom: .8rem; }
+  .md-typeset h2 { font-size: 1.35rem; line-height: 1.25; margin-top: 1.5rem; }
+  .md-typeset h3 { font-size: 1.15rem; line-height: 1.3; }
+  .md-typeset p,.md-typeset li,.flow-card-title,.flow-detail,.flow-meta { overflow-wrap:anywhere; word-break:normal; }
+  .status-toolbar { align-items:flex-start; flex-direction:column; padding:.85rem; gap:.65rem; }
+  .flow-grid { grid-template-columns:minmax(0,1fr); gap:.75rem; }
+  .flow-card { min-width:0; padding:.85rem; }
+  .flow-card-header { flex-direction:column; gap:.5rem; }
+  .flow-meta { flex-wrap:wrap; gap:.35rem .8rem; }
+  .status-pill,.health-badge { white-space:normal; }
   .phase-chart { min-width:620px; }
   .phase-legend { gap:.5rem .85rem; }
-
-  /*
-   * MkDocs Material already wraps most Markdown tables in a scroll container.
-   * These rules make that behaviour explicit for wide technical tables and
-   * preserve useful font size instead of shrinking the whole page.
-   */
-  .md-typeset__table {
-    display:block;
-    max-width:100%;
-    overflow-x:auto;
-    -webkit-overflow-scrolling:touch;
-  }
-  .md-typeset__table table,
-  .md-typeset table:not([class]) {
-    width:max-content;
-    min-width:100%;
-    font-size:.78rem;
-  }
-  .md-typeset table th,
-  .md-typeset table td {
-    padding:.5rem .6rem;
-    vertical-align:top;
-  }
-
-  /* Code and JSON remain scrollable instead of widening the page. */
-  .md-typeset pre,
-  .md-typeset code,
-  .highlight,
-  .highlighttable {
-    max-width:100%;
-  }
-  .md-typeset pre {
-    overflow-x:auto;
-    -webkit-overflow-scrolling:touch;
-    font-size:.76rem;
-  }
-  .md-typeset :not(pre) > code {
-    overflow-wrap:anywhere;
-    white-space:normal;
-  }
-
-  /* Admonitions are common on the site; reduce wasted phone width. */
-  .md-typeset .admonition,
-  .md-typeset details {
-    margin-left:0;
-    margin-right:0;
-    padding-left:.8rem;
-    padding-right:.8rem;
-  }
-
-  /* Images/embedded content should never exceed the viewport. */
-  .md-typeset img,
-  .md-typeset svg,
-  .md-typeset iframe {
-    max-width:100%;
-    height:auto;
-  }
+  .energy-topline { flex-direction:column; gap:.3rem; }
+  .energy-svg { min-width:760px; }
+  #live-energy-flow { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .energy-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .md-typeset__table { display:block; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .md-typeset__table table,.md-typeset table:not([class]) { width:max-content; min-width:100%; font-size:.78rem; }
+  .md-typeset table th,.md-typeset table td { padding:.5rem .6rem; vertical-align:top; }
+  .md-typeset pre,.md-typeset code,.highlight,.highlighttable { max-width:100%; }
+  .md-typeset pre { overflow-x:auto; -webkit-overflow-scrolling:touch; font-size:.76rem; }
+  .md-typeset :not(pre)>code { overflow-wrap:anywhere; white-space:normal; }
+  .md-typeset .admonition,.md-typeset details { margin-left:0; margin-right:0; padding-left:.8rem; padding-right:.8rem; }
+  .md-typeset img,.md-typeset svg,.md-typeset iframe { max-width:100%; height:auto; }
 }
