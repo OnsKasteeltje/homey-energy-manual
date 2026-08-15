@@ -26,8 +26,9 @@ De flow berekent een **Opportunity Score** en vertaalt die naar een advies, kand
 De score combineert forecastcontext met de werkelijke net- en apparaatstatus. Eén forecastsignaal schakelt dus nooit rechtstreeks een apparaat.
 
 ## Outputs
-Per kwartier worden onder andere opgeslagen:
+Per kwartier wordt een nieuw sample rechtstreeks toegevoegd aan `docs/data/m7-opportunity.json`. GitHub is daarmee de persistente historie voor de website; maximaal 672 kwartiersamples worden bewaard.
 
+Per sample worden onder andere opgeslagen:
 - Opportunity Score;
 - advies;
 - kandidaat;
@@ -35,18 +36,14 @@ Per kwartier worden onder andere opgeslagen:
 - gebruikte M7-signalen;
 - werkelijke import/export en apparaatcontext.
 
-De historie blijft kaart-lokaal bewaard in `M7_SHADOW_ANALYSIS` met maximaal 672 kwartiersamples. **Dezelfde scriptkaart die deze state bezit publiceert de dataset ook rechtstreeks naar GitHub** als `docs/data/m7-opportunity.json`. Hierdoor hoeft een aparte syncscript de lokale state niet meer te proberen uitlezen.
-
-GitHub-publicatiefouten worden afgevangen en stoppen de shadowanalyse niet.
-
 ## Homey API-belasting
-Per kwartier gebruikt deze flow één gezamenlijke device-uitlezing en één gezamenlijke Logic-uitlezing. Die Logic-uitlezing levert zowel de vier M7-contextwaarden als het GitHub-token voor publicatie.
+Per kwartier gebruikt deze flow één gezamenlijke device-uitlezing en één gezamenlijke Logic-uitlezing. De Logic-uitlezing levert de vier M7-contextwaarden en het GitHub-token.
 
 ## Aangestuurde apparaten
 **Geen.** Volledig read-only/shadow.
 
 ## Status
-Actief. De resultaten worden rechtstreeks door deze flow naar de tab **Schaduw** gepubliceerd.
+Actief. De resultaten worden rechtstreeks door deze flow naar de tab **Schaduw** gepubliceerd. De directe GitHub-writer is op 15 augustus 2026 succesvol gevalideerd met het eerste echte M7-sample.
 
 ## Afhankelijkheden
 M7 – Prijs & PV Forecast, P1, Tesla/Easee, boiler, Quooker en `GH_Status_Token`.
