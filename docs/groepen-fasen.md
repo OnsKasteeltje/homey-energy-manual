@@ -27,7 +27,9 @@ Deze pagina is een **levend overzicht van de elektrische indeling van de woning*
 | Koffiezetapparaat | Nog te bepalen | Nog te bepalen | **Open** | Korte testbelasting uitgevoerd; fasekoppeling nog niet betrouwbaar genoeg om te bevestigen. |
 | Quooker | Nog te bepalen | Nog te bepalen | **Open** | Regeling is in Homey gedocumenteerd, maar de elektrische fase/groep is nog niet aan deze inventaris toegevoegd. |
 | Quatt warmtepomp / CV-installatie | Nog te bepalen | Nog te bepalen | **Open** | Energieverbruik is in Homey beschikbaar; fase- en groepstoewijzing moet nog worden gevalideerd. |
-| PV-omvormers | Per omvormer te bepalen | Per omvormer te bepalen | **Open** | Voor de volledige nettopologie moet per omvormer worden vastgelegd op welke fase en groep deze invoedt. |
+| SolarEdge SE3680H | Nog te bepalen | Nog te bepalen | **Open** | PV-omvormer in de schuur. Fase en exacte installatieautomaat moeten nog via gerichte meting of uitschakeltest worden vastgesteld. |
+| GoodWe GW4200D-NS | Nog te bepalen | Nog te bepalen | **Open** | PV-omvormer voor 12 zuidoostgerichte panelen. Fase en groep moeten nog afzonderlijk worden vastgesteld. |
+| GoodWe GW2000-XS | Nog te bepalen | Nog te bepalen | **Open** | PV-omvormer voor 6 zuidgerichte panelen op een andere locatie in de woning. Fase en groep moeten nog afzonderlijk worden vastgesteld. |
 | Schuurvoeding | **L1 + L2 + L3** | **Groep 14, 3-polig B16** | **Waarschijnlijk** | Op basis van de aangeleverde meterkastfoto en de Victron-documentatie wordt groep 14 voorlopig als de 3-fase 3×16 A voeding naar de schuur behandeld. Definitieve bevestiging via gecontroleerde uitschakeltest blijft nodig. |
 
 ## Wat is nu al zeker?
@@ -50,6 +52,8 @@ Voor een betrouwbare fasekoppeling wordt bij voorkeur één apparaat tegelijk ge
 3. wacht tot het apparaat daadwerkelijk vermogen trekt;
 4. vergelijk de verandering op L1, L2 en L3;
 5. herhaal zo nodig tijdens een herkenbare vermogensfase, zoals verwarmen of centrifugeren.
+
+Voor PV-omvormers werkt dezelfde methode omgekeerd: vergelijk de fasewaarden terwijl één omvormer aantoonbaar produceert en, waar veilig mogelijk, tijdens een gecontroleerd aan/uit-moment van die omvormer.
 
 ## Meetmethode voor exact groepnummer
 
@@ -82,6 +86,10 @@ Tijdens actief verwarmen trok de boiler ongeveer 2 kW. De extra belasting versch
 
 Tijdens de gecontroleerde test op 15 augustus 2026 bleef de boiler verwarmen en steeg L2 van circa 2,00 kW naar circa 4,15 kW zodra de waterkoker werd aangezet. De extra circa 2,15 kW verscheen vrijwel volledig op L2. Daarmee is de waterkoker als L2 bevestigd.
 
+### PV-omvormers
+
+De drie PV-omvormers worden voortaan afzonderlijk als apparaten bijgehouden: **SolarEdge SE3680H**, **GoodWe GW4200D-NS** en **GoodWe GW2000-XS**. Hun exacte fase- en groepkoppeling is nog niet formeel bevestigd en blijft daarom open totdat een gerichte fase- of uitschakeltest is uitgevoerd.
+
 ### Schuurvoeding — waarschijnlijk groep 14
 
 In het integrale Victron-ontwerp is op basis van de groepenkastfoto vastgelegd dat **groep 14 waarschijnlijk de 3-polige B16-voeding naar de schuur** is. Omdat dit nog niet met een gecontroleerde uitschakeltest is bevestigd, blijft de status *Waarschijnlijk*.
@@ -95,6 +103,6 @@ Nieuwe betrouwbare inzichten over **fase- of groepindeling** worden voortaan dir
 
 ## Open vervolgstappen
 
-De eerstvolgende nuttige fase-identificaties zijn de **vaatwasser, kookplaat/fornuis, koffiezetapparaat, Quooker en PV-omvormers**. Daarnaast moeten voor de reeds op fase geïdentificeerde apparaten — **wasmachine, droger, boiler, waterkoker en Tesla/Easee** — de exacte installatieautomaten nog fysiek worden gekoppeld. Ook groep 14 als schuurvoeding moet nog éénmaal met een gecontroleerde uitschakeltest worden bevestigd.
+De eerstvolgende nuttige fase-identificaties zijn de **vaatwasser, kookplaat/fornuis, koffiezetapparaat, Quooker en de drie afzonderlijke PV-omvormers**. Daarnaast moeten voor de reeds op fase geïdentificeerde apparaten — **wasmachine, droger, boiler, waterkoker en Tesla/Easee** — de exacte installatieautomaten nog fysiek worden gekoppeld. Ook groep 14 als schuurvoeding moet nog éénmaal met een gecontroleerde uitschakeltest worden bevestigd.
 
-> Laatste inhoudelijke update: 15 augustus 2026, avond. De fase-informatie uit de praktijktests is verwerkt; exacte groepnummers worden alleen toegevoegd wanneer ze daadwerkelijk zijn bewezen.
+> Laatste inhoudelijke update: 15 augustus 2026, avond. De drie PV-omvormers worden vanaf websiteversie 1.8 afzonderlijk in de apparatenlijst bijgehouden.
