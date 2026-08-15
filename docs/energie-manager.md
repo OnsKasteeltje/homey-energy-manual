@@ -1,10 +1,11 @@
 # Energie Manager PV
 
 **Modus:** Shadow / read-only  
-**Homey-status:** 🔴 Inactief  
-**Flow:** `Energie Manager PV - Shadow Mode`
+**Homey-status:** 🟢 Actief  
+**Actieve flow:** `Energie Manager PV - Shadow Mode v1.6.4`  
+**Voorgaande flow:** `Energie Manager PV - Shadow Mode` — 🔴 Inactief
 
-De flow is momenteel in Homey uitgeschakeld. De onderstaande beschrijving documenteert de werking wanneer deze shadow-flow actief is. De flow heeft twee onafhankelijke takken: een **2-minuten sampler** en een **15-minuten GitHub-publisher**. Geen van beide stuurt apparaten aan.
+De actuele v1.6.4-flow is in Homey ingeschakeld. De flow werkt volledig in shadow/read-only-modus en stuurt geen Tesla, laadpaal of boiler aan. Hij observeert en berekent de gewenste energiesturing, houdt de boilerstatus en boilercycli bij en publiceert meetdata naar GitHub.
 
 ## Berekening
 
@@ -26,20 +27,25 @@ PV beschikbaar = max(0, -P1 + werkelijk Tesla-vermogen + werkelijk boilervermoge
 
 Boiler wordt alleen toegestaan als na Tesla-reservering minimaal circa **2,1 kW** resteert.
 
+## Boiler-observer en cyclusregistratie
+De actuele v1.6.4-flow observeert de boiler zonder deze te schakelen. Een vermogen boven **1,5 kW** wordt als `VERWARMEN` beschouwd. Na minimaal 15 minuten bevestigd verwarmen en vervolgens minder dan **100 W gedurende 10 minuten** doorloopt de observer `AFKOELEN_WACHT` naar `OP_TEMPERATUUR`.
+
+Boilercycli worden op basis van de 2-minutenmetingen bijgehouden en afgeronde cycli worden gepubliceerd naar:
+
+`docs/data/boiler-cycles.json`
+
 ## 2-minuten sampler
-Iedere 2 minuten wordt lokaal een sample toegevoegd aan `EM_SHADOW_STATE`. Er worden maximaal 720 lokale samples bewaard, ongeveer 24 uur. Deze tak publiceert niets naar GitHub.
+De actieve v1.6.4-flow wordt iedere 2 minuten uitgevoerd. De persistente runtime-state wordt opgeslagen in een Homey Logic-string. Hiermee worden onder andere de boiler-observer en actieve cyclus bijgehouden.
 
 ## 15-minuten websitepublicatie
-Een aparte trigger binnen dezelfde Advanced Flow draait iedere 15 minuten. Deze tak leest de actuele P1-, Tesla- en boilerstatus opnieuw uit, berekent één zelfstandig baseline-sample en schrijft dat rechtstreeks bij in:
+Dezelfde Advanced Flow heeft daarnaast een 15-minuten trigger. De actuele baseline wordt gepubliceerd naar:
 
 `docs/data/shadow-baseline-v01.json`
 
-De GitHub-JSON vormt daarmee een persistente websitehistorie van maximaal 720 gepubliceerde samples. De publisher is bewust losgekoppeld van de kaart-lokale `EM_SHADOW_STATE`; hierdoor is de websitepublicatie niet afhankelijk van HomeyScript `get()/set()`-state.
-
-De aparte publisher is op 15 augustus 2026 succesvol gevalideerd met een echte baseline-publicatie.
+De GitHub-JSON vormt een persistente websitehistorie van maximaal 720 gepubliceerde samples. Daarnaast worden afgeronde dagen compact bewaard in `docs/data/energy-daily-history.json`.
 
 ## Aangestuurde apparaten
-**Geen.** De volledige flow is read-only/shadow.
+**Geen.** v1.6.4 is volledig read-only/shadow. De flow observeert en registreert, maar voert geen fysieke schakelingen uit.
 
-## Volgende versie
-`Energie Manager PV - Shadow Mode v0.2 Quooker` voegt Quooker-context, Tesla-sessieregistratie en de warmwatergarantie van 240 minuten vóór 19:00 toe. Deze versie publiceert na activatie op dezelfde manier naar `docs/data/shadow-v02-quooker.json`.
+## Versiebeheer
+De ongenummerde voorganger `Energie Manager PV - Shadow Mode` is uitgeschakeld. De actuele operationele shadow-versie is `Energie Manager PV - Shadow Mode v1.6.4`. Volgens de gehanteerde versieafspraak hoort maximaal één versie binnen dezelfde flowfamilie actief te zijn.
