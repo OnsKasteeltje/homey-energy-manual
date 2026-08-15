@@ -18,7 +18,7 @@ Deze pagina is een **levend overzicht van de elektrische indeling van de woning*
 | Apparaat / installatie | Fase | Groep / automaat | Status | Onderbouwing |
 |---|---:|---:|---|---|
 | Wasmachine | **L2** | Nog te bepalen | **Fase bevestigd / groep open** | Tijdens de testwas van 15-08-2026 steeg L2 van circa 1,97 kW naar circa 3,83–3,90 kW. De extra belasting van ongeveer 1,9 kW past bij het verwarmingselement van de wasmachine; L1 en L3 vertoonden geen vergelijkbare sprong. |
-| Droger | **L3** | Nog te bepalen | **Fase bevestigd / groep open** | Tijdens de droogtest van 15-08-2026 veranderde vooral L3: de teruglevering nam af van ongeveer 350–380 W naar circa 40–65 W. L1 en L2 bleven vrijwel vlak. |
+| Droger | **L3** | Nog te bepalen | **Fase bevestigd / groep open** | Tijdens de droogtest van 15-08-2026 veranderde vooral L3. Bij het einde van de droogcyclus zakte de woning terug naar ongeveer L1 102 W, L2 149 W en L3 188 W. De eerdere extra drogerbelasting zat hoofdzakelijk op L3. |
 | Tesla / Easee-lader | **L1 + L2 + L3** | Laadgroep nog te documenteren | **Fase bevestigd / groep open** | De lader is een 3-fase verbruiker en in Homey zichtbaar met afzonderlijke stroomwaarden per fase. Het exacte automaatnummer moet nog uit de kastindeling worden vastgelegd. |
 | Elektrische boiler | **L2** | Nog te bepalen | **Fase bevestigd / groep open** | Tijdens verwarmen trok de boiler circa 1,93–2,13 kW; de duidelijke extra belasting verscheen op L2. De aansluitfase is daarmee praktisch bevestigd. |
 | Vaatwasser | Nog te bepalen | Nog te bepalen | **Open** | Praktijktest uitgevoerd, maar fasekoppeling nog niet voldoende geïsoleerd om formeel vast te leggen. |
@@ -76,7 +76,25 @@ De 20-minutenwas op 15 augustus 2026 gaf een zeer duidelijke verwarmingspiek op 
 
 ### Droger — L3
 
-Bij de droger was de stijging kleiner en geleidelijker, passend bij een zuiniger regelend droogproces. De verandering vond vrijwel uitsluitend op L3 plaats. Daarom is de droger als L3 vastgelegd.
+De droger is op **L3** gekoppeld. Tijdens de actieve droogfase veranderde hoofdzakelijk L3, terwijl L1 en L2 veel minder bewogen. Dat past bij een enkel-fase droger op L3.
+
+Bij het gemelde einde van het programma stond de droger in Homey nog op **`Running / Anticrease`** met `timeToEnd = 0`. Dat betekent dat het hoofd-droogprogramma klaar was, maar de machine nog in de anti-kreukfase stond. Op dat moment was de grote elektrische drogerbelasting verdwenen.
+
+De P1-eindmeting was toen ongeveer:
+
+| Fase | Vermogen na hoofd-droogcyclus |
+|---|---:|
+| L1 | **102 W** |
+| L2 | **149 W** |
+| L3 | **188 W** |
+| Totaal | **443 W import** |
+
+Deze meting is waardevol als **nul-/eindbaseline** voor toekomstige droogtests. Tesla gebruikte op dat moment 0 W, de elektrische boiler stond wel AAN maar gebruikte 0 W en de PV-omvormers produceerden 0 W. Daardoor was het fasebeeld relatief schoon.
+
+De Homey-apparaatstatus meldde daarnaast **`Empty Water Container`**. Dat is een apparaatmelding en staat los van de fase-identificatie.
+
+!!! info "Interpretatie van de drogerfase"
+    De fase-identificatie is gebaseerd op het verschil tussen de actieve droogfase en de belasting nadat het hoofdprogramma klaar was. De exacte groep/automaat is hiermee nog niet bewezen. Daarvoor blijft een afzonderlijke uitschakeltest nodig.
 
 ### Elektrische boiler — L2
 
@@ -105,4 +123,4 @@ Nieuwe betrouwbare inzichten over **fase- of groepindeling** worden voortaan dir
 
 De eerstvolgende nuttige fase-identificaties zijn de **vaatwasser, kookplaat/fornuis, koffiezetapparaat, Quooker en de drie afzonderlijke PV-omvormers**. Daarnaast moeten voor de reeds op fase geïdentificeerde apparaten — **wasmachine, droger, boiler, waterkoker en Tesla/Easee** — de exacte installatieautomaten nog fysiek worden gekoppeld. Ook groep 14 als schuurvoeding moet nog éénmaal met een gecontroleerde uitschakeltest worden bevestigd.
 
-> Laatste inhoudelijke update: 15 augustus 2026, avond. De drie PV-omvormers worden vanaf websiteversie 1.8 afzonderlijk in de apparatenlijst bijgehouden.
+> Laatste inhoudelijke update: 15 augustus 2026, avond. De drogersectie bevat nu ook de einde-cyclusstatus, P1-fasebaseline en interpretatie van de anti-kreukfase.
