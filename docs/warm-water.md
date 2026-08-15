@@ -71,24 +71,50 @@ boilermodus = JA
       └─ uiterlijk 19:00 moet de minimale 4 uur zijn veiliggesteld
 ```
 
-## 4. Boiler aan betekent niet automatisch werkelijk verwarmen
+## 4. Boilerstatus en gevalideerde state-machine
 
-Onze Homey-write-test heeft bevestigd dat de boiler vanuit Homey betrouwbaar **aan/uit** kan worden gezet. Tegelijk zagen we een belangrijk verschil tussen schakelstatus en werkelijk elektrisch vermogen:
+De nachtelijke praktijktest van **15 op 16 augustus 2026** heeft het onderscheid tussen schakelstatus en werkelijke warmtevraag end-to-end gevalideerd.
 
-- `onoff = true` kan betekenen dat de boiler beschikbaar/ingeschakeld is;
-- het gemeten vermogen kan toch **0 W** zijn wanneer het interne thermostaat/contact geen warmte meer vraagt;
-- tijdens werkelijk opwarmen verwachten we ongeveer **1,95–2,0 kW**.
+De boiler kan in Homey `onoff = true` blijven terwijl het interne thermostaatcontact het element uitschakelt. In dat geval is de boiler elektrisch beschikbaar, maar trekt hij **0 W** omdat de ingestelde temperatuur is bereikt.
 
-Dit onderscheid wordt voortaan expliciet gebruikt in de analyse. Alleen naar `onoff` kijken is onvoldoende om vast te stellen of de boiler nog energie nodig heeft.
-
-Een belangrijk toekomstig afgeleid signaal wordt daarom:
+De Energy Manager gebruikt daarom vanaf **v1.6.4** een semantische boilerstatus in plaats van alleen `onoff`:
 
 ```text
-boiler ingeschakeld + vermogen ~0 W
-        → waarschijnlijk op temperatuur / geen actuele warmtevraag
+VERWARMEN
+   ↓
+AFKOELEN_WACHT
+   ↓ 10 minuten continu < 100 W
+OP_TEMPERATUUR
 ```
 
-Dit moet nog verder worden gevalideerd met langere meetreeksen voordat het als harde regel wordt gebruikt.
+De relevante detectieregels zijn:
+
+- **VERWARMEN:** gemeten boilervermogen > **1,5 kW**;
+- de verwarmfase moet eerst gedurende circa **15 minuten** bevestigd zijn;
+- na bevestigd verwarmen start bij < **100 W** de fase `AFKOELEN_WACHT`;
+- blijft het vermogen vervolgens **10 minuten continu <100 W**, dan wordt `OP_TEMPERATUUR` bevestigd;
+- stijgt het vermogen in die wachtperiode weer, dan vervalt de bevestiging en keert de status terug naar `VERWARMEN`/wachtlogica.
+
+Hiermee is `boiler ingeschakeld + 0 W` niet langer slechts “waarschijnlijk warm”, maar in combinatie met de vooraf bevestigde verwarmfase en de 10-minutenwachttijd een **gevalideerd OP_TEMPERATUUR-signaal**.
+
+### Gevalideerde boilercyclus 15→16 augustus 2026
+
+De volledige cyclus is succesvol doorlopen en persistent opgeslagen in `docs/data/boiler-cycles.json`:
+
+| Kenmerk | Waarde |
+|---|---:|
+| Start | **15-08-2026 23:06** |
+| Einde | **16-08-2026 00:15** |
+| Duur | **69 minuten** |
+| Eindreden | `OP_TEMPERATUUR` |
+| Geschat boilerverbruik | **1,856 kWh** |
+| `reached_temperature` | **true** |
+
+De waargenomen keten was daarmee volledig:
+
+**VERWARMEN → AFKOELEN_WACHT → OP_TEMPERATUUR → registratie in `boiler-cycles.json`**.
+
+Dit is de eerste volledige end-to-end acceptatie van de boilercycluslogica.
 
 ## 5. Samenwerking met Tesla
 
@@ -112,19 +138,25 @@ De boiler is daarnaast nuttig voor PV-overschotten die te klein zijn voor zinvol
 
 De actieve warmwaterflow wordt nu nog niet direct vervangen door de centrale orchestrator. De overgang wordt stapsgewijs voorbereid met onafhankelijke shadowlagen.
 
-### Baseline v0.1
+### Energy Manager v1.6.4
 
-`Energie Manager PV - Shadow Mode` simuleert de bestaande PV-prioritering en schrijft geen apparaten aan.
+`Energie Manager PV - Shadow Mode v1.6.4` is de actieve semantische observatielaag. Deze flow stuurt geen apparaten aan, maar bepaalt onder meer de gevalideerde boilerstatus, volgt actieve boilercycli en publiceert baseline-, dag- en boilercyclusdata naar GitHub.
 
-### Shadow v0.2 + Quooker
+### M7 Opportunity Shadow v1.3
 
-`Energie Manager PV - Shadow Mode v0.2 Quooker` voegt Quookerstatus en bestaande Quooker-tijdvensters toe aan de context, nog steeds zonder apparaten vanuit de shadowflow te sturen.
+`M7 - Opportunity Score - Shadow v1.3` voegt prijs- en PV-forecastcontext toe en gebruikt vanaf v1.3 de **gevalideerde semantische boilerstatus** uit de Energy Manager in plaats van alleen de elektrische schakelstand.
 
-### M7 Opportunity Shadow
+Daarbij geldt:
 
-`M7 - Opportunity Score - Shadow` voegt prijs- en PV-forecastcontext toe en berekent per kwartier een Opportunity Score, advies, kandidaat en reden. Deze dataset blijft volledig gescheiden van de baseline.
+- `OP_TEMPERATUUR`: geen start- of uitstelkandidaat;
+- `AFKOELEN_WACHT`: geen kandidaat zolang de eindstatus nog wordt bevestigd;
+- `VERWARMEN`: kan bij dure netimport als uitstelbare boilerbelasting gelden;
+- `UIT`: kan bij gunstige omstandigheden als startkandidaat gelden;
+- te oude of onbekende status: conservatief geen boilerkandidaat.
 
-Het doel is eerst aantonen dat de nieuwere logica betere keuzes zou maken voordat zij de actieve warmwaterflow mag vervangen of overrulen.
+De directe validatie na de nachtelijke boilercyclus liet zien dat M7 v1.3 correct `OP_TEMPERATUUR` las terwijl `boilerOn=true` en het vermogen 0 W was. M7 zette daardoor `boilerCanStart=false` en `boilerCanDefer=false` en koos bij `DEFER_FLEX_LOAD` terecht kandidaat `NONE` in plaats van de reeds warme boiler.
+
+Het doel blijft eerst aantonen dat de nieuwere logica betere keuzes maakt voordat zij de actieve warmwaterflow mag vervangen of overrulen.
 
 ## 7. Quooker als aanvullende comfortconstraint
 
@@ -189,6 +221,7 @@ De regeling blijft bewust conservatief:
 - minimumlooptijden en vertragingen voorkomen onrustig schakelen;
 - legacy-boilerflows blijven uit om dubbele aansturing te voorkomen;
 - shadowflows sturen geen apparaten aan;
+- M7 gebruikt een te oude of onbekende boilerstatus niet als flexkandidaat;
 - de 4-uursvoorwaarde vóór 19:00 wordt eerst gecontroleerd in shadowlogica voordat actieve orchestratie wordt aangepast.
 
 ## 13. Actuele status
@@ -198,25 +231,29 @@ De regeling blijft bewust conservatief:
 | Warm water optimalisatie | 🟢 **Actief** |
 | `WW_Boilermodus` | actief als bronkeuze |
 | Boiler Homey on/off write | ✅ gevalideerd |
-| Boiler werkelijk vermogen na inschakelen | 🟡 verder valideren; 0 W kan optreden ondanks `onoff=true` |
+| Werkelijk boilervermogen tijdens verwarmen | ✅ circa 1,95–2,0 kW gevalideerd |
+| Semantische boilerstatus | ✅ `VERWARMEN → AFKOELEN_WACHT → OP_TEMPERATUUR` gevalideerd |
+| OP_TEMPERATUUR-bevestiging | ✅ 10 minuten continu <100 W na bevestigde verwarmfase |
+| Volledige boilercyclusregistratie | ✅ gevalideerd in `boiler-cycles.json` |
 | Huidige startvenster | **09:30–14:30** |
 | Huidig hard einde | **15:30** |
 | Minimale boilertijd in boilermodus | **4 uur/dag** |
 | Deadline minimale boilertijd | **19:00** |
-| Baseline Energy Manager | 🟡 Shadow |
-| Shadow v0.2 + Quooker | 🟡 gereed voor overgang na baseline |
+| Energy Manager v1.6.4 | 🟢 actieve shadowobservatie |
 | M7 prijs/PV-context | 🟡 read-only/shadow |
-| M7 Opportunity Score | 🟡 parallelle shadowanalyse |
+| M7 Opportunity Score v1.3 | 🟢 actief in shadow; semantische boilerstatus geïntegreerd |
 | Quookerregeling | bestaande Homey-flows blijven leidend |
 | Victron ESS | toekomstig; nog niet geïnstalleerd |
 | CV ↔ boiler omschakeling | handmatig |
 
 ## 14. Volgende optimalisatiestap
 
-Na voldoende shadowdata vergelijken we drie dingen:
+De belangrijke technische onzekerheid rond het herkennen van een daadwerkelijk warme boiler is hiermee weggenomen. De volgende ontwerpstap is daarom niet meer “kan Homey OP_TEMPERATUUR betrouwbaar herkennen?”, maar **hoe deze gevalideerde status samen met comfortdeadline, PV, prijs, Tesla en later Victron wordt gebruikt voor actieve orchestratie**.
 
-1. wat de huidige actieve warmwaterregeling werkelijk deed;
-2. wat de Energy Manager baseline/v0.2 zou hebben gedaan;
-3. wat M7 met prijs- en PV-forecast zou hebben geadviseerd.
+Daarbij vergelijken we nog steeds:
 
-Pas daarna wordt besloten hoe de actieve warmwaterflow wordt aangepast. De eerste harde ontwerpvoorwaarde voor die toekomstige versie is al duidelijk: **in boilermodus moet de 4-uurswarmwaterconstraint uiterlijk om 19:00 gegarandeerd zijn**.
+1. wat de huidige actieve warmwaterregeling werkelijk doet;
+2. wat Energy Manager v1.6.4 observeert en zou adviseren;
+3. wat M7 v1.3 met prijs- en PV-forecast adviseert.
+
+Pas daarna wordt de actieve warmwaterregeling vervangen of verder geïntegreerd in de centrale Energy Manager. De harde ontwerpvoorwaarde blijft: **in boilermodus moet de 4-uurswarmwaterconstraint uiterlijk om 19:00 gegarandeerd zijn**.
