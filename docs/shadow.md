@@ -54,10 +54,8 @@ Deze methode heeft geen extra temperatuursensor nodig. De status blijft wel een 
 
 Zodra `OP_TEMPERATUUR` is bevestigd, is de verwarmingscyclus voltooid. De cyclus wordt vervolgens klaargezet voor publicatie naar **`boiler-cycles.json`**. Daar bewaren we onder andere start- en eindtijd, duur, boiler-kWh, geschat PV- en netaandeel en of de temperatuurstatus daadwerkelijk is bereikt.
 
-Een cyclus kan bijvoorbeeld conceptueel opleveren: start 23:15, `OP_TEMPERATUUR` 01:40, 2 uur 25 minuten looptijd, 4,8 kWh boilerenergie en een bepaald PV-/netaandeel. De echte waarden worden uiteraard uit de Homey-metingen berekend.
-
-!!! info "Waarom dit belangrijk is voor de toekomstige warmwaterregeling"
-    Als deze detectieketen in de praktijk betrouwbaar blijkt, kan `OP_TEMPERATUUR` uiteindelijk het **primaire dagelijkse warmwaterdoel** worden. De huidige 240-minutenregel vóór 19:00 kan dan als veiligheids-/fallbackregel blijven bestaan in plaats van het primaire succescriterium te zijn.
+!!! info "Gevalideerd in de praktijk"
+    Deze volledige detectieketen is in de nacht van 15 op 16 augustus 2026 succesvol end-to-end doorlopen. `OP_TEMPERATUUR` is daarmee niet meer alleen een ontwerpaanname maar een praktisch gevalideerd semantisch signaal voor de shadowarchitectuur.
 
 ### Overige boilerstatussen
 
@@ -69,22 +67,52 @@ Een cyclus kan bijvoorbeeld conceptueel opleveren: start 23:15, `OP_TEMPERATUUR`
 
 **Deze detectie is uitsluitend observerend en stuurt de boiler niet aan.**
 
-## Nachtelijke praktijktest
+## Nachtelijke praktijktest — ✅ GESLAAGD
 
-Een natuurlijke nachtelijke opwarmcyclus is juist een goede acceptatietest. Wanneer vóór het slapen warm water wordt gebruikt en de boiler daarna elektrisch gaat bijverwarmen, kan v1.6.4 de volledige overgang automatisch volgen.
+De natuurlijke nachtelijke opwarmcyclus van **15 op 16 augustus 2026** is gebruikt als end-to-end acceptatietest van v1.6.4. De test is **succesvol afgerond**. De verwachte toestandsovergangen zijn daadwerkelijk waargenomen en de afgeronde cyclus is persistent opgeslagen in `boiler-cycles.json`.
 
-Voor een geslaagde test verwachten we achtereenvolgens:
+### Werkelijk gemeten resultaat
 
-1. boiler AAN en >1.500 W → `VERWARMEN`;
-2. minimaal 15 minuten aantoonbaar verwarmen;
-3. na het bereiken van de thermostaattemperatuur daalt het vermogen tot <100 W → `AFKOELEN_WACHT`;
-4. na 10 minuten blijvend <100 W → `OP_TEMPERATUUR`;
-5. de afgeronde cyclus verschijnt bij een publisher-run in `boiler-cycles.json`.
+| Bevinding | Resultaat |
+|---|---|
+| Start cyclus | **15-08-2026 23:06** lokale tijd |
+| Beginstatus | `VERWARMEN` |
+| Vermogen tijdens werkelijk verwarmen | circa **2 kW** |
+| Na thermostaat-afslag | vermogen zakte tot **<100 W / uiteindelijk 0 W**, terwijl de boiler AAN bleef |
+| Tussenstatus | `AFKOELEN_WACHT` |
+| Bevestiging | **10 minuten continu <100 W** na bevestigde verwarmfase |
+| Eindstatus | **`OP_TEMPERATUUR`** |
+| Einde cyclus | **16-08-2026 00:15** lokale tijd |
+| Duur | **69 minuten** |
+| Geschat boilerverbruik | **1,856 kWh** |
+| Geschat PV-aandeel | **0 kWh / 0%** |
+| Geschat netaandeel | **1,856 kWh / 100%** |
+| Gemiddelde P1-import | **2.070 W** |
+| Maximale P1-import | **2.549 W** |
+| Aantal samples | **38** |
+| `reached_temperature` | **true** |
+| Eindreden | **`OP_TEMPERATUUR`** |
+| Persistente registratie | ✅ `boiler-cycles.json` |
 
-De gebruiker hoeft hiervoor niet wakker te blijven of handmatig het vermogen te controleren. De 2-minutenobserver houdt de toestand bij en de 15-minutenpublisher bewaart de relevante resultaten. De volgende ochtend kan de cyclus worden beoordeeld op statusovergang, duur, energiegebruik en geschat PV-/netaandeel.
+De daadwerkelijk bewezen keten is dus:
 
-!!! warning "Voorwaarde voor deze test"
-    De boiler moet tijdens de nacht **AAN mogen blijven** totdat zijn interne thermostaat het verwarmingselement uitschakelt. Als een andere actieve Homey-regeling de boiler eerder UIT zet, eindigt de cyclus met reden `UIT` en is dat geen volledige acceptatietest van `OP_TEMPERATUUR`.
+**`VERWARMEN → AFKOELEN_WACHT → OP_TEMPERATUUR → boiler-cycles.json`**
+
+### Acceptatie-uitkomst
+
+**PASS.** v1.6.4 heeft tijdens een echte natuurlijke verwarmingscyclus zelfstandig:
+
+1. werkelijk verwarmen herkend;
+2. de daaropvolgende thermostatische vermogensafslag gedetecteerd zonder `onoff=true` als blijvende warmtevraag te interpreteren;
+3. de vereiste 10-minutenbevestiging doorlopen;
+4. `OP_TEMPERATUUR` correct vastgesteld;
+5. de cyclus afgesloten met `end_reason=OP_TEMPERATUUR` en `reached_temperature=true`;
+6. duur en energiegebruik geïntegreerd;
+7. het resultaat persistent gepubliceerd in `boiler-cycles.json`.
+
+Daarmee is het eerdere open validatiepunt **“boiler AAN maar 0 W”** gesloten. Alleen `onoff=true + 0 W` is op zichzelf niet voldoende; de combinatie met een vooraf bevestigde verwarmfase en de 10-minutenwachttijd is nu in de praktijk bewezen.
+
+De succesvolle test was vervolgens de basis voor **M7 Opportunity Shadow v1.3**. M7 gebruikt nu de semantische boilerstatus, waardoor een boiler die nog `onoff=true` is maar al `OP_TEMPERATUUR` staat niet meer ten onrechte als flexibele belasting wordt geselecteerd.
 
 ### Shadow v0.2 — Energie Manager PV + Quooker
 
@@ -92,7 +120,7 @@ v0.2 is een aparte experimentele analyselaag met Quooker, Tesla-sessieregistrati
 
 ### M7 Opportunity Score — prijs + PV-forecast
 
-M7 is een aparte parallelle analyselaag. De Opportunity Score combineert prijs- en PV-forecastcontext met de werkelijke net-, Tesla-, boiler- en Quookerstatus.
+M7 is een aparte parallelle analyselaag. De Opportunity Score combineert prijs- en PV-forecastcontext met de werkelijke net-, Tesla-, boiler- en Quookerstatus. De actieve **v1.3** gebruikt daarbij de gevalideerde semantische boilerstatus uit de Energy Manager.
 
 ## Logging en bewaartermijnen
 
@@ -153,10 +181,12 @@ v1.6.4 gebruikt één scriptkaart en één compacte gedeelde Logic-state. De pub
   const root = document.getElementById('shadow-monitor');
   const BASE = 'https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/';
   const URLs = {status:BASE+'homey-status.json',baseline:BASE+'shadow-baseline-v01.json',cycles:BASE+'boiler-cycles.json',daily:BASE+'energy-daily-history.json',v02:BASE+'shadow-v02-quooker.json',m7:BASE+'m7-opportunity.json'};
-  const esc = v => String(v ?? '–').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc = v => String(v ?? '–').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const fmt = ts => ts ? new Date(ts).toLocaleString('nl-NL') : '–';
   async function get(url,optional=false){const r=await fetch(url+'?ts='+Date.now(),{cache:'no-store'});if(optional&&r.status===404)return null;if(!r.ok)throw new Error(`${url.split('/').pop()}: HTTP ${r.status}`);return r.json();}
   function enabledFrom(status,name,fallback){const f=(status?.flows||[]).find(x=>x.name===name);return f?!!f.enabled:!!fallback;}
   function latestTable(x,tsField='ts'){if(!x)return '<em>Nog geen gegevens.</em>';return '<table><tbody>'+Object.entries(x).filter(([k])=>k!==tsField&&typeof x[k]!=='object').map(([k,v])=>`<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')+`<tr><th>tijd</th><td>${esc(fmt(x[tsField]))}</td></tr></tbody></table>`;}
-  async function load(){try{const [status,baseline,cycles,daily,v02,m7]=await Promise.all([get(URLs.status,true),get(URLs.baseline,true),get(URLs.cycles,true),get(URLs.daily,true),get(URLs.v02,true),get(URLs.m7,true)]);const bEnabled=enabledFrom(status,'Energie Manager PV - Shadow Mode v1.6.4',baseline?.enabled),vEnabled=enabledFrom(status,'Energie Manager PV - Shadow Mode v0.2 Quooker',v02?.enabled),mEnabled=enabledFrom(status,'M7 - Opportunity Score - Shadow',m7?.enabled),cycleList=cycles?.cycles||[],lastCycle=cycleList.length?cycleList[cycleList.length-1]:null,days=daily?.days||[],lastDay=days.length?days[days.length-1]:null,ml=m7?.latest||null,latestTimes=[baseline?.generated_at,cycles?.generated_at,daily?.generated_at,m7?.generated_at].filter(Boolean).map(x=>new Date(x).getTime()).filter(Number.isFinite),latestSync=latestTimes.length?new Date(Math.max(...latestTimes)).toISOString():null;root.innerHTML=`<p><strong>Laatste shadowpublicatie:</strong> ${esc(fmt(latestSync))}</p><div class="grid cards" markdown="0"><div class="card"><h3>Baseline v1.6.4</h3><p><strong>${esc(baseline?.sample_count??0)}</strong> samples · ${bEnabled?'ACTIEF':'INACTIEF'}</p><p><small>${esc(fmt(baseline?.generated_at))}</small></p></div><div class="card"><h3>Boilercycli</h3><p><strong>${esc(cycleList.length)}</strong> cycli · 90 dagen</p><p><small>${lastCycle?esc(lastCycle.boiler_kWh_est)+' kWh · '+esc(lastCycle.pv_share_pct_est)+'% PV':'Nog geen afgeronde v1.6.4-cyclus'}</small></p></div><div class="card"><h3>Daghistorie</h3><p><strong>${esc(days.length)}</strong> afgeronde dagen</p><p><small>${lastDay?'Laatste: '+esc(lastDay.date):'Nog geen afgeronde dag'}</small></p></div><div class="card"><h3>M7 Opportunity</h3><p><strong>${esc(m7?.sample_count??0)}</strong> samples · ${mEnabled?'ACTIEF':'INACTIEF'}</p></div></div><h2>Laatste baselinebeslissing</h2>${latestTable(baseline?.latest)}<h2>Laatste boilercyclus</h2>${lastCycle?latestTable(lastCycle,'end_ts'):'<em>Nog geen afgeronde boilercyclus gepubliceerd.</em>'}<h2>Laatste afgeronde dag</h2>${lastDay?latestTable(lastDay,'last_ts'):'<em>De eerste dag wordt na middernacht toegevoegd.</em>'}<h2>Laatste M7-analyse</h2>${ml?latestTable(ml):'<em>Nog geen M7-sample.</em>'}<h2>Shadow v0.2 + Quooker</h2><p>${vEnabled?'ACTIEF':'INACTIEF'} · ${esc(v02?.sample_count??0)} samples</p>`;}catch(e){root.innerHTML=`<div class="admonition warning"><p class="admonition-title">Shadowdata kon niet volledig worden geladen</p><p>${esc(e.message)}</p></div>`;}}load();setInterval(load,60000);})();
+  async function load(){try{const [status,baseline,cycles,daily,v02,m7]=await Promise.all([get(URLs.status,true),get(URLs.baseline,true),get(URLs.cycles,true),get(URLs.daily,true),get(URLs.v02,true),get(URLs.m7,true)]);const bEnabled=enabledFrom(status,'Energie Manager PV - Shadow Mode v1.6.4',baseline?.enabled),vEnabled=enabledFrom(status,'Energie Manager PV - Shadow Mode v0.2 Quooker',v02?.enabled),mEnabled=enabledFrom(status,'M7 - Opportunity Score - Shadow v1.3',m7?.enabled),cycleList=cycles?.cycles||[],lastCycle=cycleList.length?cycleList[cycleList.length-1]:null,days=daily?.days||[],lastDay=days.length?days[days.length-1]:null,ml=m7?.latest||null,latestTimes=[baseline?.generated_at,cycles?.generated_at,daily?.generated_at,m7?.generated_at].filter(Boolean).map(x=>new Date(x).getTime()).filter(Number.isFinite),latestSync=latestTimes.length?new Date(Math.max(...latestTimes)).toISOString():null;root.innerHTML=`<p><strong>Laatste shadowpublicatie:</strong> ${esc(fmt(latestSync))}</p><div class="grid cards" markdown="0"><div class="card"><h3>Baseline v1.6.4</h3><p><strong>${esc(baseline?.sample_count??0)}</strong> samples · ${bEnabled?'ACTIEF':'INACTIEF'}</p><p>Boilerstatus: <strong>${esc(baseline?.latest?.boilerState)}</strong></p><p>Actieve boilercyclus: <strong>${esc(baseline?.latest?.boilerCycleActive)}</strong></p></div><div class="card"><h3>Laatste boilercyclus</h3>${latestTable(lastCycle,'end_ts')}</div><div class="card"><h3>Laatste afgeronde dag</h3>${latestTable(lastDay,'date')}</div><div class="card"><h3>M7 Opportunity</h3><p>${mEnabled?'ACTIEF':'INACTIEF'} · advies <strong>${esc(ml?.advice)}</strong></p><p>kandidaat: <strong>${esc(ml?.candidate)}</strong> · score ${esc(ml?.score)}</p><p>boilerstatus: <strong>${esc(ml?.boilerState)}</strong> · leeftijd ${esc(ml?.boilerStateAgeMin)} min</p><p>start/defer: <strong>${esc(ml?.boilerCanStart)}</strong> / <strong>${esc(ml?.boilerCanDefer)}</strong></p><p>${esc(ml?.reason)}</p></div></div>`;}catch(e){root.innerHTML='<p><strong>Live shadowdata kon niet worden geladen:</strong> '+esc(e.message)+'</p>';}}
+  load();
+})();
 </script>
