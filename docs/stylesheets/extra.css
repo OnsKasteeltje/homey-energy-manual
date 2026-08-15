@@ -36,7 +36,125 @@
 .status-pill.status-error, .health-error { background:rgba(198,40,40,.13); color:#c62828; }
 .status-pill.status-unknown, .health-unknown { background:rgba(90,90,90,.12); color:#666; }
 .legend { display:flex; flex-wrap:wrap; gap:.5rem; margin:.75rem 0; }
-@media (max-width: 600px) {
-  .status-toolbar { align-items:flex-start; flex-direction:column; }
-  .flow-card-header { flex-direction:column; }
+
+/*
+ * Mobile-only improvements.
+ * Desktop/tablet layouts >= 768px intentionally remain untouched.
+ */
+@media (max-width: 767px) {
+  /* Slightly more usable content width on phones. */
+  .md-content__inner {
+    margin: 0 .15rem;
+  }
+
+  /* Keep headings readable without consuming most of a small screen. */
+  .md-typeset h1 {
+    font-size: 1.65rem;
+    line-height: 1.2;
+    margin-bottom: .8rem;
+  }
+  .md-typeset h2 {
+    font-size: 1.35rem;
+    line-height: 1.25;
+    margin-top: 1.5rem;
+  }
+  .md-typeset h3 {
+    font-size: 1.15rem;
+    line-height: 1.3;
+  }
+
+  /* Prevent long technical identifiers and URLs from forcing page overflow. */
+  .md-typeset p,
+  .md-typeset li,
+  .flow-card-title,
+  .flow-detail,
+  .flow-meta {
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  /* Status/flow cards stack cleanly to one column. */
+  .status-toolbar {
+    align-items:flex-start;
+    flex-direction:column;
+    padding:.85rem;
+    gap:.65rem;
+  }
+  .flow-grid {
+    grid-template-columns:minmax(0,1fr);
+    gap:.75rem;
+  }
+  .flow-card {
+    min-width:0;
+    padding:.85rem;
+  }
+  .flow-card-header {
+    flex-direction:column;
+    gap:.5rem;
+  }
+  .flow-meta {
+    flex-wrap:wrap;
+    gap:.35rem .8rem;
+  }
+  .status-pill,
+  .health-badge {
+    white-space:normal;
+  }
+
+  /*
+   * MkDocs Material already wraps most Markdown tables in a scroll container.
+   * These rules make that behaviour explicit for wide technical tables and
+   * preserve useful font size instead of shrinking the whole page.
+   */
+  .md-typeset__table {
+    display:block;
+    max-width:100%;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .md-typeset__table table,
+  .md-typeset table:not([class]) {
+    width:max-content;
+    min-width:100%;
+    font-size:.78rem;
+  }
+  .md-typeset table th,
+  .md-typeset table td {
+    padding:.5rem .6rem;
+    vertical-align:top;
+  }
+
+  /* Code and JSON remain scrollable instead of widening the page. */
+  .md-typeset pre,
+  .md-typeset code,
+  .highlight,
+  .highlighttable {
+    max-width:100%;
+  }
+  .md-typeset pre {
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    font-size:.76rem;
+  }
+  .md-typeset :not(pre) > code {
+    overflow-wrap:anywhere;
+    white-space:normal;
+  }
+
+  /* Admonitions are common on the site; reduce wasted phone width. */
+  .md-typeset .admonition,
+  .md-typeset details {
+    margin-left:0;
+    margin-right:0;
+    padding-left:.8rem;
+    padding-right:.8rem;
+  }
+
+  /* Images/embedded content should never exceed the viewport. */
+  .md-typeset img,
+  .md-typeset svg,
+  .md-typeset iframe {
+    max-width:100%;
+    height:auto;
+  }
 }
