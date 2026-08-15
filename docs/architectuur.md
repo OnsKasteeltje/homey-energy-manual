@@ -2,41 +2,29 @@
 
 Deze pagina beschrijft de huidige en geplande Homey-energiearchitectuur als één samenhangend regelsysteem.
 
-De centrale gedachte is:
+De architectuur kent bewust twee verschillende lagen:
 
 ```text
-                ┌─────────────────────┐
-                │    PV-productie     │
-                │ SE + GoodWe + GW2000│
-                └─────────┬───────────┘
-                          │
-                          ▼
-                ┌─────────────────────┐
-                │      P1-meter       │
-                │ netto import/export │
-                └─────────┬───────────┘
-                          │
-                          ▼
-               ┌───────────────────────┐
-               │   Energie Manager     │
-               │    Homey / EMS        │
-               └───────┬───────┬───────┘
-                       │       │
-            ┌──────────┘       └───────────┐
-            ▼                              ▼
-      ┌────────────┐                 ┌────────────┐
-      │   Tesla    │                 │   Boiler   │
-      │   Easee    │                 │ HSTP 200   │
-      └────────────┘                 └────────────┘
-            │                              │
-            └──────────┬───────────────────┘
-                       ▼
-                ┌─────────────┐
-                │ Teruglevering│
-                └─────────────┘
+                 BESTURING / ORCHESTRATIE
+
+                    ENERGY MANAGER
+                       Homey
+                    /          \
+                   ▼            ▼
+                Tesla         Boiler
+
+                 FYSIEKE ENERGIESTROOM
+
+ PV-bronnen ───► HUISBUS ◄────► GRID / P1
+                    │
+          ┌─────────┼─────────┐
+          ▼         ▼         ▼
+     Huishouden   Tesla     Boiler
 ```
 
-De **Quooker** valt bewust niet simpelweg in deze prioriteitsketen. Die heeft eigen gebruiksvensters en wordt daarom als **constraint** behandeld.
+De **Energy Manager ligt niet in het elektrische stroompad**. Hij observeert, beslist en stuurt flexibele verbruikers. De fysieke energiestroom loopt via de elektrische installatie.
+
+De **Quooker** valt niet simpelweg in de flexprioriteitsketen. Die heeft eigen gebruiksvensters en wordt als constraint behandeld.
 
 ---
 
@@ -50,45 +38,37 @@ De woning heeft drie afzonderlijke PV-omvormers:
 - GoodWe GW4200D-NS;
 - GoodWe GW2000-XS.
 
-Voor de centrale regeling is de **P1-meter leidend**. Daarmee wordt het werkelijke netto saldo van de woning gebruikt, ongeacht welke omvormer op dat moment produceert.
-
-### P1-meter
-
-De P1-meter levert:
-
-- netto import/export;
-- faseverdeling;
-- cumulatief verbruik;
-- cumulatieve teruglevering.
-
-Voor de huidige Homey-regeling wordt vooral het actuele netto vermogen gebruikt.
+Voor de centrale regeling is de **P1-meter leidend** voor de netto huisbalans. Daarnaast worden L1, L2 en L3 afzonderlijk gemonitord.
 
 ```text
 P1 < 0 W  → netto teruglevering
 P1 > 0 W  → netto afname
 ```
 
+De fasemeting wordt gebruikt voor analyse, fase-identificatie en later voor veilige actieve orchestratie.
+
 ---
 
 ## 2. Centrale beslislaag
 
-De centrale Energie Manager combineert:
+De centrale Energy Manager combineert onder andere:
 
 - P1-netvermogen;
-- Tesla/Easee laadstatus en vermogen;
-- boilervermogen;
+- L1/L2/L3-fasebelasting;
+- Tesla/Easee laadstatus en werkelijk vermogen;
+- boilervermogen en semantische boilerstatus;
 - Quooker-status;
 - tijdvensters;
 - seizoensmodus;
-- toekomstige prijs-/contractregels.
+- prijs-/PV-forecastcontext.
 
-De huidige nieuwe versie draait eerst in **shadow mode**. Hij berekent beslissingen en logt ze, maar stuurt de grote verbruikers nog niet centraal aan.
+De huidige centrale Energy Manager draait nog in **shadow mode**. Hij berekent en logt beslissingen, maar neemt de centrale fysieke aansturing nog niet over.
 
 ---
 
-## 3. Prioriteitsmodel
+## 3. Prioriteitsmodel voor flexibele energie
 
-De gewenste flexibele-verbruikersprioriteit is:
+De gewenste energietoewijzing is:
 
 ```text
 1. Normaal huishoudelijk verbruik
@@ -97,71 +77,97 @@ De gewenste flexibele-verbruikersprioriteit is:
 4. Teruglevering
 ```
 
-Dit betekent niet dat Tesla altijd stroom krijgt. De Tesla moet voldoende vermogen kunnen krijgen om zinvol te laden.
-
 ### Tesla
 
-Minimale 3-fase laadstroom:
+De minimale zinvolle 3-fase laadstroom is:
 
 ```text
 3 × 6 A ≈ 4,14 kW
 ```
 
-Daarom krijgt Tesla alleen prioriteit wanneer voldoende vermogen beschikbaar is.
+Tesla krijgt daarom alleen flexprioriteit wanneer voldoende vermogen beschikbaar is.
 
 ### Boiler
 
-De boiler vraagt circa:
-
-```text
-1,95–2,0 kW
-```
-
-Daardoor kan de boiler PV benutten in situaties waar te weinig vermogen beschikbaar is voor Tesla.
+De boiler vraagt circa 1,95–2,0 kW en kan daardoor kleiner PV-overschot benutten dan de Tesla.
 
 ### Restenergie
 
-Wat daarna overblijft, wordt teruggeleverd.
+Wat na huishoudelijk verbruik, Tesla en boiler resteert, wordt teruggeleverd.
 
 ---
 
-## 4. Quooker als constraint
+## 4. Veiligheids- en regelhiërarchie
 
-De Quooker wordt **niet** behandeld als vrij regelbare flexibele belasting.
+De Energy Manager is **niet de hoogste regelautoriteit**. Lokale veiligheids- en hardwarelagen krijgen altijd voorrang.
 
-Reden:
-
-- warmwatercomfort heeft directe gebruiksimpact;
-- de bestaande Quooker-flows hebben functionele tijdvensters;
-- het verbruik is relatief klein ten opzichte van Tesla en boiler;
-- de Quooker mag de centrale prioriteitslogica niet onverwacht verstoren.
-
-Daarom is Quooker een **constraint**:
+De doelhiërarchie is:
 
 ```text
-Energie Manager
-    │
-    ├─ leest Quooker-status
-    ├─ respecteert bestaand tijdvenster
-    └─ stuurt Quooker voorlopig niet centraal aan
+Installatieveiligheid / 3×25 A
+          ↓
+Easee Equalizer load balancing
+          ↓
+Victron grid/batterijregeling (later)
+          ↓
+Homey Energy Manager / flex-orchestratie
+          ↓
+Tesla / boiler
 ```
 
-### Huidige Quooker-vensters
+### Easee Equalizer is leidend voor laadveiligheid
+
+De Easee Equalizer mag autonoom de Tesla-laadstroom verlagen of het laden pauzeren wanneer de totale of fasebelasting dit vereist. Homey probeert zo'n ingreep **nooit te overrulen**.
+
+Voorbeeld:
+
+```text
+Tesla laadt op Homey-doel 10 A
+        ↓
+oven of andere grote verbruiker gaat aan
+        ↓
+Easee Equalizer verlaagt naar 6 A of pauzeert
+        ↓
+Homey accepteert de werkelijke laadstroom
+        ↓
+geen directe poging om opnieuw 10 A af te dwingen
+```
+
+### Gevraagd versus werkelijk Tesla-vermogen
+
+De actieve orchestratie moet altijd onderscheid maken tussen:
+
+- door Homey **gevraagde** laadstroom;
+- door Easee **werkelijk geleverde** laadstroom/vermogen.
+
+Nieuwe beslissingen worden genomen op basis van de werkelijke toestand: Tesla-vermogen, P1 en L1/L2/L3.
+
+### Geen directe herverdeling na Equalizer-ingreep
+
+Wanneer de Equalizer Tesla terugregelt, wordt het ogenschijnlijk vrijgekomen vermogen niet automatisch direct aan de boiler toegewezen. Eerst worden net- en fasebelasting opnieuw beoordeeld.
+
+### Stabilisatie / hysterese
+
+Na onverwacht terugregelen of pauzeren door Easee wordt in de toekomstige actieve regeling een korte stabilisatieperiode gebruikt voordat vermogen opnieuw wordt toegewezen. Richtwaarde: **1–2 minuten**. De definitieve waarde wordt vóór activering in shadow mode gevalideerd.
+
+Doel: voorkomen dat Easee en Homey tegen elkaar in gaan regelen.
+
+---
+
+## 5. Quooker als constraint
+
+De Quooker is geen vrij regelbare flex-load. Bestaande vensters blijven leidend zolang de centrale Energy Manager in shadow mode draait.
 
 | Dagtype | Toegestaan venster |
 |---|---|
 | Werkdagen | **15:00–19:00** |
 | Weekend | **08:00–19:00** |
 
-Buiten dit venster wordt Quooker in de Energie Manager gemarkeerd als **BUITEN_VENSTER**.
-
-Binnen het venster als **TOEGESTAAN**.
-
-De bestaande Quooker-flows blijven leidend zolang de centrale Energie Manager nog in shadow mode is.
+Binnen het venster is Quooker `TOEGESTAAN`; daarbuiten `BUITEN_VENSTER`.
 
 ---
 
-## 5. Warmwaterarchitectuur
+## 6. Warmwaterarchitectuur
 
 Er zijn twee warmwaterbronnen:
 
@@ -169,9 +175,7 @@ Er zijn twee warmwaterbronnen:
 Elektrische boiler  ←→  handmatige omschakeling  ←→  Vaillant CV
 ```
 
-Homey regelt alleen de elektrische boiler automatisch.
-
-De fysieke omschakeling naar CV blijft handmatig.
+Homey regelt alleen de elektrische boiler automatisch. De fysieke omschakeling blijft handmatig.
 
 ### `WW_Boilermodus`
 
@@ -180,13 +184,17 @@ De fysieke omschakeling naar CV blijft handmatig.
 | JA | elektrische boiler actief |
 | NEE | CV actief |
 
-Homey gebruikt deze variabele als bronselectie.
+De boilerobserver gebruikt de gevalideerde keten:
+
+```text
+VERWARMEN → AFKOELEN_WACHT → OP_TEMPERATUUR
+```
 
 ---
 
-## 6. Seizoensbeslissing
+## 7. Seizoensbeslissing
 
-Homey beoordeelt niet één dag, maar zeven volledige meetdagen.
+Homey beoordeelt zeven volledige meetdagen.
 
 Voor 2026:
 
@@ -195,64 +203,41 @@ Voor 2026:
 ≥ 5 goede PV-dagen → advies naar boiler
 ```
 
-De tussenruimte voorkomt pendelen.
-
-De melding gaat naar **Mr Horizon** en vereist handmatige fysieke omschakeling.
+De tussenruimte voorkomt pendelen. De melding vereist handmatige fysieke omschakeling.
 
 ---
 
-## 7. Tesla-laadarchitectuur
+## 8. Tesla-laadarchitectuur
 
 De Tesla-laag bestaat uit:
 
 - Easee Charger;
 - Easee Equalizer;
-- Tesla Model 3 Highland RWD;
+- Tesla Model 3;
 - bestaande Tesla-flows;
-- nieuwe centrale Energie Manager.
+- centrale Energy Manager.
 
-De nieuwe monitoring gebruikt voortaan:
+Monitoring gebruikt de werkelijke laadstatus en het werkelijke vermogen. De Energy Manager mag nooit alleen op een laadsetpoint vertrouwen wanneer de Equalizer lokaal heeft teruggestuurd.
 
-```text
-evcharger_charging
-meter_power (cumulatief)
-measure_power (alleen actueel)
-```
-
-De historische `measure_power` Insight wordt niet gebruikt als primaire bron omdat daarin null-waarden voorkomen.
-
-Per laadsessie worden straks vastgelegd:
-
-- starttijd;
-- eindtijd;
-- duur;
-- geladen kWh;
-- gemiddeld vermogen;
-- maximaal vermogen.
+Per laadsessie kunnen onder andere starttijd, eindtijd, duur, geladen kWh, gemiddeld en maximaal vermogen worden vastgelegd.
 
 ---
 
-## 8. Shadow versus actief
+## 9. Shadow versus actief
 
 ### Actief
 
-Actieve bestaande regelingen sturen werkelijk apparaten.
-
-Voorbeelden:
-
-- huidige warmwateroptimalisatie;
-- bestaande Tesla-laadflows;
-- bestaande Quooker-flows.
+Bestaande regelingen sturen werkelijk apparaten, zoals delen van warmwater-, Tesla- en Quookerlogica.
 
 ### Shadow
 
-De centrale Energie Manager:
+De centrale Energy Manager:
 
 - leest;
 - berekent;
 - logt;
 - vergelijkt;
-- stuurt nog niet.
+- stuurt nog niet centraal.
 
 Doel:
 
@@ -262,78 +247,72 @@ werkelijk gedrag
 gesimuleerde centrale beslissing
 ```
 
-Na voldoende validatie kan de centrale Energie Manager stapsgewijs delen overnemen.
+De nieuwe Equalizer-/faseveiligheidsregels worden eerst in shadow mode gevalideerd voordat ze onderdeel worden van actieve orchestratie.
 
 ---
 
-## 9. Constraints-overzicht
+## 10. Constraints-overzicht
 
 | Constraint | Effect |
 |---|---|
+| Installatieveiligheid / 3×25 A | absolute bovengrens |
+| Easee Equalizer | lokale load balancing heeft voorrang op Homey |
+| Werkelijk Tesla-vermogen | leidend boven gevraagd setpoint |
+| L1/L2/L3-fasebelasting | meewegen vóór nieuwe flexbeslissing |
+| Equalizer-ingreep | geen directe herverdeling naar boiler |
+| Stabilisatie na terugregelen | richtwaarde 1–2 min; nog te valideren |
 | Tesla minimaal 3×6 A | onder ca. 4,14 kW geen zinvolle laadstart |
 | Boiler circa 2 kW | benut kleiner PV-overschot |
-| Boiler startvenster huidig | 09:30–14:30 |
-| Boiler hard einde huidig | 15:30 |
-| Gepland boilervenster | start tot 16:30, einde 18:00 |
 | Quooker werkdagen | 15:00–19:00 |
 | Quooker weekend | 08:00–19:00 |
 | CV ↔ boiler | handmatige omschakeling |
-| `WW_Boilermodus` | bepaalt welke warmwaterbron logisch actief is |
+| `WW_Boilermodus` | bepaalt logische warmwaterbron |
 | 7-daagse hysterese | voorkomt veelvuldig omschakelen |
 | Shadow mode | centrale manager stuurt nog geen apparaten |
 | P1 beschikbaarheid | zonder P1 geen centrale vermogensbeslissing |
-| Device beschikbaarheid | ontbrekend apparaat → fout/fail-safe |
-| Flowversionering | per functionele flowfamilie maximaal één actieve versie |
+| Device beschikbaarheid | ontbrekend apparaat → fail-safe |
+| Flowversionering | per flowfamilie maximaal één actieve versie |
 
 ---
 
-## 10. Architectuur met alle beslisregels
+## 11. Doelarchitectuur met veiligheidslagen
 
 ```text
-                         ┌──────────────────────┐
-                         │      PV-bronnen      │
-                         │ SE + GW4200 + GW2000 │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │      P1-meter        │
-                         │ netto huisbalans     │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                    ┌──────────────────────────────┐
-                    │      ENERGIE MANAGER         │
-                    │ Homey / later Victron EMS    │
-                    └───────┬─────────┬────────────┘
-                            │         │
-              ┌─────────────┘         └─────────────┐
-              ▼                                     ▼
-      ┌────────────────┐                     ┌────────────────┐
-      │     TESLA      │                     │     BOILER     │
-      │ ≥ ~4,14 kW     │                     │ ≥ ~2,1 kW PV   │
-      │ prioriteit #2  │                     │ prioriteit #3  │
-      └────────────────┘                     └────────────────┘
-              │                                     │
-              └─────────────┬───────────────────────┘
-                            ▼
-                   ┌─────────────────┐
-                   │ Teruglevering   │
-                   └─────────────────┘
+                 BESTURING
 
-        Parallelle constraints:
-        ─────────────────────────────────────────────
-        Quooker: werktijden/weekendvenster respecteren
-        CV↔boiler: handmatig, WW_Boilermodus leidend
-        7-daagse seizoenshysterese
-        Shadow-validatie vóór centrale aansturing
-        Fail-safe bij ontbrekende P1/device-data
-        Maximaal één actieve versie per flowfamilie
+             ┌──────────────────┐
+             │  ENERGY MANAGER  │
+             │      Homey       │
+             └───────┬──────────┘
+                     │ gewenste laadstroom
+                     ▼
+              ┌─────────────┐
+              │ Easee       │
+              │ Charger     │
+              └──────┬──────┘
+                     │
+        ┌────────────▼────────────┐
+        │ Easee Equalizer        │
+        │ lokale load balancing  │
+        └────────────┬────────────┘
+                     │ werkelijk vermogen
+                     ▼
+                   Tesla
+
+                 ENERGIE
+
+PV ─────────► HUISBUS ◄────────► GRID
+                │
+        ┌───────┼────────┐
+        ▼       ▼        ▼
+     Huis     Tesla    Boiler
 ```
+
+De Energy Manager beslist over comfort en flexibiliteit. De Equalizer bewaakt lokaal de laadruimte. Geen hogere softwaredoelstelling mag een lokale veiligheidsbegrenzing terugdraaien.
 
 ---
 
-## 11. Toekomstige Victron-laag
+## 12. Toekomstige Victron-laag
 
 De geplande Victron-architectuur voegt later toe:
 
@@ -343,29 +322,30 @@ De geplande Victron-architectuur voegt later toe:
 - thuisbatterij;
 - Victron EMS.
 
-Daarbij wordt de rolverdeling:
+Rolverdeling:
 
 ```text
 Victron EMS
   └─ batterij / net / energie-optimalisatie
 
+Easee Equalizer
+  └─ lokale EV-load balancing / installatiebescherming
+
 Homey
   └─ huishoudelijke flexibiliteit en orchestratie
-       ├─ Tesla
+       ├─ Tesla-doel
        ├─ boiler
        ├─ Quooker constraints
        └─ gebruikersmeldingen
 ```
 
-Homey blijft dus vooral de **comfort- en verbruikersorchestrator**.
-
-Victron wordt de primaire laag voor batterij- en netoptimalisatie.
+Homey blijft comfort- en verbruikersorchestrator. Victron wordt primaire batterij-/netlaag. Easee Equalizer blijft autonoom voor veilige EV-load balancing.
 
 ---
 
-## 12. Flowversionering en wijzigingsbeheer
+## 13. Flowversionering en wijzigingsbeheer
 
-Vanaf 15 augustus 2026 geldt voor iedere Homey-flowfamilie:
+Voor iedere Homey-flowfamilie geldt:
 
 ```text
 inhoudelijke wijziging
@@ -378,34 +358,24 @@ nieuwe versie actief
 oude versie inactief
 ```
 
-Naamgeving:
-
-```text
-<functionele flownaam> vX.Y
-```
-
-Een normale wijziging verhoogt de subversie. Oude versies worden als rollback-/referentiepunt behouden, maar van dezelfde functionele flowfamilie mag **maximaal één versie actief** zijn.
-
-Bestaande ongenummerde flows blijven bestaan tot hun eerstvolgende inhoudelijke wijziging. Op dat moment wordt een nieuwe genummerde opvolger aangemaakt in plaats van de bestaande flow in-place te wijzigen.
-
-De websitebeschrijving en wijzigingshistorie worden tegelijk met de nieuwe Homey-versie aangepast.
+Van dezelfde functionele flowfamilie mag maximaal één versie actief zijn. Websitebeschrijving en wijzigingshistorie worden tegelijk bijgewerkt.
 
 ---
 
-## 13. Ontwerpprincipes
+## 14. Ontwerpprincipes
 
 De architectuur volgt deze principes:
 
 - meten vóór sturen;
-- centrale P1 als waarheid voor huisbalans;
-- Tesla vóór boiler;
-- boiler benut kleiner PV-overschot;
-- Quooker als constraint, niet als vrije batterijachtige belasting;
-- seizoenswissels met hysterese;
-- handmatige fysieke omschakelingen expliciet documenteren;
+- installatieveiligheid vóór optimalisatie;
+- lokale hardwarebeveiliging nooit overrulen;
+- werkelijk vermogen boven gevraagd vermogen;
+- centrale P1 plus L1/L2/L3 als waarheid voor net- en fasebelasting;
+- na veiligheidsingrepen eerst stabiliseren, daarna opnieuw beslissen;
+- Tesla vóór boiler binnen de beschikbare veilige flexruimte;
+- Quooker als constraint;
 - fail-safe boven agressieve optimalisatie;
 - eerst shadow mode, daarna gecontroleerde migratie;
+- Homey zo licht mogelijk houden; analyse/historie/visualisatie zoveel mogelijk buiten Homey;
 - iedere inhoudelijke flowwijziging maakt een nieuwe genummerde flowversie;
-- van één functionele flowfamilie is maximaal één versie actief;
-- oude flowversies blijven beschikbaar voor rollback/referentie;
-- alle Homey-wijzigingen tegelijk vastleggen in Flow Manual en website.
+- alle relevante wijzigingen tegelijk vastleggen in Flow Manual en wijzigingshistorie.
