@@ -1,9 +1,10 @@
 # Energie Manager PV
 
-**Status:** 🟡 Actief in shadow mode  
+**Modus:** Shadow / read-only  
+**Homey-status:** 🔴 Inactief  
 **Flow:** `Energie Manager PV - Shadow Mode`
 
-De flow heeft twee onafhankelijke takken: een **2-minuten sampler** en een **15-minuten GitHub-publisher**. Geen van beide stuurt apparaten aan.
+De flow is momenteel in Homey uitgeschakeld. De onderstaande beschrijving documenteert de werking wanneer deze shadow-flow actief is. De flow heeft twee onafhankelijke takken: een **2-minuten sampler** en een **15-minuten GitHub-publisher**. Geen van beide stuurt apparaten aan.
 
 ## Berekening
 
