@@ -12,21 +12,22 @@ Deze flow onderzoekt onafhankelijk of prijs- en PV-forecastinformatie daadwerkel
 Iedere 15 minuten.
 
 ## Inputs
-- `M7_CONTEXT` met prijs- en PV-signalen.
-- P1/netpositie.
-- Werkelijke PV-/overschotcontext.
-- Tesla/Easee-status.
-- Boilerstatus.
-- Quookerstatus/context waar beschikbaar.
-- Tijdstip en relevante bedrijfsvensters.
+- vier gedeelde Homey Logic-booleans uit M7 Prijs & PV Forecast;
+- P1/netpositie;
+- Tesla/Easee-status en laadvermogen;
+- boilerstatus en boilervermogen;
+- Quookerstatus.
+
+De vier contextvariabelen zijn `M7_Price_Negative`, `M7_Price_Cheap_Next4h`, `M7_Price_Expensive_Next4h` en `M7_PV_Top4h`.
 
 ## Logica
 De flow berekent een **Opportunity Score** en vertaalt die naar een advies, kandidaat en leesbare reden. Voorbeelden zijn `NEUTRAL`, `USE_PV_SURPLUS`, `SHIFT_FLEX_LOAD_NOW` en `DEFER_FLEX_LOAD`.
 
-Het doel is niet dat één M7-signaal direct een apparaat schakelt. De score combineert forecastcontext met wat er werkelijk op het net en bij de flexibele belastingen gebeurt.
+De score combineert forecastcontext met de werkelijke net- en apparaatstatus. Eén forecastsignaal schakelt dus nooit rechtstreeks een apparaat.
 
 ## Outputs
 Per kwartier worden onder andere opgeslagen:
+
 - Opportunity Score;
 - advies;
 - kandidaat;
@@ -34,13 +35,18 @@ Per kwartier worden onder andere opgeslagen:
 - gebruikte M7-signalen;
 - werkelijke import/export en apparaatcontext.
 
-De historie wordt apart bewaard in `M7_SHADOW_ANALYSIS` en is bedoeld voor vergelijking met de reguliere shadowdata.
+De historie blijft kaart-lokaal bewaard in `M7_SHADOW_ANALYSIS` met maximaal 672 kwartiersamples. **Dezelfde scriptkaart die deze state bezit publiceert de dataset ook rechtstreeks naar GitHub** als `docs/data/m7-opportunity.json`. Hierdoor hoeft een aparte syncscript de lokale state niet meer te proberen uitlezen.
+
+GitHub-publicatiefouten worden afgevangen en stoppen de shadowanalyse niet.
+
+## Homey API-belasting
+Per kwartier gebruikt deze flow één gezamenlijke device-uitlezing en één gezamenlijke Logic-uitlezing. Die Logic-uitlezing levert zowel de vier M7-contextwaarden als het GitHub-token voor publicatie.
 
 ## Aangestuurde apparaten
 **Geen.** Volledig read-only/shadow.
 
 ## Status
-Actief. De resultaten worden op de tab **Schaduw** zichtbaar gemaakt zodra de dedicated GitHub shadow-sync actuele data publiceert.
+Actief. De resultaten worden rechtstreeks door deze flow naar de tab **Schaduw** gepubliceerd.
 
 ## Afhankelijkheden
-M7 – Prijs & PV Forecast, P1 en de uitleesbare Homey-apparaatstatussen.
+M7 – Prijs & PV Forecast, P1, Tesla/Easee, boiler, Quooker en `GH_Status_Token`.
