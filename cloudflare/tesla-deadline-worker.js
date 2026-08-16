@@ -3,6 +3,7 @@ const REPO = 'homey-energy-manual';
 const BRANCH = 'main';
 const PATH = 'docs/data/tesla-deadline-command.json';
 const ALLOWED_ORIGIN = 'https://onskasteeltje.github.io';
+const KWH_PER_SOC_PERCENT = 0.59; // eerste praktijkkalibratie: 71% -> 90%, 3x10A, ETA 95 min, ~7.1 kW
 
 function cors(origin) {
   return {
@@ -29,6 +30,10 @@ function toBase64(text) {
   return btoa(unescape(encodeURIComponent(text)));
 }
 
+function round3(n) {
+  return Math.round(Number(n) * 1000) / 1000;
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
@@ -49,25 +54,35 @@ export default {
 
     const active = input.active === true;
     let deadline = '';
+    let currentSoc = null;
+    let targetSoc = null;
     let goalKWh = 0;
     let maxA = 11;
 
     if (active) {
       deadline = String(input.deadline || '').trim();
-      goalKWh = Number(input.goalKWh);
+      currentSoc = Math.round(Number(input.currentSoc));
+      targetSoc = Math.round(Number(input.targetSoc));
       maxA = Math.round(Number(input.maxA));
       if (!validDeadline(deadline)) return json({ ok: false, error: 'invalid_deadline' }, 400, origin);
-      if (!Number.isFinite(goalKWh) || goalKWh < 1 || goalKWh > 75) return json({ ok: false, error: 'invalid_goal_kwh' }, 400, origin);
+      if (!Number.isFinite(currentSoc) || currentSoc < 0 || currentSoc > 100) return json({ ok: false, error: 'invalid_current_soc' }, 400, origin);
+      if (!Number.isFinite(targetSoc) || targetSoc < 1 || targetSoc > 100 || targetSoc <= currentSoc) return json({ ok: false, error: 'invalid_target_soc' }, 400, origin);
       if (!Number.isFinite(maxA) || maxA < 6 || maxA > 16) return json({ ok: false, error: 'invalid_max_a' }, 400, origin);
+      goalKWh = round3((targetSoc - currentSoc) * KWH_PER_SOC_PERCENT);
+      if (goalKWh < 1 || goalKWh > 75) return json({ ok: false, error: 'derived_goal_kwh_out_of_range' }, 400, origin);
     }
 
     const command = {
-      schema: 1,
+      schema: 2,
       requestId: crypto.randomUUID(),
       requestedAt: new Date().toISOString(),
       source: 'website',
       active,
       deadline,
+      currentSoc,
+      targetSoc,
+      socEnteredAt: active ? new Date().toISOString() : '',
+      calibrationKWhPerPercent: KWH_PER_SOC_PERCENT,
       goalKWh,
       maxA
     };
@@ -90,7 +105,7 @@ export default {
     }
 
     const payload = {
-      message: active ? `Set Tesla deadline ${deadline}` : 'Disable Tesla deadline',
+      message: active ? `Set Tesla deadline ${currentSoc}% to ${targetSoc}% by ${deadline}` : 'Disable Tesla deadline',
       content: toBase64(JSON.stringify(command, null, 2) + '\n'),
       branch: BRANCH
     };
