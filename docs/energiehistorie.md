@@ -26,4 +26,4 @@ De grafiek toont vermogenswaarden door de tijd; de kengetallen erboven worden ui
 
 ## Activiteitstijdlijn
 
-Waar de bestaande baseline voldoende statusinformatie bevat, toont de pagina gebeurtenissen zoals wasmachine/droger actief of idle en boilerstatusovergangen. Dit helpt pieken in de energiegrafiek te verklaren zonder individueel apparaatvermogen te verzinnen.
+Waar de bestaande baseline voldoende statusinformatie bevat, toont de pagina gebeurtenissen zoals wasmachine/droger actief of idle, boilerstatusovergangen en **Tesla laden gestart/gestopt**. Voor Tesla heeft de gepubliceerde laadstatus voorrang; bij oudere meetpunten zonder laadstatus wordt werkelijk laadvermogen boven circa 250 W als fallback gebruikt. Zo worden laadmomenten zichtbaar zonder SOC of niet-gemeten energie te verzinnen.
