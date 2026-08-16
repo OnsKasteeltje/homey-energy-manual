@@ -13,6 +13,8 @@ Deze pagina maakt de energiearchitectuur **live zichtbaar**. De lijnen tonen de 
 
 Een dikke actieve lijn betekent een grotere vermogensstroom. Een dunne/grijze lijn betekent dat het pad op dat moment niet of nauwelijks actief is. Bij netafname loopt vermogen vanaf **Net** naar de woning; bij teruglevering loopt de richting naar **Net**.
 
+De verbindingen van **Huis** naar de onderliggende verbruikers zijn bewust als **afzonderlijke rechte connectoren** opgebouwd. Er is geen gedeelde horizontale vermogensbus meer: de lijnsterkte van Tesla, boiler, wasmachine, droger en overig verbruik wordt uitsluitend bepaald door die specifieke belasting. Daardoor wordt bijvoorbeeld alleen de verbinding naar **Overig verbruik** dik wanneer daar op dat moment het gemeten/toegewezen vermogen zit.
+
 De centrale Energy Manager blijft momenteel grotendeels in **shadow mode**. De kaart onderscheidt daarom de actuele fysieke energiebalans van de actuele beslis-/statusinformatie.
 
 ## Grootverbruikers onder Huishouden
