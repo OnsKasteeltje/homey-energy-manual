@@ -47,6 +47,23 @@ De structurele oplossing is nu dat de bestaande 2-minutenpublisher zelf de live 
 
 De publisher neemt ook de door Homey/Easee gevraagde laadstroom (`target_charger_current`) en de Easee-laadstatus mee. Het werkelijke Tesla-vermogen komt rechtstreeks uit `measure_power`. De website kan daardoor gevraagd versus werkelijk binnen hetzelfde meetmoment vergelijken. De Easee Equalizer blijft de harde veiligheidslaag voor de hoofdaansluiting.
 
+## Tesla deadlinebediening
+
+Onder het Tesla/Easee-deel staat vanaf **v2.8.10** een compacte deadline-interface. De keuze tussen **Geen deadline** en **Deadline actief** staat bewust bovenaan.
+
+Bij **Geen deadline** worden de overige invoervelden verborgen. De functionele betekenis is dat Tesla opportunistisch mag laden en als flexibele exportbuffer kan worden gebruikt wanneer de Energy Manager dat opportuun vindt.
+
+Bij **Deadline actief** verschijnen uitsluitend de noodzakelijke SOC-loze invoervelden:
+
+- **Gereed uiterlijk** — datum en tijd;
+- **Minimaal laden** — gewenst aantal kWh vóór de deadline;
+- **Max. laadstroom** — bovengrens voor de automatische regeling.
+
+De interface is voorbereid om, zodra deze velden ook in de live publisher beschikbaar zijn, de actuele Homey-status, resterende kWh en berekende latest-starttijd te tonen. Er wordt bewust geen SOC-percentage getoond.
+
+!!! warning "Schrijven naar Homey nog geblokkeerd"
+    De website draait publiek via GitHub Pages. Daarom is de knop **Deadline opslaan** voorlopig uitgeschakeld: er is nog geen veilige write-route waarmee browserinvoer zonder geheimen of tokens naar Homey kan worden geschreven. De website suggereert hierdoor niet dat een instelling al in Homey is opgeslagen wanneer dat niet zo is.
+
 ## Actualiteit
 
 De Homey-flow draait iedere **2 minuten**. De website ververst eveneens iedere 2 minuten en markeert de meetset als vertraagd wanneer de laatste snapshot ouder dan 5 minuten is. Dit veroorzaakt geen extra polling richting Homey: de browser leest alleen de reeds naar GitHub gepubliceerde dataset.
