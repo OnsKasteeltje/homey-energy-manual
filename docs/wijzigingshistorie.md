@@ -1,5 +1,15 @@
 # Wijzigingshistorie
 
+## v2.8.16 — 16 augustus 2026
+
+- Tesla-deadlinebediening gewijzigd van een handmatig **kWh-doel** naar **Huidige SOC → Doel-SOC**.
+- De gebruiker voert bij een actieve deadline nu datum/tijd, actuele SOC, gewenste SOC en maximale laadstroom in.
+- De Cloudflare Worker valideert SOC en rekent het SOC-verschil intern om naar `goalKWh`, zodat `Tesla laden v2.1` en de bestaande catch-up-logica compatibel blijven.
+- Eerste kalibratiefactor vastgelegd op circa **0,59 kWh per procentpunt**, gebaseerd op praktijkmeting 71% → 90%, 3×10 A, circa 7,1 kW en Tesla-ETA 1u35.
+- Het command-JSON is uitgebreid met `currentSoc`, `targetSoc`, `socEnteredAt` en `calibrationKWhPerPercent`; `goalKWh` blijft uitsluitend intern/technisch aanwezig.
+- Homepage toont bij een nieuwe SOC-gebaseerde deadline voortaan de percentages in plaats van het afgeleide kWh-doel.
+- Functionele documentatie van Live energiestroom en de beveiligde write-route is tegelijk bijgewerkt.
+
 ## v2.8.11 — 16 augustus 2026
 
 - Tesla deadline-interface gekoppeld aan een beveiligde write-route via Cloudflare Worker.
