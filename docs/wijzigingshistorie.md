@@ -1,5 +1,12 @@
 # Wijzigingshistorie
 
+## v2.8.6 — 16 augustus 2026
+
+- Pijlen in **Live energiestroom** visueel rustiger gemaakt: lijndikte blijft afhankelijk van de grootte van de vermogensstroom, maar de variatie is bewust begrensd.
+- Pijlpunten zijn iets kleiner gemaakt voor betere leesbaarheid op mobiel.
+- Wanneer **Wasmachine** of **Droger** alleen via Homey-status als **ACTIEF** bekend is, krijgt de betreffende connector dezelfde visuele dikte als **Overig verbruik**; er wordt nog steeds geen fictief wattage toegekend.
+- De afzonderlijke, horizontaal uitgelijnde connectoren vanaf **Huis** blijven behouden; er is geen gedeelde vermogensbus geïntroduceerd.
+
 ## v2.8.5 — 16 augustus 2026
 
 - **Tesla laadregeling** toegevoegd onder de live energiestroom als compacte keten **Homey vraagt → Easee Equalizer → werkelijk naar Tesla**.
