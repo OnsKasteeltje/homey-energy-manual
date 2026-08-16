@@ -1,5 +1,13 @@
 # Wijzigingshistorie
 
+## v2.5 — 16 augustus 2026
+
+- Homepage-status van de **Energie Manager PV** gecorrigeerd zodat niet langer de oude ongenummerde, uitgeschakelde flow als hoofdstatus wordt getoond.
+- De homepage gebruikt voor de actuele Energy Manager-versie en enabled-status aanvullend `shadow-baseline-v01.json` als operationele bron.
+- Daardoor wordt de daadwerkelijk publicerende nieuwste flowversie — momenteel **`Energie Manager PV - Shadow Mode v1.6.6`** — op de homepage als **Actief** weergegeven.
+- De algemene Homey-status blijft uit `homey-status.json` komen; alleen de logische hoofdstatus van deze geversioneerde flowfamilie wordt tegen de actuele baseline gereconcilieerd.
+- Bij tijdelijke onbeschikbaarheid van de baseline valt de homepage veilig terug op de reguliere Homey-statusweergave.
+
 ## v2.4 — 16 augustus 2026
 
 - Nieuwe actieve Homey-flow **`Energie Manager PV - Shadow Mode v1.6.6`** gedocumenteerd; v1.6.5 is uitgeschakeld zodat binnen deze flowfamilie slechts één versie actief is.
