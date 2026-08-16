@@ -60,15 +60,40 @@ Bij **Deadline actief** worden gevraagd:
 - **Doel-SOC** — gewenste laadpercentage bij de deadline;
 - **Max. laadstroom** — bovengrens voor de automatische regeling.
 
-Omdat Tesla-SOC nog niet automatisch beschikbaar is, is **Huidige SOC een handmatige momentopname**. Iedere nieuwe opgeslagen deadline krijgt daarom een nieuwe `requestId`; de geladen-energieteller wordt dan opnieuw gestart vanaf de actuele Easee-meterstand.
+Omdat Tesla-SOC nog niet automatisch beschikbaar is, is **Huidige SOC een handmatige momentopname**. Iedere nieuwe opgeslagen deadline krijgt daarom een nieuwe `requestId`.
 
 ### Interne kalibratie
 
 De gebruiker voert geen kWh-doel in. De beveiligde Worker zet het SOC-verschil intern om naar benodigde laadenergie. De eerste praktijkkalibratie is **71% → 90%, 3×10 A, circa 7,1 kW, Tesla-ETA 1u35** en levert voorlopig circa **0,59 kWh per procentpunt**. Het afgeleide kWh-doel blijft intern beschikbaar voor voortgang en catch-up.
 
-### Tesla laden v2.4: deadline + forecast + prijs + Equalizer
+### Meetbaseline en audit vanaf v2.5
 
-`Tesla laden v2.4` is de enige automatische Easee-writer. De oudere v2.x-versies zijn uitgeschakeld. De harde deadline blijft altijd leidend; M7 optimaliseert alleen zolang de deadline nog ruimte laat.
+`Tesla laden v2.5` koppelt iedere nieuwe website-`requestId` aan exact één Easee-energiemeting. In dezelfde Homey-run waarin de nieuwe opdracht wordt verwerkt, wordt de actuele cumulatieve Easee `meter_power` vastgelegd als **baseline**. Bij die baseline worden ook request-ID, ingevoerde SOC, doel-SOC, SOC-tijdstip, gebruikte kalibratiefactor en het exacte vastlegtijdstip bewaard.
+
+De voortgang wordt daarna uitsluitend berekend als:
+
+```text
+werkelijk geladen sinds SOC-invoer = actuele Easee meter_power - opgeslagen Easee-baseline
+```
+
+Deze baseline is **immutable voor dezelfde requestId**. Een Homey-reboot, nieuwe flowversie of verandering van laad-/Equalizerstatus mag hem niet opnieuw vastleggen. Alleen het opslaan van een nieuwe deadline/SOC via de website maakt een nieuwe baseline.
+
+De runtime publiceert daarom voortaan een afzonderlijk blok **Laadmeting controle** met onder andere:
+
+- SOC-moment en doel-SOC;
+- Easee-baseline in kWh;
+- actuele Easee-meterstand;
+- werkelijk geladen kWh sinds de baseline;
+- baselinekwaliteit (`exact` of `legacy-unverified`);
+- gebruikte kalibratiefactor en eventuele meetwaarschuwing.
+
+Ontbreekt bij een actieve deadline een geldige baseline, dan publiceert v2.5 **`BASELINE_FOUT`** en vraagt Homey uit voorzorg 0 A totdat een nieuwe geldige SOC-opdracht is opgeslagen. Wanneer de gemeten delta uitzonderlijk groot wordt ten opzichte van het berekende SOC-doel — momenteel meer dan **1,5× het doel plus 0,25 kWh** — wordt **`KALIBRATIE_AFWIJKING`** gepubliceerd. De voorlopige factor van 0,59 kWh/% wordt daarbij nadrukkelijk **niet automatisch aangepast**.
+
+Bestaande sessies uit v2.4 worden bij de overgang niet kunstmatig opnieuw gebaselineerd. Een aanwezige oude meterbasis wordt alleen overgenomen als **`legacy-unverified`**. Daarmee blijft de meting reconstrueerbaar, maar wordt zo'n oude sessie niet gebruikt als betrouwbare kalibratiebron.
+
+### Tesla laden v2.5: deadline + forecast + prijs + Equalizer + audit
+
+`Tesla laden v2.5` is de enige automatische Easee-writer. De oudere v2.x-versies zijn uitgeschakeld. De harde deadline blijft altijd leidend; M7 optimaliseert alleen zolang de deadline nog ruimte laat.
 
 De M7-prijssignalen zijn relatief aan **nu**: `M7_Price_Cheap_Next4h=true` betekent dat de huidige stroomprijs lager is dan de volgende vier uur; `M7_Price_Expensive_Next4h=true` betekent dat de huidige prijs hoger is dan de volgende vier uur. `M7_PV_Top4h=true` betekent dat **het huidige uur** één van de vier uren met de hoogste verwachte zonne-opbrengst tussen 09:00 en 18:00 is.
 
@@ -81,16 +106,16 @@ De basisbeslisvolgorde bij een actieve deadline is:
 5. **Gunstig PV-forecastuur nu** — wanneer het huidige uur tot de beste vier forecasturen behoort en de prijs niet ongunstig is, mag met 6 A worden geladen als er nog geen voldoende groot werkelijk overschot is.
 6. **Duurder moment / geen aanleiding** — wachten zolang dat de deadline niet in gevaar brengt.
 
-De Equalizer kan dat Homey-verzoek altijd verder beperken. De regeling telt uitsluitend de **werkelijk geleverde Easee-kWh** als voortgang. Daardoor schuift `EV Latest start` automatisch naar voren wanneer langdurig minder stroom wordt geleverd dan gevraagd. Bij een bevestigde volledige blokkade vóór latest-start verschijnt **Equalizer blokkeert laden**. Duurt de blokkade voort na latest-start, dan wordt dit **Deadline onder druk**. Is de deadline verstreken terwijl nog energie resteert en Easee nog blokkeert, dan wordt **Deadline niet haalbaar** gepubliceerd. Homey blijft in al deze situaties de gewenste laadstroom vragen zodat Easee na vrijgave vanzelf kan hervatten.
+De Equalizer kan dat Homey-verzoek altijd verder beperken. De regeling telt uitsluitend de **werkelijk geleverde Easee-kWh sinds de immutable baseline** als voortgang. Daardoor schuift `EV Latest start` automatisch naar voren wanneer langdurig minder stroom wordt geleverd dan gevraagd. Bij een bevestigde volledige blokkade vóór latest-start verschijnt **Equalizer blokkeert laden**. Duurt de blokkade voort na latest-start, dan wordt dit **Deadline onder druk**. Is de deadline verstreken terwijl nog energie resteert en Easee nog blokkeert, dan wordt **Deadline niet haalbaar** gepubliceerd. Homey blijft in al deze situaties de gewenste laadstroom vragen zodat Easee na vrijgave vanzelf kan hervatten.
 
-M7 blijft zelf **read-only**. `Tesla laden v2.4` leest alleen `M7_Price_Negative`, `M7_Price_Cheap_Next4h`, `M7_Price_Expensive_Next4h` en `M7_PV_Top4h`.
+M7 blijft zelf **read-only**. `Tesla laden v2.5` leest alleen `M7_Price_Negative`, `M7_Price_Cheap_Next4h`, `M7_Price_Expensive_Next4h` en `M7_PV_Top4h`.
 
 ### Veilige write-route
 
 De publieke GitHub Pages-site bevat geen Homey- of GitHub-token. De keten is:
 
 ```text
-Website → Cloudflare Worker → tesla-deadline-command.json → Tesla laden v2.4 → M7-context + Homey Logic → Easee → Equalizer veiligheidslaag
+Website → Cloudflare Worker → tesla-deadline-command.json → Tesla laden v2.5 → M7-context + Homey Logic → Easee → Equalizer veiligheidslaag
 ```
 
 De Worker valideert deadline, huidige SOC, doel-SOC en maximale laadstroom en vereist bij iedere wijziging de persoonlijke control-PIN. De Worker berekent intern `goalKWh`; Homey gebruikt dit voor de resterende energie en `Latest start`.
