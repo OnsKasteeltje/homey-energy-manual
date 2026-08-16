@@ -63,17 +63,18 @@
       svg+=path(`M600 220 V255`,pv,'pv',pv>0,pv>0?fmtW(pv):'',630,242);
 
       // Elke verbruiker krijgt een eigen verbinding vanaf het huis.
-      // Geen gedeelde horizontale vermogensbus: lijnsterkte representeert uitsluitend die specifieke belasting.
+      // De horizontale segmenten liggen op één lijn, zoals bij de PV-omvormers, maar blijven individuele paden.
+      const loadBendY=455;
       const loads=[
-        {x:20,title:'Tesla laden',value:fmtW(tesla),sub:'flexibele belasting',w:tesla,sourceX:485,bendY:430},
-        {x:250,title:'Boiler',value:fmtW(boiler),sub:String(bs.boilerState||'—'),w:boiler,sourceX:540,bendY:442},
-        {x:480,title:'Wasmachine',value:applianceValue(washer),sub:applianceSub(washer),w:washer.w||0,sourceX:600,bendY:454},
-        {x:710,title:'Droger',value:applianceValue(dryer),sub:applianceSub(dryer),w:dryer.w||0,sourceX:660,bendY:466},
-        {x:940,title:'Overig verbruik',value:fmtW(other),sub:'sluitpost woning',w:other,sourceX:715,bendY:478}
+        {x:20,title:'Tesla laden',value:fmtW(tesla),sub:'flexibele belasting',w:tesla,sourceX:485},
+        {x:250,title:'Boiler',value:fmtW(boiler),sub:String(bs.boilerState||'—'),w:boiler,sourceX:540},
+        {x:480,title:'Wasmachine',value:applianceValue(washer),sub:applianceSub(washer),w:washer.w||0,sourceX:600},
+        {x:710,title:'Droger',value:applianceValue(dryer),sub:applianceSub(dryer),w:dryer.w||0,sourceX:660},
+        {x:940,title:'Overig verbruik',value:fmtW(other),sub:'sluitpost woning',w:other,sourceX:715}
       ];
       loads.forEach(a=>{
         const cx=a.x+110;
-        svg+=path(`M${a.sourceX} 380 V${a.bendY} H${cx} V525`,a.w,'grid',a.w>0,'',0,0);
+        svg+=path(`M${a.sourceX} 380 V${loadBendY} H${cx} V525`,a.w,'grid',a.w>0,'',0,0);
         svg+=node(a.x,525,220,120,'VERBRUIK',a.title,a.value,a.sub,'load');
       });
 
