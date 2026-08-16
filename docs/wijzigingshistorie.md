@@ -1,5 +1,14 @@
 # Wijzigingshistorie
 
+## v2.8.25 — 16 augustus 2026
+
+- Homepage-Teslakaart sluit een verstreken deadline voortaan af in plaats van deze als **Deadline actief** te blijven tonen.
+- Nieuwe presentatiestatussen: **Tesla gereed / doel voor deadline gehaald**, **Tesla deadline gemist** en **Deadline verstreken · resultaat onzeker/onbekend**.
+- De eindstatus wordt afgeleid uit de bestaande Homey-runtime (`tesla-runtime.json`), inclusief `remainingKWh`, status en baseline-/kalibratie-audit; er is geen nieuwe Homey-aansturing toegevoegd.
+- Bij `KALIBRATIE_AFWIJKING`, `BASELINE_FOUT`, `CONFIG_FOUT`, audit-anomalie of ongeldige baseline wordt bewust geen vals positief **doel gehaald** getoond.
+- Zonder deadline toont de kaart expliciet **Geen deadline ingesteld**; een oude datum wordt dan niet meer als toekomstdoel gepresenteerd.
+- Homepage-overlay verhoogd naar `home-architecture-v1.8.js`; Homey blijft bron voor toestand, de website bepaalt uitsluitend de presentatie.
+
 ## v2.8.23 — 16 augustus 2026
 
 - Nieuwe actieve Homey-flow **`Tesla laden v2.5`**; v2.4 is uitgeschakeld zodat slechts één automatische Easee-writer actief blijft.
