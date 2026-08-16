@@ -1,5 +1,16 @@
 # Wijzigingshistorie
 
+## v2.8.11 — 16 augustus 2026
+
+- Tesla deadline-interface gekoppeld aan een beveiligde write-route via Cloudflare Worker.
+- De publieke website bevat geen Homey- of GitHub-token; bij opslaan wordt een persoonlijke control-PIN gevraagd.
+- De Worker valideert deadline, kWh-doel en maximale laadstroom en schrijft uitsluitend `docs/data/tesla-deadline-command.json`.
+- Nieuwe Homey-flow **`Tesla laden v2.1`** leest dit command-JSON iedere 2 minuten, verwerkt alleen een nieuwe `requestId` en zet daarna de bestaande EV Deadline Logic-variabelen.
+- Fouten bij het ophalen of valideren van een command laten de bestaande Homey-instelling ongemoeid.
+- De bestaande automatische Tesla-writers `Tesla laden`, `Tesla laden v2.0` en de vaste `Lader uit`-flow worden bij omschakeling uitgeschakeld zodat v2.1 de enige automatische Easee-writer blijft.
+- `docs/data/tesla-control-config.json` bevat de publieke Worker-URL; zolang die nog leeg is blijft de knop op de website veilig uitgeschakeld.
+- Nieuwe systeempagina **Tesla deadline write-route** documenteert de beveiligings- en activatiestappen.
+
 ## v2.8.10 — 16 augustus 2026
 
 - Op **Live energiestroom** is in het Tesla/Easee-deel een compacte **Tesla deadline-interface** toegevoegd.
