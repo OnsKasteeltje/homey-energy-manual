@@ -6,12 +6,14 @@ De website schrijft **niet rechtstreeks naar Homey**. De veilige keten is:
 Live energiestroom
    ↓  POST + persoonlijke control-PIN
 Cloudflare Worker
-   ↓  GitHub Contents API
+   ↓  valideert SOC/deadline + rekent SOC-verschil om naar kWh
+GitHub Contents API
+   ↓
 Tesla deadline command JSON
    ↓  iedere 2 minuten lezen
 Homey — Tesla laden v2.1
    ↓
-EV Deadline actief / tijd / kWh / max A
+EV Deadline actief / tijd / intern kWh-doel / max A
    ↓
 Easee dynamische laadstroom
 ```
@@ -26,7 +28,24 @@ De bron staat in:
 
 `cloudflare/tesla-deadline-worker.js`
 
-De Worker accepteert alleen requests vanaf `https://onskasteeltje.github.io`, vereist daarnaast de header `X-Tesla-Control-Pin`, valideert datum/tijd, kWh-doel en maximale laadstroom en schrijft daarna `docs/data/tesla-deadline-command.json`.
+De Worker accepteert alleen requests vanaf `https://onskasteeltje.github.io`, vereist daarnaast de header `X-Tesla-Control-Pin` en valideert:
+
+- lokale deadline-datum/tijd;
+- huidige SOC: 0–100%;
+- doel-SOC: 1–100% en hoger dan huidige SOC;
+- maximale laadstroom: 6–16 A.
+
+De Worker zet daarna het SOC-verschil intern om naar benodigde laadenergie en schrijft `docs/data/tesla-deadline-command.json`.
+
+## SOC-kalibratie
+
+De eerste praktijkkalibratie is:
+
+`71% → 90% · 3×10 A · circa 7,1 kW · Tesla ETA 1u35`
+
+Daaruit volgt voorlopig ongeveer **0,59 kWh per procentpunt**. Deze factor staat centraal in de Worker, zodat toekomstige kalibraties kunnen worden verfijnd zonder de Homey-flow of gebruikersinterface opnieuw te ontwerpen.
+
+Het command-JSON bewaart zowel `currentSoc` en `targetSoc` als het intern afgeleide `goalKWh`. Daardoor blijft `Tesla laden v2.1` compatibel met de bestaande deadline- en catch-upberekening.
 
 ## Benodigde Cloudflare secrets
 
@@ -35,24 +54,8 @@ De Worker accepteert alleen requests vanaf `https://onskasteeltje.github.io`, ve
 
 De PIN wordt niet in GitHub opgeslagen. De website vraagt hem alleen op het moment dat een wijziging wordt opgeslagen.
 
-## Eenmalige activatie
-
-1. Maak in Cloudflare Workers & Pages een nieuwe Worker.
-2. Plak de inhoud van `cloudflare/tesla-deadline-worker.js` en deploy.
-3. Voeg onder Worker Settings → Variables and Secrets de secrets `GITHUB_TOKEN` en `WRITE_PIN` toe.
-4. Kopieer de publieke Worker-URL, bijvoorbeeld `https://tesla-deadline.<account>.workers.dev`.
-5. Zet die URL in `docs/data/tesla-control-config.json` bij `worker_url`.
-6. Na de volgende GitHub Pages-deploy wordt **Instelling opslaan** op Live energiestroom actief.
-
 ## Homey
 
 `Tesla laden v2.1` leest iedere 2 minuten het command-JSON. Alleen een nieuwe `requestId` wordt verwerkt. Bij netwerk- of JSON-fouten blijft de bestaande Homey-instelling ongemoeid.
 
-De opdracht ondersteunt:
-
-- deadline uit: `active=false`;
-- deadline aan: lokale datum/tijd `YYYY-MM-DDTHH:mm`;
-- minimaal te laden energie: 1–75 kWh;
-- maximale laadstroom: 6–16 A.
-
-De Easee Equalizer blijft de harde lokale veiligheidslaag en kan de werkelijk geleverde laadstroom zelfstandig begrenzen.
+De gebruiker stuurt voortaan op **huidige SOC → doel-SOC**. Homey zelf blijft intern op afgeleide laadenergie werken. De Easee Equalizer blijft de harde lokale veiligheidslaag en kan de werkelijk geleverde laadstroom zelfstandig begrenzen.
