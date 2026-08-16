@@ -2,122 +2,173 @@
 
 ## Operationele rollen
 
-De energieregeling is bewust opgesplitst in **observeren/beslissen** en **fysiek aansturen**.
+De energieregeling is bewust opgesplitst in **meten**, **observeren/beslissen**, **publiceren** en **fysiek aansturen**.
 
-- `Energie Manager PV - Shadow Mode v1.6.6` blijft de actieve read-only Energy Manager voor observatie, boiler-state, Easee/Equalizer-context en shadow-publicatie.
-- `Tesla laden v2.0` is de nieuwe fysieke Tesla-controller. Deze flow is ontworpen als **enige automatische schrijver** van de dynamische Easee-laadstroom.
-- De Easee Equalizer blijft altijd de harde lokale veiligheids- en load-balancinglaag.
+De actuele kern bestaat uit:
 
-> De omschakeling van de oude Tesla-flow naar v2.0 wordt in Homey gecontroleerd uitgevoerd. Oude automatische Tesla-aansturing en de vaste 17:30-uitschakeling mogen niet tegelijk met v2.0 actief zijn.
+| Rol | Actieve flow | Ritme | Schrijft apparaten? |
+|---|---|---:|---|
+| Centrale meetlaag | `Energy Manager State Collector v1.0` | 2 min | nee |
+| Shadow Energy Manager | `Energie Manager PV - Shadow Mode v1.6.7` | 5 min | nee |
+| Centrale allocator-shadow | `Energy Manager Allocator - Shadow v0.2.4` | 5 min | nee |
+| Tesla-controller | `Tesla laden v2.6` | 2 min | ja, Easee laadstroom |
+| Live websitepublisher | `Live energie publicatie v1.2` | 5 min | nee |
+| Algemene statuspublisher | `GitHub status sync - Homey lokaal v1.4` | 30 min | nee |
+| Prijs/PV-context | `M7 - Prijs en PV forecast context - read only` | 15 min | nee |
 
-## Tesla laden v2.0
+De Easee Equalizer blijft altijd de harde lokale veiligheids- en load-balancinglaag.
 
-### Doel
+## Centrale state collector v1.0
 
-v2.0 voegt een **deadlinefunctie zonder Tesla-SOC** toe. In plaats van een doelpercentage wordt een minimale hoeveelheid energie gekozen die vóór een datum/tijd aan de auto moet zijn geleverd.
+`Energy Manager State Collector v1.0` is de centrale read-laag. Iedere twee minuten wordt in één HomeyScript-run één consistente runtime-snapshot opgebouwd uit de relevante apparaten en Logic-variabelen.
 
-De regeling gebruikt uitsluitend gegevens die Homey/Easee al betrouwbaar beschikbaar stelt:
+De collector leest onder andere:
 
-- P1-netvermogen;
+- P1 totaal en L1/L2/L3;
+- Tesla/Easee vermogen, laadstatus, doelstroom en kWh-meter;
+- Equalizer fasebelasting;
+- boilervermogen en aan/uit;
+- drie PV-omvormers;
+- wasmachine- en drogerstatus;
+- relevante deadline-, warmwater- en M7-context.
+
+De snapshot wordt gedeeld als:
+
+```text
+EM_Runtime_State
+```
+
+Doel is dat meerdere consumers niet ieder afzonderlijk opnieuw alle Homey-devices hoeven op te vragen.
+
+```text
+Homey devices + Logic
+        ↓
+Energy Manager State Collector v1.0
+        ↓
+EM_Runtime_State
+        ├─→ Allocator Shadow v0.2.4
+        └─→ Live energie publicatie v1.2
+```
+
+De Tesla-controller blijft bewust rechtstreeks meten, omdat veilige laadbesturing niet afhankelijk mag worden van een mogelijk enkele minuten oude centrale snapshot.
+
+## Tesla laden v2.6
+
+`Tesla laden v2.6` is de **enige automatische Easee-writer**. De flow evalueert iedere twee minuten en combineert:
+
+- actuele P1-balans;
 - werkelijk Tesla-laadvermogen;
-- Easee lifetime `meter_power` in kWh;
-- dynamische laadstroom;
-- laad-/aansluitstatus.
-
-Er is dus geen Tesla Fleet API, extern abonnement of veronderstelde SOC nodig.
-
-### Instelvariabelen
-
-De controller gebruikt Homey Logic-variabelen:
-
-| Variabele | Type | Betekenis |
-|---|---|---|
-| `EV Deadline actief` | Ja/Nee | schakelt deadlinebesturing in of uit |
-| `EV Deadline tijd` | tekst | deadline als `YYYY-MM-DD HH:mm` in lokale tijd |
-| `EV Doel kWh` | getal | minimaal nog te laden energie voor deze deadline |
-| `EV Max laadstroom A` | getal | maximale door Homey gevraagde laadstroom; standaard 11 A |
-
-Afgeleide/statusvariabelen zijn:
-
-- `EV Deadline status`;
-- `EV Geladen kWh`;
-- `EV Resterend kWh`;
-- `EV Latest start`;
-- `EV Deadline Runtime State v2.0` (interne persistente status).
+- Easee lifetime kWh-meter;
+- deadline en resterende laadenergie;
+- M7 prijs-/PV-context;
+- Equalizer-fasebelasting;
+- werkelijk gevraagde versus werkelijk geleverde laadstroom.
 
 ### Zonder deadline
 
-Als `EV Deadline actief = nee`, werkt de Tesla als flexibele PV-/exportbuffer. De bestaande opportunistische laadstrategie blijft behouden: tussen **11:00 en 17:30** wordt de beschikbare ruimte berekend als:
+Wanneer geen deadline actief is, fungeert de Tesla als flexibele PV-/exportbuffer. Tussen 11:00 en 17:30 wordt de beschikbare laadruimte bepaald uit de actuele netbalans en het reeds geleverde Tesla-vermogen.
+
+Een laadstart vereist minimaal ongeveer:
 
 ```text
-PV-ruimte voor Tesla = max(0, -P1 + werkelijk Tesla-vermogen)
+3 × 6 A ≈ 4,14 kW
 ```
 
-Daaruit volgt de hoogste passende 3-fase laadstroom vanaf 6 A, begrensd door `EV Max laadstroom A`. Bij onvoldoende overschot wordt de dynamische laadstroom 0 A.
-
-Mogelijke statussen zijn onder meer `OPPORTUNISTISCH` en `WACHT_OP_PV`.
+Bij onvoldoende overschot wacht de regeling.
 
 ### Met deadline
 
-Als een deadline actief is, houdt de controller bij hoeveel energie sinds het instellen van die deadline werkelijk is geladen. Primair wordt daarvoor de delta van de Easee lifetime-kWh-meter gebruikt. Alleen als die meter niet beschikbaar is, wordt teruggevallen op integratie van werkelijk laadvermogen.
+Bij een deadline wordt de werkelijk geladen energie bepaald vanaf een vaste Easee-meterbaseline die bij de nieuwe opdracht wordt opgeslagen. De regelaar bewaakt:
 
 ```text
-resterend kWh = doel kWh - werkelijk geladen kWh
-
-benodigde tijd = resterend kWh / maximaal laadvermogen
-
-latest start = deadline - benodigde tijd
+resterend kWh
+benodigde laadtijd
+latest start
+deadline
 ```
 
-Tot `latest start` blijft de controller opportunistisch laden als er voldoende PV-ruimte is. Vanaf `latest start` wordt **catch-up** actief en vraagt Homey de ingestelde maximale laadstroom, ook wanneer daarvoor netimport nodig is.
+Vanaf `EV Latest start` krijgt de deadline prioriteit boven opportunistische optimalisatie.
 
-Na het bereiken van het kWh-doel vervalt de deadlineprioriteit en mag de Tesla weer opportunistisch laden. Als de deadline al verstreken is terwijl het doel nog niet is gehaald, blijft catch-up actief en wordt dit expliciet als gemiste deadline gemarkeerd.
+### Equalizer-classificatie vanaf v2.6
 
-Belangrijke statussen:
+v2.6 voorkomt dat 0 W automatisch als een Equalizer-ingreep wordt geïnterpreteerd. Een actief laadverzoek met vrijwel 0 W wordt eerst geclassificeerd als **laden geblokkeerd**. Alleen wanneer tegelijkertijd voldoende hoge Equalizer-fasebelasting wordt gezien, wordt de blokkade specifiek aan de Equalizer toegeschreven.
 
-| Status | Betekenis |
-|---|---|
-| `GEEN_DEADLINE` | geen deadline actief |
-| `WACHT_OP_PV` | aangesloten, maar onvoldoende opportuniteit |
-| `OPPORTUNISTISCH` | laden uit beschikbaar PV-overschot |
-| `DEADLINE_WACHT` | deadline actief; nog voldoende tijd |
-| `DEADLINE_OPPORTUNISTISCH` | deadline actief en laden uit PV-overschot |
-| `DEADLINE_CATCH_UP` | latest-start bereikt; laden krijgt deadlineprioriteit |
-| `DEADLINE_GEMIST_CATCH_UP` | deadline verstreken en doel nog niet gehaald |
-| `DOEL_GEHAALD` | minimaal gevraagd aantal kWh bereikt |
-| `NIET_AANGESLOTEN` | auto niet beschikbaar voor laden |
-| `CONFIG_FOUT` | deadline actief maar tijd/doel ongeldig |
+Daarmee onderscheiden we onder andere:
 
-### Wat de deadline wel en niet garandeert
+- normaal laden;
+- beperkt laden;
+- korte nulvermogenspauze in bevestiging;
+- blokkade met Equalizer-evidence;
+- blokkade met onbekende oorzaak.
 
-Zonder SOC betekent `EV Doel kWh = 20` letterlijk: **vanaf het moment waarop deze deadlineconfiguratie wordt ingesteld minimaal 20 kWh aan de auto aanbieden/leveren vóór de deadline**. Het betekent niet dat de Tesla bijvoorbeeld 80% SOC zal bereiken.
+De Equalizer wordt nooit door Homey overruled.
 
-`EV Latest start` is gebaseerd op het nominale 3-fase vermogen van de ingestelde maximale laadstroom. Als de Easee Equalizer vanwege huisbelasting terugregelt, kan de werkelijke laadsnelheid lager zijn. De Equalizer wordt nooit door Homey overruled.
+## Shadow Energy Manager v1.6.7
 
-## Eén eigenaar van automatische Tesla-aansturing
+`Energie Manager PV - Shadow Mode v1.6.7` is read-only en bestuurt geen Tesla, boiler, wasmachine of droger.
 
-Om conflicten te voorkomen geldt de ownershipregel:
+Hij observeert onder andere:
+
+- totaal P1-vermogen en P1 L1/L2/L3;
+- gevraagd en werkelijk Tesla-vermogen;
+- afgeleide Equalizer-status;
+- boilervermogen, boilerstate en boilercycli;
+- wasmachine- en drogerstatus.
+
+De vorige versie v1.6.6 draaide iedere twee minuten én had daarnaast een aparte 15-minutentrigger naar hetzelfde zware script. Vanaf v1.6.7 is dit vereenvoudigd naar **één 5-minutentrigger**. De GitHub-publicatie wordt nog steeds intern ongeveer iedere 15 minuten bepaald.
+
+Dit verlaagt de Homey-belasting zonder de shadowfunctie op te heffen.
+
+De boiler-observer gebruikt de semantische keten:
 
 ```text
-Tesla laden v2.0
-      ↓
-enige automatische schrijver naar Easee dynamic charger current
-      ↓
-Easee / Equalizer bepaalt wat veilig werkelijk geleverd wordt
+VERWARMEN → AFKOELEN_WACHT → OP_TEMPERATUUR
 ```
 
-De oude flow `Tesla laden` mag daarom niet gelijktijdig actief zijn. Ook de oude dagelijkse flow `Lader uit` (17:30) moet uit staan, omdat een deadline-catch-up juist na 17:30 nodig kan zijn.
+Afgeronde cycli blijven naar `docs/data/boiler-cycles.json` worden gepubliceerd.
 
-De oude handmatige start/stopflows worden vervangen door versies die met v2.0 samenwerken:
+## Allocator Shadow v0.2.4
 
-- `Handmatig laden starten (8A) v1.1`: schakelt `Tesla laden v2.0` tijdelijk uit en zet de lader handmatig op 8 A;
-- `Handmatig laden stoppen v1.1`: zet de laadstroom op 0 A en geeft de automatische regeling daarna weer terug aan `Tesla laden v2.0`.
+`Energy Manager Allocator - Shadow v0.2.4` is de centrale beslis-/validatielaag in shadow mode.
 
-Daarmee kan handmatig gebruik niet iedere twee minuten door een tweede automatische flow worden overschreven.
+Vanaf v0.2.4 leest deze flow **geen volledige devicelijst meer**. Hij gebruikt `EM_Runtime_State` en vult die aan met de noodzakelijke Flow Tags en warmwaterstatus. De flow:
 
-## Easee Equalizer als harde veiligheidslaag
+- bepaalt MUST / SHOULD / MAY-prioriteit;
+- vergelijkt de allocatorrichting met observeerbaar bestaand gedrag;
+- publiceert state, decision, validation, stats en beperkte historie;
+- voert geen device-writes uit.
 
-De regelhiërarchie blijft:
+De runtime-snapshot moet jonger zijn dan vijf minuten; anders faalt de allocator bewust fail-safe.
+
+## Live energie publicatie v1.2
+
+De live websitepublisher draait iedere vijf minuten. Vanaf v1.2 leest hij `EM_Runtime_State` in plaats van zelf opnieuw alle apparaten op te vragen.
+
+De GitHub-write blijft één snapshot per vijf minuten, maar de Homey-readbelasting wordt daardoor lager.
+
+## GitHub status sync v1.4
+
+De algemene flowstatus verandert veel minder vaak dan live energie. Daarom is de cadence vanaf v1.4 verlaagd van 15 naar **30 minuten**.
+
+De sync blijft publiceren naar onder andere:
+
+- `docs/data/homey-status.json`;
+- `docs/data/shadow-status.json`.
+
+Dit heeft geen invloed op de regelcycli zelf.
+
+## M7 prijs- en PV-context
+
+M7 blijft read-only en vernieuwt iedere 15 minuten de gedeelde context:
+
+- `M7_Price_Negative`;
+- `M7_Price_Cheap_Next4h`;
+- `M7_Price_Expensive_Next4h`;
+- `M7_PV_Top4h`.
+
+Tesla v2.6 gebruikt deze signalen alleen zolang de deadlineveiligheid dit toestaat.
+
+## Veiligheids- en regelhiërarchie
 
 ```text
 Installatieveiligheid / 3×25 A
@@ -126,36 +177,50 @@ Easee Equalizer load balancing
           ↓
 Victron grid/batterijregeling (later)
           ↓
-Homey Energy Manager / Tesla laden v2.0
+Homey Energy Manager
           ↓
-Tesla
+Tesla / boiler
 ```
 
-Homey stuurt dus een **gewenste** laadstroom. De werkelijk geleverde stroom is wat Easee/Equalizer onder de actuele fasebelasting veilig toestaat.
-
-## Shadow Energy Manager v1.6.6
-
-De aparte flow `Energie Manager PV - Shadow Mode v1.6.6` blijft read-only en bestuurt geen Tesla, boiler, wasmachine of droger. Hij observeert onder andere:
-
-- totaal P1-vermogen en P1 L1/L2/L3;
-- gevraagd en werkelijk Tesla-vermogen;
-- `teslaDeliveryRatio` en afgeleide Equalizer-status;
-- boilervermogen, boilerstate en boilercycli;
-- wasmachine- en drogerstatus.
-
-De boiler-observer classificeert vermogen boven 1,5 kW als `VERWARMEN`. Na bevestigd verwarmen en vervolgens minder dan 100 W gedurende 10 minuten wordt `OP_TEMPERATUUR` bereikt. Afgeronde cycli worden gepubliceerd naar `docs/data/boiler-cycles.json`.
-
-De shadow-publicatie blijft gescheiden van de fysieke Tesla-controller: meten/beslissen en aansturen zijn daardoor architectonisch traceerbaar.
+Homey stuurt een gewenste laadstroom. De werkelijk geleverde stroom is wat Easee/Equalizer onder de actuele fasebelasting veilig toestaat.
 
 ## Grootverbruikers
 
-Wasmachine en droger leveren in Homey momenteel statusinformatie maar geen afzonderlijk betrouwbaar wattage. Daarom wordt geen individueel vermogen verzonnen. Bekende fasekoppeling:
+Wasmachine en droger leveren in Homey momenteel statusinformatie maar geen afzonderlijk betrouwbaar wattage. Daarom wordt geen individueel vermogen verzonnen.
+
+Bekende fasekoppeling:
 
 - Wasmachine: L2;
 - Droger: L3.
 
+## Homey-load ontwerpprincipe
+
+De optimalisatie van 16 augustus 2026 introduceert expliciet het principe:
+
+> **één keer meten, meerdere keren gebruiken.**
+
+Waar praktisch veilig worden device- en Logic-reads gecentraliseerd. Frequente fysieke besturing blijft rechtstreeks meten wanneer actuele data veiligheidskritisch is.
+
+Analyse, historie en websitepublicatie worden zoveel mogelijk buiten de kritische besturingsroute gehouden.
+
 ## Versiebeheer
 
-Voor functionele Homey-wijzigingen wordt een nieuwe subversie aangemaakt en blijft maximaal één versie van dezelfde automatische regelaar actief. Oude versies worden uitgeschakeld en kunnen daarna naar `90 · HISTORISCH / UITGESCHAKELD` worden verplaatst. Tijdelijke omschakelflows horen na succesvolle validatie in `99 · TEMP / OPRUIMKANDIDAAT`.
+Voor functionele Homey-wijzigingen wordt een nieuwe subversie aangemaakt en blijft maximaal één versie van dezelfde automatische regelaar actief. Oude versies worden uitgeschakeld en blijven beschikbaar als rollback-/referentiepunt.
 
-> Laatste functionele update: 16 augustus 2026 — Tesla SOC-loze kWh-deadline en single-writer-aansturing toegevoegd in `Tesla laden v2.0`.
+Actuele opvolging na de load-optimalisatie:
+
+```text
+Shadow v1.6.6          → UIT
+Shadow v1.6.7          → ACTIEF
+
+Allocator v0.2.3       → UIT
+Allocator v0.2.4       → ACTIEF
+
+Live energie v1.1      → UIT
+Live energie v1.2      → ACTIEF
+
+GitHub status sync v1.3 → UIT
+GitHub status sync v1.4 → ACTIEF
+```
+
+> Laatste functionele update: **16 augustus 2026** — Homey-load geoptimaliseerd met centrale state collector, 5-minuten shadowcadence, centrale-state consumers en 30-minuten status-sync. Tesla v2.6 blijft de enige automatische Easee-writer.
