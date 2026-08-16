@@ -1,5 +1,18 @@
 # Wijzigingshistorie
 
+## v2.8.23 — 16 augustus 2026
+
+- Nieuwe actieve Homey-flow **`Tesla laden v2.5`**; v2.4 is uitgeschakeld zodat slechts één automatische Easee-writer actief blijft.
+- Iedere nieuwe website-`requestId` krijgt voortaan exact één immutable Easee `meter_power`-baseline, samen met huidige SOC, doel-SOC, SOC-tijdstip, kalibratiefactor en exact vastlegtijdstip.
+- Reboot, flow-upgrade, M7-wijziging of Equalizerstatus kan de baseline niet meer resetten; alleen een nieuwe SOC/deadline-opdracht maakt een nieuwe baseline.
+- Nieuwe fail-safe status **`BASELINE_FOUT`** stopt de automatische laadopdracht wanneer bij een actieve deadline geen geldige meterbasis beschikbaar is.
+- Nieuwe sanity-check markeert **`KALIBRATIE_AFWIJKING`** wanneer de gemeten Easee-delta groter wordt dan 1,5× het berekende doel plus 0,25 kWh; de factor 0,59 kWh/% wordt nooit automatisch aangepast.
+- Bestaande v2.4-sessies worden niet opnieuw gebaselineerd maar alleen als **`legacy-unverified`** overgenomen.
+- Nieuwe **`Tesla runtime publicatie v1.2`** publiceert de volledige baseline-audit; v1.1 is uitgeschakeld.
+- Live energiestroom toont vanaf v2.8.23 een **Laadmeting controle** met SOC-moment, Easee-baseline, actuele meterstand en werkelijk geladen kWh sinds de baseline.
+- De huidige 84% → 90%-sessie is gereconstrueerd als **7745,87 → 7752,36 kWh = 6,49 kWh** en terecht als legacy/afwijkend gemarkeerd; deze sessie wordt niet gebruikt om de kalibratiefactor te wijzigen.
+- Homepage-runtime bijgewerkt naar `home-tesla-runtime-v1.13.js` en functionele documentatie van Live energiestroom en de beveiligde Tesla write-route tegelijk bijgewerkt.
+
 ## v2.8.22 — 16 augustus 2026
 
 - Nieuwe actieve Homey-flow **`Tesla laden v2.4`**; v2.3 is uitgeschakeld zodat slechts één automatische Easee-writer actief is.
