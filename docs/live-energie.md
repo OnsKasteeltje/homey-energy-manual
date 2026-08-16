@@ -53,15 +53,22 @@ Onder het Tesla/Easee-deel staat een compacte deadline-interface. De keuze tusse
 
 Bij **Geen deadline** worden de overige invoervelden verborgen. De Tesla blijft dan opportunistisch laden en kan als flexibele exportbuffer worden gebruikt wanneer de Energy Manager dat opportuun vindt.
 
-Bij **Deadline actief** verschijnen uitsluitend de noodzakelijke SOC-loze invoervelden:
+Bij **Deadline actief** worden vanaf v2.8.16 de voor de gebruiker natuurlijke waarden gevraagd:
 
 - **Gereed uiterlijk** — datum en tijd;
-- **Minimaal laden** — gewenst aantal kWh vóór de deadline;
+- **Huidige SOC** — het actuele percentage dat je uit de Tesla-app/auto overneemt;
+- **Doel-SOC** — het gewenste laadpercentage bij de deadline;
 - **Max. laadstroom** — bovengrens voor de automatische regeling.
 
-Er wordt bewust geen SOC-percentage getoond.
+Omdat de Tesla-SOC nog niet automatisch beschikbaar is, is **Huidige SOC een handmatige momentopname**. De website bewaart daarom ook het tijdstip waarop die SOC werd ingevoerd. Voor een nieuwe of gewijzigde deadline moet de huidige SOC opnieuw worden gecontroleerd.
 
-### Veilige write-route vanaf v2.8.11
+### Interne kalibratie
+
+De gebruiker hoeft geen kWh-doel meer in te voeren. De beveiligde Worker zet het verschil tussen huidige SOC en doel-SOC intern om naar benodigde laadenergie. De eerste praktijkkalibratie is gebaseerd op het gemeten punt **71% → 90%, 3×10 A, circa 7,1 kW, Tesla-ETA 1u35**. Dit geeft voorlopig circa **0,59 kWh per procentpunt**.
+
+De afgeleide kWh blijft intern bestaan omdat `Tesla laden v2.1` daarmee de resterende energie en het uiterste catch-upmoment berekent. Op de gebruikersinterface blijft het doel echter in procenten weergegeven. Nieuwe praktijkmetingen kunnen de kalibratiefactor later verfijnen zonder de bediening te veranderen.
+
+### Veilige write-route
 
 De publieke GitHub Pages-site bevat geen Homey- of GitHub-token. De keten is:
 
@@ -69,9 +76,7 @@ De publieke GitHub Pages-site bevat geen Homey- of GitHub-token. De keten is:
 Website → Cloudflare Worker → tesla-deadline-command.json → Tesla laden v2.1 → Homey Logic → Easee
 ```
 
-De Worker valideert de invoer en vereist bij iedere wijziging een persoonlijke control-PIN. De PIN wordt niet op de website opgeslagen. Na een succesvolle write haalt `Tesla laden v2.1` de nieuwe opdracht binnen maximaal circa twee minuten op en zet vervolgens `EV Deadline actief`, `EV Deadline tijd`, `EV Doel kWh` en `EV Max laadstroom A`.
-
-Zolang de Worker-URL nog niet eenmalig in `tesla-control-config.json` is ingevuld, blijft de knop **Instelling opslaan** zichtbaar maar uitgeschakeld met de melding **Worker nog niet gekoppeld**. Na die eenmalige activatie is geen verdere technische handeling nodig om deadlines vanaf de website te wijzigen.
+De Worker valideert deadline, huidige SOC, doel-SOC en maximale laadstroom en vereist bij iedere wijziging een persoonlijke control-PIN. De PIN wordt niet op de website opgeslagen. De Worker berekent vervolgens het interne `goalKWh` en schrijft zowel de SOC-invoer als die afgeleide waarde in de opdracht. `Tesla laden v2.1` kan daardoor ongewijzigd de bestaande energieberekening en catch-up-logica blijven uitvoeren.
 
 ## Actualiteit
 
