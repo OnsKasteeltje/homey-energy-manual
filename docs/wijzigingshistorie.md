@@ -1,5 +1,43 @@
 # Wijzigingshistorie
 
+## v2.8.22 — 16 augustus 2026
+
+- Nieuwe actieve Homey-flow **`Tesla laden v2.4`**; v2.3 is uitgeschakeld zodat slechts één automatische Easee-writer actief is.
+- Equalizer-gedrag uitgebreid van alleen gedeeltelijk begrenzen naar vier expliciete runtime-modi: `normal`, `limited`, `blocked_pending` en `blocked`.
+- Een volledige blokkade wordt pas na circa 4 minuten bevestigd wanneer Homey minimaal 6 A vraagt, de Tesla aangesloten is en het werkelijke laadvermogen vrijwel 0 W blijft.
+- Homey houdt tijdens een Equalizer-blokkade het laadverzoek bewust actief zodat Easee automatisch kan hervatten zodra andere grootverbruikers wegvallen.
+- Deadline-statussen toegevoegd voor **Equalizer blokkeert**, **Deadline onder druk** en **Deadline niet haalbaar**; alleen werkelijk geleverde Easee-kWh telt als voortgang.
+- Nieuwe **`Tesla runtime publicatie v1.1`** publiceert de Equalizer-modus naar de website; v1.0 is uitgeschakeld.
+- Homepage-runtime bijgewerkt naar `home-tesla-runtime-v1.12.js`, inclusief gevraagd → werkelijk laadniveau en volledige blokkade.
+- Functionele documentatie op homepage, Live energiestroom en de Tesla write-route tegelijk bijgewerkt.
+
+## v2.8.21 — 16 augustus 2026
+
+- Tesla-regeling uitgebreid naar **`Tesla laden v2.3`** met deadline + M7 prijs/PV-context.
+- Betekenis van `M7_PV_Top4h` gecorrigeerd: het huidige uur behoort tot de vier beste PV-forecasturen; het signaal voorspelt niet dat later meer PV komt.
+- Iedere nieuwe website-`requestId` reset de laadvoortgang vanaf de actuele Easee-meterstand zodat een nieuwe handmatige SOC-invoer een schoon vertrekpunt heeft.
+- `Latest start` blijft een harde deadlinegrens; prijs en forecast mogen alleen vóór dat moment optimaliseren.
+
+## v2.8.20 — 16 augustus 2026
+
+- Runtime-publicatie voor de Tesla-deadline toegevoegd zodat de website operationele Homey-status, resterende energie, requested current en M7-context kan tonen.
+- Homepage en Live energiestroom kunnen hierdoor onderscheid maken tussen wachten, opportunistisch laden en deadline catch-up.
+
+## v2.8.19 — 16 augustus 2026
+
+- Deadline-statusweergave op Live energiestroom gekoppeld aan de gepubliceerde Homey-runtime in plaats van alleen aan de opgeslagen website-opdracht.
+- De website maakt hierdoor onderscheid tussen ingestelde deadline en operationele laadbeslissing.
+
+## v2.8.18 — 16 augustus 2026
+
+- Na succesvolle SOC-gebaseerde deadline-opslag verdwijnt de overgangsmelding **Deadline-instelling verouderd** direct.
+- Na refresh wordt de waarschuwing alleen nog getoond wanneer het command-bestand daadwerkelijk nog het oude kWh-formaat gebruikt.
+
+## v2.8.17 — 16 augustus 2026
+
+- Oude kWh-gebaseerde Tesla-deadlines krijgen één duidelijke migratiemelding in plaats van meerdere onduidelijke statusvakken.
+- De melding vraagt éénmalig om huidige SOC en doel-SOC opnieuw in te voeren; daarna wordt de normale operationele status weergegeven.
+
 ## v2.8.16 — 16 augustus 2026
 
 - Tesla-deadlinebediening gewijzigd van een handmatig **kWh-doel** naar **Huidige SOC → Doel-SOC**.
