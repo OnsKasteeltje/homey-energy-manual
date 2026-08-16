@@ -62,24 +62,22 @@
       // PV eindigt met korte verticale aansluiting op huis
       svg+=path(`M600 220 V255`,pv,'pv',pv>0,pv>0?fmtW(pv):'',630,242);
 
-      // Verbruikers onder huis via horizontale bus
-      const busY=470;
-      svg+=path(`M600 380 V${busY}`,houseTotal,'grid',houseTotal>0,'',0,0);
-      svg+=`<path class="energy-consumption-bus" d="M130 ${busY} H1070"/>`;
+      // Elke verbruiker krijgt een eigen verbinding vanaf het huis.
+      // Geen gedeelde horizontale vermogensbus: lijnsterkte representeert uitsluitend die specifieke belasting.
       const loads=[
-        {x:20,title:'Tesla laden',value:fmtW(tesla),sub:'flexibele belasting',w:tesla},
-        {x:250,title:'Boiler',value:fmtW(boiler),sub:String(bs.boilerState||'—'),w:boiler},
-        {x:480,title:'Wasmachine',value:applianceValue(washer),sub:applianceSub(washer),w:washer.w||0},
-        {x:710,title:'Droger',value:applianceValue(dryer),sub:applianceSub(dryer),w:dryer.w||0},
-        {x:940,title:'Overig verbruik',value:fmtW(other),sub:'sluitpost woning',w:other}
+        {x:20,title:'Tesla laden',value:fmtW(tesla),sub:'flexibele belasting',w:tesla,sourceX:485,bendY:430},
+        {x:250,title:'Boiler',value:fmtW(boiler),sub:String(bs.boilerState||'—'),w:boiler,sourceX:540,bendY:442},
+        {x:480,title:'Wasmachine',value:applianceValue(washer),sub:applianceSub(washer),w:washer.w||0,sourceX:600,bendY:454},
+        {x:710,title:'Droger',value:applianceValue(dryer),sub:applianceSub(dryer),w:dryer.w||0,sourceX:660,bendY:466},
+        {x:940,title:'Overig verbruik',value:fmtW(other),sub:'sluitpost woning',w:other,sourceX:715,bendY:478}
       ];
-      loads.forEach((a,i)=>{
+      loads.forEach(a=>{
         const cx=a.x+110;
-        svg+=path(`M${cx} ${busY} V525`,a.w,'grid',a.w>0,'',0,0);
+        svg+=path(`M${a.sourceX} 380 V${a.bendY} H${cx} V525`,a.w,'grid',a.w>0,'',0,0);
         svg+=node(a.x,525,220,120,'VERBRUIK',a.title,a.value,a.sub,'load');
       });
 
-      svg+=`<text x="600" y="704" text-anchor="middle" class="energy-rule">Rechte energiepaden: verticale aansluiting → 90° hoek → horizontale bus → korte verticale aansluiting.</text>`;
+      svg+=`<text x="600" y="704" text-anchor="middle" class="energy-rule">Elke verbruiker heeft een eigen rechte verbinding vanaf het huis; lijnsterkte volgt het individuele vermogen.</text>`;
       svg+=`<g class="energy-legend" transform="translate(130 745)"><line x1="0" y1="0" x2="45" y2="0" class="legend-pv"/><text x="55" y="5">Productie</text><line x1="230" y1="0" x2="275" y2="0" class="legend-grid"/><text x="285" y="5">Net / verbruik</text><line x1="520" y1="0" x2="565" y2="0" class="legend-battery"/><text x="575" y="5">Batterij (inactief)</text></g>`;
       svg+=`</svg>`;
 
