@@ -1,5 +1,18 @@
 # Wijzigingshistorie
 
+## v2.8.7 — 16 augustus 2026
+
+- Nieuwe hoofdtab **Energiehistorie** toegevoegd op basis van het goedgekeurde lijn-diagramconcept.
+- Bovenaan keuze tussen **Dag**, **Week** en **Maand**; dezelfde dashboardstructuur wordt per periode hergebruikt.
+- **Dag** gebruikt de bestaande 24-uurs fasepublicatie en toont als lijnreeksen: **PV-productie**, **woningverbruik**, **netimport**, **netexport** en voorbereide **accu**-reeksen.
+- Dagkengetallen worden uit de meetreeks naar kWh geïntegreerd; direct eigen PV-verbruik wordt boekhoudkundig afgeleid uit PV-productie en woningverbruik.
+- **Week** en **Maand** gebruiken de bestaande compacte `energy-daily-history.json`; historische dekking wordt expliciet als gedeeltelijk getoond zolang nog maar weinig dagen zijn opgebouwd.
+- Accu geladen/ontladen is vanaf nu onderdeel van het UI-datamodel, maar blijft bewust **0 / nog geen opslagmeting** totdat Victron-data beschikbaar is.
+- Nieuwe **Energiebalans**-sectie toegevoegd onder de grafiek.
+- Nieuwe **Activiteitstijdlijn** toegevoegd die waar mogelijk wasmachine-, droger- en boilerstatusovergangen uit de bestaande baseline toont zonder individueel vermogen te verzinnen.
+- Geen extra Homey-polling toegevoegd; de pagina gebruikt uitsluitend reeds gepubliceerde GitHub-data.
+- Responsive styling toegevoegd zodat de hoofdkengetallen en onderste panelen op mobiel onder elkaar schalen.
+
 ## v2.8.6 — 16 augustus 2026
 
 - Pijlen in **Live energiestroom** visueel rustiger gemaakt: lijndikte blijft afhankelijk van de grootte van de vermogensstroom, maar de variatie is bewust begrensd.
