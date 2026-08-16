@@ -59,7 +59,9 @@ De vaatwasser is beperkt tot twee kandidaten: **groep 5 (aardlek 2)** of **groep
 
 ## Automatische PV-fasemonitor
 
-De actieve Homey Advanced Flow **`PV omvormers fase-monitor v1.1`** is uitsluitend bedoeld voor meting en analyse en schakelt geen apparaten of omvormers. Iedere 2 minuten worden P1 L1/L2/L3, totaal P1 en de productie van de drie omvormers vastgelegd. De actieve **`Fase 24h publicatie v1.1`** publiceert de laatste 24 uur naar `docs/data/pv-phase-24h.json`.
+De 24-uurs fasemeting wordt gepubliceerd door de actieve Homey Advanced Flow **`Fase 24h publicatie v1.4`**. Iedere **5 minuten** wordt één tijd-consistente snapshot gemaakt van P1 L1/L2/L3, totaal P1, de drie PV-omvormers en de relevante live belastingen. De laatste 24 uur worden gepubliceerd naar `docs/data/pv-phase-24h.json`.
+
+De analyse in v1.4 is **tijdgebaseerd** en rekent niet met een vast aantal samples. Voor de omvormer-correlatie worden de werkelijke observatieduur en timestamps gebruikt; confidence kan vanaf 60 minuten naar middel en vanaf 120 minuten naar hoog, mits ook aan de correlatie- en margecriteria wordt voldaan. Start/stop-events van wasmachine en droger worden beoordeeld met meetpunten binnen een tijdvenster van circa **±7 minuten**. Daardoor blijft de analyse correct wanneer de meetfrequentie later opnieuw wordt aangepast.
 
 De status van een omvormer wordt pas naar **Bevestigd** gewijzigd wanneer de correlatie voldoende eenduidig is of aanvullend met een gecontroleerde test is gevalideerd.
 
@@ -70,7 +72,7 @@ De status van een omvormer wordt pas naar **Bevestigd** gewijzigd wanneer de cor
 </div>
 
 !!! note "Interpretatie"
-    **Beste fase** is de fase met de sterkste gemeten samenhang. **Confidence** is een indicatie op basis van de correlatiescore en de marge ten opzichte van nummer twee. Een automatische uitkomst wordt niet zonder aanvullende beoordeling als fysiek bevestigd beschouwd.
+    **Beste fase** is de fase met de sterkste gemeten samenhang. **Confidence** is een indicatie op basis van de correlatiescore, de marge ten opzichte van nummer twee en voldoende werkelijke observatieduur. Het aantal samples is alleen informatief; timestamps bepalen de analyse. Een automatische uitkomst wordt niet zonder aanvullende beoordeling als fysiek bevestigd beschouwd.
 
 ## Meetmethode voor fase en groep
 
@@ -91,4 +93,4 @@ Nieuwe betrouwbare inzichten over **fase-, groep- of aardlekindeling** worden di
 
 De vaatwasser moet nog definitief tussen **groep 5 en groep 12** worden onderscheiden. Daarnaast blijven onder meer kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt qua exacte groep/fase nog open. De exacte groepen van boiler en waterkoker moeten eveneens nog fysiek worden gekoppeld.
 
-> Laatste inhoudelijke update: 16 augustus 2026. Groepen 1 en 2 gekoppeld aan wasmachine en droger; aardlekstructuur 1–4 voor groepen 1–13 vastgelegd; vaatwasser beperkt tot groep 5 of 12.
+> Laatste inhoudelijke update: 16 augustus 2026. Fase 24h publicatie v1.4 gebruikt een 5-minutenmeetinterval en tijdgebaseerde analyse; groepen 1 en 2 zijn gekoppeld aan wasmachine en droger; aardlekstructuur 1–4 voor groepen 1–13 is vastgelegd; vaatwasser beperkt tot groep 5 of 12.
