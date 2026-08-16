@@ -52,33 +52,35 @@ Bij **Deadline actief** worden gevraagd:
 - **Doel-SOC** — gewenste laadpercentage bij de deadline;
 - **Max. laadstroom** — bovengrens voor de automatische regeling.
 
-Omdat Tesla-SOC nog niet automatisch beschikbaar is, is **Huidige SOC een handmatige momentopname**. Voor een nieuwe of gewijzigde deadline moet die SOC opnieuw worden gecontroleerd.
+Omdat Tesla-SOC nog niet automatisch beschikbaar is, is **Huidige SOC een handmatige momentopname**. Iedere nieuwe opgeslagen deadline krijgt daarom een nieuwe `requestId`; vanaf v2.3 wordt de geladen-energie teller daarbij altijd opnieuw gestart vanaf de actuele Easee-meterstand.
 
 ### Interne kalibratie
 
 De gebruiker voert geen kWh-doel in. De beveiligde Worker zet het SOC-verschil intern om naar benodigde laadenergie. De eerste praktijkkalibratie is **71% → 90%, 3×10 A, circa 7,1 kW, Tesla-ETA 1u35** en levert voorlopig circa **0,59 kWh per procentpunt**. Het afgeleide kWh-doel blijft intern beschikbaar voor voortgang en catch-up.
 
-### Tesla laden v2.2: deadline + forecast + prijs
+### Tesla laden v2.3: deadline + forecast + prijs
 
-`Tesla laden v2.2` is de enige automatische Easee-writer. De oude v2.1 is uitgeschakeld. De harde deadline blijft altijd leidend; M7 mag uitsluitend optimaliseren zolang nog voldoende tijd over is.
+`Tesla laden v2.3` is de enige automatische Easee-writer. v2.1 en v2.2 zijn uitgeschakeld. De harde deadline blijft altijd leidend; M7 optimaliseert alleen zolang de deadline nog ruimte laat.
+
+De M7-prijssignalen zijn relatief aan **nu**: `M7_Price_Cheap_Next4h=true` betekent dat de huidige stroomprijs lager is dan de volgende vier uur; `M7_Price_Expensive_Next4h=true` betekent dat de huidige prijs hoger is dan de volgende vier uur. `M7_PV_Top4h=true` betekent dat **het huidige uur** één van de vier uren met de hoogste verwachte zonne-opbrengst tussen 09:00 en 18:00 is.
 
 De beslisvolgorde bij een actieve deadline is:
 
 1. **Deadline/catch-up** — vanaf `EV Latest start` wordt op de ingestelde maximale laadstroom geladen, ongeacht prijs of forecast.
 2. **Negatieve stroomprijs** — vóór latest-start mag direct op maximaal ingestelde stroom worden geladen.
 3. **Actueel PV-overschot** — werkelijk beschikbaar overschot krijgt voorrang en bepaalt de mogelijke laadstroom, met minimaal circa 6 A.
-4. **PV-forecast** — als M7 in de komende vier uur een gunstig PV-venster ziet, mag de regeling wachten.
-5. **Gunstige prijs** — als de deadline binnen vier uur ligt en M7 een goedkoop venster signaleert, mag vóór latest-start alvast op maximaal ingestelde stroom worden geladen.
-6. **Duurder venster / geen aanleiding** — wachten zolang dat de deadline niet in gevaar brengt.
+4. **Gunstige prijs nu** — wanneer de huidige prijs lager is dan de komende vier uur en niet tegelijk als duur wordt gemarkeerd, mag op maximaal ingestelde stroom worden geladen.
+5. **Gunstig PV-forecastuur nu** — wanneer het huidige uur tot de beste vier forecasturen behoort en de prijs niet ongunstig is, mag met 6 A worden geladen als er nog geen voldoende groot werkelijk overschot is.
+6. **Duurder moment / geen aanleiding** — wachten zolang dat de deadline niet in gevaar brengt.
 
-M7 blijft zelf **read-only**. `Tesla laden v2.2` leest alleen de contextvariabelen `M7_Price_Negative`, `M7_Price_Cheap_Next4h`, `M7_Price_Expensive_Next4h` en `M7_PV_Top4h`. De Easee Equalizer kan de werkelijk geleverde stroom altijd verder begrenzen voor installatiebeveiliging.
+M7 blijft zelf **read-only**. `Tesla laden v2.3` leest alleen `M7_Price_Negative`, `M7_Price_Cheap_Next4h`, `M7_Price_Expensive_Next4h` en `M7_PV_Top4h`. De Easee Equalizer kan de werkelijk geleverde stroom altijd verder begrenzen voor installatiebeveiliging.
 
 ### Veilige write-route
 
 De publieke GitHub Pages-site bevat geen Homey- of GitHub-token. De keten is:
 
 ```text
-Website → Cloudflare Worker → tesla-deadline-command.json → Tesla laden v2.2 → M7-context + Homey Logic → Easee
+Website → Cloudflare Worker → tesla-deadline-command.json → Tesla laden v2.3 → M7-context + Homey Logic → Easee
 ```
 
 De Worker valideert deadline, huidige SOC, doel-SOC en maximale laadstroom en vereist bij iedere wijziging de persoonlijke control-PIN. De Worker berekent intern `goalKWh`; Homey gebruikt dit voor de resterende energie en `Latest start`.
