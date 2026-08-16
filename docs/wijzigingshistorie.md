@@ -1,5 +1,16 @@
 # Wijzigingshistorie
 
+## v2.8.26 — 16 augustus 2026
+
+- Energy Manager-migratiepagina bijgewerkt naar de daadwerkelijk bereikte architectuur: `Energy Manager State Collector v1.0` → `EM_Runtime_State` → `Energy Manager Allocator - Shadow v0.2.4`.
+- Reeds gerealiseerde migratiestappen zijn als afgerond gemarkeerd: centrale state, allocator, shadow state/decision/history, `AGREE / DIFFER / NOT_COMPARABLE`-validatie en cumulatieve validatiestatistiek.
+- Boiler-HYBRID staat nu expliciet als eerstvolgende nog niet uitgevoerde actuatorstap, met de afgesproken toelatingscriteria: minimaal 30 bruikbare vergelijkingen, ≥95% agreement, nul onverklaarde MUST-conflicten en minstens één correct gevolgde verwarmingscyclus.
+- Homepage-overlay verhoogd naar `home-architecture-v1.9.js` met freshness-check op `homey-status.json`.
+- Een algemene Homey-statussnapshot ouder dan 75 minuten wordt niet meer als actuele operationele flownaam/status gepresenteerd; de homepage toont dan expliciet **status verouderd**.
+- De freshness-grens is ruimer dan het normale 30-minutenritme van status-sync v1.4 zodat één vertraagde publicatie geen vals alarm veroorzaakt.
+- `github-sync-flows.md` bijgewerkt met dezelfde freshness-regel en de scheiding tussen Homey-runtime-state en gepubliceerde GitHub-snapshots.
+- Geen Homey-flow of fysieke aansturing is voor deze website/documentatiecorrectie gewijzigd.
+
 ## v2.8.25 — 16 augustus 2026
 
 - Homepage-Teslakaart sluit een verstreken deadline voortaan af in plaats van deze als **Deadline actief** te blijven tonen.
