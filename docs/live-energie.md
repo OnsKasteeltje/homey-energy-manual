@@ -49,9 +49,9 @@ De publisher neemt ook de door Homey/Easee gevraagde laadstroom (`target_charger
 
 ## Tesla deadlinebediening
 
-Onder het Tesla/Easee-deel staat vanaf **v2.8.10** een compacte deadline-interface. De keuze tussen **Geen deadline** en **Deadline actief** staat bewust bovenaan.
+Onder het Tesla/Easee-deel staat een compacte deadline-interface. De keuze tussen **Geen deadline** en **Deadline actief** staat bewust bovenaan.
 
-Bij **Geen deadline** worden de overige invoervelden verborgen. De functionele betekenis is dat Tesla opportunistisch mag laden en als flexibele exportbuffer kan worden gebruikt wanneer de Energy Manager dat opportuun vindt.
+Bij **Geen deadline** worden de overige invoervelden verborgen. De Tesla blijft dan opportunistisch laden en kan als flexibele exportbuffer worden gebruikt wanneer de Energy Manager dat opportuun vindt.
 
 Bij **Deadline actief** verschijnen uitsluitend de noodzakelijke SOC-loze invoervelden:
 
@@ -59,10 +59,19 @@ Bij **Deadline actief** verschijnen uitsluitend de noodzakelijke SOC-loze invoer
 - **Minimaal laden** — gewenst aantal kWh vóór de deadline;
 - **Max. laadstroom** — bovengrens voor de automatische regeling.
 
-De interface is voorbereid om, zodra deze velden ook in de live publisher beschikbaar zijn, de actuele Homey-status, resterende kWh en berekende latest-starttijd te tonen. Er wordt bewust geen SOC-percentage getoond.
+Er wordt bewust geen SOC-percentage getoond.
 
-!!! warning "Schrijven naar Homey nog geblokkeerd"
-    De website draait publiek via GitHub Pages. Daarom is de knop **Deadline opslaan** voorlopig uitgeschakeld: er is nog geen veilige write-route waarmee browserinvoer zonder geheimen of tokens naar Homey kan worden geschreven. De website suggereert hierdoor niet dat een instelling al in Homey is opgeslagen wanneer dat niet zo is.
+### Veilige write-route vanaf v2.8.11
+
+De publieke GitHub Pages-site bevat geen Homey- of GitHub-token. De keten is:
+
+```text
+Website → Cloudflare Worker → tesla-deadline-command.json → Tesla laden v2.1 → Homey Logic → Easee
+```
+
+De Worker valideert de invoer en vereist bij iedere wijziging een persoonlijke control-PIN. De PIN wordt niet op de website opgeslagen. Na een succesvolle write haalt `Tesla laden v2.1` de nieuwe opdracht binnen maximaal circa twee minuten op en zet vervolgens `EV Deadline actief`, `EV Deadline tijd`, `EV Doel kWh` en `EV Max laadstroom A`.
+
+Zolang de Worker-URL nog niet eenmalig in `tesla-control-config.json` is ingevuld, blijft de knop **Instelling opslaan** zichtbaar maar uitgeschakeld met de melding **Worker nog niet gekoppeld**. Na die eenmalige activatie is geen verdere technische handeling nodig om deadlines vanaf de website te wijzigen.
 
 ## Actualiteit
 
