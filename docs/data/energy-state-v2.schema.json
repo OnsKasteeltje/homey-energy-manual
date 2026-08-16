@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "energy-state-v2.schema.json",
+  "title": "Homey Energy Core v2 State",
+  "type": "object",
+  "required": ["meta", "grid", "pv", "battery", "tesla", "hot_water", "loads", "manager"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["schema_version", "generated_at", "heartbeat_at", "publisher_version", "control_mode"],
+      "properties": {
+        "schema_version": {"const": "2.0"},
+        "generated_at": {"type": "string", "format": "date-time"},
+        "heartbeat_at": {"type": "string", "format": "date-time"},
+        "publisher_version": {"type": "string"},
+        "control_mode": {"enum": ["LEGACY", "SHADOW", "HYBRID", "ACTIVE"]}
+      },
+      "additionalProperties": true
+    },
+    "grid": {
+      "type": "object",
+      "properties": {
+        "power_w": {"type": ["number", "null"], "description": "Positief = import, negatief = export"},
+        "l1_w": {"type": ["number", "null"]},
+        "l2_w": {"type": ["number", "null"]},
+        "l3_w": {"type": ["number", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "pv": {
+      "type": "object",
+      "properties": {
+        "total_w": {"type": ["number", "null"]},
+        "solaredge_w": {"type": ["number", "null"]},
+        "goodwe_4200_w": {"type": ["number", "null"]},
+        "goodwe_2000_w": {"type": ["number", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "battery": {
+      "type": "object",
+      "properties": {
+        "soc_pct": {"type": ["number", "null"]},
+        "power_w": {"type": ["number", "null"], "description": "Positief = laden, negatief = ontladen"},
+        "state": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "tesla": {
+      "type": "object",
+      "properties": {
+        "connected": {"type": ["boolean", "null"]},
+        "charging": {"type": ["boolean", "null"]},
+        "power_w": {"type": ["number", "null"]},
+        "requested_a": {"type": ["number", "null"]},
+        "deadline_at": {"type": ["string", "null"], "format": "date-time"},
+        "need": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "hot_water": {
+      "type": "object",
+      "properties": {
+        "boiler_on": {"type": ["boolean", "null"]},
+        "boiler_power_w": {"type": ["number", "null"]},
+        "demand": {"type": ["string", "null"]},
+        "target_today": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "loads": {
+      "type": "object",
+      "properties": {
+        "washer": {"$ref": "#/$defs/load"},
+        "dryer": {"$ref": "#/$defs/load"},
+        "dishwasher": {"$ref": "#/$defs/load"},
+        "quooker": {"$ref": "#/$defs/load"}
+      },
+      "additionalProperties": true
+    },
+    "manager": {
+      "type": "object",
+      "properties": {
+        "state": {"type": ["string", "null"]},
+        "decision": {"type": ["string", "null"]},
+        "reason": {"type": ["string", "null"]},
+        "priority": {"enum": ["MUST", "SHOULD", "MAY", "NONE", null]},
+        "constraints": {"type": "array", "items": {"type": "string"}},
+        "state_dirty": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "load": {
+      "type": ["object", "null"],
+      "properties": {
+        "active": {"type": ["boolean", "null"]},
+        "power_w": {"type": ["number", "null"]},
+        "phase": {"type": ["string", "null"]},
+        "measurement": {"enum": ["DIRECT", "STATUS_ONLY", "UNKNOWN", null]}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
