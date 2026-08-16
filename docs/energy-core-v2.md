@@ -3,8 +3,10 @@
 ## Status
 
 **Implementatiefase:** parallelle opbouw / read-only.  
-**Legacy blijft leidend:** ja, totdat v2 gevalideerd is.  
+**Legacy blijft leidend:** nee: na de handmatige opschoning is de eerder opgebouwde energie-controlketen op 17 augustus 2026 grotendeels gedeactiveerd.  
 **Doel:** Homey als lichte edge-orchestrator; website en historie volledig los van de kritische regelroute.
+
+> Baselinecontrole 17 augustus 2026: Homey was weer stabiel genoeg voor een beperkte inventarisatie. `Energy Manager State Collector v1.0`, `Energy Manager Allocator - Shadow v0.2.4`, `Tesla laden v2.6`, `Warm water optimalisatie - PV boiler + CV advies v1.3`, `Live energie publicatie v1.2` en `Tesla runtime publicatie v1.3` zijn allemaal **disabled** en niet broken. Er is tijdens deze controle geen fysieke aansturing geactiveerd of gewijzigd.
 
 ## Harde architectuurregels
 
@@ -55,6 +57,21 @@ Energy Core v2
 ```
 
 Alle v2-objecten gebruiken een eigen namespace. Voor Logic/context: `EM2_*`.
+
+## Nieuwe Legacy-v1-baseline na handmatige deactivatie
+
+De flowlijst zelf bevat geen enabled-status; daarom zijn alleen de hieronder individueel gecontroleerde cruciale flows hard bevestigd.
+
+| Flow | Classificatie | Status 17-08-2026 | Opmerking |
+|---|---|---|---|
+| `Energy Manager State Collector v1.0` | Input/State | disabled | read-only; 1× `getDevices` + 1× `getVariables` per 2 min wanneer actief |
+| `Energy Manager Allocator - Shadow v0.2.4` | Decision/Shadow | disabled | leest alleen `EM_Runtime_State`; geen device writes |
+| `Tesla laden v2.6` | productie/writer | disabled | automatische Easee-writer; directe devices-read + command-fetch per 2 min wanneer actief |
+| `Warm water optimalisatie - PV boiler + CV advies v1.3` | productie/writer | disabled | boilerwriter; directe devices-read per 5 min wanneer actief |
+| `Live energie publicatie v1.2` | publisher | disabled | leest centrale state; GitHub-publicatie per 5 min wanneer actief |
+| `Tesla runtime publicatie v1.3` | publisher | disabled | read-only, maar deed eigen `getDevices` + GitHub-publicatie per 2 min wanneer actief |
+
+Deze baseline laat zien dat de handmatige deactivatie de kern van de eerder opgebouwde regeling daadwerkelijk heeft stilgezet. Dit verlaagt de runtime-load, maar betekent ook dat Tesla-/boilerautomatisering en de centrale live-publicatie niet meer door deze flows worden uitgevoerd. Oude standaardflows met namen als `Boiler aan/uit`, `Lader uit`, `Enable charger`, handmatige laadflows en oudere energieflows bestaan nog; hun enabled-status is niet in bulk afgeleid en zij worden vóór een toekomstige control-cutover afzonderlijk als safety/manual/legacy-writer geclassificeerd.
 
 ## Centrale Energy State
 
@@ -129,13 +146,13 @@ Tijdens de migratie mag de website v2 prefereren en alleen wanneer `energy-state
 
 ### Gecontroleerde cutover
 
-1. Legacy v1 bevriezen; geen nieuwe functionele uitbreidingen behalve veiligheidsfixes.
+1. Legacy-baseline vastleggen en bestaande writers expliciet classificeren.
 2. V2 Input + State read-only activeren.
 3. V2 Decision in shadow valideren.
 4. V2 publisher en websitecontract activeren.
 5. Boiler-controladapter migreren en valideren.
 6. Tesla-controladapter migreren en Equalizer als onafhankelijke veiligheidslaag behouden.
-7. Wanneer alle productieactuators v2-eigendom hebben: oude orkestratie-/shadow-/statuspublisherflows in één gecontroleerde stap deactiveren.
+7. Wanneer alle productieactuators v2-eigendom hebben: resterende oude orkestratie-/shadow-/statuspublisherflows gecontroleerd deactiveren.
 8. Oude flows minimaal één observatieperiode bewaren als rollback; niet direct verwijderen.
 
 Veiligheids-, watchdog- of hardwarebeschermingsfuncties worden niet collectief uitgezet zonder afzonderlijke classificatie.
@@ -150,6 +167,10 @@ Nieuwe v2-functionaliteit wordt alleen geaccepteerd wanneer zij binnen dit uitga
 - publishers maximaal op een lage vaste cadans en dirty-state;
 - shadow gebruikt dezelfde centrale state en leest apparaten niet opnieuw;
 - analyse/historie vindt buiten de kritische Homey-route plaats.
+
+### Concrete lessen uit de gecontroleerde legacyflows
+
+De oude centrale state + allocator is al een nuttige tussenstap: de allocator leest geen devices opnieuw. Voor v2 verbeteren we nog drie punten: de State Collector gaat van vaste 2-minuten volledige device-list-read naar events/deadbands plus een lage heartbeat; Tesla-control leest straks de centrale state in plaats van opnieuw alle devices op te vragen, behalve waar een expliciete veiligheids-read noodzakelijk is; en de Tesla-runtimepublisher wordt samengevoegd met de centrale dirty-statepublisher zodat geen aparte 2-minuten device-read + GitHub-write nodig is.
 
 ## Rollback
 
