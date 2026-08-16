@@ -1,5 +1,14 @@
 # Wijzigingshistorie
 
+## v2.6 — 16 augustus 2026
+
+- Homepage-statusprobleem structureel bij de bron opgelost: de algemene Homey-statuspublisher selecteert voor geversioneerde flowfamilies voortaan de **actieve, niet-broken versie** in plaats van één oude exact vastgelegde flownaam.
+- Nieuwe actieve systeemflow **`GitHub status sync - Homey lokaal v1.2`** aangemaakt en gevalideerd; de oude ongenummerde statuspublisher is daarna uitgeschakeld.
+- De nieuwe publisher publiceerde succesvol **`Warm water optimalisatie - PV boiler + CV advies v1.2 nacht-test`** als actief en **`Energie Manager PV - Shadow Mode v1.6.6`** als actieve shadowversie.
+- Ook **`M7 - Opportunity Score - Shadow v1.3`** wordt nu automatisch als actuele actieve versie van die flowfamilie herkend.
+- Homepage-links zijn family-aware gemaakt, zodat geversioneerde warmwater-, Energy Manager-, M7- en status-syncflows naar de juiste documentatie blijven linken.
+- Hiermee is de statusweergave niet meer afhankelijk van handmatige aanpassing van de homepage wanneer een hoofdflow een nieuwe subversie krijgt.
+
 ## v2.5 — 16 augustus 2026
 
 - Homepage-status van de **Energie Manager PV** gecorrigeerd zodat niet langer de oude ongenummerde, uitgeschakelde flow als hoofdstatus wordt getoond.
