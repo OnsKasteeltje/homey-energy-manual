@@ -8,7 +8,8 @@
 
   function flowHref(name){
     if(name.startsWith("Warm water optimalisatie - PV boiler + CV advies")) return `${BASE}warm-water/`;
-    if(/^Energie Manager PV - Shadow Mode v1\./.test(name) || name === "Energie Manager PV - Shadow Mode" || name === "Energie Manager PV - Shadow Mode v0.2 Quooker") return `${BASE}energie-manager/`;
+    if(name === "Energie Manager PV - Shadow Mode v0.2 Quooker") return `${BASE}energie-manager/#energie-manager-pv-shadow-mode-v02-quooker`;
+    if(/^Energie Manager PV - Shadow Mode v1\./.test(name) || name === "Energie Manager PV - Shadow Mode") return `${BASE}energie-manager/`;
     if(name.startsWith("M7 - Prijs en PV forecast context - read only")) return `${BASE}m7-prijs-pv-forecast/`;
     if(name.startsWith("M7 - Opportunity Score - Shadow")) return `${BASE}m7-opportunity-shadow/`;
     if(name.startsWith("Energie Manager - omschakeling")) return `${BASE}energie-manager/`;
