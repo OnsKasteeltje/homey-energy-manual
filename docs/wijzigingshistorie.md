@@ -1,5 +1,19 @@
 # Wijzigingshistorie
 
+## v2.8.5 — 16 augustus 2026
+
+- **Tesla laadregeling** toegevoegd onder de live energiestroom als compacte keten **Homey vraagt → Easee Equalizer → werkelijk naar Tesla**.
+- De logica gebruikt het actuele Homey-laadverzoek (`targetA`) en de werkelijk geschatte Tesla-laadstroom (`teslaActualAEst`).
+- Als er geen actief laadverzoek is, wordt expliciet **begrenzing niet actief** getoond; de Equalizer meet de hoofdaansluiting dan wel continu, maar grijpt niet in op een stilstaande lader.
+- Alleen wanneer er daadwerkelijk wordt geladen en de werkelijke laadstroom lager is dan gevraagd, wordt dit als **mogelijk begrensd** gemarkeerd.
+- De Easee-waarde **Beschikbaar** wordt nog niet door de huidige Homey/GitHub-dataset gepubliceerd en wordt daarom niet geschat of als feit weergegeven.
+- Voor deze versie wordt opnieuw een uniek JavaScript-bestand geladen om mobiele browsercache te omzeilen.
+
+## v2.8.4 — 16 augustus 2026
+
+- Voor **wasmachine** en **droger** wordt de connector nu ook duidelijk dik weergegeven wanneer Homey alleen de status **ACTIEF** kent en nog geen afzonderlijk wattage beschikbaar is.
+- In dat geval betekent de lijndikte uitsluitend *apparaat actief*; er wordt geen fictief vermogen aan de energiebalans toegevoegd.
+
 ## v2.8.3 — 16 augustus 2026
 
 - **Live energiestroom** gebruikt een nieuw versienummer voor het JavaScript-bestand zodat mobiele browsers, met name Safari, niet de eerder gecachte visualisatie blijven tonen.
