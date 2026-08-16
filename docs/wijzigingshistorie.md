@@ -1,5 +1,13 @@
 # Wijzigingshistorie
 
+## v2.8.1 — 16 augustus 2026
+
+- **Live energiestroom** aangepast zodat de verbinding van **Huis** naar iedere onderliggende verbruiker afzonderlijk wordt getekend.
+- De gedeelde horizontale vermogensbus tussen Huis en de verbruikers is verwijderd.
+- Lijnsterkte wordt nu per individuele belasting bepaald; daardoor wordt alleen de connector naar een werkelijk verbruikende component dik weergegeven.
+- Inactieve of niet-gemeten verbruikers behouden een dunne/lichte eigen verbinding en beïnvloeden de andere connectoren niet.
+- Dit is de eerste websitewijziging volgens de nieuwe patch-/subversieregel: normale websiteaanpassingen verhogen voortaan het derde versienummer.
+
 ## v2.8 — 16 augustus 2026
 
 - **Live energiestroom** visueel herontworpen volgens het goedgekeurde dashboardbeeld.
