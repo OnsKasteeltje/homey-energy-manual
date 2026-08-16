@@ -1,5 +1,17 @@
 # Wijzigingshistorie
 
+## v2.8.3 — 16 augustus 2026
+
+- **Live energiestroom** gebruikt een nieuw versienummer voor het JavaScript-bestand zodat mobiele browsers, met name Safari, niet de eerder gecachte visualisatie blijven tonen.
+- De afgesproken uitlijning uit v2.8.2 wordt daardoor betrouwbaar geladen: de horizontale segmenten tussen **Huis** en de vijf onderliggende verbruikers liggen op één gelijke hoogte.
+- De vijf connectoren blijven afzonderlijke paden met een eigen lijnsterkte per belasting; er is dus geen gedeelde vermogensbus geïntroduceerd.
+
+## v2.8.2 — 16 augustus 2026
+
+- De afzonderlijke verbindingen van **Huis** naar Tesla, boiler, wasmachine, droger en overig verbruik zijn visueel verder uitgelijnd.
+- Alle horizontale delen van deze vijf connectoren liggen nu op exact dezelfde hoogte, overeenkomstig de uitlijning van de PV-connectoren boven het huis.
+- Iedere verbinding blijft technisch en visueel een individueel pad, zodat de lijnsterkte uitsluitend het vermogen van die specifieke belasting weergeeft.
+
 ## v2.8.1 — 16 augustus 2026
 
 - **Live energiestroom** aangepast zodat de verbinding van **Huis** naar iedere onderliggende verbruiker afzonderlijk wordt getekend.
