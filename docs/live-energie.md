@@ -1,6 +1,6 @@
 # Live energiestroom
 
-Deze pagina maakt de energiearchitectuur **live zichtbaar**. Sinds **Fase 24h publicatie v1.3** gebruikt de live kaart voor de fysieke energiebalans en bekende apparaten één gezamenlijke **2-minuten Homey-snapshot**.
+Deze pagina maakt de energiearchitectuur **live zichtbaar**. De live kaart gebruikt voor de fysieke energiebalans en bekende apparaten één gezamenlijke Homey-snapshot.
 
 <div id="live-energy-flow">
   <p><em>Live energiestroom wordt geladen…</em></p>
@@ -19,7 +19,7 @@ woningverbruik = PV-productie + netimport - netexport ± batterij
 
 De batterij is momenteel niet actief. Een negatieve P1-waarde betekent export; een positieve P1-waarde import.
 
-Rechtstreeks gemeten in dezelfde 2-minuten snapshot zijn **P1**, **PV-productie**, **Tesla-laadvermogen** en **boilervermogen**. Wasmachine en droger leveren via hun Homey-integratie wel een actuele apparaatstatus maar geen afzonderlijk live wattage. Daarvoor wordt bewust geen vermogen geschat.
+Rechtstreeks gemeten zijn **P1**, **PV-productie**, **Tesla-laadvermogen** en **boilervermogen**. Wasmachine en droger leveren via hun Homey-integratie wel een actuele apparaatstatus maar geen afzonderlijk live wattage. Daarvoor wordt bewust geen vermogen geschat.
 
 **Overig verbruik** wordt daarom berekend als:
 
@@ -28,12 +28,6 @@ Overig = woningverbruik - TeslaW - boilerW
 ```
 
 Het werkelijke verbruik van wasmachine, droger en andere niet afzonderlijk gemeten apparaten zit dus in Overig. Hun status wordt daarnaast informatief als `ACTIEF` of `idle` getoond.
-
-## Waarom deze wijziging?
-
-De eerdere pagina combineerde een ongeveer 2-minuten P1/PV-publicatie met een tragere Energy Manager-shadowpublicatie. Wanneer de Tesla tussen die meetmomenten begon of stopte met laden, kon meerdere kW tijdelijk ten onrechte onder **Overig verbruik** verschijnen. Een daaropvolgende veiligheidswijziging verborg bij timestampverschillen de hele apparaatlaag; dat voorkwam verkeerde getallen maar was praktisch onvoldoende bruikbaar.
-
-De structurele oplossing is nu dat de bestaande 2-minutenpublisher zelf de live apparaatwaarden meeneemt. Daardoor hebben P1, PV, Tesla en boiler exact hetzelfde meetmoment.
 
 ## Grootverbruikers onder Huishouden
 
@@ -45,41 +39,52 @@ De structurele oplossing is nu dat de bestaande 2-minutenpublisher zelf de live 
 
 ## Tesla gevraagd versus werkelijk
 
-De publisher neemt ook de door Homey/Easee gevraagde laadstroom (`target_charger_current`) en de Easee-laadstatus mee. Het werkelijke Tesla-vermogen komt rechtstreeks uit `measure_power`. De website kan daardoor gevraagd versus werkelijk binnen hetzelfde meetmoment vergelijken. De Easee Equalizer blijft de harde veiligheidslaag voor de hoofdaansluiting.
+De publisher neemt ook de door Homey/Easee gevraagde laadstroom (`target_charger_current`) en de Easee-laadstatus mee. Het werkelijke Tesla-vermogen komt rechtstreeks uit `measure_power`. De Easee Equalizer blijft altijd de harde veiligheidslaag voor de hoofdaansluiting.
 
 ## Tesla deadlinebediening
 
-Onder het Tesla/Easee-deel staat een compacte deadline-interface. De keuze tussen **Geen deadline** en **Deadline actief** staat bewust bovenaan.
+Onder het Tesla/Easee-deel staat de deadline-interface. Bij **Geen deadline** worden de overige invoervelden verborgen. De Tesla wordt dan uitsluitend opportunistisch op werkelijk PV-overschot geladen en kan als flexibele exportbuffer worden gebruikt. Een lage of negatieve prijs alleen veroorzaakt zonder deadline dus geen netladen.
 
-Bij **Geen deadline** worden de overige invoervelden verborgen. De Tesla blijft dan opportunistisch laden en kan als flexibele exportbuffer worden gebruikt wanneer de Energy Manager dat opportuun vindt.
-
-Bij **Deadline actief** worden vanaf v2.8.16 de voor de gebruiker natuurlijke waarden gevraagd:
+Bij **Deadline actief** worden gevraagd:
 
 - **Gereed uiterlijk** — datum en tijd;
-- **Huidige SOC** — het actuele percentage dat je uit de Tesla-app/auto overneemt;
-- **Doel-SOC** — het gewenste laadpercentage bij de deadline;
+- **Huidige SOC** — actuele percentage uit Tesla-app/auto;
+- **Doel-SOC** — gewenste laadpercentage bij de deadline;
 - **Max. laadstroom** — bovengrens voor de automatische regeling.
 
-Omdat de Tesla-SOC nog niet automatisch beschikbaar is, is **Huidige SOC een handmatige momentopname**. De website bewaart daarom ook het tijdstip waarop die SOC werd ingevoerd. Voor een nieuwe of gewijzigde deadline moet de huidige SOC opnieuw worden gecontroleerd.
+Omdat Tesla-SOC nog niet automatisch beschikbaar is, is **Huidige SOC een handmatige momentopname**. Voor een nieuwe of gewijzigde deadline moet die SOC opnieuw worden gecontroleerd.
 
 ### Interne kalibratie
 
-De gebruiker hoeft geen kWh-doel meer in te voeren. De beveiligde Worker zet het verschil tussen huidige SOC en doel-SOC intern om naar benodigde laadenergie. De eerste praktijkkalibratie is gebaseerd op het gemeten punt **71% → 90%, 3×10 A, circa 7,1 kW, Tesla-ETA 1u35**. Dit geeft voorlopig circa **0,59 kWh per procentpunt**.
+De gebruiker voert geen kWh-doel in. De beveiligde Worker zet het SOC-verschil intern om naar benodigde laadenergie. De eerste praktijkkalibratie is **71% → 90%, 3×10 A, circa 7,1 kW, Tesla-ETA 1u35** en levert voorlopig circa **0,59 kWh per procentpunt**. Het afgeleide kWh-doel blijft intern beschikbaar voor voortgang en catch-up.
 
-De afgeleide kWh blijft intern bestaan omdat `Tesla laden v2.1` daarmee de resterende energie en het uiterste catch-upmoment berekent. Op de gebruikersinterface blijft het doel echter in procenten weergegeven. Nieuwe praktijkmetingen kunnen de kalibratiefactor later verfijnen zonder de bediening te veranderen.
+### Tesla laden v2.2: deadline + forecast + prijs
+
+`Tesla laden v2.2` is de enige automatische Easee-writer. De oude v2.1 is uitgeschakeld. De harde deadline blijft altijd leidend; M7 mag uitsluitend optimaliseren zolang nog voldoende tijd over is.
+
+De beslisvolgorde bij een actieve deadline is:
+
+1. **Deadline/catch-up** — vanaf `EV Latest start` wordt op de ingestelde maximale laadstroom geladen, ongeacht prijs of forecast.
+2. **Negatieve stroomprijs** — vóór latest-start mag direct op maximaal ingestelde stroom worden geladen.
+3. **Actueel PV-overschot** — werkelijk beschikbaar overschot krijgt voorrang en bepaalt de mogelijke laadstroom, met minimaal circa 6 A.
+4. **PV-forecast** — als M7 in de komende vier uur een gunstig PV-venster ziet, mag de regeling wachten.
+5. **Gunstige prijs** — als de deadline binnen vier uur ligt en M7 een goedkoop venster signaleert, mag vóór latest-start alvast op maximaal ingestelde stroom worden geladen.
+6. **Duurder venster / geen aanleiding** — wachten zolang dat de deadline niet in gevaar brengt.
+
+M7 blijft zelf **read-only**. `Tesla laden v2.2` leest alleen de contextvariabelen `M7_Price_Negative`, `M7_Price_Cheap_Next4h`, `M7_Price_Expensive_Next4h` en `M7_PV_Top4h`. De Easee Equalizer kan de werkelijk geleverde stroom altijd verder begrenzen voor installatiebeveiliging.
 
 ### Veilige write-route
 
 De publieke GitHub Pages-site bevat geen Homey- of GitHub-token. De keten is:
 
 ```text
-Website → Cloudflare Worker → tesla-deadline-command.json → Tesla laden v2.1 → Homey Logic → Easee
+Website → Cloudflare Worker → tesla-deadline-command.json → Tesla laden v2.2 → M7-context + Homey Logic → Easee
 ```
 
-De Worker valideert deadline, huidige SOC, doel-SOC en maximale laadstroom en vereist bij iedere wijziging een persoonlijke control-PIN. De PIN wordt niet op de website opgeslagen. De Worker berekent vervolgens het interne `goalKWh` en schrijft zowel de SOC-invoer als die afgeleide waarde in de opdracht. `Tesla laden v2.1` kan daardoor ongewijzigd de bestaande energieberekening en catch-up-logica blijven uitvoeren.
+De Worker valideert deadline, huidige SOC, doel-SOC en maximale laadstroom en vereist bij iedere wijziging de persoonlijke control-PIN. De Worker berekent intern `goalKWh`; Homey gebruikt dit voor de resterende energie en `Latest start`.
 
 ## Actualiteit
 
-De Homey-flow draait iedere **2 minuten**. De website ververst eveneens iedere 2 minuten en markeert de meetset als vertraagd wanneer de laatste snapshot ouder dan 5 minuten is. Dit veroorzaakt geen extra polling richting Homey: de browser leest alleen de reeds naar GitHub gepubliceerde dataset.
+De Tesla-regeling evalueert iedere **2 minuten**. M7 vernieuwt zijn prijs- en PV-context iedere **15 minuten**. De website leest alleen reeds gepubliceerde data en veroorzaakt geen extra polling naar Homey.
 
 Later kan dezelfde kaart worden uitgebreid met de Victron-laag: batterij laden/ontladen, netladen, eilandbedrijf en vermogensgrenzen per fase.
