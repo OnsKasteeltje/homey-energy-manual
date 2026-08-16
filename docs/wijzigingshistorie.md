@@ -1,5 +1,14 @@
 # Wijzigingshistorie
 
+## v2.8 — 16 augustus 2026
+
+- **Live energiestroom** visueel herontworpen volgens het goedgekeurde dashboardbeeld.
+- De drie PV-omvormers staan bovenaan als afzonderlijke productiebronnen.
+- **Grid/P1** staat links, **Huis** centraal en de toekomstige **Victron-batterij** rechts.
+- Schuine energielijnen zijn vervangen door duidelijke **orthogonale verbindingen met 90° hoeken** en korte verticale aansluitingen op componenten.
+- Productie, net/verbruik en de toekomstige batterij hebben afzonderlijke visuele lijnstijlen.
+- De bestaande live Homey/GitHub-databronnen en het verversingsritme van 5 minuten zijn ongewijzigd gebleven; dit is uitsluitend een presentatieverbetering.
+
 ## v2.7 — 16 augustus 2026
 
 - Homepage conceptueel vereenvoudigd: het dashboard toont voortaan **functionele capabilities/systemen** in plaats van iedere afzonderlijke Homey-flow.
