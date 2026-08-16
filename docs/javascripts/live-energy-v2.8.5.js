@@ -17,11 +17,28 @@
     return `<g><path class="energy-path energy-${kind} ${active?'is-active':'is-idle'}" d="${d}" style="stroke-width:${width}" marker-end="url(#arrow-${kind})"/>${label?`<text x="${lx}" y="${ly}" text-anchor="middle" class="energy-edge-label">${label}</text>`:''}</g>`;
   }
 
+  function closestPhaseSample(samples,targetTs){
+    if(!samples.length)return {};
+    if(!targetTs)return samples.at(-1)||{};
+    let best=samples[0],bestDelta=Infinity;
+    for(const sample of samples){
+      const ts=new Date(sample.ts||sample.generated_at||0).getTime();
+      if(!Number.isFinite(ts))continue;
+      const delta=Math.abs(ts-targetTs);
+      if(delta<bestDelta){best=sample;bestDelta=delta;}
+    }
+    return best||samples.at(-1)||{};
+  }
+
   async function load(){
     const root=document.getElementById('live-energy-flow'); if(!root)return;
     try{
       const [phase,base,m7]=await Promise.all([get('pv-phase-24h.json'),get('shadow-baseline-v01.json'),get('m7-opportunity.json').catch(()=>null)]);
-      const ps=(phase.samples||[]).at(-1)||{}, bs=base.latest||{}, ml=m7?.latest||{};
+      const phaseSamples=phase.samples||[], bs=base.latest||{}, ml=m7?.latest||{};
+      const shadowTs=new Date(bs.ts||base.generated_at||0).getTime();
+      const ps=closestPhaseSample(phaseSamples,shadowTs);
+      const alignedTs=[shadowTs,new Date(ps.ts||0).getTime()].filter(Number.isFinite).reduce((a,b)=>Math.max(a,b),0)||null;
+
       const se=Math.max(0,Number(ps.solarEdgeW)||0), gw42=Math.max(0,Number(ps.goodWe4200W)||0), gw20=Math.max(0,Number(ps.goodWe2000W)||0), pv=se+gw42+gw20;
       const p1=Number.isFinite(Number(ps.p1W))?Number(ps.p1W):Number(bs.p1W)||0;
       const importW=Math.max(0,p1), exportW=Math.max(0,-p1), houseTotal=Math.max(0,pv+p1);
@@ -29,12 +46,11 @@
       const washer=appliance(bs,'washer','L2'), dryer=appliance(bs,'dryer','L3');
       const knownLoads=tesla+boiler+[washer.w,dryer.w].filter(v=>v!==null).reduce((a,b)=>a+Math.max(0,b),0);
       const other=Math.max(0,houseTotal-knownLoads);
-      const newest=[phase.generated_at,base.generated_at].filter(Boolean).map(x=>new Date(x).getTime()).reduce((a,b)=>Math.max(a,b),0)||null;
-      const stale=newest?Date.now()-newest>30*60*1000:true;
+      const stale=alignedTs?Date.now()-alignedTs>30*60*1000:true;
       const l1=numOrNull(ps.l1W),l2=numOrNull(ps.l2W),l3=numOrNull(ps.l3W);
       const phaseSub=[l1!==null?`L1 ${fmtW(l1)}`:'',l2!==null?`L2 ${fmtW(l2)}`:'',l3!==null?`L3 ${fmtW(l3)}`:''].filter(Boolean).join(' · ');
 
-      const requestedA=Math.max(0,Number(bs.targetA)||0);
+      const requestedA=Math.max(0,Number(bs.teslaRequestedA??bs.targetA)||0);
       const actualA=Math.max(0,Number(bs.teslaActualAEst)||0);
       const chargeState=String(bs.chargeState||'').toLowerCase();
       const charging=tesla>100 || chargeState.includes('charging');
@@ -86,13 +102,13 @@
         svg+=node(a.x,525,220,120,'VERBRUIK',a.title,a.value,a.sub,'load');
       });
 
-      svg+=`<text x="600" y="704" text-anchor="middle" class="energy-rule">Elke verbruiker heeft een eigen rechte verbinding; bij wasmachine/droger kan lijnsterkte ook actieve Homey-status aangeven.</text>`;
+      svg+=`<text x="600" y="704" text-anchor="middle" class="energy-rule">Verbruiksverdeling gebruikt één tijd-consistente meetset; Tesla-verbruik kan daardoor niet als tijdelijke restpost in Overig terechtkomen.</text>`;
       svg+=`<g class="energy-legend" transform="translate(130 745)"><line x1="0" y1="0" x2="45" y2="0" class="legend-pv"/><text x="55" y="5">Productie</text><line x1="230" y1="0" x2="275" y2="0" class="legend-grid"/><text x="285" y="5">Net / verbruik</text><line x1="520" y1="0" x2="565" y2="0" class="legend-battery"/><text x="575" y="5">Batterij (inactief)</text></g>`;
       svg+=`</svg>`;
 
-      const teslaPanel=`<div class="tesla-regulation"><div class="tesla-regulation-title"><strong>Tesla laadregeling — gevraagd vs. werkelijk</strong><span>Easee Equalizer bewaakt de hoofdaansluiting</span></div><div class="tesla-regulation-grid"><div class="tesla-step"><small>HOMEY VRAAGT</small><strong>${requestedA.toFixed(0)} A</strong><span>${requestedA>0?'actief laadverzoek':'geen laadverzoek'}</span></div><div class="tesla-arrow">→</div><div class="tesla-step equalizer"><small>EASEE EQUALIZER</small><strong>${equalizerText}</strong><span>${equalizerDetail}</span></div><div class="tesla-arrow">→</div><div class="tesla-step actual"><small>WERKELIJK NAAR TESLA</small><strong>${actualA.toFixed(1)} A</strong><span>${fmtW(tesla)}</span></div></div><p class="tesla-regulation-note">Een verschil tussen gevraagd en werkelijk wordt pas als mogelijke Equalizer-begrenzing gemarkeerd wanneer er daadwerkelijk wordt geladen. De momenteel door Easee getoonde waarde ‘Beschikbaar’ wordt nog niet door onze Homey/GitHub-dataset gepubliceerd en wordt daarom hier niet geschat.</p></div>`;
+      const teslaPanel=`<div class="tesla-regulation"><div class="tesla-regulation-title"><strong>Tesla laadregeling — gevraagd vs. werkelijk</strong><span>Easee Equalizer bewaakt de hoofdaansluiting</span></div><div class="tesla-regulation-grid"><div class="tesla-step"><small>HOMEY VRAAGT</small><strong>${requestedA.toFixed(0)} A</strong><span>${requestedA>0?'actief laadverzoek':'geen laadverzoek'}</span></div><div class="tesla-arrow">→</div><div class="tesla-step equalizer"><small>EASEE EQUALIZER</small><strong>${equalizerText}</strong><span>${equalizerDetail}</span></div><div class="tesla-arrow">→</div><div class="tesla-step actual"><small>WERKELIJK NAAR TESLA</small><strong>${actualA.toFixed(1)} A</strong><span>${fmtW(tesla)}</span></div></div><p class="tesla-regulation-note">De verbruiksverdeling en Tesla-meting worden op dezelfde shadow-timestamp uitgelijnd. Daardoor wordt een nieuwere P1-meting niet meer gecombineerd met een ouder Tesla-vermogen. De momenteel door Easee getoonde waarde ‘Beschikbaar’ wordt nog niet door onze Homey/GitHub-dataset gepubliceerd en wordt daarom hier niet geschat.</p></div>`;
 
-      root.innerHTML=`<div class="energy-topline"><span><strong>Laatste data:</strong> ${newest?new Date(newest).toLocaleString('nl-NL'):'onbekend'}</span><span class="${stale?'energy-stale':'energy-ok'}">${stale?'● data ouder dan 30 min':'● actueel'}</span></div>${svg}${teslaPanel}<div class="energy-summary"><div><strong>PV</strong><br>${fmtW(pv)}</div><div><strong>Woning</strong><br>${fmtW(houseTotal)}</div><div><strong>Grid</strong><br>${p1>=0?`${fmtW(importW)} import`:`${fmtW(exportW)} export`}</div><div><strong>M7</strong><br>${String(ml.advice||'—')}</div></div><p class="energy-footnote">De visualisatie gebruikt uitsluitend reeds gepubliceerde Homey/GitHub-data en ververst maximaal eens per 5 minuten. De batterij is visueel voorbereid op de toekomstige Victron ESS-laag en is nu bewust inactief.</p>`;
+      root.innerHTML=`<div class="energy-topline"><span><strong>Meetset:</strong> ${alignedTs?new Date(alignedTs).toLocaleString('nl-NL'):'onbekend'} · tijd-consistent met Energy Manager</span><span class="${stale?'energy-stale':'energy-ok'}">${stale?'● data ouder dan 30 min':'● actueel'}</span></div>${svg}${teslaPanel}<div class="energy-summary"><div><strong>PV</strong><br>${fmtW(pv)}</div><div><strong>Woning</strong><br>${fmtW(houseTotal)}</div><div><strong>Grid</strong><br>${p1>=0?`${fmtW(importW)} import`:`${fmtW(exportW)} export`}</div><div><strong>M7</strong><br>${String(ml.advice||'—')}</div></div><p class="energy-footnote">De visualisatie gebruikt uitsluitend reeds gepubliceerde Homey/GitHub-data en ververst maximaal eens per 5 minuten. Voor een correcte uitsplitsing wordt de P1/PV-sample gekozen die het dichtst bij de actuele Energy Manager-shadowmeting ligt. De batterij is visueel voorbereid op de toekomstige Victron ESS-laag en is nu bewust inactief.</p>`;
     }catch(e){root.innerHTML=`<p><em>Live energiestroom kon niet worden geladen: ${String(e.message||e)}</em></p>`;}
   }
   let timer=null;function start(){load();if(timer)clearInterval(timer);timer=setInterval(()=>{if(!document.hidden)load();},REFRESH_MS);}document.addEventListener('DOMContentLoaded',start);document.addEventListener('DOMContentSwitch',start);
