@@ -36,6 +36,79 @@ PV beschikbaar = max(0, -P1 + werkelijk Tesla-vermogen + werkelijk boilervermoge
 
 Boiler wordt alleen toegestaan als na Tesla-reservering minimaal circa **2,1 kW** resteert.
 
+## Tesla-laadstrategie: deadline optioneel
+
+De functionele doelarchitectuur voor Tesla-laden maakt onderscheid tussen **laden met deadline** en **laden zonder deadline**.
+
+### Zonder deadline: flexibel / exportbuffer
+
+Wanneer geen deadline is ingesteld, bestaat er geen verplicht laadmoment. De Tesla mag dan als flexibele energiebuffer worden gebruikt wanneer de auto is aangesloten en laden mogelijk is.
+
+De Energy Manager mag in die situatie laden voorstellen wanneer één of meer van de volgende omstandigheden gelden:
+
+- er is voldoende direct PV-overschot;
+- de prijscontext maakt laden aantrekkelijk;
+- export naar het net is op dat moment ongewenst en de Tesla kan het overschot opnemen.
+
+De functionele status is dan bijvoorbeeld `OPPORTUNITY` of `BUFFER_EXPORT`. Er wordt **geen laadpercentage als doel verondersteld** zolang de actuele Tesla-SOC niet betrouwbaar beschikbaar is.
+
+### Met deadline: gereed vóór datum/tijd
+
+De toekomstige deadlinefunctie maakt het mogelijk een optioneel tijdstip vast te leggen waarop de Tesla gereed moet zijn. Zolang betrouwbare SOC-data ontbreekt, wordt op de website uitsluitend de deadline zelf getoond. Er worden bewust geen doel-SOC, resterende kWh of berekende `latest start` weergegeven.
+
+Zodra betrouwbare SOC beschikbaar is, wordt de bedoelde rekenketen:
+
+```text
+huidige SOC
+   ↓
+doel-SOC
+   ↓
+benodigde energie
+   ↓
+verwachte effectieve laadsnelheid
+   ↓
+benodigde laadtijd
+   ↓
+latest safe start + veiligheidsmarge
+```
+
+De voorziene states zijn:
+
+- `NIET_BESCHIKBAAR` — auto niet aangesloten of laden niet mogelijk;
+- `OPPORTUNITY` — laden wegens gunstige PV-/prijscontext;
+- `BUFFER_EXPORT` — geen deadline; laden om ongewenste export te absorberen;
+- `WACHTEN_DEADLINE` — deadline aanwezig, maar nog voldoende speelruimte;
+- `CATCH_UP` — verder wachten zou het behalen van de deadline in gevaar brengen;
+- `DOEL_GEHAALD` — deadline-doel bereikt;
+- `DEADLINE_GEMIST` — doel is niet meer haalbaar binnen de beschikbare tijd.
+
+**Belangrijk:** deze deadline-/catch-uplogica is nog geen fysieke aansturing in v1.6.6. De actuele flow blijft shadow/read-only. De functionele beschrijving legt de gewenste volgende stap vast zonder te suggereren dat deze al actief is.
+
+## Wat weten we nu wél over Tesla-laden?
+
+Zolang de Tesla-SOC niet betrouwbaar beschikbaar is, gebruikt de Energy Manager uitsluitend gemeten en observeerbare laadpaaldata. Daarbij wordt expliciet onderscheid gemaakt tussen **laadopdracht** en **werkelijke stroomafname**.
+
+Beschikbare observaties zijn onder andere:
+
+- `plugged` — auto aangesloten of niet;
+- `chargeState` — onder andere `plugged_in_charging` of `plugged_in_paused`;
+- `targetA` / `teslaRequestedA` — gevraagde laadstroom;
+- `teslaRequestedW` — bijbehorend gevraagd vermogen;
+- `teslaW` — werkelijk gemeten Tesla-laadvermogen;
+- `teslaActualAEst` — uit werkelijk vermogen geschatte equivalente laadstroom.
+
+Daarmee kan de website betrouwbaar onderscheid maken tussen bijvoorbeeld:
+
+```text
+Laadopdracht aanwezig + teslaW > 0
+→ Tesla laadt werkelijk
+
+Laadopdracht aanwezig + teslaW ≈ 0
+→ laden vrijgegeven / gevraagd, maar auto neemt geen stroom af
+```
+
+De website toont daarom in deze tussenfase **geen SOC-percentages, geen resterende kWh en geen berekende latest-starttijd**. Dat voorkomt schijnnauwkeurigheid.
+
 ## Easee Equalizer als harde veiligheidslaag
 
 De **Easee Equalizer blijft altijd leidend voor lokale load balancing** van de laadpaal. De Energy Manager mag een begrenzing of laadpauze van de Equalizer nooit proberen te overrulen.
