@@ -7,6 +7,15 @@
 
 De actuele v1.6.6-flow is in Homey ingeschakeld. De flow werkt volledig in shadow/read-only-modus en stuurt geen Tesla, laadpaal, boiler, wasmachine of droger aan. Hij observeert en berekent de gewenste energiesturing, houdt de boilerstatus en boilercycli bij, observeert de Easee/Equalizer-context en publiceert meetdata naar GitHub.
 
+## Energie Manager PV - Shadow Mode v0.2 Quooker
+
+**Homey-status:** ⚪ Uit  
+**Enabled:** nee  
+**Broken:** nee  
+**Rol:** oudere afzonderlijke Quooker-shadowvariant; niet de actuele operationele Energy Manager.
+
+Deze v0.2-flow staat momenteel bewust uit. De actieve Energy Manager is **v1.6.6** hierboven. De homepage en deze detailpagina verwijzen voor v0.2 voortaan naar deze eigen statussectie, zodat de actieve status van v1.6.6 niet meer ten onrechte als status van v0.2 kan worden gelezen.
+
 ## Berekening
 
 ```text
