@@ -1,0 +1,18 @@
+(function(){
+  const RUNTIME='/homey-energy-manual/data/tesla-runtime.json',STATUS='/homey-energy-manual/data/homey-status.json';
+  const LABELS={GEEN_DEADLINE:'Opportunistisch',WACHT_OP_PV:'Wacht op PV',OPPORTUNISTISCH:'Opportunistisch laden',DEADLINE_WACHT:'Wacht op geschikt laadmoment',DEADLINE_CATCH_UP:'Catch-up actief',DEADLINE_GEMIST_CATCH_UP:'Deadline gepasseerd · catch-up',DEADLINE_PRIJS_NEGATIEF:'Laden · negatieve stroomprijs',DEADLINE_PV_OVERSCHOT:'Laden op PV-overschot',DEADLINE_PV_FORECAST:'Laden · gunstig PV-forecastuur',DEADLINE_PRIJS_GOEDKOOP:'Laden · gunstige stroomprijs',DEADLINE_WACHT_GOEDKOPER:'Wacht op goedkoper laadmoment',DEADLINE_EQUALIZER_BLOKKEERT:'Equalizer blokkeert laden',DEADLINE_ONDER_DRUK_EQUALIZER:'Deadline onder druk',DEADLINE_NIET_HAALBAAR_EQUALIZER:'Deadline niet haalbaar',DOEL_GEHAALD:'Laaddoel gehaald',NIET_AANGESLOTEN:'Tesla niet aangesloten',CONFIG_FOUT:'Deadlineconfiguratie fout'};
+  async function json(url){try{const r=await fetch(`${url}?ts=${Date.now()}`,{cache:'no-store'});return r.ok?await r.json():null;}catch(e){return null;}}
+  async function apply(){const [d,s]=await Promise.all([json(RUNTIME),json(STATUS)]);if(!d&&!s)return;
+    if(s){const tes=(s.flows||[]).find(f=>/^Tesla laden v2\./.test(f.name)&&f.enabled&&!f.broken)||(s.flows||[]).find(f=>f.category==='Tesla'&&f.enabled&&!f.broken);document.querySelectorAll('.ha-stage.control .ha-row').forEach(row=>{const spans=row.querySelectorAll(':scope > span');if(spans.length<2||spans[0].textContent.trim()!=='Tesla / Easee')return;spans[1].innerHTML=tes?`${tes.name} · Equalizer beveiliging actief <span class="dot ok"></span>`:'regeling uit <span class="dot off"></span>';});}
+    if(!d)return;const goals=[...document.querySelectorAll('.ha-stage.decision .ha-goal')],g=goals.find(x=>x.querySelector('strong')?.textContent.trim()==='Tesla laden');if(!g)return;
+    const state=g.querySelector('.ha-goal-state'),sub=g.querySelector('small'),label=LABELS[String(d.status||'').toUpperCase()]||d.status||'';if(state&&label){state.textContent=label;state.className=`ha-goal-state ${/laden|catch-up|gehaald/i.test(label)&&!/blokkeert|onder druk|niet haalbaar/i.test(label)?'ok':'warn'}`;}
+    if(sub){const eq=d.equalizer||d.decision?.equalizer||null,requested=Math.max(0,Number(eq?.requestedA??d.targetA??0)),actualA=Number(eq?.actualA??(Number(d.teslaW||0)>250?Number(d.teslaW||0)/690:0)),mode=String(eq?.mode||'').toLowerCase();let text;
+      if(mode==='blocked')text=`Equalizer blokkeert · ${requested.toFixed(0)} A gevraagd → 0 A werkelijk · wacht op vrijgave`;
+      else if(mode==='blocked_pending')text=`Equalizer mogelijk blokkerend · ${requested.toFixed(0)} A gevraagd → 0 A werkelijk · bevestiging loopt`;
+      else if(mode==='limited')text=`Equalizer begrenst · ${requested.toFixed(0)} A gevraagd → ~${actualA.toFixed(1)} A werkelijk`;
+      else {const charging=String(d.chargeState||'').toLowerCase().includes('charging')||Number(d.teslaW||0)>500;text=charging?`Equalizer begrenst niet · ${requested.toFixed(0)} A gevraagd → ~${actualA.toFixed(1)} A werkelijk`:'Equalizer niet actief op laadstroom · Tesla laadt niet';}
+      sub.textContent=text;
+    }
+  }
+  function start(){apply();setInterval(apply,20000);}document.addEventListener('DOMContentLoaded',start);document.addEventListener('DOMContentSwitch',apply);
+})();
