@@ -2,18 +2,26 @@
 
 Deze pagina beschrijft de huidige en geplande Homey-energiearchitectuur als één samenhangend regelsysteem.
 
-De architectuur kent bewust twee verschillende lagen:
+De architectuur kent bewust verschillende lagen:
 
 ```text
-                 BESTURING / ORCHESTRATIE
+                  METEN / CONTEXT
 
-                    ENERGY MANAGER
-                       Homey
-                    /          \
-                   ▼            ▼
-                Tesla         Boiler
+Homey devices + Logic + M7 context
+              ↓
+Energy Manager State Collector v1.0
+              ↓
+        EM_Runtime_State
 
-                 FYSIEKE ENERGIESTROOM
+              ORCHESTRATIE
+
+            ENERGY MANAGER
+                 Homey
+        ┌────────┼────────┐
+        ▼        ▼        ▼
+     Shadow   Allocator  Tesla v2.6
+
+            FYSIEKE ENERGIESTROOM
 
  PV-bronnen ───► HUISBUS ◄────► GRID / P1
                     │
@@ -45,7 +53,25 @@ P1 < 0 W  → netto teruglevering
 P1 > 0 W  → netto afname
 ```
 
-De fasemeting wordt gebruikt voor analyse, fase-identificatie en later voor veilige actieve orchestratie.
+### Centrale runtime-state
+
+Vanaf 16 augustus 2026 draait `Energy Manager State Collector v1.0` iedere twee minuten. Deze flow leest in één HomeyScript-run de relevante devices en Logic-variabelen en bouwt:
+
+```text
+EM_Runtime_State
+```
+
+De centrale snapshot bevat onder andere:
+
+- P1 totaal en L1/L2/L3;
+- Tesla/Easee vermogen, laadstatus, setpoint en meterstand;
+- Equalizer-fasestromen;
+- boilervermogen en aan/uit-status;
+- PV-productie per omvormer;
+- wasmachine- en drogerstatus;
+- warmwater-, deadline- en M7-context.
+
+Niet iedere flow hoeft hierdoor opnieuw alle apparaten op te vragen.
 
 ---
 
@@ -62,7 +88,14 @@ De centrale Energy Manager combineert onder andere:
 - seizoensmodus;
 - prijs-/PV-forecastcontext.
 
-De huidige centrale Energy Manager draait nog in **shadow mode**. Hij berekent en logt beslissingen, maar neemt de centrale fysieke aansturing nog niet over.
+De centrale Energy Manager draait nog in **shadow mode**. Hij berekent en logt beslissingen, maar neemt de centrale fysieke aansturing nog niet volledig over.
+
+Actuele shadowlagen zijn:
+
+- `Energie Manager PV - Shadow Mode v1.6.7` — iedere 5 minuten;
+- `Energy Manager Allocator - Shadow v0.2.4` — iedere 5 minuten, vanuit `EM_Runtime_State`.
+
+De operationele Tesla-aansturing blijft bij `Tesla laden v2.6`.
 
 ---
 
@@ -85,7 +118,7 @@ De minimale zinvolle 3-fase laadstroom is:
 3 × 6 A ≈ 4,14 kW
 ```
 
-Tesla krijgt daarom alleen flexprioriteit wanneer voldoende vermogen beschikbaar is.
+Tesla krijgt daarom alleen flexprioriteit wanneer voldoende vermogen beschikbaar is, tenzij een deadline catch-up vereist.
 
 ### Boiler
 
@@ -100,8 +133,6 @@ Wat na huishoudelijk verbruik, Tesla en boiler resteert, wordt teruggeleverd.
 ## 4. Veiligheids- en regelhiërarchie
 
 De Energy Manager is **niet de hoogste regelautoriteit**. Lokale veiligheids- en hardwarelagen krijgen altijd voorrang.
-
-De doelhiërarchie is:
 
 ```text
 Installatieveiligheid / 3×25 A
@@ -119,38 +150,18 @@ Tesla / boiler
 
 De Easee Equalizer mag autonoom de Tesla-laadstroom verlagen of het laden pauzeren wanneer de totale of fasebelasting dit vereist. Homey probeert zo'n ingreep **nooit te overrulen**.
 
-Voorbeeld:
-
-```text
-Tesla laadt op Homey-doel 10 A
-        ↓
-oven of andere grote verbruiker gaat aan
-        ↓
-Easee Equalizer verlaagt naar 6 A of pauzeert
-        ↓
-Homey accepteert de werkelijke laadstroom
-        ↓
-geen directe poging om opnieuw 10 A af te dwingen
-```
-
 ### Gevraagd versus werkelijk Tesla-vermogen
 
-De actieve orchestratie moet altijd onderscheid maken tussen:
+De actieve orchestratie onderscheidt altijd:
 
 - door Homey **gevraagde** laadstroom;
 - door Easee **werkelijk geleverde** laadstroom/vermogen.
 
-Nieuwe beslissingen worden genomen op basis van de werkelijke toestand: Tesla-vermogen, P1 en L1/L2/L3.
+Vanaf `Tesla laden v2.6` wordt 0 W bij een actief laadverzoek niet automatisch aan de Equalizer toegeschreven. Alleen wanneer tegelijkertijd voldoende hoge Equalizer-fasebelasting wordt gemeten, wordt de oorzaak specifiek als Equalizer-blokkade geclassificeerd.
 
 ### Geen directe herverdeling na Equalizer-ingreep
 
 Wanneer de Equalizer Tesla terugregelt, wordt het ogenschijnlijk vrijgekomen vermogen niet automatisch direct aan de boiler toegewezen. Eerst worden net- en fasebelasting opnieuw beoordeeld.
-
-### Stabilisatie / hysterese
-
-Na onverwacht terugregelen of pauzeren door Easee wordt in de toekomstige actieve regeling een korte stabilisatieperiode gebruikt voordat vermogen opnieuw wordt toegewezen. Richtwaarde: **1–2 minuten**. De definitieve waarde wordt vóór activering in shadow mode gevalideerd.
-
-Doel: voorkomen dat Easee en Homey tegen elkaar in gaan regelen.
 
 ---
 
@@ -214,12 +225,13 @@ De Tesla-laag bestaat uit:
 - Easee Charger;
 - Easee Equalizer;
 - Tesla Model 3;
-- bestaande Tesla-flows;
+- `Tesla laden v2.6`;
+- M7 prijs-/PV-context;
 - centrale Energy Manager.
 
-Monitoring gebruikt de werkelijke laadstatus en het werkelijke vermogen. De Energy Manager mag nooit alleen op een laadsetpoint vertrouwen wanneer de Equalizer lokaal heeft teruggestuurd.
+`Tesla laden v2.6` is de enige automatische schrijver van de dynamische Easee-laadstroom en evalueert iedere twee minuten.
 
-Per laadsessie kunnen onder andere starttijd, eindtijd, duur, geladen kWh, gemiddeld en maximaal vermogen worden vastgelegd.
+Monitoring gebruikt de werkelijke laadstatus en het werkelijke vermogen. De Energy Manager mag nooit alleen op een laadsetpoint vertrouwen wanneer de Equalizer lokaal heeft teruggestuurd.
 
 ---
 
@@ -227,7 +239,7 @@ Per laadsessie kunnen onder andere starttijd, eindtijd, duur, geladen kWh, gemid
 
 ### Actief
 
-Bestaande regelingen sturen werkelijk apparaten, zoals delen van warmwater-, Tesla- en Quookerlogica.
+Bestaande regelingen sturen werkelijk apparaten, zoals delen van warmwaterlogica en `Tesla laden v2.6`.
 
 ### Shadow
 
@@ -247,11 +259,46 @@ werkelijk gedrag
 gesimuleerde centrale beslissing
 ```
 
-De nieuwe Equalizer-/faseveiligheidsregels worden eerst in shadow mode gevalideerd voordat ze onderdeel worden van actieve orchestratie.
+### Actuele shadow cadence
+
+`Energie Manager PV - Shadow Mode v1.6.7` draait één keer per **5 minuten**. De oude combinatie van een 2-minutentrigger plus aparte 15-minutentrigger is verwijderd. GitHub-publicatie wordt intern nog ongeveer iedere 15 minuten bepaald.
+
+`Energy Manager Allocator - Shadow v0.2.4` draait eveneens iedere **5 minuten** en gebruikt de centrale `EM_Runtime_State` in plaats van opnieuw alle devices op te halen.
 
 ---
 
-## 10. Constraints-overzicht
+## 10. Publicatie- en observatielaag
+
+De websitepublicatie is bewust uit de kritische regelroute gehouden.
+
+```text
+EM_Runtime_State
+   └─→ Live energie publicatie v1.2 → GitHub → website
+
+Shadow v1.6.7
+   └─→ shadowhistorie → GitHub
+
+GitHub status sync v1.4
+   └─→ flowstatus → GitHub
+```
+
+Actuele cadans:
+
+| Functie | Ritme |
+|---|---:|
+| State Collector v1.0 | 2 min |
+| Tesla laden v2.6 | 2 min |
+| Shadow v1.6.7 | 5 min |
+| Allocator Shadow v0.2.4 | 5 min |
+| Live energie v1.2 | 5 min |
+| M7 context | 15 min |
+| GitHub status sync v1.4 | 30 min |
+
+Deze indeling verlaagt Homey-load door **één keer meten, meerdere keren gebruiken**.
+
+---
+
+## 11. Constraints-overzicht
 
 | Constraint | Effect |
 |---|---|
@@ -260,7 +307,6 @@ De nieuwe Equalizer-/faseveiligheidsregels worden eerst in shadow mode gevalidee
 | Werkelijk Tesla-vermogen | leidend boven gevraagd setpoint |
 | L1/L2/L3-fasebelasting | meewegen vóór nieuwe flexbeslissing |
 | Equalizer-ingreep | geen directe herverdeling naar boiler |
-| Stabilisatie na terugregelen | richtwaarde 1–2 min; nog te valideren |
 | Tesla minimaal 3×6 A | onder ca. 4,14 kW geen zinvolle laadstart |
 | Boiler circa 2 kW | benut kleiner PV-overschot |
 | Quooker werkdagen | 15:00–19:00 |
@@ -271,44 +317,8 @@ De nieuwe Equalizer-/faseveiligheidsregels worden eerst in shadow mode gevalidee
 | Shadow mode | centrale manager stuurt nog geen apparaten |
 | P1 beschikbaarheid | zonder P1 geen centrale vermogensbeslissing |
 | Device beschikbaarheid | ontbrekend apparaat → fail-safe |
+| Runtime-state ouder dan 5 min | allocator weigert state fail-safe |
 | Flowversionering | per flowfamilie maximaal één actieve versie |
-
----
-
-## 11. Doelarchitectuur met veiligheidslagen
-
-```text
-                 BESTURING
-
-             ┌──────────────────┐
-             │  ENERGY MANAGER  │
-             │      Homey       │
-             └───────┬──────────┘
-                     │ gewenste laadstroom
-                     ▼
-              ┌─────────────┐
-              │ Easee       │
-              │ Charger     │
-              └──────┬──────┘
-                     │
-        ┌────────────▼────────────┐
-        │ Easee Equalizer        │
-        │ lokale load balancing  │
-        └────────────┬────────────┘
-                     │ werkelijk vermogen
-                     ▼
-                   Tesla
-
-                 ENERGIE
-
-PV ─────────► HUISBUS ◄────────► GRID
-                │
-        ┌───────┼────────┐
-        ▼       ▼        ▼
-     Huis     Tesla    Boiler
-```
-
-De Energy Manager beslist over comfort en flexibiliteit. De Equalizer bewaakt lokaal de laadruimte. Geen hogere softwaredoelstelling mag een lokale veiligheidsbegrenzing terugdraaien.
 
 ---
 
@@ -360,6 +370,16 @@ oude versie inactief
 
 Van dezelfde functionele flowfamilie mag maximaal één versie actief zijn. Websitebeschrijving en wijzigingshistorie worden tegelijk bijgewerkt.
 
+De load-optimalisatie van 16 augustus 2026 heeft onder andere geleid tot:
+
+```text
+Shadow v1.6.6           → v1.6.7
+Allocator v0.2.3        → v0.2.4
+Live energie v1.1       → v1.2
+GitHub status sync v1.3 → v1.4
++ State Collector v1.0
+```
+
 ---
 
 ## 14. Ontwerpprincipes
@@ -371,11 +391,14 @@ De architectuur volgt deze principes:
 - lokale hardwarebeveiliging nooit overrulen;
 - werkelijk vermogen boven gevraagd vermogen;
 - centrale P1 plus L1/L2/L3 als waarheid voor net- en fasebelasting;
-- na veiligheidsingrepen eerst stabiliseren, daarna opnieuw beslissen;
 - Tesla vóór boiler binnen de beschikbare veilige flexruimte;
 - Quooker als constraint;
 - fail-safe boven agressieve optimalisatie;
 - eerst shadow mode, daarna gecontroleerde migratie;
+- **één keer meten, meerdere keren gebruiken** waar dat veilig kan;
+- veiligheidskritische Tesla-besturing blijft rechtstreeks actuele data lezen;
 - Homey zo licht mogelijk houden; analyse/historie/visualisatie zoveel mogelijk buiten Homey;
 - iedere inhoudelijke flowwijziging maakt een nieuwe genummerde flowversie;
 - alle relevante wijzigingen tegelijk vastleggen in Flow Manual en wijzigingshistorie.
+
+> Laatste architectuurupdate: **16 augustus 2026** — centrale runtime-state en Homey-loadoptimalisatie geïntegreerd.
