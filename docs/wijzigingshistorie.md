@@ -1,5 +1,15 @@
 # Wijzigingshistorie
 
+## v2.8.10 — 16 augustus 2026
+
+- Op **Live energiestroom** is in het Tesla/Easee-deel een compacte **Tesla deadline-interface** toegevoegd.
+- De keuze **Geen deadline / Deadline actief** staat bovenaan; bij **Geen deadline** worden datum/tijd, kWh-doel, maximale laadstroom en deadline-resultaten verborgen.
+- Bij **Deadline actief** verschijnen de SOC-loze instellingen **Gereed uiterlijk**, **Minimaal laden (kWh)** en **Max. laadstroom (A)**.
+- De interface is voorbereid op publicatie van `EV Deadline status`, resterende kWh en `EV Latest start` vanuit Homey; er wordt bewust geen SOC-percentage verzonnen.
+- De knop **Deadline opslaan** is voorlopig zichtbaar maar uitgeschakeld zolang de publieke GitHub Pages-site geen veilige write-route naar Homey heeft. Hierdoor kan de website niet ten onrechte suggereren dat een invoer al naar Homey is geschreven.
+- Desktop en mobiel hebben afzonderlijk passende layout: horizontaal compact op desktop, onder elkaar op mobiel.
+- Functionele documentatie op **Live energiestroom** is tegelijk bijgewerkt.
+
 ## v2.8.7 — 16 augustus 2026
 
 - Nieuwe hoofdtab **Energiehistorie** toegevoegd op basis van het goedgekeurde lijn-diagramconcept.
