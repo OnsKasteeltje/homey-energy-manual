@@ -6,16 +6,15 @@
   const statusLabels = { active:"Actief", shadow:"Shadow/Test", off:"Uit", error:"Fout", unknown:"Onbekend" };
   const statusClass = s => ["active","shadow","off","error"].includes(s) ? `status-${s}` : "status-unknown";
 
-  const flowDocs = {
-    "Warm water optimalisatie - PV boiler + CV advies": `${BASE}warm-water/`,
-    "Energie Manager PV - Shadow Mode": `${BASE}energie-manager/`,
-    "Energie Manager PV - Shadow Mode v0.2 Quooker": `${BASE}energie-manager/`,
-    "M7 - Prijs en PV forecast context - read only": `${BASE}m7-prijs-pv-forecast/`,
-    "M7 - Opportunity Score - Shadow": `${BASE}m7-opportunity-shadow/`,
-    "Energie Manager - omschakeling v0.2 - 16 aug 00:00": `${BASE}energie-manager/`,
-    "GitHub status sync - Homey lokaal": `${BASE}github-sync-flows/`,
-    "GitHub shadow sync - Homey lokaal": `${BASE}github-sync-flows/`
-  };
+  function flowHref(name){
+    if(name.startsWith("Warm water optimalisatie - PV boiler + CV advies")) return `${BASE}warm-water/`;
+    if(/^Energie Manager PV - Shadow Mode v1\./.test(name) || name === "Energie Manager PV - Shadow Mode" || name === "Energie Manager PV - Shadow Mode v0.2 Quooker") return `${BASE}energie-manager/`;
+    if(name.startsWith("M7 - Prijs en PV forecast context - read only")) return `${BASE}m7-prijs-pv-forecast/`;
+    if(name.startsWith("M7 - Opportunity Score - Shadow")) return `${BASE}m7-opportunity-shadow/`;
+    if(name.startsWith("Energie Manager - omschakeling")) return `${BASE}energie-manager/`;
+    if(name.startsWith("GitHub status sync - Homey lokaal") || name.startsWith("GitHub shadow sync - Homey lokaal")) return `${BASE}github-sync-flows/`;
+    return null;
+  }
 
   function escapeHtml(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");}
   async function fetchJson(url){const u=new URL(url,document.baseURI);u.searchParams.set("_",Date.now());const r=await fetch(u,{cache:"no-store"});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();}
@@ -28,7 +27,7 @@
       dashboard.innerHTML="";
       for(const flow of (data.flows||[])){
         const status=flow.status||(flow.broken?"error":flow.enabled?"active":"off");
-        const href=flowDocs[flow.name]||null;
+        const href=flowHref(flow.name);
         const card=document.createElement("article");
         card.className=`flow-card ${statusClass(status)}`;
         const title=href?`<a class="flow-title-link" href="${escapeHtml(href)}" title="Open flowbeschrijving">${escapeHtml(flow.name)}</a>`:escapeHtml(flow.name);
