@@ -1,7 +1,10 @@
 (function(){
   const BASE='/homey-energy-manual/';
   const REFRESH_MS=5*60*1000;
+  const SYNC_TOLERANCE_MS=90*1000;
+  const LIVE_FRESH_MS=5*60*1000;
   const fmtW=v=>`${Math.round(Number(v)||0).toLocaleString('nl-NL')} W`;
+  const fmtTime=ts=>Number.isFinite(ts)?new Date(ts).toLocaleString('nl-NL'):'onbekend';
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
   async function get(path){const r=await fetch(`${BASE}data/${path}?ts=${Date.now()}`,{cache:'no-store'});if(!r.ok)throw new Error(`${path}: HTTP ${r.status}`);return r.json();}
   const numOrNull=v=>Number.isFinite(Number(v))?Number(v):null;
@@ -18,16 +21,15 @@
   }
 
   function closestPhaseSample(samples,targetTs){
-    if(!samples.length)return {};
-    if(!targetTs)return samples.at(-1)||{};
-    let best=samples[0],bestDelta=Infinity;
+    if(!samples.length || !Number.isFinite(targetTs))return {sample:null,delta:Infinity};
+    let best=null,bestDelta=Infinity;
     for(const sample of samples){
       const ts=new Date(sample.ts||sample.generated_at||0).getTime();
       if(!Number.isFinite(ts))continue;
       const delta=Math.abs(ts-targetTs);
       if(delta<bestDelta){best=sample;bestDelta=delta;}
     }
-    return best||samples.at(-1)||{};
+    return {sample:best,delta:bestDelta};
   }
 
   async function load(){
@@ -35,25 +37,40 @@
     try{
       const [phase,base,m7]=await Promise.all([get('pv-phase-24h.json'),get('shadow-baseline-v01.json'),get('m7-opportunity.json').catch(()=>null)]);
       const phaseSamples=phase.samples||[], bs=base.latest||{}, ml=m7?.latest||{};
+      const livePs=phaseSamples.at(-1)||{};
+      const liveTs=new Date(livePs.ts||phase.generated_at||0).getTime();
       const shadowTs=new Date(bs.ts||base.generated_at||0).getTime();
-      const ps=closestPhaseSample(phaseSamples,shadowTs);
-      const alignedTs=[shadowTs,new Date(ps.ts||0).getTime()].filter(Number.isFinite).reduce((a,b)=>Math.max(a,b),0)||null;
+      const match=closestPhaseSample(phaseSamples,shadowTs);
+      const splitPs=match.sample||{};
+      const splitSynchronized=!!match.sample && match.delta<=SYNC_TOLERANCE_MS;
+      const splitNearLive=Number.isFinite(liveTs)&&Number.isFinite(shadowTs)&&Math.abs(liveTs-shadowTs)<=SYNC_TOLERANCE_MS;
+      const liveFresh=Number.isFinite(liveTs)&&Date.now()-liveTs<=LIVE_FRESH_MS;
+      const splitUsable=splitSynchronized&&splitNearLive;
 
-      const se=Math.max(0,Number(ps.solarEdgeW)||0), gw42=Math.max(0,Number(ps.goodWe4200W)||0), gw20=Math.max(0,Number(ps.goodWe2000W)||0), pv=se+gw42+gw20;
-      const p1=Number.isFinite(Number(ps.p1W))?Number(ps.p1W):Number(bs.p1W)||0;
+      // Bovenste energiebalans gebruikt altijd de nieuwste 2-minuten P1/PV-meetset.
+      const se=Math.max(0,Number(livePs.solarEdgeW)||0), gw42=Math.max(0,Number(livePs.goodWe4200W)||0), gw20=Math.max(0,Number(livePs.goodWe2000W)||0), pv=se+gw42+gw20;
+      const p1=Number.isFinite(Number(livePs.p1W))?Number(livePs.p1W):0;
       const importW=Math.max(0,p1), exportW=Math.max(0,-p1), houseTotal=Math.max(0,pv+p1);
-      const tesla=Math.max(0,Number(bs.teslaW)||0), boiler=Math.max(0,Number(bs.boilerW)||0);
-      const washer=appliance(bs,'washer','L2'), dryer=appliance(bs,'dryer','L3');
-      const knownLoads=tesla+boiler+[washer.w,dryer.w].filter(v=>v!==null).reduce((a,b)=>a+Math.max(0,b),0);
-      const other=Math.max(0,houseTotal-knownLoads);
-      const stale=alignedTs?Date.now()-alignedTs>30*60*1000:true;
-      const l1=numOrNull(ps.l1W),l2=numOrNull(ps.l2W),l3=numOrNull(ps.l3W);
+      const l1=numOrNull(livePs.l1W),l2=numOrNull(livePs.l2W),l3=numOrNull(livePs.l3W);
       const phaseSub=[l1!==null?`L1 ${fmtW(l1)}`:'',l2!==null?`L2 ${fmtW(l2)}`:'',l3!==null?`L3 ${fmtW(l3)}`:''].filter(Boolean).join(' · ');
+
+      // Apparaatuitsplitsing mag alleen aan de live balans worden gekoppeld als de timestamps <=90 s verschillen.
+      const teslaRaw=Math.max(0,Number(bs.teslaW)||0), boilerRaw=Math.max(0,Number(bs.boilerW)||0);
+      const tesla=splitUsable?teslaRaw:null, boiler=splitUsable?boilerRaw:null;
+      const washer=appliance(bs,'washer','L2'), dryer=appliance(bs,'dryer','L3');
+      let other=null;
+      if(splitUsable){
+        const splitPv=Math.max(0,Number(splitPs.solarEdgeW)||0)+Math.max(0,Number(splitPs.goodWe4200W)||0)+Math.max(0,Number(splitPs.goodWe2000W)||0);
+        const splitP1=Number.isFinite(Number(splitPs.p1W))?Number(splitPs.p1W):Number(bs.p1W)||0;
+        const splitHouse=Math.max(0,splitPv+splitP1);
+        const knownLoads=teslaRaw+boilerRaw+[washer.w,dryer.w].filter(v=>v!==null).reduce((a,b)=>a+Math.max(0,b),0);
+        other=Math.max(0,splitHouse-knownLoads);
+      }
 
       const requestedA=Math.max(0,Number(bs.teslaRequestedA??bs.targetA)||0);
       const actualA=Math.max(0,Number(bs.teslaActualAEst)||0);
       const chargeState=String(bs.chargeState||'').toLowerCase();
-      const charging=tesla>100 || chargeState.includes('charging');
+      const charging=teslaRaw>100 || chargeState.includes('charging');
       let equalizerText='begrenzing niet actief';
       let equalizerDetail='Geen actief laadverzoek';
       if(requestedA>0 && charging){
@@ -88,12 +105,13 @@
       svg+=path(`M600 220 V255`,pv,'pv',pv>0,pv>0?fmtW(pv):'',630,242);
 
       const loadBendY=455;
+      const splitNote=splitUsable?'zelfde meetmoment als live balans':`wacht op synchrone meting · laatste shadow ${fmtTime(shadowTs)}`;
       const loads=[
-        {x:20,title:'Tesla laden',value:fmtW(tesla),sub:'flexibele belasting',w:tesla,active:tesla>0,sourceX:485},
-        {x:250,title:'Boiler',value:fmtW(boiler),sub:String(bs.boilerState||'—'),w:boiler,active:boiler>0,sourceX:540},
-        {x:480,title:'Wasmachine',value:applianceValue(washer),sub:applianceSub(washer),w:washer.w||0,active:washer.w!==null?washer.w>0:washer.active===true,statusOnly:washer.w===null&&washer.active===true,sourceX:600},
-        {x:710,title:'Droger',value:applianceValue(dryer),sub:applianceSub(dryer),w:dryer.w||0,active:dryer.w!==null?dryer.w>0:dryer.active===true,statusOnly:dryer.w===null&&dryer.active===true,sourceX:660},
-        {x:940,title:'Overig verbruik',value:fmtW(other),sub:'sluitpost woning',w:other,active:other>0,sourceX:715}
+        {x:20,title:'Tesla laden',value:tesla===null?'—':fmtW(tesla),sub:splitUsable?'flexibele belasting':splitNote,w:tesla||0,active:tesla!==null&&tesla>0,sourceX:485},
+        {x:250,title:'Boiler',value:boiler===null?'—':fmtW(boiler),sub:splitUsable?String(bs.boilerState||'—'):splitNote,w:boiler||0,active:boiler!==null&&boiler>0,sourceX:540},
+        {x:480,title:'Wasmachine',value:splitUsable?applianceValue(washer):'—',sub:splitUsable?applianceSub(washer):splitNote,w:splitUsable?(washer.w||0):0,active:splitUsable&&(washer.w!==null?washer.w>0:washer.active===true),statusOnly:splitUsable&&washer.w===null&&washer.active===true,sourceX:600},
+        {x:710,title:'Droger',value:splitUsable?applianceValue(dryer):'—',sub:splitUsable?applianceSub(dryer):splitNote,w:splitUsable?(dryer.w||0):0,active:splitUsable&&(dryer.w!==null?dryer.w>0:dryer.active===true),statusOnly:splitUsable&&dryer.w===null&&dryer.active===true,sourceX:660},
+        {x:940,title:'Overig verbruik',value:other===null?'—':fmtW(other),sub:splitUsable?'sluitpost woning':'niet berekend uit gemengde timestamps',w:other||0,active:other!==null&&other>0,sourceX:715}
       ];
       loads.forEach(a=>{
         const cx=a.x+110;
@@ -102,13 +120,14 @@
         svg+=node(a.x,525,220,120,'VERBRUIK',a.title,a.value,a.sub,'load');
       });
 
-      svg+=`<text x="600" y="704" text-anchor="middle" class="energy-rule">Verbruiksverdeling gebruikt één tijd-consistente meetset; Tesla-verbruik kan daardoor niet als tijdelijke restpost in Overig terechtkomen.</text>`;
+      svg+=`<text x="600" y="704" text-anchor="middle" class="energy-rule">Live PV/net/woning komt uit de nieuwste 2-minutenmeting. Apparaatverdeling wordt alleen getoond wanneer de shadowmeting maximaal 90 s afwijkt.</text>`;
       svg+=`<g class="energy-legend" transform="translate(130 745)"><line x1="0" y1="0" x2="45" y2="0" class="legend-pv"/><text x="55" y="5">Productie</text><line x1="230" y1="0" x2="275" y2="0" class="legend-grid"/><text x="285" y="5">Net / verbruik</text><line x1="520" y1="0" x2="565" y2="0" class="legend-battery"/><text x="575" y="5">Batterij (inactief)</text></g>`;
       svg+=`</svg>`;
 
-      const teslaPanel=`<div class="tesla-regulation"><div class="tesla-regulation-title"><strong>Tesla laadregeling — gevraagd vs. werkelijk</strong><span>Easee Equalizer bewaakt de hoofdaansluiting</span></div><div class="tesla-regulation-grid"><div class="tesla-step"><small>HOMEY VRAAGT</small><strong>${requestedA.toFixed(0)} A</strong><span>${requestedA>0?'actief laadverzoek':'geen laadverzoek'}</span></div><div class="tesla-arrow">→</div><div class="tesla-step equalizer"><small>EASEE EQUALIZER</small><strong>${equalizerText}</strong><span>${equalizerDetail}</span></div><div class="tesla-arrow">→</div><div class="tesla-step actual"><small>WERKELIJK NAAR TESLA</small><strong>${actualA.toFixed(1)} A</strong><span>${fmtW(tesla)}</span></div></div><p class="tesla-regulation-note">De verbruiksverdeling en Tesla-meting worden op dezelfde shadow-timestamp uitgelijnd. Daardoor wordt een nieuwere P1-meting niet meer gecombineerd met een ouder Tesla-vermogen. De momenteel door Easee getoonde waarde ‘Beschikbaar’ wordt nog niet door onze Homey/GitHub-dataset gepubliceerd en wordt daarom hier niet geschat.</p></div>`;
+      const teslaPanel=`<div class="tesla-regulation"><div class="tesla-regulation-title"><strong>Tesla laadregeling — gevraagd vs. werkelijk</strong><span>Laatste Energy Manager-shadowmeting: ${fmtTime(shadowTs)}</span></div><div class="tesla-regulation-grid"><div class="tesla-step"><small>HOMEY VRAAGT</small><strong>${requestedA.toFixed(0)} A</strong><span>${requestedA>0?'actief laadverzoek':'geen laadverzoek'}</span></div><div class="tesla-arrow">→</div><div class="tesla-step equalizer"><small>EASEE EQUALIZER</small><strong>${equalizerText}</strong><span>${equalizerDetail}</span></div><div class="tesla-arrow">→</div><div class="tesla-step actual"><small>LAATSTE SHADOW TESLA</small><strong>${actualA.toFixed(1)} A</strong><span>${fmtW(teslaRaw)}</span></div></div><p class="tesla-regulation-note">Tesla- en apparaatwaarden worden niet meer gecombineerd met een nieuwere P1/PV-balans wanneer de timestamps meer dan 90 seconden verschillen. In dat geval toont de verbruiksuitsplitsing bewust ‘—’ in plaats van vermogen ten onrechte onder Overig verbruik te boeken.</p></div>`;
 
-      root.innerHTML=`<div class="energy-topline"><span><strong>Meetset:</strong> ${alignedTs?new Date(alignedTs).toLocaleString('nl-NL'):'onbekend'} · tijd-consistent met Energy Manager</span><span class="${stale?'energy-stale':'energy-ok'}">${stale?'● data ouder dan 30 min':'● actueel'}</span></div>${svg}${teslaPanel}<div class="energy-summary"><div><strong>PV</strong><br>${fmtW(pv)}</div><div><strong>Woning</strong><br>${fmtW(houseTotal)}</div><div><strong>Grid</strong><br>${p1>=0?`${fmtW(importW)} import`:`${fmtW(exportW)} export`}</div><div><strong>M7</strong><br>${String(ml.advice||'—')}</div></div><p class="energy-footnote">De visualisatie gebruikt uitsluitend reeds gepubliceerde Homey/GitHub-data en ververst maximaal eens per 5 minuten. Voor een correcte uitsplitsing wordt de P1/PV-sample gekozen die het dichtst bij de actuele Energy Manager-shadowmeting ligt. De batterij is visueel voorbereid op de toekomstige Victron ESS-laag en is nu bewust inactief.</p>`;
+      const splitStatus=splitUsable?'✓ apparaatuitsplitsing synchroon':'⚠ apparaatuitsplitsing vertraagd';
+      root.innerHTML=`<div class="energy-topline"><span><strong>Live balans:</strong> ${fmtTime(liveTs)} · <strong>apparaten:</strong> ${fmtTime(shadowTs)}</span><span class="${liveFresh?'energy-ok':'energy-stale'}">${liveFresh?'● actueel':'● live balans vertraagd'} · ${splitStatus}</span></div>${svg}${teslaPanel}<div class="energy-summary"><div><strong>PV</strong><br>${fmtW(pv)}</div><div><strong>Woning</strong><br>${fmtW(houseTotal)}</div><div><strong>Grid</strong><br>${p1>=0?`${fmtW(importW)} import`:`${fmtW(exportW)} export`}</div><div><strong>M7</strong><br>${String(ml.advice||'—')}</div></div><p class="energy-footnote">De actuele energiebalans gebruikt de nieuwste P1/PV-publicatie. Apparaten zoals Tesla en boiler komen uit de Energy Manager-shadowpublicatie en worden alleen in dezelfde balans uitgesplitst wanneer beide timestamps maximaal 90 seconden verschillen. Zo wordt een Tesla-start of -stop niet meer tijdelijk als Overig verbruik weergegeven.</p>`;
     }catch(e){root.innerHTML=`<p><em>Live energiestroom kon niet worden geladen: ${String(e.message||e)}</em></p>`;}
   }
   let timer=null;function start(){load();if(timer)clearInterval(timer);timer=setInterval(()=>{if(!document.hidden)load();},REFRESH_MS);}document.addEventListener('DOMContentLoaded',start);document.addEventListener('DOMContentSwitch',start);
