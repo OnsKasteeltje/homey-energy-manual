@@ -37,7 +37,14 @@
       const rows=Object.entries(a).map(([name,r])=>`<tr><td>${esc(name)}</td><td><strong>${esc(r.best_phase||'—')}</strong></td><td>${esc(r.confidence||'—')}</td><td>${fmt(r.best_score)}</td><td>${fmt(r.margin)}</td></tr>`).join('');
       const detail=Object.entries(a).map(([name,r])=>`<details><summary>${esc(name)}</summary><ul>${(Array.isArray(r.scores)?r.scores:[]).map(s=>`<li><strong>${esc(s.phase)}</strong>: corr ${fmt(s.correlation)}, Δ-corr ${fmt(s.delta_correlation)}</li>`).join('')||'<li>Nog geen scores</li>'}</ul></details>`).join('');
       const last=samples.at(-1)||{};
-      root.innerHTML=`<div class="phase-live-meta"><strong>Laatste publicatie:</strong> ${fmtDate(data.generated_at)} · <strong>samples:</strong> ${esc(data.sample_count??samples.length)} · <strong>venster:</strong> ${esc(data.window_hours??24)} uur</div>${drawChart(samples)}${samples.length?`<div class="phase-current"><strong>Laatste meetpunt:</strong> L1 ${Math.round(Number(last.l1W)||0)} W · L2 ${Math.round(Number(last.l2W)||0)} W · L3 ${Math.round(Number(last.l3W)||0)} W</div>`:''}${rows?`<h3>Automatische omvormer-faseanalyse</h3><div class="phase-table-wrap"><table><thead><tr><th>Omvormer</th><th>Beste fase</th><th>Confidence</th><th>Score</th><th>Marge</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p><em>Nog geen betrouwbare omvormeranalyse beschikbaar.</em></p>'}${detail}`;
+      const interval=Number(data.sample_interval_minutes);
+      const intervalText=Number.isFinite(interval)&&interval>0?`${interval} min`:'onbekend';
+      const generatedMs=new Date(data.generated_at).getTime();
+      const ageMinutes=Number.isFinite(generatedMs)?Math.max(0,(Date.now()-generatedMs)/60000):null;
+      const staleAfterMinutes=Number.isFinite(interval)&&interval>0?Math.max(15,interval*3):15;
+      const freshness=ageMinutes===null?'onbekend':ageMinutes<=staleAfterMinutes?'actueel':'verouderd';
+      const basis=data.analysis_basis==='timestamp'?'tijdstempels':esc(data.analysis_basis||'onbekend');
+      root.innerHTML=`<div class="phase-live-meta"><strong>Laatste publicatie:</strong> ${fmtDate(data.generated_at)} · <strong>status:</strong> ${freshness} · <strong>meetinterval:</strong> ${intervalText} · <strong>analyse:</strong> ${basis} · <strong>samples:</strong> ${esc(data.sample_count??samples.length)} · <strong>venster:</strong> ${esc(data.window_hours??24)} uur</div>${drawChart(samples)}${samples.length?`<div class="phase-current"><strong>Laatste meetpunt:</strong> L1 ${Math.round(Number(last.l1W)||0)} W · L2 ${Math.round(Number(last.l2W)||0)} W · L3 ${Math.round(Number(last.l3W)||0)} W</div>`:''}${rows?`<h3>Automatische omvormer-faseanalyse</h3><div class="phase-table-wrap"><table><thead><tr><th>Omvormer</th><th>Beste fase</th><th>Confidence</th><th>Score</th><th>Marge</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p><em>Nog geen betrouwbare omvormeranalyse beschikbaar.</em></p>'}${detail}`;
     }catch(e){root.innerHTML=`<p><em>Live fase-analyse kon niet worden geladen: ${esc(e.message)}</em></p>`;}
   }
   document.addEventListener('DOMContentLoaded',loadPhase);
