@@ -44,6 +44,15 @@ Vanaf v1.4 is de frequentie verlaagd van **15 naar 30 minuten**. Flowstatus vera
 
 De status-sync leest onder andere de actuele Standard en Advanced Flows en selecteert per flowfamilie de actieve, niet-broken versie.
 
+### Freshness-regel website
+
+`homey-status.json` is een **gepubliceerde snapshot**, niet Homey zelf. De homepage controleert daarom ook `generated_at`.
+
+- tot **75 minuten oud**: snapshot mag als actuele operationele flowstatus worden gebruikt;
+- ouder dan **75 minuten** of zonder geldig tijdstip: de homepage toont **status verouderd** en presenteert oude flownamen niet als actuele implementatie.
+
+De grens is bewust ruimer dan het normale publicatieritme van 30 minuten, zodat één vertraagde publicatieronde niet direct een vals alarm geeft. Deze freshness-check verandert niets aan Homey en staat volledig buiten de regelroute.
+
 ## Centrale runtime-state
 
 Sinds 16 augustus 2026 is de meetarchitectuur uitgebreid met:
@@ -126,6 +135,8 @@ Na de optimalisatie van 16 augustus 2026 gelden de volgende ontwerpregels:
 
 Websitepublicatie en energielogica blijven conceptueel gescheiden. Een probleem met GitHub of de website mag de energiemeting of fysieke besturing niet blokkeren. Publicatiefouten moeten zichtbaar worden zonder de primaire regelroute onnodig te verstoren.
 
+Een verouderde website-snapshot wordt daarom **zichtbaar als verouderd gemarkeerd**, maar veroorzaakt nooit automatisch een Homey-write of een wijziging aan de fysieke regeling.
+
 ## Aangestuurde apparaten
 
 **Geen.** De hier beschreven status-, runtime- en shadowpublicatie is telemetrie/documentatie. Fysieke Tesla-aansturing blijft eigendom van `Tesla laden v2.6`.
@@ -134,4 +145,4 @@ Websitepublicatie en energielogica blijven conceptueel gescheiden. Een probleem 
 
 HomeyScript, gedeelde Homey Logic, `GH_Status_Token` en de repository `OnsKasteeltje/homey-energy-manual`.
 
-> Laatste update: **16 augustus 2026** — centrale state collector toegevoegd, shadowcadance verlaagd, live publisher gecentraliseerd en status-sync naar 30 minuten gebracht.
+> Laatste update: **16 augustus 2026** — centrale state collector toegevoegd, shadowcadance verlaagd, live publisher gecentraliseerd, status-sync naar 30 minuten gebracht en freshness-check voor de homepage toegevoegd.
