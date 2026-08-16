@@ -1,54 +1,67 @@
 # Groepen & fasen
 
-Deze pagina is een **levend overzicht van de elektrische indeling van de woning**. Het doel is om per apparaat vast te leggen op welke fase en, zodra bekend, op welke groep/automaat het is aangesloten. De indeling wordt stap voor stap bevestigd met Homey/P1-metingen, de groepenkastfoto en praktische tests.
+Deze pagina is een **levend overzicht van de elektrische indeling van de woning**. Het doel is om per apparaat vast te leggen op welke fase, groep/automaat en aardlekschakelaar het is aangesloten. Fase, groep en aardlek worden bewust als drie afzonderlijke eigenschappen bijgehouden.
 
 ## Betrouwbaarheidsniveaus
 
 | Status | Betekenis |
 |---|---|
-| **Bevestigd** | De fase of groep is in een afzonderlijke praktijktest of fysieke controle duidelijk vastgesteld. |
-| **Waarschijnlijk** | De koppeling past bij het gemeten gedrag, de technische aansluiting of de groepenkastfoto, maar is nog niet afzonderlijk elektrisch gevalideerd. |
-| **Open** | Nog onvoldoende informatie om een fase of groep toe te wijzen. |
+| **Bevestigd** | De fase, groep of aardlekindeling is in een afzonderlijke praktijktest of fysieke controle duidelijk vastgesteld. |
+| **Waarschijnlijk** | De koppeling past bij het gemeten gedrag of de groepenkast, maar is nog niet afzonderlijk gevalideerd. |
+| **Open** | Nog onvoldoende informatie om de eigenschap toe te wijzen. |
 
-!!! info "Fase is niet hetzelfde als groep"
-    De P1-meter meet L1, L2 en L3 aan de hoofdaansluiting. Daarmee kan een apparaat vaak betrouwbaar aan een **fase** worden gekoppeld, maar niet automatisch aan een specifiek genummerde installatieautomaat. Voor het exacte groepnummer is een aanvullende uitschakeltest of fysieke controle van de groepenkast nodig.
+!!! info "Fase is niet hetzelfde als groep of aardlek"
+    De P1-meter meet L1, L2 en L3 aan de hoofdaansluiting. Een groepnummer identificeert de installatieautomaat. De aardlekschakelaar geeft aan onder welke aardlekbeveiliging die groep valt. Deze drie gegevens mogen niet door elkaar worden gehaald.
+
+## Aardlek- en groepenstructuur
+
+| Aardlekschakelaar | Beveiligde groepen | Status |
+|---|---:|---|
+| **Aardlek 1** | **1–3** | **Bevestigd** |
+| **Aardlek 2** | **4–7** | **Bevestigd** |
+| **Aardlek 3** | **8–10** | **Bevestigd** |
+| **Aardlek 4** | **11–13** | **Bevestigd** |
+
+**Groep 14** is apart bevestigd als de **3-polige B16-schuurvoeding**.
 
 ## Huidige indeling
 
-| Apparaat / installatie | Fase | Groep / automaat | Status | Onderbouwing |
-|---|---:|---:|---|---|
-| Wasmachine | **L2** | Nog te bepalen | **Fase bevestigd / groep open** | Testwas 15-08-2026: duidelijke extra verwarmingsbelasting op L2. |
-| Droger | **L3** | Nog te bepalen | **Fase bevestigd / groep open** | Droogtest 15-08-2026: extra belasting hoofdzakelijk op L3. |
-| Tesla / Easee-lader | **L1 + L2 + L3** | Laadgroep nog te documenteren | **Fase bevestigd / groep open** | 3-fase verbruiker; afzonderlijke fasewaarden zichtbaar in Homey. |
-| Elektrische boiler | **L2** | Nog te bepalen | **Fase bevestigd / groep open** | Verwarmingsbelasting circa 1,93–2,13 kW verschijnt op L2. |
-| Vaatwasser | Nog te bepalen | Nog te bepalen | **Open** | Praktijktest uitgevoerd; nog onvoldoende geïsoleerd. |
-| Elektrisch fornuis / kookplaat | Nog te bepalen | Nog te bepalen | **Open** | Afzonderlijke validatie nodig. |
-| Waterkoker | **L2** | Nog te bepalen | **Fase bevestigd / groep open** | Aan/uit-test: circa 2,15 kW extra op L2. |
-| Koffiezetapparaat | Nog te bepalen | Nog te bepalen | **Open** | Fasekoppeling nog niet betrouwbaar bevestigd. |
-| Quooker | Nog te bepalen | Nog te bepalen | **Open** | Nog te valideren. |
-| Quatt warmtepomp / CV-installatie | Nog te bepalen | Nog te bepalen | **Open** | Nog te valideren. |
-| SolarEdge SE3680H | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.1`; 24-uursresultaat via `Fase 24h publicatie v1.1`. |
-| GoodWe GW4200D-NS | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.1`; 24-uursresultaat via `Fase 24h publicatie v1.1`. |
-| GoodWe GW2000-XS | **Wordt gemonitord** | Nog te bepalen | **Meetfase actief** | Automatische fasecorrelatie via `PV omvormers fase-monitor v1.1`; 24-uursresultaat via `Fase 24h publicatie v1.1`. |
-| Schuurvoeding | **L1 + L2 + L3** | **Groep 14, 3-polig B16** | **Bevestigd** | Op 15-08-2026 fysiek in de meterkast gecontroleerd: groep 14 is de 3-fase voeding naar de schuur. |
+| Apparaat / installatie | Fase | Groep / automaat | Aardlek | Status / onderbouwing |
+|---|---:|---:|---:|---|
+| Wasmachine | **L2** | **Groep 1** | **Aardlek 1** | **Bevestigd.** Fase uit testwas; groep fysiek vastgesteld. |
+| Droger | **L3** | **Groep 2** | **Aardlek 1** | **Bevestigd.** Fase uit droogtest; groep fysiek vastgesteld. |
+| Tesla / Easee-lader | **L1 + L2 + L3** | Laadgroep nog te documenteren | Nog te bepalen | 3-fase verbruiker; afzonderlijke fasewaarden zichtbaar in Homey. |
+| Elektrische boiler | **L2** | Nog te bepalen | Volgt uit groep | Verwarmingsbelasting circa 1,93–2,13 kW verschijnt op L2. |
+| Vaatwasser | Nog te bepalen | **Groep 5 óf groep 12** | **Aardlek 2 óf 4** | **Nog te bevestigen.** Bij groep 5 hoort aardlek 2; bij groep 12 aardlek 4. |
+| Elektrisch fornuis / kookplaat | Nog te bepalen | Nog te bepalen | Nog te bepalen | Afzonderlijke validatie nodig. |
+| Waterkoker | **L2** | Nog te bepalen | Volgt uit groep | Aan/uit-test: circa 2,15 kW extra op L2. |
+| Koffiezetapparaat | Nog te bepalen | Nog te bepalen | Nog te bepalen | Fasekoppeling nog niet betrouwbaar bevestigd. |
+| Quooker | Nog te bepalen | Nog te bepalen | Nog te bepalen | Nog te valideren. |
+| Quatt warmtepomp / CV-installatie | Nog te bepalen | Nog te bepalen | Nog te bepalen | Nog te valideren. |
+| SolarEdge SE3680H | **Wordt gemonitord** | Nog te bepalen | Volgt uit groep | Automatische fasecorrelatie actief. |
+| GoodWe GW4200D-NS | **Wordt gemonitord** | Nog te bepalen | Volgt uit groep | Automatische fasecorrelatie actief. |
+| GoodWe GW2000-XS | **Wordt gemonitord** | Nog te bepalen | Volgt uit groep | Automatische fasecorrelatie actief. |
+| Schuurvoeding | **L1 + L2 + L3** | **Groep 14, 3-polig B16** | Apart / n.v.t. in schema 1–13 | **Bevestigd.** Fysiek in de meterkast gecontroleerd. |
+
+## Wat is nu al zeker?
+
+- **Groep 1 → wasmachine → aardlek 1 → L2**;
+- **Groep 2 → droger → aardlek 1 → L3**;
+- **aardlek 1 → groepen 1–3**;
+- **aardlek 2 → groepen 4–7**;
+- **aardlek 3 → groepen 8–10**;
+- **aardlek 4 → groepen 11–13**;
+- **groep 14 → 3-polige B16-schuurvoeding**;
+- Tesla/Easee is een 3-fase verbruiker;
+- boiler en waterkoker zijn aan L2 gekoppeld.
+
+De vaatwasser is beperkt tot twee kandidaten: **groep 5 (aardlek 2)** of **groep 12 (aardlek 4)**.
 
 ## Automatische PV-fasemonitor
 
-De actieve Homey Advanced Flow **`PV omvormers fase-monitor v1.1`** is uitsluitend bedoeld voor meting en analyse en schakelt geen apparaten of omvormers. v1.0 is uitgeschakeld en vervangen door v1.1, omdat v1.1 de bewezen actuele `every_nth`-trigger gebruikt.
+De actieve Homey Advanced Flow **`PV omvormers fase-monitor v1.1`** is uitsluitend bedoeld voor meting en analyse en schakelt geen apparaten of omvormers. Iedere 2 minuten worden P1 L1/L2/L3, totaal P1 en de productie van de drie omvormers vastgelegd. De actieve **`Fase 24h publicatie v1.1`** publiceert de laatste 24 uur naar `docs/data/pv-phase-24h.json`.
 
-Iedere **2 minuten** wordt gelijktijdig vastgelegd:
-
-- P1-vermogen op **L1, L2 en L3**;
-- totaal P1-vermogen;
-- productie van **SolarEdge SE3680H**;
-- productie van **GoodWe GW4200D-NS**;
-- productie van **GoodWe GW2000-XS**.
-
-De meetreeks wordt maximaal **36 uur** opgeslagen in de aparte Homey Logic-state **`PV Fase Monitor v1.0`**. De state-naam is bewust gelijk gebleven om migratie te vermijden. Door natuurlijke productievariaties van iedere omvormer te correleren met veranderingen op L1/L2/L3 kan de meest waarschijnlijke aansluitfase per omvormer worden bepaald zonder de omvormers actief te schakelen.
-
-De actieve Advanced Flow **`Fase 24h publicatie v1.1`** leest uitsluitend deze meetstate en publiceert iedere **15 minuten** de laatste 24 uur naar `docs/data/pv-phase-24h.json`. Daarbij worden per omvormer zowel de gewone Pearson-correlatie als de correlatie van opeenvolgende vermogensveranderingen (Δ-correlatie) met L1/L2/L3 berekend. v1.1 publiceert ook een expliciete status/foutmelding als brondata tijdelijk niet analyseerbaar is. v1.0 is uitgeschakeld.
-
-De status wordt pas van **Meetfase actief** naar **Bevestigd** gewijzigd wanneer de correlatie voldoende eenduidig is of aanvullend met een gecontroleerde test is gevalideerd.
+De status van een omvormer wordt pas naar **Bevestigd** gewijzigd wanneer de correlatie voldoende eenduidig is of aanvullend met een gecontroleerde test is gevalideerd.
 
 ## Live 24-uurs fase-analyse
 
@@ -57,38 +70,25 @@ De status wordt pas van **Meetfase actief** naar **Bevestigd** gewijzigd wanneer
 </div>
 
 !!! note "Interpretatie"
-    **Beste fase** is de fase met de sterkste gemeten samenhang. **Confidence** is een indicatie op basis van de absolute correlatiescore én de marge ten opzichte van de nummer twee. Een automatische uitkomst wordt niet zonder aanvullende beoordeling als fysiek bevestigd beschouwd.
+    **Beste fase** is de fase met de sterkste gemeten samenhang. **Confidence** is een indicatie op basis van de correlatiescore en de marge ten opzichte van nummer twee. Een automatische uitkomst wordt niet zonder aanvullende beoordeling als fysiek bevestigd beschouwd.
 
-## Wat is nu al zeker?
+## Meetmethode voor fase en groep
 
-- **L2:** wasmachine, elektrische boiler en waterkoker;
-- **L3:** droger;
-- **L1 + L2 + L3:** Tesla/Easee-lader;
-- **groep 14:** **bevestigd** als 3-polige B16-schuurvoeding.
-
-Voor de overige huishoudelijke apparaten is het exacte installatieautomaatnummer nog niet bewezen.
-
-## Meetmethode voor fase
-
-Voor een betrouwbare fasekoppeling wordt bij voorkeur één apparaat tegelijk getest. Voor PV-omvormers gebruiken we daarnaast de automatische correlatiemethode: de afzonderlijke productie wordt over langere tijd vergeleken met de drie P1-fasen. Dit voorkomt onnodig schakelen van de omvormers en levert meerdere onafhankelijke meetpunten op.
-
-## Meetmethode voor exact groepnummer
-
-Een groepnummer wordt pas als **Bevestigd** gemarkeerd wanneer de koppeling fysiek is vastgesteld via een gecontroleerde uitschakeltest of fysieke verificatie.
+Voor een betrouwbare fasekoppeling wordt bij voorkeur één apparaat tegelijk getest. Voor PV-omvormers gebruiken we daarnaast automatische correlatie. Een exact groepnummer wordt pas als bevestigd gemarkeerd wanneer de koppeling fysiek is vastgesteld via een gecontroleerde uitschakeltest of fysieke verificatie.
 
 !!! warning "Veiligheid"
     Schakel alleen installatieautomaten met de normale bedieningshendel. Verwijder geen afdekkappen en raak geen bedrading of spanningsvoerende delen aan.
 
 ## Fasebelasting
 
-Wasmachine, boiler en waterkoker zijn alle drie aan L2 gekoppeld. Vooral boiler en waterkoker kunnen samen ongeveer 4,1 kW toevoegen. Dit blijft relevant voor toekomstige fasebalancering en voor de voorbereiding van de Victron-opstelling.
+Wasmachine, boiler en waterkoker zijn aan L2 gekoppeld. Vooral boiler en waterkoker kunnen samen ongeveer 4,1 kW toevoegen. De droger is aan L3 gekoppeld. Dit blijft relevant voor toekomstige fasebalancering en de voorbereiding van de Victron-opstelling.
 
 ## Beheerregel
 
-Nieuwe betrouwbare inzichten over **fase- of groepindeling** worden direct op deze pagina verwerkt. Voor Homey-flows geldt versiebeheer: een inhoudelijke aanpassing resulteert in een nieuwe subversie; slechts één versie van dezelfde functionele flow hoort actief te zijn.
+Nieuwe betrouwbare inzichten over **fase-, groep- of aardlekindeling** worden direct op deze pagina verwerkt. Onzekere koppelingen blijven expliciet als onzeker gemarkeerd; er wordt niet tussen alternatieven gegokt.
 
 ## Open vervolgstappen
 
-De actieve PV-fasemonitor verzamelt nu de data waarmee de fase van de drie omvormers kan worden bepaald. De 24-uurs publisher maakt deze analyse live zichtbaar voor beoordeling. Daarnaast blijven vaatwasser, kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt nog open. Voor reeds geïdentificeerde apparaten moeten de exacte installatieautomaten nog fysiek worden gekoppeld. **Groep 14 als schuurvoeding is niet langer een open punt.**
+De vaatwasser moet nog definitief tussen **groep 5 en groep 12** worden onderscheiden. Daarnaast blijven onder meer kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt qua exacte groep/fase nog open. De exacte groepen van boiler en waterkoker moeten eveneens nog fysiek worden gekoppeld.
 
-> Laatste inhoudelijke update: 16 augustus 2026. PV-fasemonitor en 24-uurs publisher naar v1.1 gebracht; live publicatie gevalideerd met eerste sample.
+> Laatste inhoudelijke update: 16 augustus 2026. Groepen 1 en 2 gekoppeld aan wasmachine en droger; aardlekstructuur 1–4 voor groepen 1–13 vastgelegd; vaatwasser beperkt tot groep 5 of 12.
