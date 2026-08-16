@@ -11,7 +11,7 @@ GitHub Contents API
    ↓
 Tesla deadline command JSON
    ↓  iedere 2 minuten lezen
-Homey — Tesla laden v2.4
+Homey — Tesla laden v2.5
    ↓             ↑
 Easee ← besluit  M7 prijs/PV-context (read-only)
    ↓
@@ -35,22 +35,50 @@ De eerste praktijkkalibratie is `71% → 90% · 3×10 A · circa 7,1 kW · Tesla
 
 De PIN wordt niet in GitHub opgeslagen. De website vraagt hem alleen op het moment dat een wijziging wordt opgeslagen.
 
-## Homey v2.4
+## Homey v2.5
 
-`Tesla laden v2.4` leest iedere 2 minuten het command-JSON. Alleen een nieuwe `requestId` wordt als nieuwe gebruikersopdracht verwerkt. Bij iedere nieuwe `requestId` wordt de energieteller opnieuw gebaselineerd op de actuele Easee `meter_power`; een migratie van v2.3 naar v2.4 reset die meterbasis juist **niet**. Bij netwerk- of JSON-fouten blijft de bestaande Homey-instelling ongemoeid. Oudere v2.x-versies zijn uitgeschakeld zodat er slechts één automatische Easee-writer actief is.
+`Tesla laden v2.5` leest iedere 2 minuten het command-JSON. Alleen een nieuwe `requestId` wordt als nieuwe gebruikersopdracht verwerkt. In dezelfde Homey-run wordt eerst de actuele Easee `meter_power` gelezen en daarna exact één **meetbaseline** voor die requestId opgeslagen. De baseline bevat minimaal:
 
-De deadline is een harde constraint. Vóór het berekende `EV Latest start` gebruikt v2.4 aanvullend de read-only M7-variabelen:
+- requestId;
+- huidige SOC en doel-SOC;
+- `socEnteredAt` uit de website-opdracht;
+- gebruikte `calibrationKWhPerPercent`;
+- afgeleid `goalKWh`;
+- Easee `baseMeterKWh`;
+- exact `baselineCapturedAt`-tijdstip.
+
+De baseline is **immutable voor dezelfde requestId**. Een Homey-reboot, nieuwe flowversie, wijziging van prijs/PV-context of Equalizerstatus mag geen nieuwe meterbasis maken. Alleen een nieuwe website-opdracht met een nieuwe requestId maakt een nieuwe baseline.
+
+De voortgang wordt daarna uitsluitend bepaald uit:
+
+```text
+deliveredSinceBaselineKWh = currentMeterKWh - baselineMeterKWh
+```
+
+De runtimepublicatie v1.2 geeft de volledige audit naar de website door. Daardoor zijn SOC-moment, meterbasis, actuele meterstand en gemeten delta achteraf rechtstreeks controleerbaar.
+
+### Fail-safe bij baseline- of kalibratieproblemen
+
+Als een actieve deadline geen geldige baseline voor de actieve requestId heeft, publiceert v2.5 **`BASELINE_FOUT`** en vraagt Homey 0 A. De gebruiker kan dit herstellen door de actuele SOC en deadline opnieuw op te slaan, waardoor een nieuwe requestId en exacte baseline ontstaan.
+
+Daarnaast geldt een sanity-check op de gemeten energie. Wanneer de Easee-delta meer wordt dan **1,5× het berekende doel plus 0,25 kWh**, publiceert v2.5 **`KALIBRATIE_AFWIJKING`** en stopt de automatische aanvraag voor die afwijkende sessie. De software verandert de kalibratiefactor van 0,59 kWh/% daarbij nooit automatisch; eerst moet de sessie inhoudelijk worden beoordeeld.
+
+Bij de overgang van v2.4 naar v2.5 wordt een bestaande meterbasis bewust niet opnieuw gezet. Als zo'n oude basis beschikbaar is, wordt hij alleen als **`legacy-unverified`** geïmporteerd. Daarmee blijft de oude rekensom reproduceerbaar, maar geldt de sessie niet als betrouwbare kalibratiemeting.
+
+## Deadline, prijs en PV
+
+De deadline is een harde constraint. Vóór het berekende `EV Latest start` gebruikt v2.5 aanvullend de read-only M7-variabelen:
 
 - `M7_Price_Negative` — huidige prijs is negatief;
 - `M7_Price_Cheap_Next4h` — huidige prijs is lager dan de volgende vier uur;
 - `M7_Price_Expensive_Next4h` — huidige prijs is hoger dan de volgende vier uur;
 - `M7_PV_Top4h` — het huidige uur is één van de vier uren met de hoogste zonne-forecast tussen 09:00 en 18:00.
 
-Actueel PV-overschot heeft voorrang. Een gunstige prijs nu kan een actieve deadline versnellen met maximaal de ingestelde laadstroom. Als het huidige uur volgens de forecast tot de beste PV-uren behoort en de prijs niet ongunstig is, mag v2.4 met 6 A laden wanneer het actuele overschot nog niet voldoende is voor 6 A. **Vanaf Latest start blijft Homey maximaal de ingestelde laadstroom vragen**, ongeacht prijs of forecast.
+Actueel PV-overschot heeft voorrang. Een gunstige prijs nu kan een actieve deadline versnellen met maximaal de ingestelde laadstroom. Als het huidige uur volgens de forecast tot de beste PV-uren behoort en de prijs niet ongunstig is, mag v2.5 met 6 A laden wanneer het actuele overschot nog niet voldoende is voor 6 A. **Vanaf Latest start blijft Homey maximaal de ingestelde laadstroom vragen**, ongeacht prijs of forecast.
 
 ### Equalizer begrenzen en volledig blokkeren
 
-De werkelijk geleverde Tesla-kWh is leidend voor de voortgang. `Tesla laden v2.4` vergelijkt daarom het Homey-verzoek met het werkelijke Tesla-vermogen en publiceert in de runtime één van vier Equalizer-modi:
+De werkelijk geleverde Tesla-kWh is leidend voor de voortgang. `Tesla laden v2.5` vergelijkt daarom het Homey-verzoek met het werkelijke Tesla-vermogen en publiceert in de runtime één van vier Equalizer-modi:
 
 - `normal` — geen zichtbare beperking;
 - `limited` — de Tesla laadt, maar aantoonbaar onder het gevraagde ampèrage;
@@ -59,6 +87,6 @@ De werkelijk geleverde Tesla-kWh is leidend voor de voortgang. `Tesla laden v2.4
 
 Bij `blocked` wordt **het Homey-laadverzoek niet verlaagd naar 0 A**. De Equalizer mag de lader lokaal gepauzeerd houden en Easee kan de sessie weer zelfstandig hervatten zodra andere grote verbruikers verdwijnen. Daardoor ontstaat geen conflict tussen Homey en de veiligheidslaag.
 
-Een langdurige beperking of blokkade verhoogt de resterende energie niet kunstmatig: alleen werkelijk geleverde `meter_power` telt. Daardoor wordt `EV Latest start` iedere twee minuten opnieuw uit de resterende kWh berekend. Een bevestigde blokkade krijgt vóór latest-start status `DEADLINE_EQUALIZER_BLOKKEERT`, na latest-start `DEADLINE_ONDER_DRUK_EQUALIZER` en na de deadline met resterende energie `DEADLINE_NIET_HAALBAAR_EQUALIZER`.
+Een langdurige beperking of blokkade verhoogt de resterende energie niet kunstmatig: alleen de gemeten Easee-delta sinds de opgeslagen baseline telt. Daardoor wordt `EV Latest start` iedere twee minuten opnieuw uit de resterende kWh berekend. Een bevestigde blokkade krijgt vóór latest-start status `DEADLINE_EQUALIZER_BLOKKEERT`, na latest-start `DEADLINE_ONDER_DRUK_EQUALIZER` en na de deadline met resterende energie `DEADLINE_NIET_HAALBAAR_EQUALIZER`.
 
 Zonder deadline blijft de Tesla alleen opportunistisch/exportbuffer laden; een lage of negatieve prijs veroorzaakt dan op zichzelf geen netladen.
