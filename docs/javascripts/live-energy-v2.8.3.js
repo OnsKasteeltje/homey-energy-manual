@@ -12,8 +12,8 @@
   function node(x,y,w,h,kicker,title,value,sub='',cls=''){
     return `<g class="energy-node ${cls}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14"/><text x="${x+w/2}" y="${y+22}" text-anchor="middle" class="energy-kicker">${kicker}</text><text x="${x+w/2}" y="${y+47}" text-anchor="middle" class="energy-title">${title}</text><text x="${x+w/2}" y="${y+75}" text-anchor="middle" class="energy-value">${value}</text>${sub?`<text x="${x+w/2}" y="${y+97}" text-anchor="middle" class="energy-sub">${sub}</text>`:''}</g>`;
   }
-  function path(d,w,kind='grid',active=true,label='',lx=0,ly=0){
-    const width=active?clamp(2.5+Math.abs(Number(w)||0)/750,3,10):2;
+  function path(d,w,kind='grid',active=true,label='',lx=0,ly=0,forceWidth=null){
+    const width=forceWidth!==null?forceWidth:(active?clamp(2.5+Math.abs(Number(w)||0)/750,3,10):2);
     return `<g><path class="energy-path energy-${kind} ${active?'is-active':'is-idle'}" d="${d}" style="stroke-width:${width}" marker-end="url(#arrow-${kind})"/>${label?`<text x="${lx}" y="${ly}" text-anchor="middle" class="energy-edge-label">${label}</text>`:''}</g>`;
   }
 
@@ -58,22 +58,23 @@
       svg+=path(`M755 317 H795 V317 H835`,0,'battery',false,'',0,0);
       svg+=path(`M600 220 V255`,pv,'pv',pv>0,pv>0?fmtW(pv):'',630,242);
 
-      // Individuele verbindingen met één gezamenlijke horizontale uitlijnhoogte.
       const loadBendY=455;
       const loads=[
-        {x:20,title:'Tesla laden',value:fmtW(tesla),sub:'flexibele belasting',w:tesla,sourceX:485},
-        {x:250,title:'Boiler',value:fmtW(boiler),sub:String(bs.boilerState||'—'),w:boiler,sourceX:540},
-        {x:480,title:'Wasmachine',value:applianceValue(washer),sub:applianceSub(washer),w:washer.w||0,sourceX:600},
-        {x:710,title:'Droger',value:applianceValue(dryer),sub:applianceSub(dryer),w:dryer.w||0,sourceX:660},
-        {x:940,title:'Overig verbruik',value:fmtW(other),sub:'sluitpost woning',w:other,sourceX:715}
+        {x:20,title:'Tesla laden',value:fmtW(tesla),sub:'flexibele belasting',w:tesla,active:tesla>0,sourceX:485},
+        {x:250,title:'Boiler',value:fmtW(boiler),sub:String(bs.boilerState||'—'),w:boiler,active:boiler>0,sourceX:540},
+        {x:480,title:'Wasmachine',value:applianceValue(washer),sub:applianceSub(washer),w:washer.w||0,active:washer.w!==null?washer.w>0:washer.active===true,statusOnly:washer.w===null&&washer.active===true,sourceX:600},
+        {x:710,title:'Droger',value:applianceValue(dryer),sub:applianceSub(dryer),w:dryer.w||0,active:dryer.w!==null?dryer.w>0:dryer.active===true,statusOnly:dryer.w===null&&dryer.active===true,sourceX:660},
+        {x:940,title:'Overig verbruik',value:fmtW(other),sub:'sluitpost woning',w:other,active:other>0,sourceX:715}
       ];
       loads.forEach(a=>{
         const cx=a.x+110;
-        svg+=path(`M${a.sourceX} 380 V${loadBendY} H${cx} V525`,a.w,'grid',a.w>0,'',0,0);
+        // Zonder wattmeting geeft Homey-status ACTIEF een duidelijke dikke connector, zonder fictief vermogen toe te kennen.
+        const forceWidth=a.statusOnly?6:null;
+        svg+=path(`M${a.sourceX} 380 V${loadBendY} H${cx} V525`,a.w,'grid',a.active,'',0,0,forceWidth);
         svg+=node(a.x,525,220,120,'VERBRUIK',a.title,a.value,a.sub,'load');
       });
 
-      svg+=`<text x="600" y="704" text-anchor="middle" class="energy-rule">Elke verbruiker heeft een eigen rechte verbinding vanaf het huis; lijnsterkte volgt het individuele vermogen.</text>`;
+      svg+=`<text x="600" y="704" text-anchor="middle" class="energy-rule">Elke verbruiker heeft een eigen rechte verbinding; bij wasmachine/droger kan lijnsterkte ook actieve Homey-status aangeven.</text>`;
       svg+=`<g class="energy-legend" transform="translate(130 745)"><line x1="0" y1="0" x2="45" y2="0" class="legend-pv"/><text x="55" y="5">Productie</text><line x1="230" y1="0" x2="275" y2="0" class="legend-grid"/><text x="285" y="5">Net / verbruik</text><line x1="520" y1="0" x2="565" y2="0" class="legend-battery"/><text x="575" y="5">Batterij (inactief)</text></g>`;
       svg+=`</svg>`;
 
