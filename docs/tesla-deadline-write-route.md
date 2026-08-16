@@ -11,7 +11,7 @@ GitHub Contents API
    ↓
 Tesla deadline command JSON
    ↓  iedere 2 minuten lezen
-Homey — Tesla laden v2.2
+Homey — Tesla laden v2.3
    ↓             ↑
 Easee ← besluit  M7 prijs/PV-context (read-only)
 ```
@@ -33,17 +33,17 @@ De eerste praktijkkalibratie is `71% → 90% · 3×10 A · circa 7,1 kW · Tesla
 
 De PIN wordt niet in GitHub opgeslagen. De website vraagt hem alleen op het moment dat een wijziging wordt opgeslagen.
 
-## Homey v2.2
+## Homey v2.3
 
-`Tesla laden v2.2` leest iedere 2 minuten het command-JSON. Alleen een nieuwe `requestId` wordt verwerkt. Bij netwerk- of JSON-fouten blijft de bestaande Homey-instelling ongemoeid. `Tesla laden v2.1` is uitgeschakeld zodat er slechts één automatische Easee-writer actief is.
+`Tesla laden v2.3` leest iedere 2 minuten het command-JSON. Alleen een nieuwe `requestId` wordt als nieuwe gebruikersopdracht verwerkt. Bij iedere nieuwe `requestId` wordt de energieteller expliciet opnieuw gebaselineerd op de actuele Easee `meter_power`; daardoor hoort de voortgang altijd bij de SOC-momentopname waarmee de deadline is opgeslagen. Bij netwerk- of JSON-fouten blijft de bestaande Homey-instelling ongemoeid. v2.1 en v2.2 zijn uitgeschakeld zodat er slechts één automatische Easee-writer actief is.
 
-De deadline is een harde constraint. Vóór het berekende `EV Latest start` gebruikt v2.2 aanvullend de read-only M7-variabelen:
+De deadline is een harde constraint. Vóór het berekende `EV Latest start` gebruikt v2.3 aanvullend de read-only M7-variabelen:
 
-- `M7_Price_Negative`;
-- `M7_Price_Cheap_Next4h`;
-- `M7_Price_Expensive_Next4h`;
-- `M7_PV_Top4h`.
+- `M7_Price_Negative` — huidige prijs is negatief;
+- `M7_Price_Cheap_Next4h` — huidige prijs is lager dan de volgende vier uur;
+- `M7_Price_Expensive_Next4h` — huidige prijs is hoger dan de volgende vier uur;
+- `M7_PV_Top4h` — het huidige uur is één van de vier uren met de hoogste zonne-forecast tussen 09:00 en 18:00.
 
-Actueel PV-overschot, negatieve prijs, PV-forecast en goedkoop/duur prijsvenster mogen het laadmoment optimaliseren. **Vanaf Latest start wordt altijd catch-up gestart op de ingestelde maximale laadstroom**, ongeacht de forecast. Zonder deadline blijft de Tesla alleen opportunistisch/exportbuffer laden en veroorzaakt een lage prijs op zichzelf geen netladen.
+Actueel PV-overschot heeft voorrang. Een gunstige prijs nu kan een actieve deadline versnellen met maximaal de ingestelde laadstroom. Als het huidige uur volgens de forecast tot de beste PV-uren behoort en de prijs niet ongunstig is, mag v2.3 met 6 A laden wanneer het actuele overschot nog niet voldoende is voor 6 A. **Vanaf Latest start wordt altijd catch-up gestart op de ingestelde maximale laadstroom**, ongeacht prijs of forecast.
 
-De Easee Equalizer blijft de harde lokale veiligheidslaag en kan de werkelijk geleverde laadstroom zelfstandig begrenzen.
+Zonder deadline blijft de Tesla alleen opportunistisch/exportbuffer laden; een lage of negatieve prijs veroorzaakt dan op zichzelf geen netladen. De Easee Equalizer blijft de harde lokale veiligheidslaag en kan de werkelijk geleverde laadstroom zelfstandig begrenzen.
