@@ -1,24 +1,24 @@
 {
   "meta": {
     "schema_version": "2.3",
-    "generated_at": "2026-08-17T21:20:00.368Z",
-    "heartbeat_at": "2026-08-17T21:20:00.368Z",
-    "publisher_version": "EM2_CORE_PUBLISH_V0.9.1",
+    "generated_at": "2026-08-17T21:29:06.157Z",
+    "heartbeat_at": "2026-08-17T21:29:06.157Z",
+    "publisher_version": "EM2_CORE_PUBLISH_V0.9.2",
     "control_mode": "SHADOW",
-    "source_sample_at": "2026-08-17T21:20:00.059Z",
-    "state_revision": 162,
-    "decision_revision": 162,
-    "shadow_revision": 162,
+    "source_sample_at": "2026-08-17T21:29:05.970Z",
+    "state_revision": 164,
+    "decision_revision": 164,
+    "shadow_revision": 164,
     "state_age_sec": 0,
-    "publish_reason": "REVISION_THROTTLED",
+    "publish_reason": "SCHEMA_UPGRADE",
     "min_publish_interval_sec": 600
   },
   "grid": {
-    "power_w": 342,
-    "l1_w": 79,
-    "l2_w": 222,
-    "l3_w": 41,
-    "import_w": 342,
+    "power_w": 719,
+    "l1_w": 383,
+    "l2_w": 230,
+    "l3_w": 86,
+    "import_w": 719,
     "export_w": 0
   },
   "pv": {
@@ -45,7 +45,7 @@
     "deadline_active": true
   },
   "equalizer": {
-    "power_w": 274,
+    "power_w": 475,
     "l1_a": 1,
     "l2_a": 2,
     "l3_a": 2
@@ -58,12 +58,12 @@
       "schema": "EM2_WW_STATE_V0.5",
       "date": "2026-08-17",
       "startedAt": "2026-08-17T15:13:18.878Z",
-      "updatedAt": "2026-08-17T21:20:00.330Z",
-      "sourceRevision": 162,
-      "lastStateSampleAt": "2026-08-17T21:20:00.059Z",
-      "boilerOnMinToday": 366.7,
+      "updatedAt": "2026-08-17T21:29:06.126Z",
+      "sourceRevision": 164,
+      "lastStateSampleAt": "2026-08-17T21:29:05.970Z",
+      "boilerOnMinToday": 375.8,
       "heatingConfirmMin": 119.99279999999999,
-      "lowAfterHeatingMin": 10.000133333333334,
+      "lowAfterHeatingMin": 19.096733333333333,
       "heatingConfirmed": true,
       "goalReached": true,
       "goalReachedAt": "2026-08-17T17:00:00.519Z",
@@ -72,28 +72,32 @@
       "boilerOn": true,
       "boilerPowerW": 0,
       "remainingFallbackMin": 0,
-      "minuteOfDay": 1400,
+      "minuteOfDay": 1409,
       "catchupRequired": false,
       "stateAgeSec": 0,
       "policy": {
-        "primaryGoal": "OP_TEMPERATUUR",
+        "primaryGoal": "OP_TEMPERATUUR_ONCE_PER_DAY",
+        "goalLatch": "LOCAL_CALENDAR_DAY",
+        "sameDayReheat": false,
         "heatConfirmW": 1500,
         "heatConfirmMinutes": 15,
         "lowThresholdW": 100,
         "lowConfirmMinutes": 10,
         "fallbackMinutes": 240,
         "deadline": "19:00"
-      }
+      },
+      "goalReachedToday": true,
+      "goalLatchDate": "2026-08-17"
     },
     "control": {
       "schema": "EM2_CONTROL_WW_V0.7",
-      "generatedAt": "2026-08-17T21:20:00.354Z",
+      "generatedAt": "2026-08-17T21:29:06.142Z",
       "controlMode": "SHADOW",
       "readOnly": true,
-      "sourceRevision": 162,
+      "sourceRevision": 164,
       "action": "BOILER_OFF",
       "priority": "MUST",
-      "reason": "Dagdoel OP_TEMPERATUUR bereikt",
+      "reason": "Dagdoel OP_TEMPERATUUR eerder vandaag bereikt; geen heropwarming dezelfde dag",
       "guards": {
         "readOnly": true,
         "deviceWrites": false,
@@ -105,16 +109,20 @@
         "boilerOn": true,
         "boilerPowerW": 0,
         "mode": true,
-        "gridW": 342,
+        "gridW": 719,
         "goalReached": true,
-        "boilerOnMinToday": 366.7,
+        "goalReachedToday": true,
+        "goalLatchDate": "2026-08-17",
+        "boilerOnMinToday": 375.8,
         "remainingFallbackMin": 0,
         "catchupRequired": false,
-        "wwStateUpdatedAt": "2026-08-17T21:20:00.330Z",
+        "wwStateUpdatedAt": "2026-08-17T21:29:06.126Z",
         "wwStateQuality": "PARTIAL_FROM_START_TIME"
       },
       "policy": {
-        "primaryGoal": "OP_TEMPERATUUR",
+        "primaryGoal": "OP_TEMPERATUUR_ONCE_PER_DAY",
+        "goalLatch": "LOCAL_CALENDAR_DAY",
+        "sameDayReheat": false,
         "fallbackMinutes": 240,
         "startWindow": "09:30-18:30",
         "deadline": "19:00",
@@ -124,7 +132,7 @@
       },
       "safety": {
         "physicalWritePerformed": false,
-        "note": "Shadow-only; atomair berekend in Core Tick v0.9.1; uitsluitend Logic-write EM2_Control_WW"
+        "note": "Shadow-only; atomair berekend in Core Tick v0.9.2; uitsluitend Logic-write EM2_Control_WW"
       }
     }
   },
