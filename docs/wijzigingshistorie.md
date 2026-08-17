@@ -10,6 +10,16 @@ De hoofdindeling is daarom:
 
 De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De technische Git-historie blijft uiteraard beschikbaar voor rollback en detailonderzoek.
 
+## v2.0.3 — 17 augustus 2026
+
+### Homepage Tesla single-source
+
+- De Tesla-tegel op de homepage wordt nog maar door **één renderer** aangestuurd: de actuele Energy Core v2-browserstate.
+- De oude `home-tesla-runtime` homepage-overlay is uit de siteconfiguratie verwijderd en kan de v2-tegel daardoor niet meer achteraf overschrijven.
+- Oude kalibratie-/baseline-auditstatussen blijven beschikbaar op **Live energiestroom**, waar de aparte Tesla runtime/deadline-interface ze technisch hoort te tonen.
+- Tesla deadline-, Equalizer- en laadmetingfunctionaliteit op Live energiestroom blijft ongewijzigd.
+- Geen Homey-flow, laadregeling of fysieke Control is gewijzigd; dit is uitsluitend een veilige scheiding van websiteverantwoordelijkheden.
+
 ## v2.0.2 — 17 augustus 2026
 
 ### Presentatie afgestemd op actuele v2-state
