@@ -47,7 +47,7 @@ Devices / meters / Victron / Easee
 
 - `EM v2 | 10 State | Collector v0.2` — actief, één centrale device/logic-read per 5 minuten, 100 W-deadbands en 30-minuten heartbeat; geen device writes en geen netwerk-I/O.
 - `EM v2 | 20 Decision + 80 Shadow | v0.1` — actief; leest uitsluitend `EM2_State`, schrijft alleen `EM2_Decision`/`EM2_Shadow`; geen device reads, device writes of netwerk-I/O.
-- `EM v2 | 90 Publish | State Publisher v0.1` — wordt als enige websitepublisher voor v2 gebruikt; leest uitsluitend `EM2_*` Logic-state en publiceert `docs/data/energy-state-v2.json` bij dirty state of een 30-minuten heartbeat. Deze laag staat buiten de control-route en heeft geen toegang tot actuators.
+- `EM v2 | 90 Publish | State Publisher v0.1` — actief; leest uitsluitend `EM2_*` Logic-state en publiceert `docs/data/energy-state-v2.json` bij dirty state of een 30-minuten heartbeat. Deze laag staat buiten de control-route en heeft geen toegang tot actuators.
 
 ## Homey-mappen v2
 
@@ -138,7 +138,7 @@ Tijdens de migratie mag de website v2 prefereren en alleen wanneer `energy-state
 1. Legacy-baseline vastleggen en bestaande writers expliciet classificeren.
 2. V2 Input + State read-only activeren. **Uitgevoerd.**
 3. V2 Decision in shadow valideren. **Actief; 24-uurs observatievenster gestart.**
-4. V2 publisher en websitecontract activeren. **In uitvoering op 17 augustus 2026.**
+4. V2 publisher en websitecontract activeren. **Publisher actief op 17 augustus 2026; eerste snapshot handmatig getriggerd.**
 5. Boiler-controladapter migreren en valideren.
 6. Tesla-controladapter migreren en Equalizer als onafhankelijke veiligheidslaag behouden.
 7. Wanneer alle productieactuators v2-eigendom hebben: resterende oude orkestratie-/shadow-/statuspublisherflows gecontroleerd deactiveren.
