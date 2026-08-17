@@ -1,31 +1,31 @@
 {
   "meta": {
-    "schema_version": "2.1",
-    "generated_at": "2026-08-17T16:30:02.341Z",
-    "heartbeat_at": "2026-08-17T16:30:02.341Z",
-    "publisher_version": "EM2_PUBLISH_V0.7",
+    "schema_version": "2.2",
+    "generated_at": "2026-08-17T16:34:29.204Z",
+    "heartbeat_at": "2026-08-17T16:34:29.204Z",
+    "publisher_version": "EM2_PUBLISH_V0.8",
     "control_mode": "SHADOW",
-    "source_sample_at": "2026-08-17T16:25:00.022Z",
-    "state_revision": 109,
-    "decision_revision": 109,
-    "shadow_revision": 109,
-    "state_age_sec": 300,
-    "publish_reason": "REVISION_THROTTLED",
+    "source_sample_at": "2026-08-17T16:30:00.122Z",
+    "state_revision": 110,
+    "decision_revision": 110,
+    "shadow_revision": 110,
+    "state_age_sec": 268,
+    "publish_reason": "SCHEMA_UPGRADE",
     "min_publish_interval_sec": 600
   },
   "grid": {
-    "power_w": 1923,
-    "l1_w": 78,
-    "l2_w": 2091,
-    "l3_w": -245,
-    "import_w": 1923,
+    "power_w": 1485,
+    "l1_w": 152,
+    "l2_w": 1885,
+    "l3_w": -551,
+    "import_w": 1485,
     "export_w": 0
   },
   "pv": {
-    "total_w": 411.69,
+    "total_w": 505.69,
     "solaredge_w": 166.69,
-    "goodwe_4200_w": 141,
-    "goodwe_2000_w": 104
+    "goodwe_4200_w": 214,
+    "goodwe_2000_w": 125
   },
   "battery": {
     "soc_pct": null,
@@ -44,8 +44,81 @@
   },
   "hot_water": {
     "boiler_on": true,
-    "boiler_power_w": 1917.83,
-    "mode": true
+    "boiler_power_w": 1909.82,
+    "mode": true,
+    "day_state": {
+      "schema": "EM2_WW_STATE_V0.4",
+      "date": "2026-08-17",
+      "startedAt": "2026-08-17T15:13:18.878Z",
+      "updatedAt": "2026-08-17T16:30:00.404Z",
+      "sourceRevision": 110,
+      "lastStateSampleAt": "2026-08-17T16:30:00.122Z",
+      "boilerOnMinToday": 76.7,
+      "heatingConfirmMin": 59.99476666666666,
+      "lowAfterHeatingMin": 0,
+      "heatingConfirmed": true,
+      "goalReached": false,
+      "goalReachedAt": null,
+      "bootstrappedFromLegacy": false,
+      "quality": "PARTIAL_FROM_START_TIME",
+      "boilerOn": true,
+      "boilerPowerW": 1909.82,
+      "remainingFallbackMin": 163.3,
+      "minuteOfDay": 1110,
+      "catchupRequired": true,
+      "stateAgeSec": 0,
+      "policy": {
+        "primaryGoal": "OP_TEMPERATUUR",
+        "heatConfirmW": 1500,
+        "heatConfirmMinutes": 15,
+        "lowThresholdW": 100,
+        "lowConfirmMinutes": 10,
+        "fallbackMinutes": 240,
+        "deadline": "19:00"
+      }
+    },
+    "control": {
+      "schema": "EM2_CONTROL_WW_V0.5",
+      "generatedAt": "2026-08-17T15:16:45.271Z",
+      "controlMode": "SHADOW",
+      "readOnly": true,
+      "sourceRevision": 95,
+      "action": "HOLD",
+      "priority": "MUST",
+      "reason": "Catch-up vereist: 238 min fallback resterend",
+      "guards": {
+        "readOnly": true,
+        "deviceWrites": false,
+        "stateFresh": true,
+        "revisionMatch": true,
+        "wwStateFresh": true
+      },
+      "inputs": {
+        "boilerOn": true,
+        "boilerPowerW": 0,
+        "mode": true,
+        "gridW": -1428,
+        "goalReached": false,
+        "boilerOnMinToday": 1.7,
+        "remainingFallbackMin": 238.3,
+        "catchupRequired": true,
+        "wwStateUpdatedAt": "2026-08-17T15:15:00.329Z",
+        "wwStateQuality": "PARTIAL_FROM_START_TIME"
+      },
+      "policy": {
+        "primaryGoal": "OP_TEMPERATUUR",
+        "fallbackMinutes": 240,
+        "startWindow": "09:30-18:30",
+        "deadline": "19:00",
+        "minRunMinutes": 30,
+        "startExportW": 2100,
+        "maxImportW": 500
+      },
+      "safety": {
+        "physicalWritePerformed": false,
+        "note": "Shadow-only; uitsluitend Logic-write EM2_Control_WW"
+      }
+    }
   },
   "loads": {
     "washer": {
@@ -60,13 +133,13 @@
     "quooker": null
   },
   "manager": {
-    "state": "IMPORT_HIGH",
+    "state": "IMPORT",
     "decision": "HOLD",
     "reason": "Geen harde verplichting of sterke opportunity",
     "priority": "MAY",
     "constraints": [],
     "state_dirty": true,
-    "state_age_sec": 300
+    "state_age_sec": 268
   },
   "shadow": {
     "comparison": {
@@ -76,7 +149,7 @@
       "tesla": "NOT_CHARGING",
       "teslaPowerW": 0,
       "boilerOn": true,
-      "boilerPowerW": 1917.83
+      "boilerPowerW": 1909.82
     },
     "decision": {
       "priority": "MAY",
