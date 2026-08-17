@@ -43,6 +43,12 @@ Devices / meters / Victron / Easee
  later Victron          └─ externe historie/analyse
 ```
 
+## Actuele v2 Homey-flows
+
+- `EM v2 | 10 State | Collector v0.2` — actief, één centrale device/logic-read per 5 minuten, 100 W-deadbands en 30-minuten heartbeat; geen device writes en geen netwerk-I/O.
+- `EM v2 | 20 Decision + 80 Shadow | v0.1` — actief; leest uitsluitend `EM2_State`, schrijft alleen `EM2_Decision`/`EM2_Shadow`; geen device reads, device writes of netwerk-I/O.
+- `EM v2 | 90 Publish | State Publisher v0.1` — wordt als enige websitepublisher voor v2 gebruikt; leest uitsluitend `EM2_*` Logic-state en publiceert `docs/data/energy-state-v2.json` bij dirty state of een 30-minuten heartbeat. Deze laag staat buiten de control-route en heeft geen toegang tot actuators.
+
 ## Homey-mappen v2
 
 ```text
@@ -58,56 +64,20 @@ Energy Core v2
 
 Alle v2-objecten gebruiken een eigen namespace. Voor Logic/context: `EM2_*`.
 
-## Implementatiestatus 17 augustus 2026
-
-De eerste echte greenfield-kern is actief, maar uitsluitend read-only/shadow:
-
-| Flow | Status | Homey-load | Fysieke writes |
-|---|---|---|---|
-| `Energy Core v2 - 10 State - Collector v0.2` | enabled | iedere 5 min één gedeelde `getDevices` + `getVariables`; Logic-write alleen bij materiaalwijziging of 30-min heartbeat | geen |
-| `Energy Core v2 - 20 Decision + 80 Shadow v0.1` | enabled | iedere 5 min alleen `getVariables`; geen device-read | geen |
-
-De State Collector schrijft `EM2_State` en zet `EM2_Publish_Due` alleen wanneer publicatie nodig is. Start-deadbands zijn 100 W voor vermogenswaarden, 0,5 A voor fasecurrenten en 0,02 kWh voor de Easee-meter; status- en deadlinewijzigingen zijn exact. De Decision/Shadow-laag leest uitsluitend `EM2_State`, classificeert `MUST / SHOULD / MAY`, schrijft `EM2_Decision` en `EM2_Shadow` en gebruikt `AGREE / DIFFER / NOT_COMPARABLE` alleen als observatie-uitkomst.
-
-De eerste versie blijft bewust op één 5-minuten centrale snapshot. De Homey-kaarten bevestigen dat native change-events beschikbaar zijn voor P1, PV, Easee, Equalizer, boiler en apparaten. Nadat deze centrale v2-keten stabiel is gevalideerd kan de Input-laag stapsgewijs naar event-adapters worden omgezet, zonder de Decision/Shadow-contracten te wijzigen.
-
-**Nog niet geïmplementeerd:** `30 Control` en `90 Publish`. Er bestaat dus nog geen v2-route die Tesla, boiler of Victron fysiek aanstuurt en `energy-state-v2.json` wordt nog niet vanuit deze nieuwe state gepubliceerd.
-
-## Nieuwe Legacy-v1-baseline na handmatige deactivatie
-
-| Flow | Classificatie | Status 17-08-2026 | Opmerking |
-|---|---|---|---|
-| `Energy Manager State Collector v1.0` | Input/State | disabled | read-only; 1× `getDevices` + 1× `getVariables` per 2 min wanneer actief |
-| `Energy Manager Allocator - Shadow v0.2.4` | Decision/Shadow | disabled | leest alleen `EM_Runtime_State`; geen device writes |
-| `Tesla laden v2.6` | productie/writer | disabled | automatische Easee-writer; directe devices-read + command-fetch per 2 min wanneer actief |
-| `Warm water optimalisatie - PV boiler + CV advies v1.3` | productie/writer | disabled | boilerwriter; directe devices-read per 5 min wanneer actief |
-| `Live energie publicatie v1.2` | publisher | disabled | leest centrale state; GitHub-publicatie per 5 min wanneer actief |
-| `Tesla runtime publicatie v1.3` | publisher | disabled | deed eigen `getDevices` + GitHub-publicatie per 2 min wanneer actief |
-| `Boiler aan / Boiler uit / Boiler opwarmen` | legacy boilerwriters | disabled | geen automatische legacy-boilerroute actief via deze flows |
-| `Lader uit` | legacy EV-writer | disabled | geen vaste legacy-stoproute actief |
-| `Charger disabled due to insufficient export` | legacy EV-writer | disabled | exportgestuurde legacy-route uit |
-| `Handmatig laden starten/stoppen` en `Start laden Tesla 16A` | manual legacy writers | disabled | oude handmatige routes uit |
-| `Enable charger` | manual/fallback writer | **enabled** | programmatic trigger; kan Easee fysiek enable-en en blijft bewust ongemoeid tot Control-cutover |
-
-`Enable charger` telt daarom als expliciete uitzondering op de greenfield-isolatie. Vóór Tesla naar `HYBRID` of `ACTIVE` gaat moet deze route opnieuw worden beoordeeld, zodat er exact één automatische writer-eigenaar blijft en een eventuele handmatige/fallbackfunctie bewust gescheiden wordt.
-
 ## Centrale Energy State
 
-De contractbron is `docs/data/energy-state-v2.schema.json`. De publisher levert uiteindelijk één actuele snapshot als `docs/data/energy-state-v2.json`.
+De interne Homey-state is `EM2_State`. Dit interne contract mag Homey-georiënteerd blijven. Het publieke websitecontract is bewust een aparte vertaling en wordt vastgelegd door `docs/data/energy-state-v2.schema.json`; de publisher levert `docs/data/energy-state-v2.json`.
 
-De actieve Homey-state heet `EM2_State` en bevat momenteel:
+Belangrijkste domeinen:
 
-- `grid`: netto vermogen, import/export en L1/L2/L3;
-- `pv`: totaal en productie per drie omvormers;
-- `tesla`: werkelijk vermogen, gevraagde stroom, laadstatus en Easee-meter;
-- `equalizer`: totaal en fasecurrenten;
-- `hotWater`: boilervermogen, aan/uit en bestaande warmwatermodus;
-- `appliances`: wasmachine/droger status-only;
-- `goals`: Tesla deadline, latest-start, resterende kWh en status;
-- `context`: bestaande M7 prijs-/PV-context;
-- metadata: schema, sample-, change-, publish-timestamp en revision.
-
-Batterij/Victron wordt toegevoegd zodra de read-only Victronbron beschikbaar is. Ontbrekende data blijft expliciet onbekend.
+- `grid`: netto vermogen en fasen;
+- `pv`: totaal en productie per omvormer;
+- `battery`: SOC, vermogen en richting wanneer Victron beschikbaar is;
+- `tesla`: aangesloten/laden/werkelijk vermogen/gevraagde stroom/deadlinebehoefte;
+- `hot_water`: boilervermogen, warmtevraag en dagdoel;
+- `loads`: alleen werkelijk gemeten of expliciet status-only apparaten;
+- `manager`: control mode, state, beslissing, reden en actieve constraints;
+- `meta`: timestamp, heartbeat, schema- en publisher-versie.
 
 ## Event- en deadbandbeleid
 
@@ -121,30 +91,26 @@ Startwaarden voor tuning:
 | PV totaal | ≥ 100 W wijziging of grensovergang |
 | Tesla werkelijk vermogen | ≥ 100 W of laadstatuswijziging |
 | Boiler vermogen | ≥ 100 W of aan/uit-wijziging |
-| Equalizer/fasecurrent | ≥ 100 W / 0,5 A |
-| Easee energiemeter | ≥ 0,02 kWh |
-| SOC later | ≥ 1 procentpunt |
+| Batterijvermogen | ≥ 100 W of richtingwijziging |
+| SOC | ≥ 1 procentpunt |
 | Deadline / MUST-status | iedere relevante statewijziging en periodieke deadline-tick |
 
-Grensovergangen krijgen in de uiteindelijke event-adapters altijd voorrang boven de numerieke deadband.
+Grensovergangen krijgen altijd voorrang boven de numerieke deadband.
 
 ## Dirty-state publisher
 
-De websitepublisher wordt onafhankelijk van de control-route:
+De websitepublisher werkt onafhankelijk van de control-route:
 
 ```text
-relevante statewijziging / heartbeat
-       ↓
-EM2_Publish_Due = true
-       ↓
-90 Publish (nog te bouwen)
-       ↓
-energy-state-v2.json
-       ↓
-EM2_Publish_Due = false
+relevante statewijziging → EM2_Publish_Due = true
+
+5-min publisher tick:
+  publish_due = false + heartbeat < 30 min → geen GitHub-call
+  publish_due = true → snapshot publiceren, vlag na succes wissen
+  heartbeat ≥ 30 min → snapshot publiceren, ook zonder statewijziging
 ```
 
-De State Collector forceert daarnaast iedere 30 minuten een heartbeat-write, ook zonder materiële wijziging. Hierdoor kan de toekomstige publisher onderscheid maken tussen **geen relevante verandering** en **Homey/publisher niet meer gezond**.
+De publisher leest geen devices. Hij vertaalt `EM2_State`, `EM2_Decision` en `EM2_Shadow` naar één stabiel publiek `energy-state-v2.json`. Alleen na een succesvolle GitHub-write wordt `EM2_Publish_Due` gewist. Zo kan de website onderscheid maken tussen **geen relevante verandering** en **publisher/Homey niet meer gezond** zonder extra Homey-load.
 
 ## Websitecontract
 
@@ -162,21 +128,19 @@ Tijdens de migratie mag de website v2 prefereren en alleen wanneer `energy-state
 
 | Mode | Betekenis |
 |---|---|
-| `LEGACY` | legacy productieflows sturen; v2 observeert |
+| `LEGACY` | huidige productieflows sturen; v2 observeert |
 | `SHADOW` | v2 state + decision actief, geen v2 device-writes |
 | `HYBRID` | alleen expliciet gemigreerde actuators volgen v2 |
 | `ACTIVE` | v2 is leidend voor alle gemigreerde flexloads |
 
-**Huidige v2-mode: `SHADOW`.**
-
 ### Gecontroleerde cutover
 
-1. Legacy-baseline vastleggen en bestaande writers expliciet classificeren. **Grotendeels gerealiseerd.**
-2. V2 Input + State read-only activeren. **Gerealiseerd met State Collector v0.2.**
-3. V2 Decision in shadow valideren. **Gestart met Decision + Shadow v0.1.**
-4. V2 publisher en websitecontract activeren. **Nog te doen.**
-5. Boiler-controladapter migreren en valideren. **Nog niet toegestaan.**
-6. Tesla-controladapter migreren en Equalizer als onafhankelijke veiligheidslaag behouden. **Nog niet toegestaan.**
+1. Legacy-baseline vastleggen en bestaande writers expliciet classificeren.
+2. V2 Input + State read-only activeren. **Uitgevoerd.**
+3. V2 Decision in shadow valideren. **Actief; 24-uurs observatievenster gestart.**
+4. V2 publisher en websitecontract activeren. **In uitvoering op 17 augustus 2026.**
+5. Boiler-controladapter migreren en valideren.
+6. Tesla-controladapter migreren en Equalizer als onafhankelijke veiligheidslaag behouden.
 7. Wanneer alle productieactuators v2-eigendom hebben: resterende oude orkestratie-/shadow-/statuspublisherflows gecontroleerd deactiveren.
 8. Oude flows minimaal één observatieperiode bewaren als rollback; niet direct verwijderen.
 
@@ -193,11 +157,9 @@ Nieuwe v2-functionaliteit wordt alleen geaccepteerd wanneer zij binnen dit uitga
 - shadow gebruikt dezelfde centrale state en leest apparaten niet opnieuw;
 - analyse/historie vindt buiten de kritische Homey-route plaats.
 
-Vergeleken met de gedeactiveerde legacy-kern daalt de actieve centrale device-scan van iedere 2 minuten naar iedere 5 minuten. De Decision/Shadow-laag voegt daarbij geen device-read toe. Dit is een eerste structurele reductie; event-driven Input is de volgende optimalisatiefase.
-
 ## Rollback
 
-De huidige read-only v2-kern kan zonder effect op fysieke apparatuur worden teruggedraaid door beide v2-flows uit te schakelen. Voor latere control geldt:
+Rollback blijft expliciet en niet-destructief:
 
 ```text
 v2 control writer UIT
