@@ -1,11 +1,11 @@
 {
   "meta": {
     "schema_version": "2.3",
-    "generated_at": "2026-08-17T20:48:55.745Z",
-    "heartbeat_at": "2026-08-17T20:48:55.745Z",
-    "publisher_version": "EM2_CORE_PUBLISH_V0.9",
+    "generated_at": "2026-08-17T20:50:47.425Z",
+    "heartbeat_at": "2026-08-17T20:50:47.425Z",
+    "publisher_version": "EM2_CORE_PUBLISH_V0.9.1",
     "control_mode": "SHADOW",
-    "source_sample_at": "2026-08-17T20:48:55.569Z",
+    "source_sample_at": "2026-08-17T20:50:47.277Z",
     "state_revision": 157,
     "decision_revision": 157,
     "shadow_revision": 157,
@@ -14,11 +14,11 @@
     "min_publish_interval_sec": 600
   },
   "grid": {
-    "power_w": 2276,
+    "power_w": 2282,
     "l1_w": 87,
-    "l2_w": 2137,
+    "l2_w": 2139,
     "l3_w": 53,
-    "import_w": 2276,
+    "import_w": 2282,
     "export_w": 0
   },
   "pv": {
@@ -58,11 +58,11 @@
       "schema": "EM2_WW_STATE_V0.5",
       "date": "2026-08-17",
       "startedAt": "2026-08-17T15:13:18.878Z",
-      "updatedAt": "2026-08-17T20:48:55.727Z",
+      "updatedAt": "2026-08-17T20:50:47.396Z",
       "sourceRevision": 157,
-      "lastStateSampleAt": "2026-08-17T20:48:55.569Z",
-      "boilerOnMinToday": 335.6,
-      "heatingConfirmMin": 98.91621666666666,
+      "lastStateSampleAt": "2026-08-17T20:50:47.277Z",
+      "boilerOnMinToday": 337.5,
+      "heatingConfirmMin": 100.77736666666665,
       "lowAfterHeatingMin": 0,
       "heatingConfirmed": true,
       "goalReached": true,
@@ -72,7 +72,7 @@
       "boilerOn": true,
       "boilerPowerW": 1952.45,
       "remainingFallbackMin": 0,
-      "minuteOfDay": 1368,
+      "minuteOfDay": 1370,
       "catchupRequired": false,
       "stateAgeSec": 0,
       "policy": {
@@ -86,31 +86,31 @@
       }
     },
     "control": {
-      "schema": "EM2_CONTROL_WW_V0.6",
-      "generatedAt": "2026-08-17T20:45:00.364Z",
+      "schema": "EM2_CONTROL_WW_V0.7",
+      "generatedAt": "2026-08-17T20:50:47.410Z",
       "controlMode": "SHADOW",
       "readOnly": true,
-      "sourceRevision": 156,
-      "action": "NO_ACTION_REVISION_MISMATCH",
+      "sourceRevision": 157,
+      "action": "BOILER_OFF",
       "priority": "MUST",
-      "reason": "Decision hoort niet bij dezelfde State-revision",
+      "reason": "Dagdoel OP_TEMPERATUUR bereikt",
       "guards": {
         "readOnly": true,
         "deviceWrites": false,
         "stateFresh": true,
-        "revisionMatch": false,
-        "wwStateFresh": false
+        "revisionMatch": true,
+        "wwStateFresh": true
       },
       "inputs": {
         "boilerOn": true,
-        "boilerPowerW": 1951.56,
+        "boilerPowerW": 1952.45,
         "mode": true,
-        "gridW": 2347,
+        "gridW": 2282,
         "goalReached": true,
-        "boilerOnMinToday": 326.7,
+        "boilerOnMinToday": 337.5,
         "remainingFallbackMin": 0,
         "catchupRequired": false,
-        "wwStateUpdatedAt": "2026-08-17T20:40:00.414Z",
+        "wwStateUpdatedAt": "2026-08-17T20:50:47.396Z",
         "wwStateQuality": "PARTIAL_FROM_START_TIME"
       },
       "policy": {
@@ -124,7 +124,7 @@
       },
       "safety": {
         "physicalWritePerformed": false,
-        "note": "Shadow-only; uitsluitend Logic-write EM2_Control_WW"
+        "note": "Shadow-only; atomair berekend in Core Tick v0.9.1; uitsluitend Logic-write EM2_Control_WW"
       }
     }
   },
@@ -146,7 +146,7 @@
     "reason": "Geen harde verplichting of sterke opportunity",
     "priority": "MAY",
     "constraints": [],
-    "state_dirty": true,
+    "state_dirty": false,
     "state_age_sec": 0
   },
   "shadow": {
