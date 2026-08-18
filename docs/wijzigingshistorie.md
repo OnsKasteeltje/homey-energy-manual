@@ -10,6 +10,18 @@ De hoofdindeling is daarom:
 
 De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De technische Git-historie blijft beschikbaar voor rollback en detailonderzoek.
 
+## v2.0.9 — 18 augustus 2026
+
+### Live energiestroom: hybride ruimteverwarming geïntegreerd
+
+- De live energiestroom toont voortaan **vier onafhankelijke parallelle verbruikstakken** vanuit de woning: Tesla, Boiler, Ruimteverwarming en Overig.
+- Er zijn geen onderlinge pijlen tussen deze vier verbruikscategorieën; `Overig` is een vierde categorie en geen downstream-stroom van andere apparaten.
+- De nieuwe tegel **Ruimteverwarming** representeert de hybride Quatt-opstelling als één functioneel systeem met Quatt als elektrische bron en CV-ketel als ondersteunende status.
+- Zolang Quatt/CV-data niet in de Energy Core v2-snapshot aanwezig is, toont de site bewust `status onbekend` en geen verzonnen vermogen.
+- Zolang Quatt-vermogen ontbreekt blijft `Overig = woningverbruik - TeslaW - boilerW`; pas bij betrouwbare gepubliceerde Quatt-data wordt ook `QuattW` afgetrokken.
+- De Energiemanager-balk toont Tesla, Boiler en Ruimteverwarming als functionele onderdelen; Overig blijft een meet-/restcategorie.
+- Deze wijziging is **uitsluitend websitepresentatie**: geen nieuwe Homey-flow, device-read, pollingcyclus, publisher-call of fysieke Control toegevoegd.
+
 ## v2.0.8 — 18 augustus 2026
 
 ### Warmwatervraag op ieder moment van de dag onderdeel van HYBRID-acceptatie
