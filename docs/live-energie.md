@@ -53,13 +53,23 @@ Er bestaan **geen onderlinge energiestromen** tussen deze vier categorieën. Ied
 
 ### Overig verbruik
 
-Met Quatt als first-class comfortload geldt:
+`Overig` is nadrukkelijk het **residu na alle individueel bekende vermogens**:
 
 ```text
-Overig = woningverbruik - TeslaW - boilerW - QuattW
+Overig = woningverbruik
+       - TeslaW
+       - boilerW
+       - QuattW
+       - wasmachineW
+       - drogerW
+       - vaatwasserW
+       - QuookerW
+       - overige toekomstige individueel gemeten loads
 ```
 
-De Core publiceert ditzelfde principe ook in `energy_budget.other_house_load_w`. De website rekent vanuit dezelfde fysieke balans en `quatt.power_w`, zodat Quatt niet dubbel in Overig wordt geteld.
+Alleen een werkelijk gepubliceerd wattage wordt afgetrokken. Een apparaatstatus zoals `RUNNING` zonder betrouwbaar `power_w` is onvoldoende om vermogen te verzinnen. De huidige wasmachine- en drogerintegraties leveren wel apparaatstatus maar geen rechtstreeks `measure_power`; hun `loads.*.power_w` is daarom voorlopig `null`. Zolang dat zo is, blijft hun energie fysiek onderdeel van `Overig`, maar de site kan bij actieve status expliciet aangeven dat een bekende actieve load nog niet watt-nauwkeurig is uitgesplitst.
+
+Dit voorkomt twee fouten tegelijk: bekende gemeten loads worden niet dubbel in `Overig` geteld, en niet-gemeten loads worden niet met een fictieve schatting van het residu afgetrokken.
 
 ## Ruimteverwarming — hybride Quatt
 
@@ -97,11 +107,11 @@ De Quatt-uitbreiding gebruikt **dezelfde bestaande `Homey.devices.getDevices()` 
 | Laag | Actieve versie | Functie |
 |---|---|---|
 | Core | `EM v2 | 00 Core Tick | v0.9.7` | één centrale device- en Logic-snapshot per 5 minuten; State/Decision/Shadow/WW/publicatie |
-| Publieke state | schema `2.5` / `EM2_CORE_PUBLISH_V0.9.7` | revision-consistente snapshot met first-class `quatt` en `energy_budget` |
-| Website | `live-energy-v2.8.39.js` | vier parallelle verbruikstakken en hybride Quatt/CV-presentatie |
+| Publieke state | schema `2.5` / `EM2_CORE_PUBLISH_V0.9.7` | revision-consistente snapshot met first-class `quatt`, `loads` en `energy_budget` |
+| Website | `live-energy-v2.8.40.js` + `live-energy-known-loads-v2.8.41.js` | vier parallelle verbruikstakken; `Overig` als residu na alle beschikbare individuele wattages |
 
 De live kaart toont revision en bron-timestamp expliciet. De status `actueel/vertraagd` komt uit dezelfde freshness-regels als de EM v2 health-indicator.
 
 Later kan dezelfde kaart zonder architectuurwijziging worden uitgebreid met live Victron ESS-waarden voor batterij laden/ontladen, SOC en eilandbedrijf.
 
-> Laatste update: **18 augustus 2026** — Live energiestroom gekoppeld aan first-class Quatt-data uit Core v0.9.7/schema 2.5. Geen extra periodieke Homey-read en Quatt blijft OBSERVE_ONLY.
+> Laatste update: **18 augustus 2026** — `Overig` is gecorrigeerd naar residu na alle betrouwbare individueel gepubliceerde vermogens. Wasmachine/droger worden pas numeriek afgetrokken zodra voor hen betrouwbaar actueel wattage beschikbaar is; actieve status zonder wattage leidt niet tot een fictieve aftrek.
