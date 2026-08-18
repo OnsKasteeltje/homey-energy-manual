@@ -10,6 +10,20 @@ De hoofdindeling is daarom:
 
 De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De technische Git-historie blijft beschikbaar voor rollback en detailonderzoek.
 
+## v2.0.7 — 18 augustus 2026
+
+### Core Tick v0.9.5 en confirmed-heating fallback
+
+- De actieve Energy Core is nu `EM v2 | 00 Core Tick | v0.9.5`.
+- De live publisher identificeert zich als `EM2_CORE_PUBLISH_V0.9.5` met schema 2.3.
+- State, Decision en Shadow blijven revision-consistent; actuele publicaties tonen dezelfde revision voor de hele keten.
+- De 240-minuten warmwaterfallback telt niet langer relais-aan-tijd maar uitsluitend **bevestigde verwarmingsminuten**: boiler AAN én gemeten boilervermogen >1500 W.
+- `boilerOnMinToday` blijft alleen diagnostiek; de fallback gebruikt `heatingMinToday` en publiceert `fallbackAccounting = CONFIRMED_HEATING_MINUTES`.
+- Bij migratie binnen de lopende dag kan de eerder verstreken verwarmingsduur niet betrouwbaar worden gereconstrueerd; daarom wordt de accountingkwaliteit expliciet als partieel vanaf de v0.9.5-start gemarkeerd.
+- Het primaire dagdoel blijft `OP_TEMPERATUUR` eenmaal per lokale kalenderdag en blijft daarna gelatcht (`sameDayReheat=false`).
+- Warm Water Control blijft **PURE SHADOW**: `readOnly=true`, `deviceWrites=false`, `physicalWritePerformed=false`.
+- De algemene pagina **Energie Manager PV** is bijgewerkt van de oude v1 Collector/Allocator-architectuur naar de actuele centrale Energy Core v2-opzet.
+
 ## v2.0.6 — 18 augustus 2026
 
 ### Mobiele energiehistorie leesbaarder
@@ -23,7 +37,7 @@ De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De techni
 
 ### Warmwater opportunity planner
 
-- Energy Core draait nu op `EM v2 | 00 Core Tick | v0.9.4`.
+- Energy Core draait op dat moment op `EM v2 | 00 Core Tick | v0.9.4`.
 - Nieuwe lichte contextlaag `EM v2 | 30 Context | Price + PV v0.1` vernieuwt iedere 15 minuten prijs- en PV-forecastsignalen zonder device-scan.
 - Context krijgt een freshness-tijdstip; Core gebruikt prijs/forecast alleen wanneer die maximaal 35 minuten oud zijn.
 - Ochtendherverwarming vóór 09:30 wordt bewust uitgesteld wanneer de deadline dit toelaat. Als het boilerrelais nog aan staat, kan Shadow `BOILER_OFF / SHOULD` adviseren om spontane herverwarming na warmwatergebruik te voorkomen.
@@ -35,7 +49,7 @@ De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De techni
 - Het dagdoel blijft `OP_TEMPERATUUR` eenmaal per lokale kalenderdag; `goalReachedToday` blijft daarna gelatcht en `sameDayReheat=false`.
 - De v0.9.4-validatie publiceerde schema 2.3 met gelijke State/Decision/Shadow-revisions en `physicalWritePerformed=false`.
 - Fysieke WW-Control blijft uitgeschakeld: alle boileracties zijn nog PURE SHADOW.
-- Bekend validatiepunt vóór fysieke WW-Control: de 240-minuten fallback moet nog van relais-aan-tijd naar werkelijk/bevestigd verwarmen worden omgezet.
+- Bekend validatiepunt vóór fysieke WW-Control was op dat moment dat de 240-minutenfallback nog van relais-aan-tijd naar werkelijk/bevestigd verwarmen moest worden omgezet; dit is in v2.0.7/v0.9.5 opgelost.
 
 ## v2.0.4 — 17 augustus 2026
 
@@ -54,7 +68,7 @@ De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De techni
 - De oude `home-tesla-runtime` homepage-overlay is uit de siteconfiguratie verwijderd en kan de v2-tegel daardoor niet meer achteraf overschrijven.
 - Oude kalibratie-/baseline-auditstatussen blijven beschikbaar op **Live energiestroom**, waar de aparte Tesla runtime/deadline-interface ze technisch hoort te tonen.
 - Tesla deadline-, Equalizer- en laadmetingfunctionaliteit op Live energiestroom blijft ongewijzigd.
-- Geen Homey-flow, laadregeling of fysieke Control is gewijzigd; dit is uitsluitend een veilige scheiding van websiteverantwoordelijkheden.
+- Geen Homey-flow, laadregeling of fysieke Control gewijzigd; dit is uitsluitend een veilige scheiding van websiteverantwoordelijkheden.
 
 ## v2.0.2 — 17 augustus 2026
 
