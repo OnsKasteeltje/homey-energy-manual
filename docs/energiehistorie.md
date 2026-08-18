@@ -7,6 +7,9 @@
 !!! info "Energy Core v2 is leidend voor Dag"
     **Dag** gebruikt vanaf 17 augustus 2026 de nieuwe `energy-day-v2.json`-reeks uit `EM v2 | 70 History | Day Series v0.1`. Deze flow leest uitsluitend `EM2_State` en veroorzaakt **geen extra device-reads**. **Week**, **Maand** en **Jaar** gebruiken voorlopig de bestaande compacte `energy-daily-history.json`.
 
+!!! warning "Tesla legacy-historie uitgesloten"
+    De oude `tesla_kWh_est` uit Shadow Mode is een 15-minuten-schatting en wordt vanaf 18 augustus 2026 niet meer als feitelijk Tesla-verbruik weergegeven. De eerder zichtbare 20,014 kWh van 16 augustus is daarom uit de presentatie uitgesloten. Nieuwe Tesla-energie wordt opgebouwd uit `teslaW` in de Energy Core v2-dagreeks en over de werkelijke sample-timestamps geïntegreerd. Totdat een dag volledig via deze methode is gearchiveerd, toont de historische Tesla-waarde bewust `—` in plaats van 0 kWh of een legacy-schatting.
+
 !!! note "Opbouw vanaf migratiemoment"
     De nieuwe v2-dagreeks start op het moment van migratie. Er worden geen fictieve eerdere meetpunten aangemaakt. Daarom beginnen de dag-kWh en de grafiek vanaf het eerste echte v2-historypunt van vandaag en groeien daarna automatisch verder.
 
@@ -20,11 +23,12 @@ Woningverbruik = PV-productie + P1-netvermogen
 Netimport = max(P1, 0)
 Netexport = max(-P1, 0)
 Direct eigen PV-verbruik = max(PV - netexport, 0)
+Tesla-energie = integraal(teslaW × werkelijke sampletijd)
 ```
 
 De history-flow draait iedere vijf minuten. Hij doet geen eigen meting van apparaten, maar leest de centrale `EM2_State`. Wanneer die state door de deadband niet is vernieuwd, wordt de laatst bekende toestand als **hold-last-value** gebruikt en krijgt het historypunt `held=true`. Daarmee ontstaat een regelmatige meetreeks zonder een tweede Homey-device-scan. De pagina toont hoeveel historypunten hiervan hold-punten zijn.
 
-Vanaf twee echte tijdspunten berekent de website de kWh met trapeziumintegratie over de tijd. Een interval wordt voor robuustheid gemaximeerd op tien minuten zodat een langere datagaping niet stilzwijgend als een volledig gemeten periode wordt meegerekend.
+Vanaf twee echte tijdspunten berekent de website de kWh met trapeziumintegratie over de tijd. Een interval wordt voor robuustheid gemaximeerd op tien minuten zodat een langere datagaping niet stilzwijgend als een volledig gemeten periode wordt meegerekend. Hetzelfde principe geldt voor de nieuwe Tesla-energiemeting: ontbrekende of vertraagde samples mogen geen oude vermogenswaarde onbeperkt doortrekken.
 
 ## Activiteitstijdlijn
 
@@ -50,4 +54,4 @@ De extra Homey-belasting bestaat daarmee uit één Logic-read/-write per vijf mi
 
 De interface bevat al **Accu geladen** en **Accu ontladen**. Totdat live Victron ESS-metingen beschikbaar zijn, blijven deze waarden bewust op 0 / nog geen opslagmeting; er wordt geen batterijdata geschat.
 
-> Laatste update: **17 augustus 2026** — Dagoverzicht gemigreerd naar Energy Core v2-daghistorie; legacy `pv-phase-24h.json` en `shadow-baseline-v01.json` zijn niet langer nodig voor de Dag-tab.
+> Laatste update: **18 augustus 2026** — onbetrouwbare legacy Tesla-kWh uit Week/Maand/Jaar uitgesloten; nieuwe Tesla-energiemeting gebaseerd op `teslaW` uit Energy Core v2 en tijdintegratie. De 20,014 kWh legacywaarde van 16 augustus wordt niet meer als feitelijk verbruik gepresenteerd.
