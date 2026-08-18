@@ -104,14 +104,16 @@ Dit beïnvloedt de besluitvorming voor flexibele lasten, maar geeft Homey **geen
 
 De Quatt-uitbreiding gebruikt **dezelfde bestaande `Homey.devices.getDevices()` snapshot** van de centrale Core. Er is geen tweede Quatt-poll, geen extra periodieke flow en geen browser→Homey-route toegevoegd.
 
+Op desktop gebruikt deze pagina bewust een bredere contentcontainer dan de overige documentatiepagina's. Daardoor benut het Live energiestroom-diagram vrijwel de volledige beschikbare browserbreedte, terwijl tablet en mobiel hun bestaande responsive layout behouden.
+
 | Laag | Actieve versie | Functie |
 |---|---|---|
 | Core | `EM v2 | 00 Core Tick | v0.9.7` | één centrale device- en Logic-snapshot per 5 minuten; State/Decision/Shadow/WW/publicatie |
 | Publieke state | schema `2.5` / `EM2_CORE_PUBLISH_V0.9.7` | revision-consistente snapshot met first-class `quatt`, `loads` en `energy_budget` |
-| Website | `live-energy-v2.8.40.js` + `live-energy-known-loads-v2.8.41.js` | vier parallelle verbruikstakken; `Overig` als residu na alle beschikbare individuele wattages |
+| Website | `live-energy-v2.8.48.js` + `live-energy-balance-guard-v2.8.49.js` + `live-energy-v2.0.10.css` | brede desktopweergave; parallelle verbruikstakken; `Overig` als residu na alle beschikbare individuele wattages |
 
 De live kaart toont revision en bron-timestamp expliciet. De status `actueel/vertraagd` komt uit dezelfde freshness-regels als de EM v2 health-indicator.
 
 Later kan dezelfde kaart zonder architectuurwijziging worden uitgebreid met live Victron ESS-waarden voor batterij laden/ontladen, SOC en eilandbedrijf.
 
-> Laatste update: **18 augustus 2026** — `Overig` is gecorrigeerd naar residu na alle betrouwbare individueel gepubliceerde vermogens. Wasmachine/droger worden pas numeriek afgetrokken zodra voor hen betrouwbaar actueel wattage beschikbaar is; actieve status zonder wattage leidt niet tot een fictieve aftrek.
+> Laatste update: **18 augustus 2026** — desktopweergave verbreed zodat Live energiestroom aanzienlijk meer van de beschikbare schermbreedte gebruikt; mobiel/tablet blijven responsive. `Overig` blijft het residu na alle betrouwbaar gepubliceerde individuele vermogens.
