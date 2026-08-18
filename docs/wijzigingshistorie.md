@@ -10,6 +10,21 @@ De hoofdindeling is daarom:
 
 De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De technische Git-historie blijft beschikbaar voor rollback en detailonderzoek.
 
+## v2.0.10 — 18 augustus 2026
+
+### Quatt opgenomen in centrale Energy Core snapshot
+
+- De actieve kern is opgehoogd naar `EM v2 | 00 Core Tick | v0.9.6`; v0.9.5 is gedeactiveerd.
+- Quatt CIC wordt binnen **dezelfde bestaande `getDevices()` snapshot** gelezen. Er is geen extra periodieke device-read of aparte Quatt-poll toegevoegd.
+- De publieke state is opgehoogd naar schema `2.4` met publisher `EM2_CORE_PUBLISH_V0.9.6`.
+- Nieuw `heating`-blok publiceert elektrisch Quatt-vermogen, thermisch vermogen, COP/werkingsmodus, thermostaat-warmtevraag en CV-verzoek/aansturing/branderstatus.
+- `cv_flame = null` blijft expliciet **onbekend**; de website behandelt een CV-verzoek of -aansturing niet als bewijs dat de brander daadwerkelijk actief is.
+- De Live energiestroom gebruikt `heating.quatt_power_w` nu als de elektrische tak **Ruimteverwarming** en trekt dit vermogen af van `Overig`.
+- Thermisch vermogen en CV/gasstatus worden alleen als context/status getoond en niet in de elektrische energiebalans opgeteld.
+- De website-renderer is opgehoogd naar `live-energy-v2.8.39.js`.
+- Decision-, Shadow- en Warm Water Control-logica zijn inhoudelijk niet uitgebreid met Quatt-sturing; de wijziging blijft read-only voor ruimteverwarming.
+- De eenmalige migratieflow is na succesvolle cut-over weer uitgeschakeld.
+
 ## v2.0.9 — 18 augustus 2026
 
 ### Live energiestroom: hybride ruimteverwarming geïntegreerd
