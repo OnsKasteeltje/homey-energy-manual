@@ -1,23 +1,25 @@
-# Energy Core v2 — greenfield architectuur
+# Energy Core v2 — doelarchitectuur
 
 ## Status
 
-**Implementatiefase:** centrale single-reader Core Tick actief in read-only SHADOW.  
-**Actieve kern:** `EM v2 | 00 Core Tick | v0.9.6`.  
-**Contextlaag:** `EM v2 | 30 Context | Price + PV v0.1`.  
-**Fysieke v2-writes:** geen.
+**Actieve kern:** `EM v2 | 00 Core Tick | v0.9.7`  
+**Contextlaag:** `EM v2 | 30 Context | Price + PV v0.1`  
+**Control mode:** `SHADOW`  
+**Fysieke Quatt-writes:** geen (`OBSERVE_ONLY`)  
+**Publicatieschema:** `2.5`
 
-Energy Core v2 gebruikt één centrale fysieke snapshot per vijf minuten. State, Decision, Shadow, warmwater-state, warmwater-Control en publicatie worden atomair uit dezelfde sample en revision berekend. Prijs- en PV-forecastcontext wordt apart iedere 15 minuten bijgewerkt zonder extra device-scan.
+Energy Core v2 gebruikt één centrale fysieke snapshot per vijf minuten. State, Decision, Shadow, warmwater-state, warmwater-Control en publicatie worden uit dezelfde sample/revision berekend. Quatt is vanaf v0.9.7 een first-class energieverbruiker én budget-input, zonder een extra periodieke device-read.
 
 ## Harde architectuurregels
 
 1. Per Core Tick maximaal één `getDevices()` en één `getVariables()`.
 2. Downstream-berekeningen gebruiken dezelfde in-memory snapshot.
-3. Websitebezoek veroorzaakt nul Homey-calls; de site leest gepubliceerde snapshots.
-4. State, Decision, Shadow en Control-intent horen bij dezelfde State-revision.
-5. Verouderde prijs/PV-context wordt niet als actuele waarheid gebruikt.
-6. Per fysieke actuator bestaat uiteindelijk exact één automatische writer.
-7. Een v2-Control-adapter krijgt pas fysieke writes na voldoende shadowvalidatie.
+3. P1 is leidend voor de netto energiebalans; apparaatmetingen verklaren en classificeren de belasting.
+4. Quatt is voorlopig een comfortload en **geen flexload**: meten en budgetteren mag, fysieke aansturing niet.
+5. Websitebezoek veroorzaakt nul Homey-calls; de site leest gepubliceerde snapshots.
+6. State, Decision, Shadow en Control-intent horen bij dezelfde State-revision.
+7. Per fysieke actuator bestaat uiteindelijk exact één automatische writer.
+8. Een v2-Control-adapter krijgt pas fysieke writes na expliciete shadowvalidatie.
 
 ## Actuele keten
 
@@ -27,159 +29,204 @@ Prijs + PV forecast cards
         ▼
 EM v2 | 30 Context | Price + PV v0.1
 
-Devices / meters / Easee / Quatt + Homey Logic
+P1 + PV + Easee + boiler + Quatt + overige devices + Homey Logic
         │ iedere 5 min
+        │ 1 × getDevices() + 1 × getVariables()
         ▼
-EM v2 | 00 Core Tick | v0.9.6
+EM v2 | 00 Core Tick | v0.9.7
         ├── State → EM2_State · revision N
+        ├── Energy budget → in dezelfde State
         ├── Decision → EM2_Decision · sourceRevision N
         ├── Shadow → EM2_Shadow · sourceRevision N
         ├── Warm Water State → EM2_WW_State · sourceRevision N
         ├── Warm Water Control → EM2_Control_WW · sourceRevision N
-        │                         GEEN fysieke write
-        └── Publish → energy-state-v2.json · schema 2.4
-
-Parallel, zonder device-read:
-EM v2 | 70 History | Day Series → energy-day-v2.json
+        │                         GEEN fysieke v2-write
+        └── Publish → energy-state-v2.json · schema 2.5
 ```
 
-## Ruimteverwarming vanaf v0.9.6
+## Quatt als first-class energieverbruiker
 
-Quatt CIC is toegevoegd aan **dezelfde bestaande `getDevices()` snapshot**. Er is dus geen tweede Quatt-read of nieuwe periodieke poll. De Core publiceert in schema 2.4 een apart `heating`-blok:
+De primaire live bron is **Quatt CIC `measure_power`**. Die waarde wordt uit dezelfde `getDevices()`-snapshot gelezen die Core Tick toch al gebruikt. Er is dus geen tweede Quatt-poll, geen aparte periodieke observer en geen hogere Homey-load.
+
+Daarnaast worden uit dezelfde snapshot diagnostische verwarmingswaarden gepubliceerd:
+
+- elektrisch Quatt-vermogen;
+- thermisch vermogen;
+- COP per warmtepomp waar beschikbaar;
+- working mode;
+- thermostaat heating-status;
+- CV-request en, waar betrouwbaar beschikbaar, vlamstatus.
+
+Thermisch vermogen en COP zijn diagnostiek en worden **niet** bij de elektrische energiebalans opgeteld.
+
+Quatt wordt semantisch gepubliceerd als:
 
 ```text
-heating.quatt_power_w
-heating.thermal_power_w
-heating.cop_1
-heating.cop_2
-heating.working_mode_1
-heating.working_mode_2
-heating.thermostat_heating_on
-heating.cv_requested
-heating.cv_onoff_command
-heating.cv_flame
+role         = COMFORT_BASELOAD
+control_mode = OBSERVE_ONLY
+controllable = false
 ```
 
-`quatt_power_w` is het elektrische Quatt-verbruik en kan daardoor rechtstreeks als aparte woningverbruiker worden verwerkt. `thermal_power_w` en COP zijn diagnostische/thermische waarden en worden niet opgeteld bij de elektrische energiebalans.
+Fysieke Quatt-acties — bijvoorbeeld prijsbegrenzing, geluidsniveau of andere setpoints — vallen buiten scope totdat daarvoor apart een veilige Control-policy is ontworpen en gevalideerd.
 
-De CV-status blijft bewust tri-state waar de bron dat vereist. `cv_flame = null` betekent **onbekend** en mag niet als `false` worden geïnterpreteerd. `cv_requested` en `cv_onoff_command` geven een verzoek/aansturing voor ketelondersteuning weer, maar zijn op zichzelf geen bewijs dat de fysieke brander actief is.
+## Waarom Quatt niet dubbel van export wordt afgetrokken
 
-## Warmwaterstate v0.8
+P1 meet de netto woningbalans en bevat het actuele Quatt-verbruik al. Wanneer Quatt bijvoorbeeld 1.500 W trekt, is die 1.500 W dus al verwerkt in de gemeten import/export.
 
-Warmwatercontext staat in `EM2_WW_State` (`EM2_WW_STATE_V0.8`). Het primaire dagdoel is `OP_TEMPERATUUR_ONCE_PER_DAY`. Zodra dit doel op een lokale kalenderdag is bereikt, blijft `goalReachedToday=true`; later warmwatergebruik opent het doel niet opnieuw (`sameDayReheat=false`).
-
-Thermostaatdetectie:
+Daarom is dit **fout**:
 
 ```text
-boiler aan + vermogen > 1500 W gedurende 15 min
-    → opwarmen bevestigd
-
-daarna boiler nog aan + vermogen < 100 W gedurende 10 min
-    → OP_TEMPERATUUR bereikt
+flex = P1-export - huidig Quatt-vermogen
 ```
 
-### Warmwatervraag is tijdsonafhankelijk
+Dat zou Quatt dubbel tellen.
 
-De regeling mag niet impliciet aannemen dat warmwatervraag alleen in de ochtend plaatsvindt. Warmwatergebruik kan op ieder moment van de dag optreden en wordt daarom als aparte gebeurtenis/context gezien, niet automatisch als nieuwe verwarmingsopdracht.
+v0.9.7 gebruikt in plaats daarvan een **Quatt-rampreserve**: alleen extra marge voor mogelijke modulatie/ramp-up wordt van de reeds gemeten export afgetrokken.
 
-Voor het bereiken van het dagdoel moet na iedere relevante warmwatervraag opnieuw worden beoordeeld of er nog veilig kan worden gewacht op PV/prijs-opportunity of dat catch-up dichterbij komt. Na `goalReachedToday=true` mag latere warmwatervraag dezelfde dag geen nieuwe verplichte opwarmcyclus openen zolang `sameDayReheat=false` geldt.
+## Gedeeld vermogensbudget
 
-Deze scenario's zijn expliciet onderdeel van de acceptatie vóór promotie van WW Control naar HYBRID:
+De centrale State publiceert vanaf schema 2.5 `energy_budget`:
 
-- warmwatervraag in de ochtend vóór een opportunity;
-- warmwatervraag rond middag/namiddag terwijl het dagdoel nog niet is bereikt;
-- warmwatervraag kort vóór de catch-up/deadlinezone;
-- warmwatervraag nadat `OP_TEMPERATUUR` die dag al is bereikt;
-- meerdere warmwatervraagmomenten op dezelfde dag.
+```text
+house_load_w
+known_flexible_load_w
+comfort_load_w
+other_house_load_w
+grid_safety_reserve_w
+quatt_ramp_reserve_w
+flex_export_budget_w
+discretionary_import_budget_w
+battery_support_w
+battery_integrated
+```
 
-Promotie naar fysieke WW-Control is niet toegestaan zolang deze scenario's niet logisch en fail-safe in SHADOW zijn beoordeeld.
+Huidige policy:
 
-### Fallback-accounting vanaf v0.9.5
+| Component | Waarde / regel |
+|---|---:|
+| Grid safety reserve | 200 W |
+| Quatt idle reserve | 100 W |
+| Quatt actief vanaf | 250 W |
+| Quatt actieve rampreserve | max(350 W, 25% van Quatt), maximaal 750 W |
+| Verwacht boilervermogen | 1.900 W |
+| Tesla PV-opportunitydrempel | 800 W flex-exportbudget |
+| PV-forecast minimum | 500 W flex-exportbudget |
+| Max. discretionaire import | 4.000 W |
+| Batterijsteun | 0 W zolang Victron niet geïntegreerd is |
 
-De 240-minutenfallback telt niet langer relais-aan-tijd. `boilerOnMinToday` blijft uitsluitend als diagnostische teller bestaan. De fallback gebruikt nu `heatingMinToday`: alleen intervallen waarin het boilerrelais AAN staat én het gemeten boilervermogen >1500 W is, tellen als bevestigde verwarmingsminuten.
+De kernformule is:
+
+```text
+flex_export_budget
+ = max(0,
+       P1_export
+       - grid_safety_reserve
+       - quatt_ramp_reserve)
+```
+
+`discretionary_import_budget` is de resterende ruimte tot 4.000 W actuele netimport voor niet-verplichte economische starts.
+
+## Effect op Decision en Tesla
+
+Quatt zelf krijgt geen `ON/OFF`-intent. In plaats daarvan beïnvloedt hij hoeveel flexruimte aan andere loads wordt toegewezen.
+
+Voor Tesla geldt in SHADOW:
+
+- deadline/MUST blijft leidend;
+- een PV-opportunity gebruikt `flex_export_budget_w` in plaats van ruwe P1-export;
+- goedkope prijs is alleen een discretionaire opportunity als voldoende importbudget resteert;
+- negatieve prijs blijft een expliciet economisch signaal;
+- Easee Equalizer blijft de lokale veiligheidslaag en kan altijd verder terugregelen.
+
+Hierdoor kan een modulerende Quatt niet ongemerkt dezelfde exportruimte claimen die Homey tegelijk aan Tesla denkt toe te wijzen.
+
+## Effect op Warm Water Control
+
+Warm Water Control is vanaf v0.9.7 `EM2_CONTROL_WW_V0.11` en blijft PURE SHADOW.
+
+Voor PV-start wordt niet meer alleen naar ruwe export gekeken. De boilerstart vereist circa 1.900 W **flex-exportbudget ná grid- en Quatt-reserve**.
+
+Voor prijsstarts geldt daarnaast:
+
+- negatieve prijs + voldoende tariefhorizon: toegestaan als economische opportunity;
+- goedkope prijs + voldoende tariefhorizon: alleen als geprojecteerde import inclusief circa 1.900 W boiler binnen het discretionaire importbudget blijft;
+- onvoldoende importbudget: `WAIT_IMPORT_BUDGET`.
+
+De bestaande run-locks blijven gelden:
+
+| Startreden | Run-lock |
+|---|---:|
+| `CATCHUP` | 0 min opportunity-lock |
+| `EXPORT` | 15 min |
+| `PV_FORECAST` | 15 min |
+| `PRICE_NEGATIVE` | 30 min |
+| `PRICE_CHEAP` | 30 min |
+
+Het warmwaterdagdoel en de confirmed-heating fallback uit v0.9.5 blijven ongewijzigd.
+
+## Later: Victron / batterij
+
+Het budgetmodel is bewust al batterij-ready. Nu is:
+
+```text
+battery_support_w = 0
+battery_integrated = false
+```
+
+Na Victron-integratie kan de batterijlaag toegestane laad-/ontlaadruimte aan hetzelfde budget toevoegen zonder de betekenis van Quatt te veranderen.
+
+Doelverdeling:
+
+```text
+Installatieveiligheid / netlimieten
+        ↓
+Easee Equalizer (lokale EV-veiligheid)
+        ↓
+Victron EMS (later: batterij/net)
+        ↓
+Energy Core v2 gedeeld budget
+        ├── Quatt = comfort / observe-only
+        ├── boiler = flex, met comfortdeadline
+        └── Tesla = flex, met laaddeadline
+```
+
+Victron mag later batterijvermogen inzetten om import/export te optimaliseren, maar Homey hoeft daarvoor de Quatt niet fysiek te sturen. Quatt blijft een bekende comfortlast die eerst in het budget wordt gerespecteerd.
+
+## Warmwaterstate
+
+`EM2_WW_STATE_V0.8` houdt het dagdoel `OP_TEMPERATUUR_ONCE_PER_DAY` bij. Confirmed-heating accounting blijft:
 
 ```text
 heatingNow = boilerOn && boilerPowerW > 1500 W
-heatingMinToday += deltaMin alleen wanneer heatingNow
 remainingFallbackMin = max(0, 240 - heatingMinToday)
 ```
 
-Als `OP_TEMPERATUUR` al bereikt is, wordt `remainingFallbackMin` direct 0. De state publiceert expliciet `fallbackAccounting = CONFIRMED_HEATING_MINUTES` en `fallbackHeatingThresholdW = 1500`.
+Na `goalReachedToday=true` wordt dezelfde kalenderdag geen verplichte heropwarming geopend (`sameDayReheat=false`).
 
-Bij migratie vanaf v0.9.4 kon de reeds verstreken verwarmingsduur van die dag niet betrouwbaar achteraf worden gereconstrueerd. Daarom startte `heatingMinToday` conservatief vanaf de v0.9.5-cut-over en bleef `heatingAccountingQuality = PARTIAL_FROM_V0.9.5_START` voor die dag zichtbaar. Dit beïnvloedt een reeds gelatcht dagdoel niet.
+## Validatie v0.9.7
 
-## Warmwater Control v0.10 — PURE SHADOW
+De veilige cut-over heeft de actieve v0.9.6 eerst uitgeschakeld en daarna v0.9.7 geactiveerd. De eerste v0.9.7-publicatie valideerde:
 
-Warm Water Control wordt atomair binnen Core Tick v0.9.6 berekend als `EM2_CONTROL_WW_V0.10`. Alle `BOILER_ON`- en `BOILER_OFF`-uitkomsten zijn nog uitsluitend Shadow-intenties; `readOnly=true`, `deviceWrites=false` en `physicalWritePerformed=false`.
+- `publisher_version = EM2_CORE_PUBLISH_V0.9.7`;
+- `schema_version = 2.5`;
+- `state_revision = decision_revision = shadow_revision = 329`;
+- Quatt live in de centrale State/publicatie;
+- `energy_budget` live gepubliceerd;
+- `control_mode = SHADOW`;
+- `quatt.control_mode = OBSERVE_ONLY`;
+- `deviceWrites = false`;
+- `physicalWritePerformed = false`;
+- `quattWritePerformed = false`.
 
-### Start- en run-lockbeleid
+Op het validatiemoment stond Quatt vrijwel in standby (10,3 W). De Quatt-reserve was daarom 100 W. Bij 184 W netexport en 200 W gridreserve resteerde terecht 0 W flex-exportbudget.
 
-| Situatie / startreden | Startvoorwaarde | Run-lock |
-|---|---|---:|
-| `CATCHUP` | deadline/fallback maakt uitstel onverantwoord | 0 min opportunity-lock |
-| `EXPORT` | ≥2100 W actuele netexport | 15 min |
-| `PV_FORECAST` | top-4 PV-forecastuur én ≥500 W actuele export | 15 min |
-| `PRICE_NEGATIVE` | negatieve prijs én ≥30 min resterend in huidig tariefuur | 30 min |
-| `PRICE_CHEAP` | huidige prijs goedkoper dan komende 4 uur én ≥30 min resterend in huidig tariefuur | 30 min |
+## Operationeel Homey-loadbudget
 
-Na afloop van een PV/prijs-run-lock mag opnieuw worden geoptimaliseerd. Bij geen geldige opportunity en meer dan circa 500 W netimport of een duidelijk ongunstige prijs kan `BOILER_OFF / SHOULD` volgen. Catch-up blijft comfort/deadline-gedreven.
-
-De gewenste dagelijkse lijn is generiek en niet aan ochtendgebruik gebonden:
-
-```text
-warmwatervraag op enig moment vóór dagdoel
-    → niet automatisch herverwarmen
-    → opnieuw opportunity versus resterende tijd/catch-up beoordelen
-    → start alleen wanneer opportunity of catch-up dat rechtvaardigt
-    → run-lock passend bij de startreden
-    → indien nodig catch-up richting 19:00 op basis van bevestigde verwarmingsminuten
-    → OP_TEMPERATUUR eenmaal bereikt
-    → dagdoel gelatcht; latere warmwatervraag opent geen verplichte heropwarming dezelfde dag
-```
-
-## Validatie cut-over 18 augustus 2026
-
-De oorspronkelijke veilige cut-over activeerde v0.9.5 met confirmed-heating fallback. Daarna is v0.9.6 als beperkte state/publicatie-uitbreiding ingevoerd: v0.9.5 is uitgeschakeld, v0.9.6 actief gemaakt en handmatig eenmaal gestart.
-
-De eerste v0.9.6-publicatie valideerde:
-
-- `publisher_version = EM2_CORE_PUBLISH_V0.9.6`;
-- `schema_version = 2.4`;
-- gelijke State/Decision/Shadow-revisions;
-- een nieuw `heating`-blok met actuele Quatt CIC-data;
-- behoud van `control_mode = SHADOW`;
-- WW State `EM2_WW_STATE_V0.8`;
-- WW Control `EM2_CONTROL_WW_V0.10`;
-- `readOnly = true`, `deviceWrites = false`, `physicalWritePerformed = false`.
-
-De Quatt-uitbreiding verandert geen Decision- of fysieke Control-logica. Zij maakt bestaande Quatt-data alleen onderdeel van de centrale state en publicatie.
-
-## Publisher en load-budget
-
-```text
-schema_version    = 2.4
-publisher_version = EM2_CORE_PUBLISH_V0.9.6
-control_mode      = SHADOW
-```
-
-Operationeel budget:
-
-- 1 × `getDevices()` per 5 minuten in Core Tick, inclusief Quatt CIC;
-- 1 × `getVariables()` per 5 minuten in Core Tick;
-- State, Decision, Shadow, WW State en WW Control daarna in-memory;
-- context iedere 15 minuten zonder device-scan;
-- GitHub-write maximaal iedere 10 minuten bij relevante wijzigingen;
-- 30-minuten-heartbeat;
+- 1 × `getDevices()` per 5 minuten, **inclusief Quatt**;
+- 1 × `getVariables()` per 5 minuten;
+- alle State/Decision/WW-berekeningen daarna in-memory;
+- prijs/PV-context iedere 15 minuten zonder device-scan;
+- GitHub-publicatie gethrottled;
 - website: nul Homey-calls.
 
-## Control modes
-
-| Mode | Betekenis |
-|---|---|
-| `SHADOW` | **huidige mode**: v2 observeert en berekent control-intent, geen v2 device-writes |
-| `HYBRID` | alleen expliciet gevalideerde actuators mogen door v2 worden gestuurd |
-| `ACTIVE` | v2 is leidend voor alle gemigreerde flexloads |
-
-De eerdere fallback-accounting op relais-aan-tijd is met v0.9.5 opgelost als blocker. Voor promotie van WW naar fysieke Control moeten zowel een volledige dagcyclus met confirmed-heating-accounting als de hierboven beschreven tijdsonafhankelijke warmwatervraagscenario's voldoende zijn gevalideerd.
-
-> Laatste update: **18 augustus 2026 — Core Tick v0.9.6.** Quatt CIC is toegevoegd aan dezelfde single-reader snapshot en wordt via schema 2.4 als `heating` gepubliceerd. Geen extra periodieke device-read en geen nieuwe fysieke writes.
+> Laatste update: **18 augustus 2026 — Core Tick v0.9.7.** Quatt is nu niet alleen zichtbaar in State, maar ook expliciet verwerkt in het gedeelde energie-/flexbudget voor Tesla en boiler. Quatt blijft OBSERVE_ONLY; geen fysieke Quatt-writes.
