@@ -12,18 +12,21 @@ De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De techni
 
 ## v2.0.10 — 18 augustus 2026
 
-### Quatt opgenomen in centrale Energy Core snapshot
+### Quatt first-class in Energy Core en Live energiestroom
 
-- De actieve kern is opgehoogd naar `EM v2 | 00 Core Tick | v0.9.6`; v0.9.5 is gedeactiveerd.
+- De uiteindelijke actieve kern is `EM v2 | 00 Core Tick | v0.9.7`; de tussenversies v0.9.5 en v0.9.6 zijn gedeactiveerd.
 - Quatt CIC wordt binnen **dezelfde bestaande `getDevices()` snapshot** gelezen. Er is geen extra periodieke device-read of aparte Quatt-poll toegevoegd.
-- De publieke state is opgehoogd naar schema `2.4` met publisher `EM2_CORE_PUBLISH_V0.9.6`.
-- Nieuw `heating`-blok publiceert elektrisch Quatt-vermogen, thermisch vermogen, COP/werkingsmodus, thermostaat-warmtevraag en CV-verzoek/aansturing/branderstatus.
-- `cv_flame = null` blijft expliciet **onbekend**; de website behandelt een CV-verzoek of -aansturing niet als bewijs dat de brander daadwerkelijk actief is.
-- De Live energiestroom gebruikt `heating.quatt_power_w` nu als de elektrische tak **Ruimteverwarming** en trekt dit vermogen af van `Overig`.
+- De publieke state gebruikt schema `2.5` met publisher `EM2_CORE_PUBLISH_V0.9.7`.
+- Quatt is first-class `COMFORT_BASELOAD` met `control_mode = OBSERVE_ONLY` en `controllable = false`.
+- Het publieke `quatt`-blok bevat elektrisch vermogen, thermisch vermogen, COP/werkingsmodus, thermostaat-warmtevraag, CV-verzoek en branderstatus waar beschikbaar.
+- `cv_flame = null` blijft expliciet **onbekend**; een CV-verzoek wordt niet als bewijs van een brandende ketel behandeld.
+- Het nieuwe `energy_budget` houdt een Quatt-rampreserve vrij voor flexibele lasten zonder het actuele Quatt-verbruik dubbel uit de P1-balans af te trekken.
+- De Live energiestroom gebruikt `quatt.power_w` als de elektrische tak **Ruimteverwarming** en trekt dit vermogen af van `Overig`.
+- Tesla, Boiler, Ruimteverwarming en Overig blijven vier onafhankelijke parallelle energietakken vanuit Huis.
 - Thermisch vermogen en CV/gasstatus worden alleen als context/status getoond en niet in de elektrische energiebalans opgeteld.
-- De website-renderer is opgehoogd naar `live-energy-v2.8.39.js`.
-- Decision-, Shadow- en Warm Water Control-logica zijn inhoudelijk niet uitgebreid met Quatt-sturing; de wijziging blijft read-only voor ruimteverwarming.
-- De eenmalige migratieflow is na succesvolle cut-over weer uitgeschakeld.
+- De website-renderer `live-energy-v2.8.39.js` is gekoppeld aan het actuele `quatt`-blok van schema 2.5.
+- Quatt krijgt geen fysieke Homey-aansturing; de wijziging blijft observe-only voor ruimteverwarming.
+- De eenmalige v0.9.6- en v0.9.7-cut-overflows zijn na succesvolle overgang weer uitgeschakeld.
 
 ## v2.0.9 — 18 augustus 2026
 
