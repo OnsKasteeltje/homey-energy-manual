@@ -10,6 +10,15 @@ De hoofdindeling is daarom:
 
 De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De technische Git-historie blijft beschikbaar voor rollback en detailonderzoek.
 
+## v2.0.6 — 18 augustus 2026
+
+### Mobiele energiehistorie leesbaarder
+
+- Het week-/maand-/jaaroverzicht op smalle schermen krijgt extra ruimte links van de grafiek zodat Y-aswaarden niet meer worden afgesneden.
+- De mobiele aslabels zijn compacter gemaakt zonder de desktopweergave te wijzigen.
+- De legenda wordt op mobiel in twee kolommen gezet, zodat Netimport, Netexport, Boiler en Tesla binnen het kaartkader blijven.
+- De wijziging is uitsluitend presentatielogica; Energy Core, Homey-calls, meetdata en historische berekeningen zijn ongewijzigd.
+
 ## v2.0.5 — 18 augustus 2026
 
 ### Warmwater opportunity planner
