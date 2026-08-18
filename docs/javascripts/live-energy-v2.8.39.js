@@ -14,7 +14,7 @@
     const p1=num(g.power_w),importW=Math.max(0,num(g.import_w)||p1),exportW=Math.max(0,num(g.export_w)||-p1);
     const batteryRaw=Number(b.power_w),batteryChargeW=Number.isFinite(batteryRaw)&&batteryRaw>0?batteryRaw:0,batteryDischargeW=Number.isFinite(batteryRaw)&&batteryRaw<0?Math.abs(batteryRaw):0;
     const houseTotal=Math.max(0,pv+p1+batteryDischargeW-batteryChargeW),tesla=Math.max(0,num(t.power_w)),boiler=Math.max(0,num(hw.boiler_power_w));
-    const heating=r.heating||r.space_heating||null;
+    const heating=r.quatt||r.heating||r.space_heating||null;
     const quattRaw=heating&&(heating.quatt_power_w??heating.power_w),quattKnown=quattRaw!==null&&quattRaw!==undefined&&Number.isFinite(Number(quattRaw));
     const quatt=quattKnown?Math.max(0,num(quattRaw)):0,thermal=Math.max(0,num(heating?.thermal_power_w));
     const other=Math.max(0,houseTotal-tesla-boiler-quatt);
