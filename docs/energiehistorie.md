@@ -10,6 +10,9 @@
 !!! warning "Tesla legacy-historie uitgesloten"
     De oude `tesla_kWh_est` uit Shadow Mode is een 15-minuten-schatting en wordt vanaf 18 augustus 2026 niet meer als feitelijk Tesla-verbruik weergegeven. De eerder zichtbare 20,014 kWh van 16 augustus is daarom uit de presentatie uitgesloten. Nieuwe Tesla-energie wordt opgebouwd uit `teslaW` in de Energy Core v2-dagreeks en over de werkelijke sample-timestamps geïntegreerd. Totdat een dag volledig via deze methode is gearchiveerd, toont de historische Tesla-waarde bewust `—` in plaats van 0 kWh of een legacy-schatting.
 
+!!! note "Herstel v2.8.37"
+    De eerste presentatiefilter voor legacy Tesla-data gebruikte onbedoeld een `MutationObserver` op het dashboard dat hij zelf wijzigde. Daardoor kon een zelf-triggerende DOM-lus ontstaan, waardoor Week/Maand/Jaar en ook de Material-navigatie/inhoudsopgave niet meer reageerden. In `energy-history-tesla-quality-v2.8.37.js` is die observer verwijderd; de filter draait nu alleen bij laden, paginaswitch en een klik op de historie-tabs.
+
 !!! note "Opbouw vanaf migratiemoment"
     De nieuwe v2-dagreeks start op het moment van migratie. Er worden geen fictieve eerdere meetpunten aangemaakt. Daarom beginnen de dag-kWh en de grafiek vanaf het eerste echte v2-historypunt van vandaag en groeien daarna automatisch verder.
 
@@ -54,4 +57,4 @@ De extra Homey-belasting bestaat daarmee uit één Logic-read/-write per vijf mi
 
 De interface bevat al **Accu geladen** en **Accu ontladen**. Totdat live Victron ESS-metingen beschikbaar zijn, blijven deze waarden bewust op 0 / nog geen opslagmeting; er wordt geen batterijdata geschat.
 
-> Laatste update: **18 augustus 2026** — onbetrouwbare legacy Tesla-kWh uit Week/Maand/Jaar uitgesloten; nieuwe Tesla-energiemeting gebaseerd op `teslaW` uit Energy Core v2 en tijdintegratie. De 20,014 kWh legacywaarde van 16 augustus wordt niet meer als feitelijk verbruik gepresenteerd.
+> Laatste update: **18 augustus 2026** — v2.8.37 herstelt de interactieve historie-tabs en Material-navigatie na de Tesla legacy-filter; de legacy Tesla-kWh blijft uitgesloten zonder een mutation-loop te veroorzaken.
