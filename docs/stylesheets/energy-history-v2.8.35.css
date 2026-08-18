@@ -1,4 +1,17 @@
-/* Mobile-only refinements for Energy History charts. Desktop layout remains unchanged. */
+/* Mobile refinements + interactive hover/touch tooltips for Energy History. */
+.eh-chart-interactive{position:relative}
+.eh-chart-interactive .eh-chart{touch-action:pan-y}
+.eh-hover-line{stroke:#dbe7f2;stroke-width:1;stroke-dasharray:4 4;opacity:0;pointer-events:none}
+.eh-hover-line.is-visible{opacity:.8}
+.eh-hover-dot{fill:#fff;stroke:#0f1926;stroke-width:2;opacity:0;pointer-events:none}
+.eh-hover-dot.is-visible{opacity:1}
+.eh-tooltip{position:absolute;z-index:5;display:none;pointer-events:none;background:rgba(9,16,25,.96);border:1px solid #2a3a4e;border-radius:10px;padding:9px 10px;color:#edf4fb;box-shadow:0 8px 24px rgba(0,0,0,.28);font-size:.76rem}
+.eh-tooltip.is-visible{display:block}
+.eh-tooltip-title{font-weight:700;margin-bottom:6px}
+.eh-tooltip-row{display:flex;justify-content:space-between;gap:14px;padding:2px 0}
+.eh-tooltip-key:before{content:"";display:inline-block;width:10px;height:3px;margin-right:6px;vertical-align:middle;background:currentColor}
+.eh-tooltip-key.pv{color:#f4c21f}.eh-tooltip-key.home{color:#3da5ff}.eh-tooltip-key.import{color:#bf6cff}.eh-tooltip-key.export{color:#74d42d}.eh-tooltip-key.battery{color:#31d0c6}
+
 @media(max-width:760px){
   #energy-history-dashboard .eh-chart-wrap{
     box-sizing:border-box;
@@ -36,6 +49,11 @@
   #energy-history-dashboard .eh-key:before{
     width:11px;
     margin-right:5px;
+  }
+
+  #energy-history-dashboard .eh-tooltip{
+    font-size:.7rem;
+    padding:8px 9px;
   }
 }
 
