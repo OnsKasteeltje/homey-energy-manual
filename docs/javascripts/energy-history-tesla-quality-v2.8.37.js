@@ -17,14 +17,15 @@
       if(!sub){sub=document.createElement('div');sub.className='eh-card-sub';card.appendChild(sub);}
       if(sub.textContent!=='legacy schatting uitgesloten')sub.textContent='legacy schatting uitgesloten';
     });
-    // The fourth aggregate chart series is the legacy Tesla estimate. Hide only that
-    // series; day view has five series and is based on v2 samples, so leave it intact.
+    // The fourth aggregate chart series is the legacy Tesla estimate. Hide the line
+    // and its integrated point markers; day view remains based on direct v2 samples.
     const title=[...root.querySelectorAll('.eh-panel-title h3')].find(x=>/Weekoverzicht|Maandoverzicht|Energie-overzicht · jaar/.test(x.textContent));
     if(title){
       const panel=title.closest('.eh-panel');
       if(panel){
         const lines=panel.querySelectorAll('path.eh-line');
         if(lines.length===4&&lines[3].style.display!=='none')lines[3].style.display='none';
+        panel.querySelectorAll('circle.eh-data-point.eh-pv').forEach(p=>p.style.display='none');
         panel.querySelectorAll('.eh-key').forEach(k=>{
           if(k.textContent.trim()==='Tesla')k.textContent='Tesla · legacy uitgesloten';
         });
