@@ -10,6 +10,17 @@ De hoofdindeling is daarom:
 
 De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De technische Git-historie blijft beschikbaar voor rollback en detailonderzoek.
 
+## v2.0.8 — 18 augustus 2026
+
+### Warmwatervraag op ieder moment van de dag onderdeel van HYBRID-acceptatie
+
+- De warmwaterregeling mag niet aannemen dat vraag alleen in de ochtend plaatsvindt.
+- Warmwatergebruik wordt behandeld als gebeurtenis/context, niet automatisch als nieuwe verwarmingsopdracht.
+- Vóór het bereiken van `OP_TEMPERATUUR` moet na relevante warmwatervraag opnieuw opportunity versus resterende tijd/catch-up worden beoordeeld.
+- Na `goalReachedToday=true` opent latere warmwatervraag dezelfde dag geen nieuwe verplichte opwarmcyclus zolang `sameDayReheat=false` geldt.
+- Voor promotie van Warm Water Control naar HYBRID moeten expliciet ochtend-, middag/namiddag-, vlak-voor-catch-up-, na-dagdoel- en meervoudige-vraagscenario's logisch en fail-safe in SHADOW zijn beoordeeld.
+- Deze eis is vastgelegd in de Energy Core v2-documentatie en geldt als harde acceptatievoorwaarde vóór fysieke WW-writes.
+
 ## v2.0.7 — 18 augustus 2026
 
 ### Core Tick v0.9.5 en confirmed-heating fallback
