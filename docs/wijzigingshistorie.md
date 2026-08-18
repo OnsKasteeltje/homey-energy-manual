@@ -10,6 +10,37 @@ De hoofdindeling is daarom:
 
 De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De technische Git-historie blijft beschikbaar voor rollback en detailonderzoek.
 
+## v2.0.13 — 18 augustus 2026
+
+### Energiehistorie: actuele dag in weekbeeld en renderer opgeschoond
+
+- Het rollende weekoverzicht combineert voortaan afgesloten dagen uit `energy-daily-history.json` met **vandaag t/m nu** uit `energy-day-v2.json`.
+- De weekas blijft een vaste rollende reeks van zeven kalenderdagen; ontbrekende dagen worden als echte gaten weergegeven en niet als 0 kWh.
+- De actuele dag wordt vanuit de 5-minuten v2-samples geïntegreerd naar dezelfde kWh-velden als de historische dagrecords: netimport, netexport, boiler en Tesla.
+- Een geïsoleerde dag na een ontbrekende kalenderdag blijft zichtbaar via datapunt-markers in de hoofd-renderer, zonder een kunstmatige lijn over het ontbrekende interval.
+- De tijdelijke losse marker-workaround `energy-history-point-markers-v2.8.40.js` is volledig verwijderd uit `mkdocs.yml` én uit de repository.
+- Marker-rendering is nu onderdeel van één primaire History-renderer; er is geen tweede DOM-postprocessinglaag meer.
+- De marker-policy is aangescherpt: **daggrafieken in W blijven lijn-only**, terwijl compacte kWh-historiegrafieken markers mogen gebruiken. Hiermee is de eerdere onrustige dagweergave hersteld.
+- De Tesla-quality guard is aangepast zodat legacy Tesla-schattingen ook geen losse aggregate markers kunnen achterlaten.
+- Hover/touch blijft beschikbaar; bij ontbrekende dagen toont de tooltip `geen data`.
+- Geen Homey-call, flowwijziging of fysieke Control was nodig voor deze reparaties.
+
+## v2.0.12 — 18 augustus 2026
+
+### WW Planner v0.12 — thermische opslag op marginale energiekosten
+
+- De warmwaterstrategie is inhoudelijk herzien vanwege een fundamentele meetbeperking: wanneer het externe boilerrelais UIT staat kan Energy Core geen nieuwe thermische warmtevraag waarnemen.
+- Na het bereiken van `OP_TEMPERATUUR` blijft de boiler daarom beschikbaar tot **19:00**; daarna mag `NIGHT_HOLD` ingaan.
+- Nachtoptimalisatie telt voor het nieuwe dagdoel pas vanaf **00:00 lokale tijd**.
+- Vanuit `NIGHT_HOLD` kan de planner vrijgeven via `NIGHT_PRICE_RELEASE`, `PV_RELEASE` of uiterlijk om **10:00** via `DEADLINE_RELEASE` als comfortgarantie.
+- Een release geeft de interne boilerthermostaat toestemming om zelf te bepalen of er warmtevraag is; <100 W betekent geen actuele thermische vraag, >1500 W bevestigt verwarmen.
+- Na release wordt niet opnieuw opportunistisch uitgeschakeld zolang de verwarmingscyclus wordt beoordeeld; het verdwijnen van export door het eigen boilervermogen is dus geen stoptrigger.
+- De planner optimaliseert op **marginale energiekosten** en behandelt eigen PV niet als gratis: gemiste terugleververgoeding is de opportunity cost van PV-gebruik in de boiler.
+- Eerste SHADOW-ontwerp gebruikt een economische marge van circa **€0,05/kWh** om triviale prijsverschillen niet tot onnodig vroeg thermisch laden te laten leiden; negatieve prijzen vormen een aparte sterke opportunity.
+- Het voorgestelde Context-contract bevat onder meer actuele prijs, goedkoopste nachtprijs, beste prijs vóór 10:00, exportwaarde, PV-forecast vóór 10:00 en verwacht bruikbaar flex-overschot.
+- Scenario's voor negatieve prijs, goedkope nacht, goede/slechte PV, vroege echte export, ontbrekende opportunity, stale context en 0 W/>1500 W na release zijn doorgerekend en vastgelegd.
+- Planner v0.12 is **ontwerp/documentatie en nog niet actief in Homey**. De eerstvolgende implementatiestap blijft Context-uitbreiding + Planner v0.12 uitsluitend in SHADOW, zonder fysieke boilerwrites.
+
 ## v2.0.11 — 18 augustus 2026
 
 ### Nieuw icoon voor ruimteverwarming
