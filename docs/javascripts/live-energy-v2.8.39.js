@@ -1,0 +1,66 @@
+(function(){
+  'use strict';
+  const fmtW=v=>`${Math.round(Number(v)||0).toLocaleString('nl-NL')} W`;
+  const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+  const num=v=>Number.isFinite(Number(v))?Number(v):0;
+  const isWorkingMode=v=>{const s=String(v??'').toLowerCase();return s!==''&&s!=='0'&&s!=='unknown'&&s!=='null';};
+  function node(x,y,w,h,kicker,title,value,sub='',cls=''){return `<g class="energy-node ${cls}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14"/><text x="${x+w/2}" y="${y+22}" text-anchor="middle" class="energy-kicker">${kicker}</text><text x="${x+w/2}" y="${y+47}" text-anchor="middle" class="energy-title">${title}</text><text x="${x+w/2}" y="${y+75}" text-anchor="middle" class="energy-value">${value}</text>${sub?`<text x="${x+w/2}" y="${y+97}" text-anchor="middle" class="energy-sub">${sub}</text>`:''}</g>`;}
+  function path(d,w,kind='grid',active=true,label='',lx=0,ly=0){const width=active?clamp(2.5+Math.abs(num(w))/750,3,10):2;return `<g><path class="energy-path energy-${kind} ${active?'is-active':'is-idle'}" d="${d}" style="stroke-width:${width}" marker-end="url(#arrow-${kind})"/>${label?`<text x="${lx}" y="${ly}" text-anchor="middle" class="energy-edge-label">${label}</text>`:''}</g>`;}
+  function render(detail){
+    const root=document.getElementById('live-energy-flow'); if(!root)return;
+    if(!detail?.raw){root.innerHTML='<p><em>Wachten op Energy Core v2-state…</em></p>';return;}
+    const r=detail.raw, g=r.grid||{}, p=r.pv||{}, t=r.tesla||{}, hw=r.hot_water||{}, b=r.battery||{}, m=r.meta||{};
+    const se=Math.max(0,num(p.solaredge_w)),gw42=Math.max(0,num(p.goodwe_4200_w)),gw20=Math.max(0,num(p.goodwe_2000_w)),pv=Math.max(0,num(p.total_w)||se+gw42+gw20);
+    const p1=num(g.power_w),importW=Math.max(0,num(g.import_w)||p1),exportW=Math.max(0,num(g.export_w)||-p1);
+    const batteryRaw=Number(b.power_w),batteryChargeW=Number.isFinite(batteryRaw)&&batteryRaw>0?batteryRaw:0,batteryDischargeW=Number.isFinite(batteryRaw)&&batteryRaw<0?Math.abs(batteryRaw):0;
+    const houseTotal=Math.max(0,pv+p1+batteryDischargeW-batteryChargeW),tesla=Math.max(0,num(t.power_w)),boiler=Math.max(0,num(hw.boiler_power_w));
+    const heating=r.heating||r.space_heating||null;
+    const quattRaw=heating&&(heating.quatt_power_w??heating.power_w),quattKnown=quattRaw!==null&&quattRaw!==undefined&&Number.isFinite(Number(quattRaw));
+    const quatt=quattKnown?Math.max(0,num(quattRaw)):0,thermal=Math.max(0,num(heating?.thermal_power_w));
+    const other=Math.max(0,houseTotal-tesla-boiler-quatt);
+    const thermostatDemand=heating?.thermostat_heating_on===true;
+    const quattActive=thermal>100||isWorkingMode(heating?.working_mode_1)||isWorkingMode(heating?.working_mode_2)||(quatt>100&&thermostatDemand);
+    const cvRequested=heating?.cv_requested===true||heating?.cv_onoff_command===true;
+    const cvFlameKnown=typeof heating?.cv_flame==='boolean',cvFlame=heating?.cv_flame===true,cvActive=cvFlame||cvRequested;
+    const copVals=[Number(heating?.cop_1),Number(heating?.cop_2)].filter(v=>Number.isFinite(v)&&v>0),cop=copVals.length?copVals.reduce((a,v)=>a+v,0)/copVals.length:null;
+    const heatingValue=quattKnown?fmtW(quatt):'—';
+    let heatingSub='Quatt / CV status onbekend';
+    if(heating){
+      if(quattActive&&cvFlame)heatingSub='Quatt + CV · hybride';
+      else if(quattActive&&cvRequested&&!cvFlameKnown)heatingSub='Quatt · CV ondersteuning gevraagd';
+      else if(quattActive&&cvRequested)heatingSub='Quatt · CV aangestuurd';
+      else if(quattActive)heatingSub='Quatt actief · CV niet gevraagd';
+      else if(cvFlame)heatingSub='CV verwarmt';
+      else if(cvRequested)heatingSub='CV ondersteuning gevraagd';
+      else if(thermostatDemand)heatingSub='warmtevraag · systeem wacht/start';
+      else heatingSub='geen warmtevraag';
+    }
+    const heatingDetail=[thermal>0?`thermisch ${fmtW(thermal)}`:'',cop?`COP ${cop.toFixed(1)}`:'',cvFlameKnown?`CV-vlam ${cvFlame?'aan':'uit'}`:'CV-vlam onbekend'].filter(Boolean).join(' · ');
+    const requestedA=Math.max(0,num(t.requested_a)),actualA=tesla/690;
+    const phaseSub=[g.l1_w!=null?`L1 ${fmtW(g.l1_w)}`:'',g.l2_w!=null?`L2 ${fmtW(g.l2_w)}`:'',g.l3_w!=null?`L3 ${fmtW(g.l3_w)}`:''].filter(Boolean).join(' · ');
+    const fresh=detail.stateFresh&&detail.heartbeatFresh,chargeState=String(t.charge_state||'unknown'),charging=t.charging===true||tesla>100;
+    let equalizerText='begrenzing niet actief',equalizerDetail='Geen actief laadverzoek';if(requestedA>0&&charging){if(actualA+0.5<requestedA){equalizerText='mogelijk begrensd';equalizerDetail='Werkelijke laadstroom lager dan gevraagd';}else{equalizerText='geen begrenzing zichtbaar';equalizerDetail='Werkelijk volgt gevraagd';}}else if(requestedA>0){equalizerText='begrenzing niet vastgesteld';equalizerDetail='Laadverzoek aanwezig, geen actuele afname';}
+    const W=1200,H=790;let svg=`<svg class="energy-svg energy-dashboard" viewBox="0 0 ${W} ${H}" role="img" aria-label="Live energiestroom"><defs><marker id="arrow-pv" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0,0 L0,8 L8,4 z" class="arrow-pv"/></marker><marker id="arrow-grid" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0,0 L0,8 L8,4 z" class="arrow-grid"/></marker><marker id="arrow-battery" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0,0 L0,8 L8,4 z" class="arrow-battery"/></marker></defs>`;
+    svg+=node(30,30,340,115,'PRODUCTIE','SolarEdge SE3680H',fmtW(se),'PV-omvormer','source')+node(430,30,340,115,'PRODUCTIE','GoodWe GW4200D-NS',fmtW(gw42),'PV-omvormer','source')+node(830,30,340,115,'PRODUCTIE','GoodWe GW2000-XS',fmtW(gw20),'PV-omvormer','source');
+    svg+=path('M200 145 V190 H600',se,'pv',se>0)+path('M600 145 V220',gw42,'pv',gw42>0)+path('M1000 145 V190 H600',gw20,'pv',gw20>0);
+    svg+=node(55,255,310,125,'NET / METER (P1)','Grid',fmtW(Math.abs(p1)),p1>0?'import':p1<0?'export':'in balans','grid')+node(445,255,310,125,'WONING','Huis',fmtW(houseTotal),phaseSub||'centrale energiebalans','house')+node(835,255,310,125,'BATTERIJ','Victron batterij',batteryChargeW?`Laden ${fmtW(batteryChargeW)}`:batteryDischargeW?`Ontladen ${fmtW(batteryDischargeW)}`:'Niet actief',batteryChargeW||batteryDischargeW?'live energiestroom':'voorbereid op ESS','battery');
+    if(importW>0)svg+=path('M365 317 H445',importW,'grid',true,`Grid → Huis · ${fmtW(importW)}`,405,303);else if(exportW>0)svg+=path('M445 317 H365',exportW,'grid',true,`Huis → Grid · ${fmtW(exportW)}`,405,303);else svg+=path('M365 317 H445',0,'grid',false,'in balans',405,303);
+    if(batteryChargeW>0)svg+=path('M755 317 H835',batteryChargeW,'battery',true,`Huis → Accu · ${fmtW(batteryChargeW)}`,795,303);else if(batteryDischargeW>0)svg+=path('M835 317 H755',batteryDischargeW,'battery',true,`Accu → Huis · ${fmtW(batteryDischargeW)}`,795,303);else svg+=path('M755 317 H835',0,'battery',false,'inactief',795,303);
+    svg+=path('M600 220 V255',pv,'pv',pv>0,pv>0?fmtW(pv):'',630,242);
+    const loads=[
+      {x:25,title:'Tesla',value:fmtW(tesla),sub:chargeState,w:tesla,active:tesla>0,sourceX:500},
+      {x:315,title:'Boiler',value:fmtW(boiler),sub:hw.boiler_on?'aan':'uit',w:boiler,active:boiler>0,sourceX:565},
+      {x:605,title:'Ruimteverwarming',value:heatingValue,sub:heatingSub,w:quatt,active:quatt>0,sourceX:635},
+      {x:895,title:'Overig',value:fmtW(other),sub:'rest van woningverbruik',w:other,active:other>0,sourceX:700}
+    ];
+    loads.forEach(a=>{const cx=a.x+140;svg+=path(`M${a.sourceX} 380 V455 H${cx} V515`,a.w,'grid',a.active)+node(a.x,515,280,125,'VERBRUIK',a.title,a.value,a.sub,'load');});
+    svg+=`<text x="600" y="700" text-anchor="middle" class="energy-rule">Vier parallelle verbruikstakken · geen onderlinge energiestroom tussen Tesla, Boiler, Ruimteverwarming en Overig.</text><text x="600" y="724" text-anchor="middle" class="energy-rule">Energy Core v2 revision ${m.state_revision??'?'} · één bron-timestamp.</text><g class="energy-legend" transform="translate(130 760)"><line x1="0" y1="0" x2="45" y2="0" class="legend-pv"/><text x="55" y="5">Productie</text><line x1="230" y1="0" x2="275" y2="0" class="legend-grid"/><text x="285" y="5">Net / verbruik</text><line x1="520" y1="0" x2="565" y2="0" class="legend-battery"/><text x="575" y="5">Batterij</text></g></svg>`;
+    const wwGoal=hw.day_state?.goalReachedToday===true||hw.day_state?.goalReached===true;
+    const heatingManager=heating?(quattActive&&cvActive?'● Hybride':quattActive?'● Quatt verwarmt':cvFlame?'● CV verwarmt':cvRequested?'● CV gevraagd':thermostatDemand?'● Warmtevraag':'○ Geen warmtevraag'):'? Status niet beschikbaar';
+    const managerPanel=`<div class="energy-manager-panel"><div class="energy-manager-title"><strong>Energiemanager</strong><span>functionele status</span></div><div class="energy-manager-grid"><div><small>TESLA</small><strong>${charging?'● Laden':'○ Niet laden'}</strong><span>${t.deadline_active&&t.deadline_at?`Deadline ${new Date(t.deadline_at).toLocaleString('nl-NL')}`:'Geen actieve laaddeadline'}</span></div><div><small>BOILER</small><strong>${wwGoal?'● Dagdoel bereikt':hw.boiler_on?'● Verwarmt':'○ Dagdoel open'}</strong><span>${wwGoal?'Op temperatuur vandaag':'Warmwaterregeling volgt Core v2'}</span></div><div><small>RUIMTEVERWARMING</small><strong>${heatingManager}</strong><span>${heating?`${heatingSub}${heatingDetail?` · ${heatingDetail}`:''}`:'Website vraagt hiervoor geen extra Homey-data op'}</span></div></div></div>`;
+    const teslaPanel=`<div class="tesla-regulation"><div class="tesla-regulation-title"><strong>Tesla laadregeling — gevraagd vs. werkelijk</strong><span>Energy Core v2 · SHADOW</span></div><div class="tesla-regulation-grid"><div class="tesla-step"><small>HOMEY VRAAGT</small><strong>${requestedA.toFixed(0)} A</strong><span>${requestedA>0?'actief laadverzoek':'geen laadverzoek'}</span></div><div class="tesla-arrow">→</div><div class="tesla-step equalizer"><small>EASEE EQUALIZER</small><strong>${equalizerText}</strong><span>${equalizerDetail}</span></div><div class="tesla-arrow">→</div><div class="tesla-step actual"><small>WERKELIJK NAAR TESLA</small><strong>${actualA.toFixed(1)} A</strong><span>${fmtW(tesla)}</span></div></div></div>`;
+    root.innerHTML=`<div class="energy-topline"><span><strong>EM v2 revision ${m.state_revision??'?'}</strong> · bron ${m.source_sample_at?new Date(m.source_sample_at).toLocaleString('nl-NL'):'onbekend'}</span><span class="${fresh?'energy-ok':'energy-stale'}">${fresh?'● actueel':'● vertraagd'}</span></div>${svg}${managerPanel}${teslaPanel}<div class="energy-summary"><div><strong>PV</strong><br>${fmtW(pv)}</div><div><strong>Woning</strong><br>${fmtW(houseTotal)}</div><div><strong>Grid</strong><br>${p1>=0?`${fmtW(importW)} import`:`${fmtW(exportW)} export`}</div><div><strong>Accu</strong><br>${batteryChargeW?`${fmtW(batteryChargeW)} laden`:batteryDischargeW?`${fmtW(batteryDischargeW)} ontladen`:'inactief'}</div></div>`;
+  }
+  function refresh(){const s=window.EnergyCoreV2?.state;if(s)render(s);else window.EnergyCoreV2?.refresh?.();}
+  document.addEventListener('energycorev2state',e=>render(e.detail));document.addEventListener('DOMContentLoaded',()=>setTimeout(refresh,250));document.addEventListener('DOMContentSwitch',()=>setTimeout(refresh,100));
+})();
