@@ -1,404 +1,294 @@
 # Architectuuroverzicht
 
-Deze pagina beschrijft de huidige en geplande Homey-energiearchitectuur als één samenhangend regelsysteem.
+Deze pagina beschrijft de **actuele doelarchitectuur van Energy Core v2**. De oudere v1-opzet met losse State Collector, Allocator Shadow en meerdere zelfstandige publishers is niet meer leidend.
 
-De architectuur kent bewust verschillende lagen:
+## 1. Hoofdstructuur
 
 ```text
-                  METEN / CONTEXT
-
-Homey devices + Logic + M7 context
-              ↓
-Energy Manager State Collector v1.0
-              ↓
-        EM_Runtime_State
-
-              ORCHESTRATIE
-
-            ENERGY MANAGER
-                 Homey
-        ┌────────┼────────┐
-        ▼        ▼        ▼
-     Shadow   Allocator  Tesla v2.6
-
-            FYSIEKE ENERGIESTROOM
-
- PV-bronnen ───► HUISBUS ◄────► GRID / P1
+FYSIEKE INSTALLATIE / VEILIGHEID
+3×25 A · P1 · Easee Equalizer · lokale apparaatbeveiligingen
                     │
-          ┌─────────┼─────────┐
-          ▼         ▼         ▼
-     Huishouden   Tesla     Boiler
+                    ▼
+               METEN / STATE
+P1 · PV · Easee · boiler · Quatt · overige relevante devices
+                    │
+           1 centrale snapshot / 5 min
+                    ▼
+       EM v2 | 00 Core Tick | v0.9.7
+                    │
+        ┌───────────┼───────────┐
+        ▼           ▼           ▼
+      State      Decision     Shadow
+        │           │
+        │      gedeeld energie-/flexbudget
+        │           │
+        └──────► Control intents
+                    │
+                    ▼
+        afzonderlijk gevalideerde writers
+
+Ondersteunend:
+Prijs/PV-context · GitHub-publicatie · historie · website
 ```
 
-De **Energy Manager ligt niet in het elektrische stroompad**. Hij observeert, beslist en stuurt flexibele verbruikers. De fysieke energiestroom loopt via de elektrische installatie.
+De Energy Manager ligt niet in het fysieke stroompad. Hij meet, classificeert en verdeelt beschikbare flexibiliteit. Installatieveiligheid en lokale hardwarebeveiliging blijven altijd hoger in de hiërarchie.
 
-De **Quooker** valt niet simpelweg in de flexprioriteitsketen. Die heeft eigen gebruiksvensters en wordt als constraint behandeld.
+## 2. Single-reader meetlaag
 
----
-
-## 1. Bronnen en meetlaag
-
-### PV-bronnen
-
-De woning heeft drie afzonderlijke PV-omvormers:
-
-- SolarEdge SE3680H;
-- GoodWe GW4200D-NS;
-- GoodWe GW2000-XS.
-
-Voor de centrale regeling is de **P1-meter leidend** voor de netto huisbalans. Daarnaast worden L1, L2 en L3 afzonderlijk gemonitord.
+De actuele centrale kern is:
 
 ```text
-P1 < 0 W  → netto teruglevering
-P1 > 0 W  → netto afname
+EM v2 | 00 Core Tick | v0.9.7
 ```
 
-### Centrale runtime-state
-
-Vanaf 16 augustus 2026 draait `Energy Manager State Collector v1.0` iedere twee minuten. Deze flow leest in één HomeyScript-run de relevante devices en Logic-variabelen en bouwt:
+Iedere vijf minuten gebruikt deze maximaal:
 
 ```text
-EM_Runtime_State
+1 × Homey.devices.getDevices()
+1 × Homey.logic.getVariables()
 ```
 
-De centrale snapshot bevat onder andere:
+Daaruit wordt één revision-consistente snapshot opgebouwd. P1, PV, Tesla/Easee, boiler, Quatt en appliance-status worden vervolgens in-memory verwerkt. Downstream-logica mag niet opnieuw dezelfde devices gaan pollen.
 
-- P1 totaal en L1/L2/L3;
-- Tesla/Easee vermogen, laadstatus, setpoint en meterstand;
-- Equalizer-fasestromen;
-- boilervermogen en aan/uit-status;
-- PV-productie per omvormer;
-- wasmachine- en drogerstatus;
-- warmwater-, deadline- en M7-context.
+Prijs- en PV-forecastcontext wordt iedere 15 minuten vernieuwd zonder een extra device-scan.
 
-Niet iedere flow hoeft hierdoor opnieuw alle apparaten op te vragen.
+## 3. Waarheidsbronnen
 
----
-
-## 2. Centrale beslislaag
-
-De centrale Energy Manager combineert onder andere:
-
-- P1-netvermogen;
-- L1/L2/L3-fasebelasting;
-- Tesla/Easee laadstatus en werkelijk vermogen;
-- boilervermogen en semantische boilerstatus;
-- Quooker-status;
-- tijdvensters;
-- seizoensmodus;
-- prijs-/PV-forecastcontext.
-
-De centrale Energy Manager draait nog in **shadow mode**. Hij berekent en logt beslissingen, maar neemt de centrale fysieke aansturing nog niet volledig over.
-
-Actuele shadowlagen zijn:
-
-- `Energie Manager PV - Shadow Mode v1.6.7` — iedere 5 minuten;
-- `Energy Manager Allocator - Shadow v0.2.4` — iedere 5 minuten, vanuit `EM_Runtime_State`.
-
-De operationele Tesla-aansturing blijft bij `Tesla laden v2.6`.
-
----
-
-## 3. Prioriteitsmodel voor flexibele energie
-
-De gewenste energietoewijzing is:
+Voor de elektrische woningbalans is **P1 leidend**:
 
 ```text
-1. Normaal huishoudelijk verbruik
-2. Tesla
-3. Boiler
-4. Teruglevering
+P1 < 0 W → netto export
+P1 > 0 W → netto import
 ```
 
-### Tesla
+Apparaatmetingen verklaren vervolgens waar die belasting vandaan komt en welke delen flexibel zijn.
 
-De minimale zinvolle 3-fase laadstroom is:
+Belangrijk gevolg: een grootverbruiker die al in P1 zit, zoals Quatt, mag niet nogmaals van P1-export worden afgetrokken. Dat zou dubbel tellen.
+
+## 4. Rollen van energieverbruikers
+
+Niet iedere belasting heeft dezelfde regelvrijheid.
+
+| Verbruiker | Architectuurrol | Flexibel? | Fysieke v2-Control |
+|---|---|---:|---|
+| Normaal huishouden | basislast | nee | n.v.t. |
+| Quatt | `COMFORT_BASELOAD` | voorlopig nee | `OBSERVE_ONLY` |
+| Boiler | flexload met comfortdoel | ja | nog Shadow/afzonderlijke migratie |
+| Tesla | flexload met optionele deadline | ja | afzonderlijke writer/migratie |
+| Quooker | constraint/gebruikspatroon | beperkt | buiten centrale budgetwriter |
+| Victron-batterij | toekomstige energie-/netbuffer | ja | later via Victron EMS |
+
+Deze scheiding voorkomt dat comfortkritische ruimteverwarming op dezelfde manier wordt behandeld als een verplaatsbare boiler- of EV-load.
+
+## 5. Quatt als serieuze comfortlast
+
+De primaire elektrische Quatt-bron is:
 
 ```text
-3 × 6 A ≈ 4,14 kW
+Quatt CIC.measure_power
 ```
 
-Tesla krijgt daarom alleen flexprioriteit wanneer voldoende vermogen beschikbaar is, tenzij een deadline catch-up vereist.
+Quatt wordt uit dezelfde bestaande Core-snapshot gelezen en veroorzaakt dus geen extra Homey-poll.
 
-### Boiler
+Naast elektrisch vermogen worden, waar beschikbaar, diagnostische waarden meegenomen zoals thermisch vermogen, COP, working mode, thermostaatvraag en CV-request.
 
-De boiler vraagt circa 1,95–2,0 kW en kan daardoor kleiner PV-overschot benutten dan de Tesla.
+Quatt wordt gepubliceerd als:
 
-### Restenergie
+```text
+role         = COMFORT_BASELOAD
+control_mode = OBSERVE_ONLY
+controllable = false
+```
 
-Wat na huishoudelijk verbruik, Tesla en boiler resteert, wordt teruggeleverd.
+Energy Core mag Quatt dus **wel meewegen**, maar niet fysiek begrenzen, uitschakelen of van setpoint veranderen zolang daar geen aparte veilige Control-policy voor is gevalideerd.
 
----
+## 6. Centraal vermogensbudget
 
-## 4. Veiligheids- en regelhiërarchie
+Vanaf Core v0.9.7 publiceert State een expliciet `energy_budget`.
 
-De Energy Manager is **niet de hoogste regelautoriteit**. Lokale veiligheids- en hardwarelagen krijgen altijd voorrang.
+Belangrijkste grootheden:
+
+- totale geschatte woninglast;
+- bekende flexlast (Tesla + boiler);
+- comfortlast (Quatt);
+- overige woninglast;
+- grid safety reserve;
+- Quatt-rampreserve;
+- werkelijk vrij exportbudget voor flexloads;
+- discretionair importbudget;
+- toekomstige batterijsteun.
+
+### Flex-exportbudget
+
+P1 bevat actueel Quatt-verbruik al. Alleen extra marge voor mogelijke Quatt-modulatie wordt gereserveerd:
+
+```text
+flex_export_budget
+ = max(0,
+       P1_export
+       - 200 W gridreserve
+       - Quatt-rampreserve)
+```
+
+Quatt-rampreserve:
+
+```text
+Quatt < 250 W        → 100 W reserve
+Quatt ≥ 250 W        → max(350 W, 25% Quatt)
+                        met maximum 750 W
+```
+
+Dit is een conservatieve startpolicy. Shadowdata kan later aanleiding geven om de reserve te kalibreren.
+
+### Discretionair importbudget
+
+Voor economische starts bij goedkope stroom wordt daarnaast bewaakt hoeveel extra netimport verantwoord is. De huidige bovengrens voor discretionaire flexstarts is 4.000 W totale actuele import.
+
+Dit budget is **geen installatieveiligheidslimiet**. De echte installatiegrenzen en Easee-loadbalancing blijven hoger in de hiërarchie.
+
+## 7. Decision-prioriteit
+
+De doelarchitectuur gebruikt geen simpele vaste lijst “Tesla altijd vóór boiler”. De prioriteit is contextafhankelijk:
+
+```text
+1. Installatieveiligheid en lokale hardwarebeveiliging
+2. Comfort-baseload: normaal huishouden + Quatt
+3. Harde doelen/MUST
+      ├─ Tesla deadline catch-up
+      └─ warmwater catch-up
+4. Economische flex-opportunities
+      ├─ PV/flex-export
+      ├─ negatieve prijs
+      └─ goedkoop prijsvenster binnen importbudget
+5. Rest naar net / later batterijbeleid
+```
+
+Hiermee kan een MUST-deadline terecht een opportunistische load verdringen, terwijl gewone PV-optimalisatie alleen vrije ruimte gebruikt.
+
+## 8. Tesla
+
+Voor Tesla gebruikt Decision vanaf v0.9.7 het **flex-exportbudget na Quatt-reserve** en niet alleen de kale P1-export.
+
+Belangrijk:
+
+- deadline/MUST blijft boven opportunistische optimalisatie staan;
+- zonder deadline is Tesla een flexibele exportbuffer;
+- goedkope prijs moet voldoende discretionair importbudget hebben;
+- negatieve prijs is een aparte economische opportunity;
+- Easee Equalizer blijft autonoom de feitelijke laadstroom begrenzen indien fase- of installatiebelasting dat vereist.
+
+Werkelijk laadvermogen blijft belangrijker dan alleen het gevraagde laadsetpoint.
+
+## 9. Warm water
+
+De elektrische boiler blijft een verplaatsbare belasting met een comfortdoel:
+
+```text
+OP_TEMPERATUUR één keer per lokale kalenderdag
+```
+
+Confirmed-heating accounting gebruikt werkelijk verwarmingsvermogen in plaats van alleen relais-aan-tijd.
+
+Warm Water Control v0.11 gebruikt vanaf Core v0.9.7 dezelfde gedeelde budgetcontext:
+
+- PV-start vereist circa 1.900 W flex-exportbudget na Quatt/gridreserve;
+- top-PV-forecast vraagt minimaal 500 W flex-exportbudget;
+- goedkope prijsstart controleert of verwachte import binnen het discretionaire importbudget blijft;
+- catch-up/deadline kan economische optimalisatie overrulen;
+- alle huidige WW-intenties blijven Shadow zolang fysieke Control niet expliciet is vrijgegeven.
+
+## 10. Veiligheidshiërarchie
 
 ```text
 Installatieveiligheid / 3×25 A
           ↓
-Easee Equalizer load balancing
+Lokale apparaatbeveiligingen
           ↓
-Victron grid/batterijregeling (later)
+Easee Equalizer voor EV-loadbalancing
           ↓
-Homey Energy Manager / flex-orchestratie
+Victron EMS voor batterij/net (later)
           ↓
-Tesla / boiler
+Energy Core v2 flexorchestratie
+          ↓
+Gevalideerde actuator-writers
 ```
 
-### Easee Equalizer is leidend voor laadveiligheid
+Homey probeert lokale beveiligingslagen nooit te overrulen.
 
-De Easee Equalizer mag autonoom de Tesla-laadstroom verlagen of het laden pauzeren wanneer de totale of fasebelasting dit vereist. Homey probeert zo'n ingreep **nooit te overrulen**.
+## 11. Victron-doelarchitectuur
 
-### Gevraagd versus werkelijk Tesla-vermogen
+De geplande Victron-laag bestaat uit MultiPlus-II, Cerbo GX, VM/3P75CT en thuisbatterij. Victron wordt de primaire batterij-/netlaag; Homey blijft huishoudelijke orchestrator.
 
-De actieve orchestratie onderscheidt altijd:
-
-- door Homey **gevraagde** laadstroom;
-- door Easee **werkelijk geleverde** laadstroom/vermogen.
-
-Vanaf `Tesla laden v2.6` wordt 0 W bij een actief laadverzoek niet automatisch aan de Equalizer toegeschreven. Alleen wanneer tegelijkertijd voldoende hoge Equalizer-fasebelasting wordt gemeten, wordt de oorzaak specifiek als Equalizer-blokkade geclassificeerd.
-
-### Geen directe herverdeling na Equalizer-ingreep
-
-Wanneer de Equalizer Tesla terugregelt, wordt het ogenschijnlijk vrijgekomen vermogen niet automatisch direct aan de boiler toegewezen. Eerst worden net- en fasebelasting opnieuw beoordeeld.
-
----
-
-## 5. Quooker als constraint
-
-De Quooker is geen vrij regelbare flex-load. Bestaande vensters blijven leidend zolang de centrale Energy Manager in shadow mode draait.
-
-| Dagtype | Toegestaan venster |
-|---|---|
-| Werkdagen | **15:00–19:00** |
-| Weekend | **08:00–19:00** |
-
-Binnen het venster is Quooker `TOEGESTAAN`; daarbuiten `BUITEN_VENSTER`.
-
----
-
-## 6. Warmwaterarchitectuur
-
-Er zijn twee warmwaterbronnen:
+In het huidige schema is reeds ruimte gereserveerd voor:
 
 ```text
-Elektrische boiler  ←→  handmatige omschakeling  ←→  Vaillant CV
+battery_support_w = 0
+battery_integrated = false
 ```
 
-Homey regelt alleen de elektrische boiler automatisch. De fysieke omschakeling blijft handmatig.
+Na integratie kan Victron een toegestane batterijbijdrage aan hetzelfde gedeelde budget leveren. Dat verandert de rol van Quatt niet: Quatt blijft een bekende comfortlast die het beschikbare flexbudget beïnvloedt, niet automatisch een aan te sturen flexload.
 
-### `WW_Boilermodus`
+## 12. Publicatie en website
 
-| Waarde | Betekenis |
-|---|---|
-| JA | elektrische boiler actief |
-| NEE | CV actief |
-
-De boilerobserver gebruikt de gevalideerde keten:
+Core Tick publiceert een gethrottlede, revision-consistente snapshot naar:
 
 ```text
-VERWARMEN → AFKOELEN_WACHT → OP_TEMPERATUUR
+docs/data/energy-state-v2.json
 ```
 
----
-
-## 7. Seizoensbeslissing
-
-Homey beoordeelt zeven volledige meetdagen.
-
-Voor 2026:
+Actueel:
 
 ```text
-≤ 3 goede PV-dagen → advies naar CV
-≥ 5 goede PV-dagen → advies naar boiler
+schema_version    = 2.5
+publisher_version = EM2_CORE_PUBLISH_V0.9.7
+control_mode      = SHADOW
 ```
 
-De tussenruimte voorkomt pendelen. De melding vereist handmatige fysieke omschakeling.
+Websitebezoek veroorzaakt geen Homey-calls. Historie en presentatie staan buiten de kritische fysieke regelroute.
 
----
+## 13. Flowversionering
 
-## 8. Tesla-laadarchitectuur
-
-De Tesla-laag bestaat uit:
-
-- Easee Charger;
-- Easee Equalizer;
-- Tesla Model 3;
-- `Tesla laden v2.6`;
-- M7 prijs-/PV-context;
-- centrale Energy Manager.
-
-`Tesla laden v2.6` is de enige automatische schrijver van de dynamische Easee-laadstroom en evalueert iedere twee minuten.
-
-Monitoring gebruikt de werkelijke laadstatus en het werkelijke vermogen. De Energy Manager mag nooit alleen op een laadsetpoint vertrouwen wanneer de Equalizer lokaal heeft teruggestuurd.
-
----
-
-## 9. Shadow versus actief
-
-### Actief
-
-Bestaande regelingen sturen werkelijk apparaten, zoals delen van warmwaterlogica en `Tesla laden v2.6`.
-
-### Shadow
-
-De centrale Energy Manager:
-
-- leest;
-- berekent;
-- logt;
-- vergelijkt;
-- stuurt nog niet centraal.
-
-Doel:
-
-```text
-werkelijk gedrag
-      versus
-gesimuleerde centrale beslissing
-```
-
-### Actuele shadow cadence
-
-`Energie Manager PV - Shadow Mode v1.6.7` draait één keer per **5 minuten**. De oude combinatie van een 2-minutentrigger plus aparte 15-minutentrigger is verwijderd. GitHub-publicatie wordt intern nog ongeveer iedere 15 minuten bepaald.
-
-`Energy Manager Allocator - Shadow v0.2.4` draait eveneens iedere **5 minuten** en gebruikt de centrale `EM_Runtime_State` in plaats van opnieuw alle devices op te halen.
-
----
-
-## 10. Publicatie- en observatielaag
-
-De websitepublicatie is bewust uit de kritische regelroute gehouden.
-
-```text
-EM_Runtime_State
-   └─→ Live energie publicatie v1.2 → GitHub → website
-
-Shadow v1.6.7
-   └─→ shadowhistorie → GitHub
-
-GitHub status sync v1.4
-   └─→ flowstatus → GitHub
-```
-
-Actuele cadans:
-
-| Functie | Ritme |
-|---|---:|
-| State Collector v1.0 | 2 min |
-| Tesla laden v2.6 | 2 min |
-| Shadow v1.6.7 | 5 min |
-| Allocator Shadow v0.2.4 | 5 min |
-| Live energie v1.2 | 5 min |
-| M7 context | 15 min |
-| GitHub status sync v1.4 | 30 min |
-
-Deze indeling verlaagt Homey-load door **één keer meten, meerdere keren gebruiken**.
-
----
-
-## 11. Constraints-overzicht
-
-| Constraint | Effect |
-|---|---|
-| Installatieveiligheid / 3×25 A | absolute bovengrens |
-| Easee Equalizer | lokale load balancing heeft voorrang op Homey |
-| Werkelijk Tesla-vermogen | leidend boven gevraagd setpoint |
-| L1/L2/L3-fasebelasting | meewegen vóór nieuwe flexbeslissing |
-| Equalizer-ingreep | geen directe herverdeling naar boiler |
-| Tesla minimaal 3×6 A | onder ca. 4,14 kW geen zinvolle laadstart |
-| Boiler circa 2 kW | benut kleiner PV-overschot |
-| Quooker werkdagen | 15:00–19:00 |
-| Quooker weekend | 08:00–19:00 |
-| CV ↔ boiler | handmatige omschakeling |
-| `WW_Boilermodus` | bepaalt logische warmwaterbron |
-| 7-daagse hysterese | voorkomt veelvuldig omschakelen |
-| Shadow mode | centrale manager stuurt nog geen apparaten |
-| P1 beschikbaarheid | zonder P1 geen centrale vermogensbeslissing |
-| Device beschikbaarheid | ontbrekend apparaat → fail-safe |
-| Runtime-state ouder dan 5 min | allocator weigert state fail-safe |
-| Flowversionering | per flowfamilie maximaal één actieve versie |
-
----
-
-## 12. Toekomstige Victron-laag
-
-De geplande Victron-architectuur voegt later toe:
-
-- MultiPlus-II 5000;
-- Cerbo GX;
-- VM/3P75CT;
-- thuisbatterij;
-- Victron EMS.
-
-Rolverdeling:
-
-```text
-Victron EMS
-  └─ batterij / net / energie-optimalisatie
-
-Easee Equalizer
-  └─ lokale EV-load balancing / installatiebescherming
-
-Homey
-  └─ huishoudelijke flexibiliteit en orchestratie
-       ├─ Tesla-doel
-       ├─ boiler
-       ├─ Quooker constraints
-       └─ gebruikersmeldingen
-```
-
-Homey blijft comfort- en verbruikersorchestrator. Victron wordt primaire batterij-/netlaag. Easee Equalizer blijft autonoom voor veilige EV-load balancing.
-
----
-
-## 13. Flowversionering en wijzigingsbeheer
-
-Voor iedere Homey-flowfamilie geldt:
+Voor iedere functionele flowfamilie geldt:
 
 ```text
 inhoudelijke wijziging
       ↓
-nieuwe flow met hoger versienummer
+nieuwe hogere versie
       ↓
 validatie
       ↓
 nieuwe versie actief
-oude versie inactief
+oude versie uit
 ```
 
-Van dezelfde functionele flowfamilie mag maximaal één versie actief zijn. Websitebeschrijving en wijzigingshistorie worden tegelijk bijgewerkt.
+Er mag maximaal één versie van dezelfde Core-flow actief zijn. De v0.9.7-cut-over heeft daarom eerst v0.9.6 uitgeschakeld en pas daarna v0.9.7 geactiveerd.
 
-De load-optimalisatie van 16 augustus 2026 heeft onder andere geleid tot:
+## 14. Gevalideerde toestand v0.9.7
 
-```text
-Shadow v1.6.6           → v1.6.7
-Allocator v0.2.3        → v0.2.4
-Live energie v1.1       → v1.2
-GitHub status sync v1.3 → v1.4
-+ State Collector v1.0
-```
+De eerste v0.9.7-publicatie op 18 augustus 2026 bevestigde:
 
----
+- schema 2.5;
+- State/Decision/Shadow allemaal revision 329;
+- Quatt live in State;
+- expliciet `energy_budget`;
+- Quatt `OBSERVE_ONLY`;
+- geen fysieke Quatt-write;
+- behoud van Shadow-guards voor warm water.
 
-## 14. Ontwerpprincipes
+Tijdens die sample gebruikte Quatt 10,3 W. Bij 184 W netexport, 200 W gridreserve en 100 W Quatt-idlereserve was het berekende flex-exportbudget terecht 0 W.
 
-De architectuur volgt deze principes:
+## 15. Ontwerpprincipes
 
 - meten vóór sturen;
-- installatieveiligheid vóór optimalisatie;
+- veiligheid vóór optimalisatie;
+- comfortload is niet automatisch flexload;
+- P1 is leidend en apparaatvermogen wordt niet dubbel geteld;
+- één centrale read, meerdere in-memory consumers;
+- deadlines boven opportunistische optimalisatie;
 - lokale hardwarebeveiliging nooit overrulen;
-- werkelijk vermogen boven gevraagd vermogen;
-- centrale P1 plus L1/L2/L3 als waarheid voor net- en fasebelasting;
-- Tesla vóór boiler binnen de beschikbare veilige flexruimte;
-- Quooker als constraint;
-- fail-safe boven agressieve optimalisatie;
-- eerst shadow mode, daarna gecontroleerde migratie;
-- **één keer meten, meerdere keren gebruiken** waar dat veilig kan;
-- veiligheidskritische Tesla-besturing blijft rechtstreeks actuele data lezen;
-- Homey zo licht mogelijk houden; analyse/historie/visualisatie zoveel mogelijk buiten Homey;
-- iedere inhoudelijke flowwijziging maakt een nieuwe genummerde flowversie;
-- alle relevante wijzigingen tegelijk vastleggen in Flow Manual en wijzigingshistorie.
+- eerst Shadow, daarna gecontroleerde fysieke Control;
+- Homey zo licht mogelijk houden;
+- iedere inhoudelijke flowwijziging krijgt een nieuwe versie;
+- documentatie en architectuur worden tegelijk met operationele wijzigingen bijgewerkt.
 
-> Laatste architectuurupdate: **16 augustus 2026** — centrale runtime-state en Homey-loadoptimalisatie geïntegreerd.
+> Laatste architectuurupdate: **18 augustus 2026 — Energy Core v2 / Core Tick v0.9.7.** Quatt is first-class `COMFORT_BASELOAD` en onderdeel van State, Decision en het gedeelde flexbudget, zonder extra device-poll en zonder fysieke Quatt-sturing.
