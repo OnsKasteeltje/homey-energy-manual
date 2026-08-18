@@ -10,6 +10,15 @@ De hoofdindeling is daarom:
 
 De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De technische Git-historie blijft beschikbaar voor rollback en detailonderzoek.
 
+## v2.0.11 — 18 augustus 2026
+
+### Nieuw icoon voor ruimteverwarming
+
+- Het eerdere warmte-symbool voor **Ruimteverwarming** is op de homepage vervangen door een eigen lijnicoon: **huis met drie warmtelijnen**.
+- Het icoon representeert bewust de functie *woning verwarmen* en niet specifiek gas, warm water of een losse warmtebron.
+- De oranje warmtelijnen en donkere huiscontour sluiten aan op de bestaande Quatt + CV-presentatie en blijven ook op mobiel goed herkenbaar.
+- De wijziging is uitsluitend presentatielogica; Energy Core, Quatt-observatie en fysieke Control zijn ongewijzigd.
+
 ## v2.0.10 — 18 augustus 2026
 
 ### Quatt first-class in Energy Core en Live energiestroom
