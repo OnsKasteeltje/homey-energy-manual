@@ -57,6 +57,22 @@ daarna boiler nog aan + vermogen < 100 W gedurende 10 min
     → OP_TEMPERATUUR bereikt
 ```
 
+### Warmwatervraag is tijdsonafhankelijk
+
+De regeling mag niet impliciet aannemen dat warmwatervraag alleen in de ochtend plaatsvindt. Warmwatergebruik kan op ieder moment van de dag optreden en wordt daarom als aparte gebeurtenis/context gezien, niet automatisch als nieuwe verwarmingsopdracht.
+
+Voor het bereiken van het dagdoel moet na iedere relevante warmwatervraag opnieuw worden beoordeeld of er nog veilig kan worden gewacht op PV/prijs-opportunity of dat catch-up dichterbij komt. Na `goalReachedToday=true` mag latere warmwatervraag dezelfde dag geen nieuwe verplichte opwarmcyclus openen zolang `sameDayReheat=false` geldt.
+
+Deze scenario's zijn expliciet onderdeel van de acceptatie vóór promotie van WW Control naar HYBRID:
+
+- warmwatervraag in de ochtend vóór een opportunity;
+- warmwatervraag rond middag/namiddag terwijl het dagdoel nog niet is bereikt;
+- warmwatervraag kort vóór de catch-up/deadlinezone;
+- warmwatervraag nadat `OP_TEMPERATUUR` die dag al is bereikt;
+- meerdere warmwatervraagmomenten op dezelfde dag.
+
+Promotie naar fysieke WW-Control is niet toegestaan zolang deze scenario's niet logisch en fail-safe in SHADOW zijn beoordeeld.
+
 ### Fallback-accounting vanaf v0.9.5
 
 De 240-minutenfallback telt niet langer relais-aan-tijd. `boilerOnMinToday` blijft uitsluitend als diagnostische teller bestaan. De fallback gebruikt nu `heatingMinToday`: alleen intervallen waarin het boilerrelais AAN staat én het gemeten boilervermogen >1500 W is, tellen als bevestigde verwarmingsminuten.
@@ -87,17 +103,17 @@ Warm Water Control wordt atomair binnen Core Tick v0.9.5 berekend als `EM2_CONTR
 
 Na afloop van een PV/prijs-run-lock mag opnieuw worden geoptimaliseerd. Bij geen geldige opportunity en meer dan circa 500 W netimport of een duidelijk ongunstige prijs kan `BOILER_OFF / SHOULD` volgen. Catch-up blijft comfort/deadline-gedreven.
 
-De gewenste dagelijkse lijn is:
+De gewenste dagelijkse lijn is generiek en niet aan ochtendgebruik gebonden:
 
 ```text
-ochtend warmwatergebruik
-    → niet onmiddellijk herverwarmen
-    → wachten op actuele PV-export, gunstige prijs of PV-forecastmoment
-    → start alleen wanneer opportunity en prijshorizon passen
+warmwatervraag op enig moment vóór dagdoel
+    → niet automatisch herverwarmen
+    → opnieuw opportunity versus resterende tijd/catch-up beoordelen
+    → start alleen wanneer opportunity of catch-up dat rechtvaardigt
     → run-lock passend bij de startreden
     → indien nodig catch-up richting 19:00 op basis van bevestigde verwarmingsminuten
     → OP_TEMPERATUUR eenmaal bereikt
-    → dagdoel gelatcht; geen heropwarming dezelfde dag
+    → dagdoel gelatcht; latere warmwatervraag opent geen verplichte heropwarming dezelfde dag
 ```
 
 ## Validatie cut-over 18 augustus 2026
@@ -140,6 +156,6 @@ Operationeel budget:
 | `HYBRID` | alleen expliciet gevalideerde actuators mogen door v2 worden gestuurd |
 | `ACTIVE` | v2 is leidend voor alle gemigreerde flexloads |
 
-De eerdere fallback-accounting op relais-aan-tijd is met v0.9.5 opgelost als blocker. Voor promotie van WW naar fysieke Control blijft een volledige dagcyclus met de nieuwe confirmed-heating-accounting nog te valideren.
+De eerdere fallback-accounting op relais-aan-tijd is met v0.9.5 opgelost als blocker. Voor promotie van WW naar fysieke Control moeten zowel een volledige dagcyclus met confirmed-heating-accounting als de hierboven beschreven tijdsonafhankelijke warmwatervraagscenario's voldoende zijn gevalideerd.
 
-> Laatste update: **18 augustus 2026 — Core Tick v0.9.5.** De 240-minutenfallback telt uitsluitend bevestigde verwarming >1500 W; relais-aan-tijd blijft diagnostiek. Opportunity-specifieke run-locks uit v0.9.4 blijven behouden. PURE SHADOW, geen fysieke writes.
+> Laatste update: **18 augustus 2026 — Core Tick v0.9.5.** De 240-minutenfallback telt uitsluitend bevestigde verwarming >1500 W; relais-aan-tijd blijft diagnostiek. Warmwatervraag kan op elk moment van de dag optreden en is expliciet onderdeel van de HYBRID-acceptatie. PURE SHADOW, geen fysieke writes.
