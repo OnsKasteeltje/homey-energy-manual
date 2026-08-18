@@ -8,7 +8,32 @@ De hoofdindeling is daarom:
 - **Architectuur v2** — centrale Energy Core met één gedeelde state-sample per cyclus, atomische beslis-/shadowketen en expliciete scheiding tussen observatie, beslissing, publicatie en fysieke Control.
 - Nieuwe wijzigingen binnen de huidige architectuur krijgen voortaan uitsluitend een **v2-subversie**.
 
-De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De technische Git-historie blijft uiteraard beschikbaar voor rollback en detailonderzoek.
+De oude fijnmazige versiereeks is niet meer onderdeel van deze pagina. De technische Git-historie blijft beschikbaar voor rollback en detailonderzoek.
+
+## v2.0.5 — 18 augustus 2026
+
+### Warmwater opportunity planner
+
+- Energy Core verhoogd naar `EM v2 | 00 Core Tick | v0.9.3`.
+- Nieuwe lichte contextlaag `EM v2 | 30 Context | Price + PV v0.1` vernieuwt iedere 15 minuten prijs- en PV-forecastsignalen zonder device-scan.
+- Context krijgt een freshness-tijdstip; Core gebruikt prijs/forecast alleen wanneer die maximaal 35 minuten oud zijn.
+- Ochtendherverwarming vóór 09:30 wordt niet meer als gewenst gedrag beschouwd: Shadow adviseert het boilerrelais uit te zetten en te wachten op een gunstiger energiemoment.
+- WW kan vanaf 09:30 als SHOULD-opportunity starten op sterke actuele export, negatieve prijs, relatief goedkoop prijsvenster of een top-4 PV-forecastuur met voldoende actuele export.
+- Deadline/catch-up vóór 19:00 blijft boven opportunity-optimalisatie staan.
+- Lopende runs krijgen een minimale looptijd van 30 minuten voordat een ongunstige prijs/import reden kan zijn om te stoppen.
+- De ochtendobservatie bevestigde dat geen actieve legacy-boilerstartflow de boiler had gestart; het relais stond nog aan en de interne thermostaat hervatte na warmwatergebruik vanzelf het element.
+- Eerste v0.9.3-publicatie gaf voor deze ochtendtoestand `BOILER_OFF / SHOULD / WAIT_MORNING`.
+- Fysieke Control blijft uitgeschakeld. Er zijn geen v2-device-writes toegevoegd.
+- Bekend validatiepunt vóór fysieke WW-Control: de 240-minuten fallback moet nog van relais-aan-tijd naar werkelijk/bevestigd verwarmen worden omgezet.
+
+## v2.0.4 — 17 augustus 2026
+
+### Compacte Energy Core healthweergave
+
+- Het grote inline blok `EM v2: LIVE · state · heartbeat · revision · SHADOW` is verwijderd van homepage, Live energiestroom en Energy Core v2.
+- De compacte health-indicator in de header blijft behouden.
+- Healthmonitoring zelf is niet verwijderd; alleen de redundante detailpresentatie is opgeschoond.
+- Geen Homey-regellogica of fysieke Control gewijzigd.
 
 ## v2.0.3 — 17 augustus 2026
 
