@@ -1,190 +1,175 @@
-# Warm water optimalisatie — PV boiler + CV advies
+# Warm water optimalisatie — Energy Core v2
 
-**Status:** 🟢 Actief  
-**Actieve flow:** `Warm water optimalisatie - PV boiler + CV advies v1.3`
+**Status:** 🟢 actief in **PURE SHADOW**  
+**Actieve kern:** `EM v2 | 00 Core Tick | v0.9.4`  
+**Context:** `EM v2 | 30 Context | Price + PV v0.1`  
+**Fysieke v2-boilerwrites:** **uitgeschakeld**
 
-De flow draait iedere 5 minuten en stuurt de elektrische boiler aan; de CV-omschakeling blijft handmatig.
+De warmwaterregeling is onderdeel van Energy Core v2. De eerdere v1-productieflows zijn niet meer de operationele beslislaag. Core v2 observeert de elektrische boiler, leidt de dagstatus af en berekent iedere vijf minuten wat de gewenste aansturing zou zijn. Fysieke aan/uit-acties worden pas toegevoegd nadat de Shadow-logica volledig is gevalideerd.
 
-## 1. Doel en uitgangspunt
+## 1. Dagdoel
 
-De warmwaterregeling combineert twee warmtebronnen:
+Het primaire dagelijkse comfortdoel is:
 
-| Onderdeel | Uitgangspunt |
-|---|---|
-| Elektrische boiler | **Stiebel Eltron HSTP 200**, 200 liter |
-| Gemeten boilervermogen tijdens werkelijk verwarmen | circa **1,95–2,0 kW** |
-| CV-ketel | **Vaillant ecoTEC exclusive** |
-| PV-meetbasis | netto P1-import/-export van de gehele woning |
-| CV ↔ boiler omschakeling | **handmatig** |
+> **De elektrische boiler moet eenmaal per lokale kalenderdag aantoonbaar `OP_TEMPERATUUR` bereiken.**
 
-De elektrische boiler wordt automatisch aan/uit gestuurd. De Vaillant CV-ketel wordt niet automatisch omgeschakeld. Homey geeft alleen advies over de gewenste warmwaterbron.
+De 240-minutenregel is alleen een fallback wanneer `OP_TEMPERATUUR` niet betrouwbaar kan worden vastgesteld.
 
-## 2. Actieve regeling v1.3
+Zodra het dagdoel is bereikt:
 
-Vanaf **16 augustus 2026** is `Warm water optimalisatie - PV boiler + CV advies v1.3` de actieve productieflow.
+- `goalReachedToday=true` blijft gelatcht tot de lokale dagwissel;
+- later warmwatergebruik opent het dagdoel niet opnieuw;
+- `sameDayReheat=false`;
+- WW Control adviseert het relais uit te zetten indien het nog aan staat;
+- er volgt die dag geen nieuwe verplichte catch-up.
 
-De belangrijkste wijziging ten opzichte van v1.2/v1.1 is dat **OP_TEMPERATUUR nu het primaire dagelijkse comfortdoel is**. De oude regel van 240 minuten ingeschakelde boilertijd blijft alleen bestaan als fallback zolang OP_TEMPERATUUR die dag niet betrouwbaar is bevestigd.
+Daarmee is onderscheid gemaakt tussen **“de boiler is op dit moment volledig warm”** en **“het dagelijkse warmwaterdoel is vandaag al gehaald”**.
 
-Een PV-start is mogelijk wanneer:
+## 2. Detectie van OP_TEMPERATUUR
 
-- `WW_Boilermodus = JA`;
-- het tijdstip tussen **09:30 en 18:30** ligt;
-- gedurende minimaal 5 minuten ongeveer **2,1 kW netto P1-export** beschikbaar is.
-
-Na inschakelen geldt een minimumlooptijd van ongeveer **30 minuten**. Daarna mag de boiler bij ongunstige omstandigheden tijdelijk worden gestopt wanneer gedurende circa **10 minuten meer dan 0,5 kW netto uit het net wordt afgenomen**, zolang het dagdoel nog veilig kan worden gehaald.
-
-Om **19:00** eindigt de dagelijkse regelperiode.
-
-## 3. Primair dagdoel: OP_TEMPERATUUR
-
-Het dagdoel in boilermodus is nu:
-
-> **De boiler moet aantoonbaar OP_TEMPERATUUR bereiken.**
-
-De detectie is gevalideerd met de volgende state-machine:
+De gevalideerde detectie gebruikt het boilervermogen en de relaisstatus:
 
 ```text
-VERWARMEN
-   ↓
-AFKOELEN_WACHT
-   ↓ 10 minuten continu < 100 W
-OP_TEMPERATUUR
+boiler aan + vermogen > 1500 W gedurende minimaal 15 min
+    → verwarmen bevestigd
+
+daarna boiler nog aan + vermogen < 100 W gedurende minimaal 10 min
+    → interne thermostaat is afgeslagen
+    → OP_TEMPERATUUR bereikt
 ```
 
-Detectieregels:
+Een terugkeer boven 100 W tijdens de low-power bevestiging onderbreekt die bevestiging.
 
-- **VERWARMEN:** boilervermogen > **1,5 kW**;
-- de verwarmfase moet minimaal **15 minuten** bevestigd zijn;
-- daarna start bij < **100 W** de status `AFKOELEN_WACHT`;
-- blijft het vermogen **10 minuten continu <100 W** terwijl de boiler Homey-technisch AAN blijft, dan wordt `OP_TEMPERATUUR` bevestigd;
-- stijgt het vermogen tijdens de wachttijd weer, dan vervalt de bevestiging.
+De actuele state staat in `EM2_WW_State` en gebruikt schema `EM2_WW_STATE_V0.7`.
 
-Zodra `OP_TEMPERATUUR` die dag is bevestigd:
+## 3. Niet automatisch direct na ochtendgebruik herverwarmen
 
-- geldt het warmwaterdoel als gehaald;
-- wordt eventuele 240-minuten-catch-up direct beëindigd;
-- wordt geen verdere boilertijd geforceerd om alsnog 4 uur te halen;
-- de boiler mag worden uitgeschakeld door de warmwaterflow.
+Een belangrijk v2-principe is dat warmwatergebruik in de ochtend niet automatisch betekent dat de boiler direct op netstroom moet herverwarmen. Zolang comfort/deadline dit toelaten, wacht de planner op een gunstiger energiemoment.
 
-## 4. 240 minuten is alleen fallback
+Vóór **09:30** geldt daarom normaal:
 
-De oude 240-minutenregel blijft bewust behouden als veiligheidsnet voor situaties waarin de thermostaat-afslag niet betrouwbaar wordt waargenomen.
+- boiler uit → `HOLD`, wachten;
+- boilerrelais nog aan terwijl het dagdoel open staat → Shadow kan `BOILER_OFF / SHOULD` adviseren om spontane thermostaat-herverwarming te voorkomen.
 
-Zolang `OP_TEMPERATUUR` **niet** is bevestigd, bewaakt v1.3:
+Dit laatste is relevant omdat een relais dat fysiek aan blijft staan later vanzelf opnieuw vermogen kan gaan trekken zodra de interne boilerthermostaat na warmwatergebruik weer sluit.
 
-- hoeveel boilertijd die dag al beschikbaar was;
-- hoeveel minuten nog ontbreken tot 240 minuten;
-- hoeveel tijd resteert tot 19:00.
+## 4. Opportunity planner
 
-Wanneer verder uitstellen betekent dat 240 minuten vóór 19:00 niet meer haalbaar zijn, start de catch-up. Deze fallback mag zo nodig netstroom gebruiken om comfort te borgen.
+Vanaf 09:30 combineert v0.9.4 actuele netexport met verse prijs- en PV-forecastcontext.
+
+### Startvoorwaarden en run-lock
+
+| Opportunity | Startvoorwaarde | Minimum run-lock |
+|---|---|---:|
+| `EXPORT` | ≥ **2100 W** actuele netexport | **15 min** |
+| `PV_FORECAST` | huidig uur top-4 PV-forecast én ≥ **500 W** actuele export | **15 min** |
+| `PRICE_NEGATIVE` | negatieve stroomprijs én ≥ **30 min** tot volgend tariefuur | **30 min** |
+| `PRICE_CHEAP` | huidige prijs goedkoper dan komende 4 uur én ≥ **30 min** tot volgend tariefuur | **30 min** |
+| `CATCHUP` | verder wachten bedreigt het dagdoel/deadline | opportunity-lock **0 min**; deadline is leidend |
+
+### Waarom prijs een tariefhorizon heeft
+
+Een relatief goedkoop uur is niet voldoende reden om bijvoorbeeld om 10:45 te starten wanneer om 11:00 een nieuw, mogelijk duurder tarief begint. Daarom geldt:
+
+```text
+prijs gunstig
++ minimaal 30 minuten resterend in huidig tariefuur
+    → prijsstart toegestaan
+
+prijs gunstig
++ minder dan 30 minuten resterend
+    → HOLD / WAIT_PRICE_HORIZON
+```
+
+Hierdoor past de startbeslissing bij de 30-minuten prijs-run-lock.
+
+### Waarom PV een kortere lock heeft
+
+Actuele PV/export kan sneller veranderen dan een uurtarief. Een PV- of exportstart krijgt daarom slechts **15 minuten** anti-flap/run-lock. Daarna mag de planner opnieuw optimaliseren. Als de opportunity verdwenen is en structureel ongunstige import ontstaat, kan `BOILER_OFF / SHOULD` volgen.
+
+## 5. Context en freshness
+
+`EM v2 | 30 Context | Price + PV v0.1` vernieuwt iedere 15 minuten:
+
+- `M7_Price_Negative`;
+- `M7_Price_Cheap_Next4h`;
+- `M7_Price_Expensive_Next4h`;
+- `M7_PV_Top4h`;
+- `EM2_Context_UpdatedAt`.
+
+Deze contextflow leest geen fysieke apparaten. Core v2 accepteert de context alleen wanneer deze maximaal **35 minuten** oud is. Bij stale context worden prijs en PV-forecast niet gebruikt; actuele netexport en harde catch-up blijven wel beschikbaar.
+
+## 6. Deadline en fallback
+
+De dagelijkse regelperiode eindigt om **19:00**. Als `OP_TEMPERATUUR` nog niet is bevestigd en verder uitstellen de fallback/deadline in gevaar brengt, krijgt `CATCHUP` prioriteit `MUST`.
 
 Conceptueel:
 
 ```text
-boilermodus = JA
-      │
-      ├─ OP_TEMPERATUUR vandaag bereikt?
-      │       ├─ JA → dagdoel gehaald; geen 240-minuten-catch-up
-      │       └─ NEE
-      │            ├─ voldoende tijd → zoveel mogelijk PV-optimaliseren
-      │            └─ deadline nadert → 240 minuten als fallback veiligstellen
-      │
-      └─ 19:00 einde dagelijkse regelperiode
+dagdoel nog open
+    │
+    ├─ vóór 09:30 → wachten
+    │
+    ├─ opportunity beschikbaar → starten met passende run-lock
+    │
+    ├─ geen opportunity → blijven wachten zolang dit veilig kan
+    │
+    └─ deadline in gevaar → CATCHUP / MUST
+
+OP_TEMPERATUUR bereikt
+    → dagdoel gelatcht
+    → geen same-day reheat
 ```
 
-## 5. Gevalideerde boilercyclus
+## 7. Bekend aandachtspunt vóór fysieke Control
 
-De praktijktest van **15 op 16 augustus 2026** heeft de volledige keten end-to-end gevalideerd en persistent opgeslagen in `docs/data/boiler-cycles.json`.
+De huidige 240-minuten fallback gebruikt nog `boilerOnMinToday`, dus **relais-aan-tijd**. De ochtendobservatie van 18 augustus liet zien waarom dit niet nauwkeurig genoeg is: het relais kan uren aan staan terwijl de interne thermostaat open is en het element 0 W trekt.
 
-| Kenmerk | Waarde |
-|---|---:|
-| Start | **15-08-2026 23:06** |
-| Einde | **16-08-2026 00:15** |
-| Duur | **69 minuten** |
-| Eindreden | `OP_TEMPERATUUR` |
-| Geschat boilerverbruik | **1,856 kWh** |
-| `reached_temperature` | **true** |
+Daarom moet vóór fysieke WW-Control de fallback worden omgezet naar **werkelijke/bevestigde verwarmingsminuten**. Het primaire `OP_TEMPERATUUR`-doel en de thermostaatdetectie worden hierdoor niet aangetast, maar de fallback/catch-up mag vóór fysieke aansturing niet op een opgeblazen relaisteller vertrouwen.
 
-Op **16 augustus 2026 om 10:46 lokaal** registreerde Shadow v1.6.6 opnieuw een geldige OP_TEMPERATUUR-cyclus. Daarom bevat v1.3 voor de migratiedag een eenmalige bootstrap: het dagdoel van 16 augustus wordt als reeds gehaald beschouwd, zodat de nieuwe flow niet alsnog onnodige catch-up activeert.
+## 8. Samenwerking met andere energieverbruikers
 
-## 6. Samenwerking met Tesla
+WW is één flexibele belasting binnen Energy Core v2. De centrale architectuur moet uiteindelijk gezamenlijk budgetteren tussen onder andere:
 
-De centrale PV-prioriteit blijft:
+- huishoudelijk basisverbruik;
+- Tesla/Easee;
+- elektrische boiler;
+- Quatt als serieuze energieverbruiker;
+- later Victron/batterij.
+
+Daarom wordt de warmwaterplanner niet als zelfstandige losse productieflow verder uitgebouwd; hij consumeert dezelfde centrale state/context als de rest van de Energy Core.
+
+## 9. Veiligheid en huidige Control-status
+
+De actuele WW Control staat in `EM2_Control_WW` (`EM2_CONTROL_WW_V0.9`). De belangrijkste guards zijn:
 
 ```text
-1. Huishoudelijk verbruik
-          ↓
-2. Tesla
-          ↓
-3. Boiler
-          ↓
-4. Teruglevering
+controlMode   = SHADOW
+readOnly      = true
+deviceWrites  = false
+stateFresh    = true
+revisionMatch = true
+wwStateFresh  = true
 ```
 
-Tesla houdt dus normaal prioriteit boven de boiler. De boiler kan vooral PV-overschot benutten dat niet nodig is voor Tesla of te klein is voor zinvol 3-fase Tesla-laden.
+De publicatie bevat daarnaast expliciet:
 
-De boilerfallback doorbreekt die economische prioriteit alleen wanneer `OP_TEMPERATUUR` nog niet is bereikt en de comfortdeadline anders in gevaar komt.
+```text
+physicalWritePerformed = false
+```
 
-## 7. Energy Manager en M7
+`BOILER_ON`, `BOILER_OFF` en `HOLD` zijn dus **beslissingen/adviezen**, nog geen fysieke acties.
 
-De warmwaterregeling werkt samen met de centrale observatie- en beslislaag:
+## 10. Actuele validatiestand
 
-- `Energie Manager PV - Shadow Mode v1.6.6` publiceert de actuele energiebalans en semantische boilerstatus;
-- `M7 - Opportunity Score - Shadow v1.3` gebruikt die semantische status voor prijs/PV-beslissingen;
-- `OP_TEMPERATUUR` is in M7 geen start- of uitstelkandidaat;
-- `AFKOELEN_WACHT` blijft conservatief geen kandidaat;
-- `VERWARMEN` kan een uitstelbare belasting zijn bij dure netimport;
-- `UIT` kan een startkandidaat zijn bij gunstige omstandigheden.
+Op 18 augustus 2026 is Core Tick v0.9.4 succesvol gepubliceerd als `EM2_CORE_PUBLISH_V0.9.4`. De context was vers en State, Decision en Shadow stonden op dezelfde revision. De WW-policy bevatte aantoonbaar:
 
-## 8. `WW_Boilermodus`
+- `priceStartHorizonMin = 30`;
+- `priceRunLockMin = 30`;
+- `pvRunLockMin = 15`;
+- `catchupRunLockMin = 0`;
+- `contextFreshMinutes = 35`.
 
-De fysieke omschakeling tussen CV en elektrische boiler blijft handmatig.
+Op dat validatiemoment was `goalReachedToday=true`; daarom was de correcte Shadow-uitkomst `BOILER_OFF / MUST / GOAL_REACHED`.
 
-| `WW_Boilermodus` | Betekenis |
-|---|---|
-| **JA** | warm tapwater via elektrische boiler |
-| **NEE** | warm tapwater via Vaillant CV |
-
-In CV-modus houdt de warmwaterflow de elektrische boiler uit.
-
-## 9. Fail-safe en veiligheid
-
-De regeling blijft conservatief:
-
-- in CV-modus blijft de elektrische boiler uit;
-- Homey schakelt de Vaillant CV niet automatisch om;
-- ontbrekende kritieke meetdata leiden tot stoppen in plaats van gokken;
-- minimumlooptijden en hold-tijden voorkomen onrustig schakelen;
-- maximaal één warmwaterproductieversie is actief;
-- legacy- en testversies blijven uit;
-- de tijdelijke omschakelflow voor v1.2 → v1.3 is na succesvolle migratie uitgeschakeld;
-- de handmatige start van v1.3 is uitsluitend read-only diagnostiek en stuurt geen apparaten.
-
-## 10. Actuele status
-
-| Onderdeel | Status |
-|---|---|
-| Warm water optimalisatie | 🟢 **v1.3 actief** |
-| Primair dagdoel | ✅ **OP_TEMPERATUUR** |
-| OP_TEMPERATUUR-detectie | ✅ >1500 W ≥15 min, daarna <100 W ≥10 min terwijl AAN |
-| 240 minuten | 🟡 alleen fallback zolang OP_TEMPERATUUR niet bevestigd is |
-| Nieuwe PV-start mogelijk | **09:30–18:30** |
-| Einde dagelijkse regelperiode | **19:00** |
-| Boiler Homey on/off write | ✅ gevalideerd |
-| Volledige boilercyclusregistratie | ✅ gevalideerd in `boiler-cycles.json` |
-| Energy Manager | 🟢 Shadow v1.6.6 actief |
-| M7 Opportunity Score | 🟢 v1.3 shadow met semantische boilerstatus |
-| CV ↔ boiler omschakeling | handmatig |
-
-## 11. Wijzigingshistorie
-
-### v1.3 — 16 augustus 2026
-
-- `OP_TEMPERATUUR` is het primaire dagelijkse boilerdoel geworden.
-- Detectie gebruikt >1500 W gedurende minimaal 15 minuten en daarna <100 W gedurende minimaal 10 minuten terwijl de boiler AAN blijft.
-- Na bevestigd `OP_TEMPERATUUR` wordt geen verdere catch-up naar 240 minuten uitgevoerd.
-- 240 minuten blijft beschikbaar als fallback wanneer thermostaat-afslag niet betrouwbaar wordt bevestigd.
-- PV-startvenster loopt tot 18:30; dagelijkse regelperiode eindigt om 19:00.
-- Migratiedag 16-08-2026 gebruikt een eenmalige bootstrap op basis van de reeds door Shadow v1.6.6 vastgelegde geldige cyclus om 10:46 lokaal.
-- Handmatige start van de flow is read-only diagnostiek.
-- v1.2 nacht-test en de oude ongenummerde v1.1 zijn uitgeschakeld; slechts één warmwaterproductieversie is actief.
+> **Volgende WW-blocker vóór fysieke Control:** fallback-accounting van relais-aan-tijd naar werkelijk/bevestigd verwarmen corrigeren en daarna een volledige dagcyclus met de opportunity-planner observeren.
