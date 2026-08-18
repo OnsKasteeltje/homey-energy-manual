@@ -39,25 +39,61 @@ De energiebalans is:
 woningverbruik = PV-productie + netimport - netexport ± batterij
 ```
 
-Een negatieve P1-waarde betekent export; een positieve P1-waarde import. Rechtstreeks beschikbaar zijn P1, de drie PV-omvormers, Tesla/Easee en boiler. Wasmachine en droger leveren momenteel status maar geen afzonderlijk live wattage; hun vermogen wordt daarom niet geschat.
+Een negatieve P1-waarde betekent export; een positieve P1-waarde import. Rechtstreeks beschikbaar zijn P1, de drie PV-omvormers, Tesla/Easee en boiler.
 
-**Overig verbruik** is:
+De woning splitst op de live kaart in **vier parallelle verbruikstakken**:
+
+```text
+Huis
+ ├─ Tesla
+ ├─ Boiler
+ ├─ Ruimteverwarming
+ └─ Overig
+```
+
+Er bestaan **geen onderlinge energiestromen** tussen deze vier categorieën. Iedere pijl loopt rechtstreeks van de woning naar de betreffende verbruikstak.
+
+### Overig verbruik
+
+Zolang Quatt-vermogen nog niet in de Energy Core v2-snapshot aanwezig is, blijft:
 
 ```text
 Overig = woningverbruik - TeslaW - boilerW
 ```
 
+Ruimteverwarming wordt in dat geval als afzonderlijke functionele categorie getoond met vermogen/status `onbekend`. De website trekt geen geschat Quatt-vermogen van Overig af en verzint geen warmtepompdata.
+
+Zodra een toekomstige v2-snapshot betrouwbaar `space_heating`/`heating` met Quatt-vermogen bevat, kan de bestaande renderer automatisch rekenen met:
+
+```text
+Overig = woningverbruik - TeslaW - boilerW - QuattW
+```
+
+## Ruimteverwarming — hybride Quatt
+
+De tegel **Ruimteverwarming** vertegenwoordigt het hybride verwarmingssysteem als één functionele verbruiker:
+
+- **Quatt** is de elektrische verwarmingsbron en kan later met werkelijk elektrisch vermogen worden getoond;
+- **CV-ketel** is ondersteunende/alternatieve warmtebron en wordt als status weergegeven, niet als elektrische energiestroom;
+- mogelijke toestanden zijn onder meer `Quatt verwarmt`, `hybride (Quatt + CV)`, `CV verwarmt`, `geen warmtevraag` en `status onbekend`;
+- gas wordt bewust niet als elektrische pijl in het energiediagram getekend.
+
+De Energiemanager-balk toont Tesla, Boiler en Ruimteverwarming als functionele onderdelen. `Overig` blijft een meet-/restcategorie en wordt daarom niet als stuurbare Energiemanager-functie gepresenteerd.
+
 ## Grootverbruikers
 
 - **Tesla / Easee** — werkelijk gemeten laadvermogen en gevraagde laadstroom;
 - **Boiler** — werkelijk vermogen en aan/uit-status;
-- **Wasmachine — L2, groep 1, aardlek 1** — Homey-status, geen individueel wattage;
-- **Droger — L3, groep 2, aardlek 1** — Homey-status, geen individueel wattage;
+- **Ruimteverwarming** — Quatt/CV-functionele status; elektrisch Quatt-vermogen alleen zodra betrouwbaar gepubliceerd;
 - **Overig huishouden** — resterend woningverbruik.
+
+Wasmachine en droger blijven beschikbaar in de achterliggende Homey-context/groepenindeling, maar zijn in de hoofd-liveflow geen aparte energietakken zolang er geen betrouwbaar individueel live wattage beschikbaar is.
 
 ## Actualiteit en Homey-load
 
 De live pagina hergebruikt de sitebrede Energy Core v2-adapter. De browser leest dus hetzelfde `energy-state-v2.json` als de health-indicator en doet geen afzonderlijke Homey- of legacy-live-data-aanroep.
+
+De actuele Quatt/CV-uitbreiding is **uitsluitend websitepresentatie**. Er zijn geen extra Homey-device-reads, flows, pollingcycli of publicatieroutes toegevoegd.
 
 De actieve kern is:
 
@@ -71,4 +107,4 @@ De live kaart toont de gebruikte revision en bron-timestamp expliciet. De status
 
 Later kan dezelfde kaart zonder architectuurwijziging worden uitgebreid met live Victron ESS-waarden voor batterij laden/ontladen, SOC en eilandbedrijf.
 
-> Laatste update: **17 augustus 2026** — Live energiestroom gemigreerd van de legacy `pv-phase-24h.json`/`energy-live.json` route naar de revision-consistente Energy Core v2-state.
+> Laatste update: **18 augustus 2026** — Live energiestroom toont Tesla, Boiler, Ruimteverwarming en Overig als vier onafhankelijke parallelle verbruikstakken. Hybride Quatt/CV-presentatie toegevoegd zonder extra Homey-load.
