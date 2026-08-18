@@ -2,134 +2,169 @@
 
 ## Operationele status
 
-De Energie Manager draait sinds 17 augustus 2026 op **Energy Core v2**. De centrale operationele kern is:
+De centrale productiearchitectuur draait op **Energy Core v2**:
 
 ```text
 EM v2 | 30 Context | Price + PV v0.1
                 │
                 ▼
-EM v2 | 00 Core Tick | v0.9.5
+EM v2 | 00 Core Tick | v0.9.7
                 │
-                ├─ State
+                ├─ State + gedeeld energie-/flexbudget
                 ├─ Decision
                 ├─ Shadow
                 ├─ Warm Water State
                 ├─ Warm Water Control (PURE SHADOW)
-                └─ Publish
+                └─ Publish · schema 2.5
 ```
 
-De eerdere architectuur met een losse State Collector, Allocator Shadow, aparte Shadow Manager en meerdere zelfstandige publishers is **niet meer de leidende productiearchitectuur**. Die flows kunnen nog als legacy/rollback of diagnose aanwezig zijn, maar mogen niet als actuele kern worden gelezen.
-
-De volledige technische beschrijving staat op [Energy Core v2](energy-core-v2.md).
+`v0.9.7` is de actuele Core-versie. De vorige `v0.9.6` is uitgeschakeld en blijft als rollbackversie aanwezig.
 
 ## Centrale single-reader architectuur
 
-`EM v2 | 00 Core Tick | v0.9.5` vormt de centrale regelcyclus. Iedere vijf minuten wordt maximaal één gezamenlijke device-snapshot en één Logic-snapshot gelezen. Alle downstream-berekeningen gebruiken daarna dezelfde in-memory state en dezelfde revision.
+Iedere vijf minuten leest Core Tick maximaal één gezamenlijke Homey-device-snapshot en één Logic-snapshot. P1, PV, Tesla/Easee, boiler, Quatt en overige relevante devices komen dus uit dezelfde cyclus. Alle verdere State-, Decision-, Shadow- en Control-berekeningen gebeuren in-memory.
 
-Belangrijkste ontwerpregels:
+Quatt veroorzaakt daardoor **geen extra periodieke `getDevices()`-call**.
 
-- maximaal één `getDevices()` per Core Tick;
-- maximaal één `getVariables()` per Core Tick;
-- State, Decision, Shadow en Control-intent horen bij dezelfde revision;
-- websitebezoek veroorzaakt geen Homey-calls;
-- publicatie naar GitHub is gethrottled en veroorzaakt geen extra device-scan;
-- per fysieke actuator bestaat uiteindelijk precies één automatische writer.
+De website leest alleen de gepubliceerde GitHub-snapshot; websitebezoek veroorzaakt nul Homey-calls.
 
 ## Actuele publicatie
 
-De website gebruikt als actuele bron onder andere:
+De centrale publieke state staat in:
 
 ```text
 docs/data/energy-state-v2.json
 ```
 
-De actuele publisher identificeert zich als:
+Actueel:
 
 ```text
-schema_version    = 2.3
-publisher_version = EM2_CORE_PUBLISH_V0.9.5
+schema_version    = 2.5
+publisher_version = EM2_CORE_PUBLISH_V0.9.7
 control_mode      = SHADOW
 ```
 
-Live state, Decision en Shadow worden met dezelfde revision gepubliceerd. De daghistorie wordt parallel bijgehouden door `EM v2 | 70 History | Day Series` zonder extra device-read.
+State, Decision en Shadow worden revision-consistent gepubliceerd.
 
-## Warm water
+## Rollen van de grote energieverbruikers
 
-Het primaire warmwaterdoel is **OP_TEMPERATUUR eenmaal per lokale kalenderdag**. Zodra het doel betrouwbaar is bereikt, blijft `goalReachedToday=true` tot de dagwissel. Avondelijk warmwatergebruik opent het dagdoel niet opnieuw (`sameDayReheat=false`).
+Energy Core maakt expliciet onderscheid tussen comfortlasten en flexlasten:
 
-Thermostaatdetectie:
+| Load | Rol | Door Energy Core fysiek gestuurd? |
+|---|---|---|
+| Quatt | `COMFORT_BASELOAD` | nee, `OBSERVE_ONLY` |
+| Boiler | flexload met warmwaterdoel/deadline | nog PURE SHADOW |
+| Tesla | flexload met optionele laad-deadline | centrale Decision; fysieke migratie apart |
+| Victron/batterij | toekomstige buffer/netlaag | nog niet geïntegreerd |
+
+Quatt wordt dus serieus meegenomen in de energieverdeling zonder dat Homey de warmtepomp op basis van korte prijs- of PV-schommelingen gaat schakelen.
+
+## Quatt in State
+
+De primaire elektrische meetwaarde is `Quatt CIC.measure_power`. Vanuit dezelfde snapshot publiceert Energy Core onder andere:
 
 ```text
-boiler aan + >1500 W gedurende 15 min
-    → verwarming bevestigd
-
-daarna boiler nog aan + <100 W gedurende 10 min
-    → OP_TEMPERATUUR
+quatt.power_w
+quatt.thermal_power_w
+quatt.cop_1 / cop_2
+quatt.working_mode_1 / working_mode_2
+quatt.thermostat_heating_on
+quatt.cv_requested
+quatt.cv_flame
 ```
 
-### Fallback-accounting v0.9.5
+Elektrisch Quatt-vermogen telt als woningverbruik. Thermisch vermogen en COP zijn diagnostiek en worden niet als elektrische energie opgeteld.
 
-De 240-minutenfallback gebruikt vanaf Core Tick v0.9.5 **bevestigde verwarmingsminuten** en niet langer de tijd dat het boilerrelais alleen maar aan stond.
+Quatt wordt expliciet gemarkeerd met:
 
 ```text
-heatingNow = boilerOn && boilerPowerW > 1500 W
-remainingFallbackMin = max(0, 240 - heatingMinToday)
+role         = COMFORT_BASELOAD
+control_mode = OBSERVE_ONLY
+controllable = false
 ```
 
-`boilerOnMinToday` blijft beschikbaar als diagnostische teller, maar is niet meer de bron voor de fallbackbeslissing. De state publiceert hiervoor `fallbackAccounting = CONFIRMED_HEATING_MINUTES`.
+## Gedeeld energie-/flexbudget
 
-## Warm Water Control
+P1 bevat het actuele Quatt-verbruik al. Het huidige Quatt-vermogen wordt daarom **niet nogmaals van de P1-export afgetrokken**. Dat zou dubbel tellen.
 
-Warm Water Control is momenteel `EM2_CONTROL_WW_V0.10` en draait volledig in **PURE SHADOW**:
+Wel reserveert Core extra ruimte voor mogelijke Quatt-ramp-up:
 
-- `readOnly=true`;
-- `deviceWrites=false`;
-- `physicalWritePerformed=false`.
+```text
+flex_export_budget
+ = max(0,
+       P1_export
+       - 200 W gridreserve
+       - Quatt-rampreserve)
+```
 
-De planner kan onder meer `BOILER_ON`, `BOILER_OFF` of `HOLD` adviseren op basis van deadline, actuele export, prijs en PV-forecast, maar v2 schakelt de boiler nog niet fysiek.
+De Quatt-rampreserve is momenteel:
 
-Opportunity-starts gebruiken passende run-locks:
+- 100 W wanneer Quatt vrijwel idle is;
+- zodra Quatt ≥250 W gebruikt: minimaal 350 W;
+- vervolgens 25% van actueel Quatt-vermogen;
+- maximaal 750 W.
 
-| Startreden | Run-lock |
-|---|---:|
-| `CATCHUP` | geen opportunity-lock |
-| `EXPORT` | 15 min |
-| `PV_FORECAST` | 15 min |
-| `PRICE_NEGATIVE` | 30 min |
-| `PRICE_CHEAP` | 30 min |
+Daarnaast publiceert Core een discretionair importbudget tot 4.000 W actuele netimport voor economische starts van flexloads.
 
-## Tesla en Equalizer
+## Effect op Tesla
 
-De Easee Equalizer blijft de harde lokale veiligheids- en load-balancinglaag. Homey mag deze bescherming nooit overrulen.
+Tesla-opportunities gebruiken vanaf v0.9.7 het **flex-exportbudget** in plaats van kale P1-export. Daardoor wordt een deel van het overschot niet tegelijk aan Tesla beloofd terwijl de Quatt nog kan moduleren.
 
-Tesla-Control is nog niet volledig naar de fysieke v2-Control-laag gemigreerd. Tot die migratie expliciet is gevalideerd blijft de bestaande fysieke Tesla-writer de productieroute, terwijl Energy Core v2 de centrale state, context en beslisarchitectuur levert.
+De hoofdregels zijn:
 
-Een Tesla-deadline kan actief of afwezig zijn. Zonder deadline kan de Tesla als flexibele energie-/exportbuffer worden gebruikt; met deadline krijgt tijdig voldoende laden uiteindelijk prioriteit boven opportunistische optimalisatie.
+- deadline/MUST blijft leidend;
+- PV-opportunity: voldoende flex-exportbudget na Quatt- en gridreserve;
+- goedkope prijs: alleen wanneer voldoende discretionair importbudget resteert;
+- negatieve prijs: expliciete economische opportunity;
+- Easee Equalizer blijft altijd de lokale veiligheidslaag en mag verder terugregelen.
 
-## Quatt en toekomstige Victron-integratie
+## Effect op warm water
 
-Quatt wordt als relevante grootverbruiker in de v2-state/allocatiearchitectuur meegenomen zonder onnodige extra Homey device-reads. Fysieke Quatt-aansturing valt buiten scope zolang die niet apart veilig is ontworpen en gevalideerd.
+Warm Water Control is vanaf v0.9.7 `EM2_CONTROL_WW_V0.11` en blijft **PURE SHADOW**:
 
-Victron/batterij-integratie sluit later aan op dezelfde architectuur: centrale state, gedeeld vermogensbudget en expliciete Control-route. Victron zelf blijft de primaire laag voor batterij- en netregeling; Homey orkestreert flexloads daarboven.
+```text
+readOnly=true
+deviceWrites=false
+physicalWritePerformed=false
+quattWritePerformed=false
+```
 
-## Veiligheids- en regelhiërarchie
+Voor een PV-gedreven boilerstart moet ongeveer 1.900 W flex-exportbudget beschikbaar zijn **na** Quatt- en gridreserve. Een top-PV-forecastmoment vereist minimaal 500 W flex-exportbudget.
+
+Bij goedkope stroom wordt bovendien gecontroleerd of de geprojecteerde import na een boilerstart binnen 4.000 W blijft. Zo niet, dan volgt `WAIT_IMPORT_BUDGET` in plaats van een nieuwe economische boilerstart.
+
+De bestaande warmwaterregels blijven gelden: één `OP_TEMPERATUUR`-doel per dag, confirmed-heating fallback en opportunity-specifieke run-locks.
+
+## Toekomstige Victron-integratie
+
+Hetzelfde budgetmodel is voorbereid op batterijsteun. Zolang Victron niet geïntegreerd is:
+
+```text
+battery_support_w = 0
+battery_integrated = false
+```
+
+Later kan Victron toegestane batterij-laad/ontlaadruimte aan het centrale budget toevoegen. De rolverdeling blijft dan:
 
 ```text
 Installatieveiligheid / 3×25 A
           ↓
-Easee Equalizer load balancing
+Easee Equalizer voor lokale EV-veiligheid
           ↓
-Victron grid/batterijregeling (later)
+Victron EMS voor batterij/net (later)
           ↓
-Energy Core v2
-          ↓
-Flexloads: Tesla / boiler / overige
+Energy Core v2 voor huishoudelijke flexorchestratie
+          ├─ Quatt: comfort / observe-only
+          ├─ boiler: flex + comfortdeadline
+          └─ Tesla: flex + laaddeadline
 ```
 
-## Legacy-status
+Fysieke Quatt-aansturing blijft buiten scope totdat daarvoor apart een veilige en expliciet gewenste Control-policy bestaat.
 
-Flows uit architectuur v1, zoals de losse State Collector, Allocator Shadow, `Energie Manager PV - Shadow Mode` en afzonderlijke publishers, zijn niet meer de referentie voor de actuele productiearchitectuur. Ze worden alleen behouden zolang ze nog aantoonbaar nodig zijn voor rollback, historie, veiligheid of gecontroleerde migratie.
+## Validatie 18 augustus 2026
 
-De gecontroleerde Legacy Cleanup verwijdert of deactiveert alleen onderdelen waarvan veilig vaststaat dat ze volledig door v2 zijn vervangen.
+De eerste v0.9.7-publicatie liet schema 2.5 en gelijke State/Decision/Shadow-revision 329 zien. Op dat moment gebruikte Quatt 10,3 W en stond hij praktisch idle. De Quatt-rampreserve was daarom 100 W. Bij 184 W netexport en 200 W gridreserve resteerde terecht 0 W flex-exportbudget.
 
-> Laatste functionele update: **18 augustus 2026 — Energy Core v2 / Core Tick v0.9.5 actief.** Confirmed-heating fallback-accounting is operationeel; Warm Water Control blijft PURE SHADOW zonder fysieke writes.
+De validatie bevestigde tevens dat Quatt `OBSERVE_ONLY` bleef en dat geen fysieke boiler- of Quatt-write vanuit deze Core plaatsvond.
+
+> Laatste functionele update: **18 augustus 2026 — Energy Core v2 / Core Tick v0.9.7 actief.** Quatt is first-class comfortload en beïnvloedt het gedeelde vermogensbudget voor Tesla en boiler; geen extra device-poll en geen fysieke Quatt-sturing.
