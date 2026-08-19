@@ -5,7 +5,7 @@
 De centrale productiearchitectuur draait op **Energy Core v2**:
 
 ```text
-EM v2 | 30 Context | Price + PV v0.1
+EM v2 | 30 Context | Price + PV v0.4
                 │
                 ▼
 EM v2 | 00 Core Tick | v0.9.7
@@ -18,7 +18,7 @@ EM v2 | 00 Core Tick | v0.9.7
                 └─ Publish · schema 2.5
 ```
 
-`v0.9.7` is de actuele Core-versie. De vorige `v0.9.6` is uitgeschakeld en blijft als rollbackversie aanwezig.
+`v0.9.7` is de actuele Core-versie. De vorige `v0.9.6` is uitgeschakeld en blijft als rollbackversie aanwezig. Voor prijscontext blijft **Price + PV v0.4** de actieve productieversie; kandidaat v0.5 is na een mislukte read-only validatie uitgeschakeld.
 
 ## Centrale single-reader architectuur
 
@@ -135,6 +135,25 @@ Bij goedkope stroom wordt bovendien gecontroleerd of de geprojecteerde import na
 
 De bestaande warmwaterregels blijven gelden: één `OP_TEMPERATUUR`-doel per dag, confirmed-heating fallback en opportunity-specifieke run-locks.
 
+### PBTH prijshorizon
+
+De beoogde full-horizon implementatie gebruikt PBTH `prices_json` met periode `next_hours`. Voor DAP15 geldt één numerieke array-entry per 15 minuten. De payload bevat geen timestamps; daarom mogen geen tijdstempels uit de payload worden verondersteld of verzonnen. De resterende horizon moet worden berekend vanaf het begin van het huidige kwartierslot plus het aantal geldige aaneengesloten slots maal 15 minuten, minus de reeds verstreken tijd in het huidige slot.
+
+De policy is:
+
+```text
+>= 12 uur          FULL
+6 tot 12 uur       INTRADAY
+< 6 uur            DIAGNOSTIC
+DEGRADED/MISSING   DIAGNOSTIC
+```
+
+`coversTomorrow10` moet worden bepaald door het werkelijke berekende horizon-einde te vergelijken met 10:00 de volgende dag in `Europe/Berlin`. Nachtvoorverwarming is alleen horizon-eligible als zowel `FULL` als `coversTomorrow10=true` geldt.
+
+Op **19 augustus 2026** is kandidaat `EM v2 | 30 Context | Price + PV v0.5` read-only naast v0.4 opgebouwd. De Homey Advanced Flow accepteerde de `prices_json(next_hours)`-kaart, maar de `prices`-outputtoken werd in de geteste tokenketen niet als bruikbare JSON aan de vervolgstap doorgegeven. Een aparte buffer-readback resulteerde in diagnosecode **-2** (lege/niet-parseerbare JSON-buffer). Daardoor kon geen betrouwbare exacte horizon worden gemeten.
+
+De cut-over is daarom bewust **niet** uitgevoerd: v0.5 en de tijdelijke PBTH-probes zijn uitgeschakeld en v0.4 blijft actief. Dit is een integratie-/tokentransportblokkade en geen aanwijzing dat de zichtbare PBTH-prijswaarden zelf onjuist zijn. Er zijn tijdens deze test geen fysieke actuatorwrites uitgevoerd; de WW Planner blijft `readOnly=true`, `deviceWrites=false` en PURE SHADOW.
+
 ## Toekomstige Victron-integratie
 
 Hetzelfde budgetmodel is voorbereid op batterijsteun. Zolang Victron niet geïntegreerd is:
@@ -167,4 +186,4 @@ De eerste v0.9.7-publicatie liet schema 2.5 en gelijke State/Decision/Shadow-rev
 
 De validatie bevestigde tevens dat Quatt `OBSERVE_ONLY` bleef en dat geen fysieke boiler- of Quatt-write vanuit deze Core plaatsvond.
 
-> Laatste functionele update: **18 augustus 2026 — Energy Core v2 / Core Tick v0.9.7 actief.** Quatt is first-class comfortload en beïnvloedt het gedeelde vermogensbudget voor Tesla en boiler; geen extra device-poll en geen fysieke Quatt-sturing.
+> Laatste functionele update: **19 augustus 2026 — PBTH v0.5 full-horizon kandidaat veilig teruggerold na tokentransport-validatiefout.** Price + PV v0.4 blijft productie; WW Planner blijft PURE SHADOW en zonder fysieke writes.
