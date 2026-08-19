@@ -58,6 +58,12 @@ De website houdt aanvullend `live-energy-balance-guard-v2.8.53.js` als tweede ve
 
 De woning splitst op de live kaart in zes parallelle verbruikstakken: Tesla, Boiler, Ruimteverwarming, Wasmachine, Droger en Overig. Er bestaan geen onderlinge energiestromen tussen deze categorieën; iedere pijl loopt rechtstreeks van de woning naar de betreffende verbruikstak.
 
+## Live kaartindeling
+
+De Live-pagina gebruikt vanaf `live-energy-v2.8.60.js` de donkere conceptindeling als primaire renderer. **PV Opwek**, **Batterij** en **Net** staan op de bovenste rij; **Huis** staat centraal daaronder; de zes onafhankelijke verbruikstakken staan op één horizontale rij. De componenten hebben eigen lijniconen zodat de energiestromen sneller visueel te volgen zijn.
+
+Naast de energiestromen wordt ook de fysieke **Net ↔ accu**-koppeling via de AC-bus getoond. Die verbinding is topologisch: zij maakt zichtbaar dat batterij en net elektrisch aan dezelfde woningbus gekoppeld zijn, maar vormt **geen extra meting** en wordt daarom niet dubbel meegenomen in de energiebalans. De kaart vermeldt dit expliciet in de legenda en onderaan het diagram.
+
 ### Overig verbruik
 
 `Overig` is nadrukkelijk het **residu na alle individueel bekende vermogens**:
@@ -96,10 +102,10 @@ De v0.9.8-balansguard gebruikt dezelfde bestaande `Homey.devices.getDevices()`-s
 |---|---|---|
 | Core | `EM v2 | 00 Core Tick | v0.9.8` | één centrale device- en Logic-snapshot per 5 minuten; fysieke balance-gate; State/Decision/Shadow/WW/publicatie |
 | Publieke state | schema `2.6` / `EM2_CORE_PUBLISH_V0.9.8` | revision-consistente snapshot met expliciete `balance`, first-class `quatt`, `loads` en fail-closed `energy_budget` |
-| Website | `live-energy-v2.8.51.js` + `live-energy-inactive-zero-v2.8.52.js` + `live-energy-balance-guard-v2.8.53.js` | parallelle verbruikstakken; tweede fail-safe voor niet-tijdgelijke brondata; `Overig` als residu na beschikbare individuele wattages |
+| Website | `live-energy-v2.8.60.js` + `live-energy-inactive-zero-v2.8.52.js` + `live-energy-balance-guard-v2.8.53.js` | donkere conceptindeling met lijniconen; PV/Batterij/Net boven, Huis centraal; zes parallelle verbruikstakken; expliciete AC-bus-koppeling; tweede fail-safe voor niet-tijdgelijke brondata |
 
 De eerste productievalidatie van v0.9.8 publiceerde schema 2.6 met gelijke State/Decision/Shadow-revision en een sluitende energiebalans. De safety-route bleef `SHADOW`/read-only; er zijn geen fysieke Tesla-, boiler- of Quatt-writes toegevoegd.
 
 Later kan dezelfde kaart zonder architectuurwijziging worden uitgebreid met live Victron ESS-waarden voor batterij laden/ontladen, SOC en eilandbedrijf.
 
-> Laatste update: **19 augustus 2026** — Core v0.9.8 actief. Fysiek onmogelijke P1/PV-combinaties worden nu al in de Core fail-closed afgevangen; de websiteguard blijft als tweede verdedigingslaag actief.
+> Laatste update: **19 augustus 2026** — Live kaart overgezet naar de donkere conceptindeling; Core v0.9.8 blijft leidend voor de energiedata en balansvalidatie.
