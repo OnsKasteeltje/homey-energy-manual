@@ -1,40 +1,40 @@
 {
   "meta": {
     "schema_version": "2.6",
-    "generated_at": "2026-08-19T13:15:00.333Z",
-    "heartbeat_at": "2026-08-19T13:15:00.333Z",
+    "generated_at": "2026-08-19T13:25:00.278Z",
+    "heartbeat_at": "2026-08-19T13:25:00.278Z",
     "publisher_version": "EM2_CORE_PUBLISH_V0.9.8",
     "control_mode": "SHADOW",
-    "source_sample_at": "2026-08-19T13:15:00.127Z",
-    "state_revision": 578,
-    "decision_revision": 578,
-    "shadow_revision": 578,
+    "source_sample_at": "2026-08-19T13:25:00.120Z",
+    "state_revision": 580,
+    "decision_revision": 580,
+    "shadow_revision": 580,
     "state_age_sec": 0,
     "publish_reason": "REVISION_THROTTLED",
     "min_publish_interval_sec": 300
   },
   "balance": {
-    "valid": true,
-    "reason": "OK",
+    "valid": false,
+    "reason": "NEGATIVE_HOUSE_BALANCE",
     "tolerance_w": 75,
-    "physical_house_candidate_w": 3385.2,
+    "physical_house_candidate_w": -1358.5,
     "known_measured_load_w": 10.3,
-    "residual_w": 3374.9,
-    "fail_closed_flex_budget": false
+    "residual_w": null,
+    "fail_closed_flex_budget": true
   },
   "grid": {
-    "power_w": 1130,
-    "l1_w": 79,
-    "l2_w": 1885,
-    "l3_w": -834,
-    "import_w": 1130,
-    "export_w": 0
+    "power_w": -3246,
+    "l1_w": 152,
+    "l2_w": -1132,
+    "l3_w": -2266,
+    "import_w": 0,
+    "export_w": 3246
   },
   "pv": {
-    "total_w": 2255.1800000000003,
-    "solaredge_w": 1282.18,
-    "goodwe_4200_w": 709,
-    "goodwe_2000_w": 264
+    "total_w": 1887.49,
+    "solaredge_w": 753.49,
+    "goodwe_4200_w": 858,
+    "goodwe_2000_w": 276
   },
   "battery": {
     "soc_pct": null,
@@ -58,18 +58,18 @@
     "ramp_reserve_w": 100
   },
   "energy_budget": {
-    "house_load_w": 3385,
+    "house_load_w": null,
     "known_flexible_load_w": 0,
     "comfort_load_w": 10,
-    "other_house_load_w": 3375,
+    "other_house_load_w": null,
     "grid_safety_reserve_w": 200,
     "quatt_ramp_reserve_w": 100,
     "flex_export_budget_w": 0,
-    "discretionary_import_budget_w": 2870,
+    "discretionary_import_budget_w": 4000,
     "battery_support_w": 0,
     "battery_integrated": false,
-    "balance_valid": true,
-    "balance_reason": "OK"
+    "balance_valid": false,
+    "balance_reason": "NEGATIVE_HOUSE_BALANCE"
   },
   "tesla": {
     "connected": false,
@@ -84,10 +84,10 @@
     "deadline_active": true
   },
   "equalizer": {
-    "power_w": 1154,
-    "l1_a": 1,
-    "l2_a": 8,
-    "l3_a": -4
+    "power_w": -2671,
+    "l1_a": 0,
+    "l2_a": -5,
+    "l3_a": -9
   },
   "hot_water": {
     "boiler_on": true,
@@ -97,15 +97,15 @@
       "schema": "EM2_WW_STATE_V0.8",
       "date": "2026-08-19",
       "startedAt": "2026-08-18T22:00:00.032Z",
-      "updatedAt": "2026-08-19T13:15:00.305Z",
-      "sourceRevision": 578,
-      "lastStateSampleAt": "2026-08-19T13:15:00.127Z",
-      "boilerOnMinToday": 314.9,
+      "updatedAt": "2026-08-19T13:25:00.247Z",
+      "sourceRevision": 580,
+      "lastStateSampleAt": "2026-08-19T13:25:00.120Z",
+      "boilerOnMinToday": 324.9,
       "heatingMinToday": 85,
       "heatingAccountingQuality": "FROM_STATE_START",
-      "currentOnRunMin": 314.9,
+      "currentOnRunMin": 324.9,
       "heatingConfirmMin": 85.00143333333335,
-      "lowAfterHeatingMin": 229.99493333333328,
+      "lowAfterHeatingMin": 239.9939666666666,
       "heatingConfirmed": true,
       "goalReached": true,
       "goalReachedToday": true,
@@ -118,7 +118,7 @@
       "boilerOn": true,
       "boilerPowerW": 0,
       "remainingFallbackMin": 0,
-      "minuteOfDay": 915,
+      "minuteOfDay": 925,
       "catchupRequired": false,
       "stateAgeSec": 0,
       "fallbackAccounting": "CONFIRMED_HEATING_MINUTES",
@@ -138,10 +138,10 @@
     },
     "control": {
       "schema": "EM2_CONTROL_WW_V0.11",
-      "generatedAt": "2026-08-19T13:15:00.318Z",
+      "generatedAt": "2026-08-19T13:25:00.262Z",
       "controlMode": "SHADOW",
       "readOnly": true,
-      "sourceRevision": 578,
+      "sourceRevision": 580,
       "action": "BOILER_OFF",
       "priority": "MUST",
       "reason": "Dagdoel OP_TEMPERATUUR eerder vandaag bereikt; geen heropwarming dezelfde dag",
@@ -156,28 +156,28 @@
         "contextFresh": false,
         "priceHorizonOk": true,
         "priceImportGuardOk": true,
-        "balanceValid": true
+        "balanceValid": false
       },
       "inputs": {
         "boilerOn": true,
         "boilerPowerW": 0,
         "mode": true,
-        "gridW": 1130,
-        "exportW": 0,
-        "importW": 1130,
+        "gridW": -3246,
+        "exportW": 3246,
+        "importW": 0,
         "flexExportBudgetW": 0,
-        "discretionaryImportBudgetW": 2870,
-        "balanceValid": true,
-        "balanceReason": "OK",
+        "discretionaryImportBudgetW": 4000,
+        "balanceValid": false,
+        "balanceReason": "NEGATIVE_HOUSE_BALANCE",
         "quattPowerW": 10.3,
         "quattRampReserveW": 100,
         "goalReached": true,
         "goalReachedToday": true,
         "goalLatchDate": "2026-08-19",
-        "boilerOnMinToday": 314.9,
+        "boilerOnMinToday": 324.9,
         "heatingMinToday": 85,
         "heatingAccountingQuality": "FROM_STATE_START",
-        "currentOnRunMin": 314.9,
+        "currentOnRunMin": 324.9,
         "runStartReason": "UNKNOWN",
         "runStartedAt": "2026-08-19T08:05:00.156Z",
         "activeRunLockMin": 15,
@@ -189,10 +189,10 @@
         "priceNegative": false,
         "priceCheapNext4h": false,
         "priceExpensiveNext4h": false,
-        "priceHorizonMin": 45,
+        "priceHorizonMin": 35,
         "priceHorizonOk": true,
         "pvTop4h": false,
-        "wwStateUpdatedAt": "2026-08-19T13:15:00.305Z",
+        "wwStateUpdatedAt": "2026-08-19T13:25:00.247Z",
         "wwStateQuality": "PARTIAL_FROM_START_TIME"
       },
       "policy": {
@@ -245,18 +245,19 @@
     "quooker": null
   },
   "manager": {
-    "state": "IMPORT",
+    "state": "SURPLUS_HIGH",
     "decision": "HOLD",
-    "reason": "Geen harde verplichting of sterke opportunity",
+    "reason": "Energiebalans ongeldig (NEGATIVE_HOUSE_BALANCE); flex-export opportunities geblokkeerd",
     "priority": "MAY",
     "constraints": [
       "QUATT_OBSERVE_ONLY_10W",
-      "QUATT_RAMP_RESERVE_100W"
+      "QUATT_RAMP_RESERVE_100W",
+      "BALANCE_INVALID_NEGATIVE_HOUSE_BALANCE"
     ],
     "state_dirty": true,
     "state_age_sec": 0,
     "flex_export_budget_w": 0,
-    "discretionary_import_budget_w": 2870
+    "discretionary_import_budget_w": 4000
   },
   "shadow": {
     "comparison": {
@@ -269,18 +270,18 @@
       "boilerPowerW": 0,
       "quattPowerW": 10.3,
       "flexExportBudgetW": 0,
-      "balanceValid": true
+      "balanceValid": false
     },
     "decision": {
       "priority": "MAY",
       "intent": "HOLD",
-      "reason": "Geen harde verplichting of sterke opportunity"
+      "reason": "Energiebalans ongeldig (NEGATIVE_HOUSE_BALANCE); flex-export opportunities geblokkeerd"
     }
   },
   "context": {
     "updated_at": "2026-08-19T12:15:10.154Z",
     "fresh": false,
-    "age_sec": 3590,
+    "age_sec": 4190,
     "price_negative": false,
     "price_cheap_next4h": true,
     "price_expensive_next4h": false,
