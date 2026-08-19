@@ -1,0 +1,103 @@
+/* Live energiestroom v2.0.17 — conceptbeeld overgezet naar de echte website. */
+#live-energy-flow{
+  --live-bg:#08111c;
+  --live-panel:#101a28;
+  --live-panel-2:#121f30;
+  --live-border:#35465d;
+  --live-text:#f2f6fb;
+  --live-muted:#aebbd0;
+  --live-green:#32dc74;
+  --live-blue:#2388ff;
+  --live-orange:#f5a623;
+  --live-topology:#91a1b8;
+}
+#live-energy-flow .energy-topline{
+  color:#dce5f1;
+  padding:.65rem .8rem;
+  margin:.35rem 0 .7rem;
+  background:#0d1724;
+  border:1px solid #28394e;
+  border-radius:.8rem;
+}
+#live-energy-flow .energy-svg{
+  color:var(--live-text);
+  background:
+    radial-gradient(circle at 50% 25%,rgba(35,136,255,.06),transparent 34%),
+    linear-gradient(180deg,#07101a 0%,#0a1420 100%);
+  border:1px solid #26384d;
+  border-radius:1.05rem;
+  box-shadow:0 18px 44px rgba(0,0,0,.28);
+}
+#live-energy-flow .energy-node rect{
+  fill:var(--live-panel);
+  stroke:var(--live-border);
+  stroke-width:2.1;
+}
+#live-energy-flow .energy-node.source rect{stroke:#2d6fa8;fill:#0e1b29;}
+#live-energy-flow .energy-node.battery rect{stroke:#53657c;fill:#101b2a;}
+#live-energy-flow .energy-node.grid rect{stroke:#53657c;fill:#101b2a;}
+#live-energy-flow .energy-node.house rect{stroke:#53657c;fill:#111d2c;}
+#live-energy-flow .energy-node.load rect,
+#live-energy-flow .energy-node.residual rect{stroke:#35475e;fill:#0f1a28;}
+#live-energy-flow .energy-title,
+#live-energy-flow .energy-value,
+#live-energy-flow .energy-sub,
+#live-energy-flow .energy-rule,
+#live-energy-flow .energy-topology-label,
+#live-energy-flow .energy-legend text{fill:var(--live-text);}
+#live-energy-flow .energy-title{font-size:20px;font-weight:650;}
+#live-energy-flow .energy-value{font-size:28px;font-weight:800;}
+#live-energy-flow .energy-sub{font-size:13px;fill:var(--live-muted);opacity:1;}
+#live-energy-flow .energy-rule{font-size:13px;fill:var(--live-muted);opacity:1;}
+#live-energy-flow .energy-icon{fill:none;stroke:#e5edf7;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+#live-energy-flow .energy-icon-pv{stroke:#328dff;}
+#live-energy-flow .energy-icon-pv circle,#live-energy-flow .energy-icon-pv path:last-child{stroke:#ffd11a;}
+#live-energy-flow .energy-icon-battery{stroke:#b8c4d5;}
+#live-energy-flow .energy-node.battery .energy-icon-battery path{stroke:var(--live-green);}
+#live-energy-flow .energy-icon-grid{stroke:#aeb9cb;}
+#live-energy-flow .energy-icon-house{stroke:#edf3fb;}
+#live-energy-flow .energy-icon-heat{stroke:#f5a623;}
+#live-energy-flow .energy-path{fill:none;stroke-linecap:round;stroke-linejoin:round;opacity:.98;}
+#live-energy-flow .energy-path.energy-pv{stroke:var(--live-green);}
+#live-energy-flow .energy-path.energy-grid{stroke:var(--live-blue);}
+#live-energy-flow .energy-path.energy-battery{stroke:var(--live-green);stroke-dasharray:none;}
+#live-energy-flow .energy-path.is-idle{stroke:#607188;opacity:.36;stroke-width:2.2!important;}
+#live-energy-flow .arrow-pv,#live-energy-flow .arrow-battery{fill:var(--live-green);}
+#live-energy-flow .arrow-grid{fill:var(--live-blue);}
+#live-energy-flow .energy-consumption-bus{fill:none;stroke:var(--live-blue);stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round;}
+#live-energy-flow .energy-grid-battery-link{
+  fill:none;
+  stroke:var(--live-topology);
+  stroke-width:2.5;
+  stroke-linecap:round;
+  opacity:.92;
+}
+#live-energy-flow .arrow-topology{fill:var(--live-topology);}
+#live-energy-flow .energy-topology-label{font-size:12px;font-weight:700;fill:#b9c6d8;}
+#live-energy-flow .energy-legend rect{fill:#0e1825;stroke:#314158;stroke-width:1.5;}
+#live-energy-flow .legend-pv{stroke:var(--live-green);stroke-width:4;stroke-linecap:round;}
+#live-energy-flow .legend-grid{stroke:var(--live-blue);stroke-width:4;stroke-linecap:round;}
+#live-energy-flow .legend-topology{stroke:var(--live-topology);stroke-width:3;stroke-linecap:round;}
+#live-energy-flow .energy-legend text{font-size:13px;}
+#live-energy-flow .legend-note{fill:#9facc0!important;font-size:12px!important;}
+
+/* Functionele panelen onder het diagram sluiten visueel aan op het concept. */
+#live-energy-flow .energy-manager-panel{
+  color:var(--live-text);
+  background:#0d1724;
+  border:1px solid #2c3d52;
+  box-shadow:0 8px 22px rgba(0,0,0,.16);
+}
+#live-energy-flow .energy-manager-grid>div{
+  background:#111d2c;
+  border-color:#31445c;
+}
+#live-energy-flow .energy-manager-title span,
+#live-energy-flow .energy-manager-grid small,
+#live-energy-flow .energy-manager-grid span{color:var(--live-muted);opacity:1;}
+
+@media (max-width:767px){
+  #live-energy-flow{overflow-x:auto;}
+  #live-energy-flow .energy-svg{min-width:900px;width:900px;max-width:none;box-shadow:none;}
+  #live-energy-flow .energy-topline{min-width:0;}
+}
