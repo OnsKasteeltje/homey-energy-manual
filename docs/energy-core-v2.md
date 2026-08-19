@@ -3,7 +3,8 @@
 ## Status
 
 **Actieve kern:** `EM v2 | 00 Core Tick | v0.9.7`  
-**Contextlaag:** `EM v2 | 30 Context | Price + PV v0.1`  
+**Contextlaag:** `EM v2 | 30 Context | Price + PV v0.3`  
+**Prijsbron:** PBTH/DAP15 `NL_Netherlands` via `EM2_Price_Context`  
 **Control mode:** `SHADOW`  
 **Fysieke Quatt-writes:** geen (`OBSERVE_ONLY`)  
 **Publicatieschema:** `2.5`
@@ -20,14 +21,18 @@ Energy Core v2 gebruikt één centrale fysieke snapshot per vijf minuten. State,
 6. State, Decision, Shadow en Control-intent horen bij dezelfde State-revision.
 7. Per fysieke actuator bestaat uiteindelijk exact één automatische writer.
 8. Een v2-Control-adapter krijgt pas fysieke writes na expliciete shadowvalidatie.
+9. Ontbrekende prijswaarden worden nooit als `0` geïnterpreteerd; onbekend blijft `null` en leidt tot een quality/fallback-pad.
 
 ## Actuele keten
 
 ```text
-Prijs + PV forecast cards
-        │ iedere 15 min, geen device-scan
+PBTH/DAP15 NL_Netherlands
+        │ iedere 15 min via bestaande Context-scheduler
+        │ null-safe normalisatie, geen tweede scheduler
         ▼
-EM v2 | 30 Context | Price + PV v0.1
+EM v2 | 30 Context | Price + PV v0.3
+        └── EM2_Price_Context · schema EM2_PRICE_CONTEXT_V0.3
+            PURE SHADOW / context-only / geen actuatorwrites
 
 P1 + PV + Easee + boiler + Quatt + overige devices + Homey Logic
         │ iedere 5 min
@@ -43,6 +48,31 @@ EM v2 | 00 Core Tick | v0.9.7
         │                         GEEN fysieke v2-write
         └── Publish → energy-state-v2.json · schema 2.5
 ```
+
+## PBTH PriceContext v0.3
+
+Vanaf 19 augustus 2026 is PBTH/DAP15 `NL_Netherlands` de genormaliseerde prijsbron voor de nieuwe v2-prijscontext. De adapter draait binnen de bestaande 15-minuten Context-flow; er is dus **geen extra scheduler** toegevoegd.
+
+`EM2_Price_Context` bevat onder andere:
+
+- actuele import- en exportprijs;
+- kwartierprijzen `m15`, `m30` en `m45`;
+- beschikbare intraday/next-day horizonwaarden;
+- `quality` en `horizon_status`;
+- expliciete guards voor bronbeschikbaarheid, null-safety en write-safety.
+
+De normalisatie is bewust strikt: `null`, `undefined` en lege PBTH-velden blijven `null` en worden nooit numeriek `0`. Velden waarvoor nog geen betrouwbare volledige tijdreeks beschikbaar is — zoals afgeleide nachtminimum- of `best_before_10`-waarden — worden niet verzonnen.
+
+De adapter is momenteel **PURE SHADOW/context-only**:
+
+```text
+mode               = PURE_SHADOW
+null_safe          = true
+no_actuator_writes = true
+control_dependency = false
+```
+
+Dat betekent dat PBTH v0.3 al als gevalideerde contextbron beschikbaar is, maar op dit documentatiemoment nog **niet** als fysieke stuurafhankelijkheid voor boiler, Tesla of Quatt geldt. De WW Planner mag pas na afzonderlijke shadowkoppeling en validatie van freshness, horizon, fallback en revision-alignment op deze context gaan beslissen. Fysieke actuatorwrites blijven daarbij buiten scope.
 
 ## Quatt als first-class energieverbruiker
 
@@ -225,8 +255,9 @@ Op het validatiemoment stond Quatt vrijwel in standby (10,3 W). De Quatt-reserve
 - 1 × `getDevices()` per 5 minuten, **inclusief Quatt**;
 - 1 × `getVariables()` per 5 minuten;
 - alle State/Decision/WW-berekeningen daarna in-memory;
-- prijs/PV-context iedere 15 minuten zonder device-scan;
+- PBTH prijscontext iedere 15 minuten via de bestaande Context-scheduler;
+- geen tweede PBTH-scheduler;
 - GitHub-publicatie gethrottled;
 - website: nul Homey-calls.
 
-> Laatste update: **18 augustus 2026 — Core Tick v0.9.7.** Quatt is nu niet alleen zichtbaar in State, maar ook expliciet verwerkt in het gedeelde energie-/flexbudget voor Tesla en boiler. Quatt blijft OBSERVE_ONLY; geen fysieke Quatt-writes.
+> Laatste update: **19 augustus 2026 — PBTH PriceContext v0.3.** PBTH/DAP15 `NL_Netherlands` is nu de gevalideerde, null-safe prijscontextbron in PURE SHADOW. De adapter gebruikt de bestaande 15-minuten Context-scheduler en heeft geen actuatorwrites. WW Planner/Control-koppeling volgt pas na afzonderlijke shadowvalidatie.
