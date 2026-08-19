@@ -1,0 +1,86 @@
+/* Live energiestroom — donkere, hoog-contrast weergave van uitsluitend de energieflow. */
+#live-energy-flow .energy-svg{
+  color:#e8eef8;
+  background:linear-gradient(180deg,#0b1420 0%,#0e1826 100%);
+  border-color:#2a394d;
+  box-shadow:0 10px 28px rgba(5,12,22,.22);
+}
+
+#live-energy-flow .energy-node rect{
+  fill:#111c2b;
+  stroke:#43536a;
+}
+#live-energy-flow .energy-node.source rect{
+  fill:#10231d;
+  stroke:#2fbd70;
+}
+#live-energy-flow .energy-node.grid rect{
+  fill:#101b2d;
+  stroke:#4f82ff;
+}
+#live-energy-flow .energy-node.house rect{
+  fill:#17182d;
+  stroke:#8f82ff;
+}
+#live-energy-flow .energy-node.battery rect{
+  fill:#241c0f;
+  stroke:#f4ad32;
+}
+#live-energy-flow .energy-node.load rect,
+#live-energy-flow .energy-node.residual rect{
+  fill:#121b28;
+  stroke:#4a5b70;
+}
+
+#live-energy-flow .energy-kicker,
+#live-energy-flow .energy-title,
+#live-energy-flow .energy-value,
+#live-energy-flow .energy-sub,
+#live-energy-flow .energy-edge-label,
+#live-energy-flow .energy-rule{
+  fill:#e8eef8;
+}
+#live-energy-flow .energy-kicker,
+#live-energy-flow .energy-sub,
+#live-energy-flow .energy-rule{
+  opacity:.78;
+}
+#live-energy-flow .energy-title,
+#live-energy-flow .energy-value{
+  text-shadow:0 1px 2px rgba(0,0,0,.5);
+}
+
+#live-energy-flow .energy-path.energy-pv{stroke:#38d77a;}
+#live-energy-flow .energy-path.energy-grid{stroke:#4d8dff;}
+#live-energy-flow .energy-path.energy-battery{stroke:#ffb13b;}
+#live-energy-flow .arrow-pv{fill:#38d77a;}
+#live-energy-flow .arrow-grid{fill:#4d8dff;}
+#live-energy-flow .arrow-battery{fill:#ffb13b;}
+#live-energy-flow .energy-path.is-idle{
+  stroke:#66758a;
+  opacity:.48;
+}
+
+/* De status- en functiekaders horen visueel bij de live flow en krijgen dezelfde donkere kaartstijl. */
+#live-energy-flow .energy-manager-panel{
+  color:#e8eef8;
+  background:#101927;
+  border-color:#314158;
+  box-shadow:0 6px 18px rgba(5,12,22,.14);
+}
+#live-energy-flow .energy-manager-grid>div{
+  background:#131f2f;
+  border-color:#34465f;
+}
+#live-energy-flow .energy-manager-title span,
+#live-energy-flow .energy-manager-grid small,
+#live-energy-flow .energy-manager-grid span{
+  color:#b8c4d6;
+  opacity:1;
+}
+
+@media (max-width:767px){
+  #live-energy-flow .energy-svg{
+    box-shadow:none;
+  }
+}
