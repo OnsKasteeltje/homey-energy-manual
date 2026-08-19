@@ -33,7 +33,8 @@ Deze pagina is een **levend overzicht van de elektrische indeling van de woning*
 | Tesla / Easee-lader | **L1 + L2 + L3** | Laadgroep nog te documenteren | Nog te bepalen | 3-fase verbruiker; afzonderlijke fasewaarden zichtbaar in Homey. |
 | Elektrische boiler | **L2** | Nog te bepalen | Volgt uit groep | Verwarmingsbelasting circa 1,93–2,13 kW verschijnt op L2. |
 | Vaatwasser | Nog te bepalen | **Groep 5 óf groep 12** | **Aardlek 2 óf 4** | **Nog te bevestigen.** Bij groep 5 hoort aardlek 2; bij groep 12 aardlek 4. |
-| Elektrisch fornuis / kookplaat | Nog te bepalen | Nog te bepalen | Nog te bepalen | Afzonderlijke validatie nodig. |
+| **ATAG oven** | **L3 (kandidaat)** | Nog te bepalen | Nog te bepalen | **Waarschijnlijk.** Rond de ATAG-melding *Snel voorverwarmen klaar* op 18-08 om 18:21 is vlak ervoor een duidelijke extra belasting op L3 zichtbaar (circa 1,3–1,5 kW gemiddeld per 5 min), die na het meldmoment afneemt. Nog valideren met extra start/stopmomenten. |
+| Elektrische kookplaat / fornuis | Nog te bepalen | Nog te bepalen | Nog te bepalen | Afzonderlijke validatie nodig; niet gelijkgesteld aan de ATAG-oven. |
 | Waterkoker | **L2** | Nog te bepalen | Volgt uit groep | Aan/uit-test: circa 2,15 kW extra op L2. |
 | Koffiezetapparaat | Nog te bepalen | Nog te bepalen | Nog te bepalen | Fasekoppeling nog niet betrouwbaar bevestigd. |
 | Quooker | Nog te bepalen | Nog te bepalen | Nog te bepalen | Nog te valideren. |
@@ -55,7 +56,7 @@ Deze pagina is een **levend overzicht van de elektrische indeling van de woning*
 - Tesla/Easee is een 3-fase verbruiker;
 - boiler en waterkoker zijn aan L2 gekoppeld.
 
-De vaatwasser is beperkt tot twee kandidaten: **groep 5 (aardlek 2)** of **groep 12 (aardlek 4)**.
+De vaatwasser is beperkt tot twee kandidaten: **groep 5 (aardlek 2)** of **groep 12 (aardlek 4)**. De **ATAG-oven heeft L3 als kandidaatfase**, maar is nog niet als bevestigd aangemerkt.
 
 ## Automatische PV-fasemonitor
 
@@ -78,12 +79,18 @@ De status van een omvormer wordt pas naar **Bevestigd** gewijzigd wanneer de cor
 
 Voor een betrouwbare fasekoppeling wordt bij voorkeur één apparaat tegelijk getest. Voor PV-omvormers gebruiken we daarnaast automatische correlatie. Een exact groepnummer wordt pas als bevestigd gemarkeerd wanneer de koppeling fysiek is vastgesteld via een gecontroleerde uitschakeltest of fysieke verificatie.
 
+### ATAG-oven: kandidaatfase L3
+
+Voor de oven gebruiken we de ATAG-appmeldingen als externe tijdmarkeringen en vergelijken die met de historische P1-fasereeksen. Op **18 augustus 2026 om 18:21** meldde de oven dat snel voorverwarmen gereed was. In de 5-minutenmetingen is op **L3** vlak daarvoor een extra positieve belasting van grofweg **1,3–1,5 kW** zichtbaar; na het meldmoment neemt deze belasting duidelijk af. L1 en L2 laten rond hetzelfde markeringsmoment geen vergelijkbaar patroon zien.
+
+Dit is voldoende om **L3 als kandidaatfase / waarschijnlijk** te registreren, maar nog niet om de fase als bevestigd te behandelen. Voor bevestiging worden meerdere onafhankelijke oven-start/stop- of voorverwarmmomenten vergeleken, bij voorkeur zonder gelijktijdige grote onbekende verbruikers.
+
 !!! warning "Veiligheid"
     Schakel alleen installatieautomaten met de normale bedieningshendel. Verwijder geen afdekkappen en raak geen bedrading of spanningsvoerende delen aan.
 
 ## Fasebelasting
 
-Wasmachine, boiler en waterkoker zijn aan L2 gekoppeld. Vooral boiler en waterkoker kunnen samen ongeveer 4,1 kW toevoegen. De droger is aan L3 gekoppeld. Dit blijft relevant voor toekomstige fasebalancering en de voorbereiding van de Victron-opstelling.
+Wasmachine, boiler en waterkoker zijn aan L2 gekoppeld. Vooral boiler en waterkoker kunnen samen ongeveer 4,1 kW toevoegen. De droger is aan L3 gekoppeld. De ATAG-oven is voorlopig eveneens een **L3-kandidaat**, wat relevant kan worden voor toekomstige fasebalancering zodra die koppeling is bevestigd. Dit blijft relevant voor de voorbereiding van de Victron-opstelling.
 
 ## Beheerregel
 
@@ -91,6 +98,6 @@ Nieuwe betrouwbare inzichten over **fase-, groep- of aardlekindeling** worden di
 
 ## Open vervolgstappen
 
-De vaatwasser moet nog definitief tussen **groep 5 en groep 12** worden onderscheiden. Daarnaast blijven onder meer kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt qua exacte groep/fase nog open. De exacte groepen van boiler en waterkoker moeten eveneens nog fysiek worden gekoppeld.
+De vaatwasser moet nog definitief tussen **groep 5 en groep 12** worden onderscheiden. De **ATAG-oven moet met aanvullende app-gemarkeerde start/stop- of voorverwarmmomenten worden gevalideerd voordat L3 naar Bevestigd kan**. Daarnaast blijven onder meer kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt qua exacte groep/fase nog open. De exacte groepen van boiler en waterkoker moeten eveneens nog fysiek worden gekoppeld.
 
-> Laatste inhoudelijke update: 16 augustus 2026. Fase 24h publicatie v1.4 gebruikt een 5-minutenmeetinterval en tijdgebaseerde analyse; groepen 1 en 2 zijn gekoppeld aan wasmachine en droger; aardlekstructuur 1–4 voor groepen 1–13 is vastgelegd; vaatwasser beperkt tot groep 5 of 12.
+> Laatste inhoudelijke update: 19 augustus 2026. ATAG-oven toegevoegd met **L3 als kandidaatfase (Waarschijnlijk)** op basis van correlatie tussen ATAG-appmelding en historische P1-fasemetingen; bevestiging volgt pas na extra onafhankelijke meetmomenten.
