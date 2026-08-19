@@ -115,6 +115,56 @@ Outputs:
 
 Alle outputs staan op `SHADOW_CANDIDATE`. Er zijn geen writes naar Tesla, boiler of Quatt.
 
+## Stap 2b — warmwaterbronkeuze BOILER versus CV
+
+De contract-aware beslislaag bevatte bij de audit van 19 augustus 2026 nog een architectuurgat: `state.hotWater.mode` werd als reeds gekozen invoer gebruikt. Daardoor werd alleen geoptimaliseerd **wanneer** de elektrische boiler mocht verwarmen, niet **of** warm water economisch beter elektrisch of via de CV wordt gemaakt.
+
+Dit wordt expliciet hersteld met een aparte bronkeuzelaag vóór de bestaande warmwatertiming:
+
+`warmwatervraag → bronkeuze BOILER/CV → indien BOILER: timing via prijs/PV/deadline → actuator`
+
+Tijdens shadow-validatie blijft `WW_Boilermodus` de handmatige/operationele waarheid. De nieuwe bronselector mag deze variabele niet overschrijven en mag geen fysieke boiler- of CV-write uitvoeren. Hij publiceert uitsluitend advies.
+
+### Genormaliseerde kostenvergelijking
+
+Beide bronnen worden vergeleken in EUR per bruikbare kWh warmte:
+
+- elektrisch: `costBoiler = electricityMarginalEURkWh / boilerEfficiency`
+- CV/gas: `costCV = gasEURm3 / (gasKWhPerM3 * cvEfficiency)`
+
+De elektriciteitskosten komen uit dezelfde uniforme contractprijscontext:
+
+- bij `DYNAMIC`: PBTH-afgeleide actuele/toekomstige marginale prijs;
+- bij `FIXED`: vaste importprijs wanneer netstroom nodig is;
+- bij directe PV-zelfconsumptie: de gemiste terugleverwaarde/opportunity cost, niet automatisch nul euro.
+
+Gasprijs en rendementen worden expliciete configuratie-inputs; de bronselector mag bij ontbrekende of ongeldige configuratie geen bronwissel adviseren. Een calorische gaswaarde wordt eveneens configureerbaar gehouden zodat de rekenlaag geen verborgen energiewaarde aanneemt.
+
+Voorgestelde geïsoleerde SHADOW-outputs/configuratie:
+
+- `EM2_WW_Source_Advice`: `BOILER`, `CV`, `HOLD` of `UNKNOWN`;
+- `EM2_WW_Source_CostBoiler_EUR_kWh`;
+- `EM2_WW_Source_CostCV_EUR_kWh`;
+- `EM2_WW_Source_Delta_EUR_kWh`;
+- `EM2_WW_Source_Reason`;
+- `EM2_WW_Gas_EUR_m3`;
+- `EM2_WW_Gas_kWh_m3`;
+- `EM2_WW_CV_Efficiency`;
+- `EM2_WW_Boiler_Efficiency`;
+- `EM2_WW_Source_Hysteresis_EUR_kWh`.
+
+### Hysterese en anti-flapping
+
+De bronkeuze wordt niet op iedere kleine prijsbeweging omgeschakeld. De selector adviseert alleen `BOILER` of `CV` als het kostenverschil groter is dan de configureerbare hysterese. Binnen de band is het advies `HOLD`. Voor daadwerkelijke toekomstige omschakeling kan daarnaast een minimale geldigheidsduur of opeenvolgend aantal bevestigingen worden geëist.
+
+### Fail-safe gedrag
+
+- ontbrekende prijs-, gas- of rendementsinput → `UNKNOWN`, geen bronwissel;
+- verschil binnen hysterese → `HOLD`;
+- bestaande comfort-/veiligheidsdeadline blijft hoger in prioriteit dan pure kostenoptimalisatie;
+- in SHADOW worden geen actuatorwrites uitgevoerd;
+- pas na validatie mag bronadvies de operationele modus beïnvloeden.
+
 ## Veiligheidsinvarianten
 
 1. De huidige actieve v0.5/v0.9.8-route wordt door stappen 1 en 2 niet gewijzigd.
@@ -124,6 +174,7 @@ Alle outputs staan op `SHADOW_CANDIDATE`. Er zijn geen writes naar Tesla, boiler
 5. `DYNAMIC` classificeert prijs volledig binnen de adapter; downstream bestaat geen M7-prijsafhankelijkheid meer.
 6. Ontbrekende of verouderde prijscontext maakt prijsoptimalisatie onbruikbaar; deadline-, comfort-, PV- en veiligheidslogica blijven de fallback.
 7. Er zijn geen fysieke actuatorwrites in deze kandidaatflows.
+8. De warmwaterbronselector is fail-safe en read-only zolang shadow-validatie loopt; `WW_Boilermodus` blijft operationeel leidend.
 
 ## Stap 3 — shadow-validatie
 
@@ -134,17 +185,21 @@ Uitgevoerd:
 - kandidaatadapter gecontroleerd geactiveerd;
 - kandidaatbeslisflow gecontroleerd geactiveerd;
 - beide flows handmatig gestart zonder startfout;
-- safety-check bevestigd: `broken=false`, geïsoleerde kandidaatnamespace en geen actuatorwrites.
+- safety-check bevestigd: `broken=false`, geïsoleerde kandidaatnamespace en geen actuatorwrites;
+- architectuuraudit uitgevoerd voor warmwaterbronkeuze; ontbrekende BOILER↔CV-kostenafweging vastgesteld en als stap 2b gespecificeerd.
 
 Nog te valideren:
 
 - `DYNAMIC` kandidaatbesluiten vergelijken met de huidige v0.5/v0.9.8-besluiten;
 - de nieuwe P25/P75-classificaties observeren op verschillende prijsprofielen;
 - daarna dezelfde situaties met `FIXED` simuleren;
+- warmwaterbronselector in Homey als geïsoleerde SHADOW-output toevoegen en valideren vóór iedere operationele koppeling;
 - verschillen classificeren als verwacht contracteffect, logische verbetering of fout;
 - PBTH-callbelasting bewaken wanneer de kandidaatadapter parallel draait.
 
 Observatiebeperking: de Homey Insights-connector levert voor de nieuw aangemaakte kandidaatvariabelen momenteel historische `null`-punten terug en kan die reeks daardoor niet correct parseren. Dit verhindert op dit moment een betrouwbare externe readback van de kandidaatwaarden; daarom is nog geen FIXED-simulatie gestart.
+
+Op 19 augustus 2026 gaf Homey tijdens de implementatie van stap 2b opnieuw `Too many requests`. De bronselector is daarom bewust nog niet naar Homey geschreven; de architectuur en fail-safe contracten zijn wel vastgelegd, zodat de write later zonder ontwerpwijziging kan worden uitgevoerd.
 
 ## Stap 4 — selector en cut-over
 
@@ -152,6 +207,7 @@ Na succesvolle shadow-validatie:
 
 - website-instelling `FIXED | DYNAMIC` toevoegen;
 - normaal/dal-regeling voor FIXED expliciet aan de configuratie koppelen;
+- warmwaterbronselector van SHADOW naar gevalideerd advies promoveren;
 - kandidaatinterface promoveren tot canonieke prijsinterface;
 - actieve beslislaag op de uniforme prijsinterface laten draaien;
 - actieve flowversies gecontroleerd vervangen en oude versies uitschakelen.
