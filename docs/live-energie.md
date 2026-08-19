@@ -24,10 +24,10 @@ EM2_CORE_PUBLISH_V0.9.7 · schema 2.5
         ↓
 docs/data/energy-state-v2.json
         ↓
-website
+website + balansvalidatie
 ```
 
-De publicatie blijft revision-consistent: State, Decision en Shadow gebruiken dezelfde revision en dezelfde fysieke bron-sample.
+De publicatie blijft revision-consistent: State, Decision en Shadow gebruiken dezelfde revision. De onderliggende Homey-devicecapabilities kunnen echter op verschillende momenten door hun apps zijn ververst. Daarom valideert de Live-pagina aanvullend of P1, PV, batterij en bekende verbruikers samen een fysiek mogelijke energiebalans vormen.
 
 ## Gemeten versus afgeleid
 
@@ -39,17 +39,13 @@ woningverbruik = PV-productie + netimport - netexport ± batterij
 
 Een negatieve P1-waarde betekent export; een positieve P1-waarde import. Rechtstreeks beschikbaar zijn P1, de drie PV-omvormers, Tesla/Easee, boiler en Quatt CIC.
 
-De woning splitst op de live kaart in **vier parallelle verbruikstakken**:
+### Balansvalidatie
 
-```text
-Huis
- ├─ Tesla
- ├─ Boiler
- ├─ Ruimteverwarming
- └─ Overig
-```
+De Live-pagina accepteert een afgeleid woningvermogen alleen wanneer het berekende woningvermogen niet negatief is en ten minste de onafhankelijk gemeten bekende verbruikers kan bevatten, met een kleine meettolerantie. Een moment waarop bijvoorbeeld P1 al een nieuwe exportwaarde heeft maar één PV-omvormer nog zijn vorige waarde rapporteert, wordt daardoor niet meer stilzwijgend naar `Huis 0 W` afgerond.
 
-Er bestaan **geen onderlinge energiestromen** tussen deze vier categorieën. Iedere pijl loopt rechtstreeks van de woning naar de betreffende verbruikstak.
+Bij zo'n niet-tijdgelijke snapshot toont de site **`Huis —`** en **`Overig —`** met de melding `brondata niet tijdgelijk` / `wacht op sluitende snapshot`. Ook verschijnt `balans ongeldig`. Zodra de volgende snapshot weer fysiek sluitend is, worden Huis en Overig automatisch opnieuw berekend uit de fysieke energiebalans.
+
+De woning splitst op de live kaart in zes parallelle verbruikstakken: Tesla, Boiler, Ruimteverwarming, Wasmachine, Droger en Overig. Er bestaan geen onderlinge energiestromen tussen deze categorieën; iedere pijl loopt rechtstreeks van de woning naar de betreffende verbruikstak.
 
 ### Overig verbruik
 
@@ -73,47 +69,26 @@ Dit voorkomt twee fouten tegelijk: bekende gemeten loads worden niet dubbel in `
 
 ## Ruimteverwarming — hybride Quatt
 
-Core v0.9.7 publiceert binnen schema 2.5 een first-class `quatt`-blok met onder meer:
+Core v0.9.7 publiceert binnen schema 2.5 een first-class `quatt`-blok met onder meer `power_w`, thermisch vermogen, COP, working modes, warmtevraag en CV-status. Quatt heeft de rol `COMFORT_BASELOAD`, staat `OBSERVE_ONLY` en is niet door deze route bestuurbaar.
 
-- `power_w` — actueel elektrisch vermogen van Quatt;
-- `thermal_power_w` — thermisch vermogen van beide warmtepompmodules samen;
-- `cop_1` en `cop_2`;
-- `working_mode_1` en `working_mode_2`;
-- `thermostat_heating_on` — warmtevraag volgens de Quatt/CiC-keten;
-- `cv_requested` — CiC vraagt CV-ondersteuning;
-- `cv_flame` — fysieke branderstatus indien de Quatt-integratie die betrouwbaar levert;
-- `role = COMFORT_BASELOAD`;
-- `control_mode = OBSERVE_ONLY` en `controllable = false`;
-- `ramp_reserve_w` — reserve die de Energy Manager vrijhoudt voor mogelijke Quatt-opregelruimte.
-
-De website gebruikt deze velden conservatief. `cv_flame = null` betekent **onbekend** en wordt nooit als bewezen `CV uit` geïnterpreteerd. `cv_requested` toont dat ondersteuning gevraagd wordt, maar is op zichzelf geen bewijs dat de gasbrander daadwerkelijk brandt.
-
-Mogelijke functionele statussen zijn onder meer `Quatt verwarmt`, `Quatt + CV · hybride`, `CV ondersteuning gevraagd`, `CV verwarmt`, `warmtevraag` en `geen warmtevraag`.
-
-De CV-ketel blijft een **status binnen Ruimteverwarming** en wordt niet als elektrische stroom getekend. Gas wordt dus bewust niet als elektrische pijl in het energiediagram opgenomen.
-
-De Energiemanager-balk toont Tesla, Boiler en Ruimteverwarming als functionele onderdelen. `Overig` blijft een meet-/restcategorie en wordt daarom niet als stuurbare Energiemanager-functie gepresenteerd.
+De website gebruikt de CV-velden conservatief. `cv_flame = null` betekent **onbekend** en wordt nooit als bewezen `CV uit` geïnterpreteerd. De CV-ketel blijft een status binnen Ruimteverwarming en wordt niet als elektrische stroom getekend.
 
 ## Energy budget en Quatt-reserve
 
-Core v0.9.7 behandelt Quatt als observe-only comfortload. Het actuele Quatt-verbruik zit al in de P1/woningbalans en wordt niet nogmaals van export afgetrokken. Voor flexibele lasten wordt alleen een aparte Quatt-rampreserve meegenomen. De publieke snapshot bevat daarvoor `energy_budget`, waaronder `flex_export_budget_w`, `discretionary_import_budget_w` en `quatt_ramp_reserve_w`.
-
-Dit beïnvloedt de besluitvorming voor flexibele lasten, maar geeft Homey **geen** recht om de Quatt aan of uit te zetten.
+Core v0.9.7 behandelt Quatt als observe-only comfortload. Het actuele Quatt-verbruik zit al in de P1/woningbalans en wordt niet nogmaals van export afgetrokken. Voor flexibele lasten wordt alleen een aparte Quatt-rampreserve meegenomen. Dit beïnvloedt de besluitvorming voor flexibele lasten, maar geeft Homey **geen** recht om de Quatt aan of uit te zetten.
 
 ## Actualiteit en Homey-load
 
-De Quatt-uitbreiding gebruikt **dezelfde bestaande `Homey.devices.getDevices()` snapshot** van de centrale Core. Er is geen tweede Quatt-poll, geen extra periodieke flow en geen browser→Homey-route toegevoegd.
-
-Op desktop gebruikt deze pagina bewust een bredere contentcontainer dan de overige documentatiepagina's. Daardoor benut het Live energiestroom-diagram vrijwel de volledige beschikbare browserbreedte, terwijl tablet en mobiel hun bestaande responsive layout behouden.
+De Live-pagina veroorzaakt geen extra Homey-polls. De balansguard werkt uitsluitend op dezelfde reeds gepubliceerde JSON-snapshot. Daarmee blijft één centrale Core-device-read per vijf minuten de bron voor de site.
 
 | Laag | Actieve versie | Functie |
 |---|---|---|
 | Core | `EM v2 | 00 Core Tick | v0.9.7` | één centrale device- en Logic-snapshot per 5 minuten; State/Decision/Shadow/WW/publicatie |
 | Publieke state | schema `2.5` / `EM2_CORE_PUBLISH_V0.9.7` | revision-consistente snapshot met first-class `quatt`, `loads` en `energy_budget` |
-| Website | `live-energy-v2.8.48.js` + `live-energy-balance-guard-v2.8.49.js` + `live-energy-v2.0.10.css` | brede desktopweergave; parallelle verbruikstakken; `Overig` als residu na alle beschikbare individuele wattages |
+| Website | `live-energy-v2.8.51.js` + `live-energy-inactive-zero-v2.8.52.js` + `live-energy-balance-guard-v2.8.53.js` | parallelle verbruikstakken; fail-safe validatie van niet-tijdgelijke P1/PV-bronnen; `Overig` als residu na beschikbare individuele wattages |
 
 De live kaart toont revision en bron-timestamp expliciet. De status `actueel/vertraagd` komt uit dezelfde freshness-regels als de EM v2 health-indicator.
 
 Later kan dezelfde kaart zonder architectuurwijziging worden uitgebreid met live Victron ESS-waarden voor batterij laden/ontladen, SOC en eilandbedrijf.
 
-> Laatste update: **18 augustus 2026** — desktopweergave verbreed zodat Live energiestroom aanzienlijk meer van de beschikbare schermbreedte gebruikt; mobiel/tablet blijven responsive. `Overig` blijft het residu na alle betrouwbaar gepubliceerde individuele vermogens.
+> Laatste update: **19 augustus 2026** — fail-safe energiebalans toegevoegd. Een fysiek onmogelijke P1/PV-combinatie wordt niet meer als `Huis 0 W` getoond, maar expliciet als niet-tijdgelijke brondata.
