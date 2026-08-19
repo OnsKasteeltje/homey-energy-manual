@@ -3,8 +3,9 @@
 ## Status
 
 **Actieve kern:** `EM v2 | 00 Core Tick | v0.9.7`  
-**Contextlaag:** `EM v2 | 30 Context | Price + PV v0.3`  
+**Contextlaag:** `EM v2 | 30 Context | Price + PV v0.4`  
 **Prijsbron:** PBTH/DAP15 `NL_Netherlands` via `EM2_Price_Context`  
+**WW Planner:** `EM2_WW_PLANNER_V0.12` (`PURE_SHADOW`)  
 **Control mode:** `SHADOW`  
 **Fysieke Quatt-writes:** geen (`OBSERVE_ONLY`)  
 **Publicatieschema:** `2.5`
@@ -22,6 +23,7 @@ Energy Core v2 gebruikt één centrale fysieke snapshot per vijf minuten. State,
 7. Per fysieke actuator bestaat uiteindelijk exact één automatische writer.
 8. Een v2-Control-adapter krijgt pas fysieke writes na expliciete shadowvalidatie.
 9. Ontbrekende prijswaarden worden nooit als `0` geïnterpreteerd; onbekend blijft `null` en leidt tot een quality/fallback-pad.
+10. Prijsoptimalisatie mag comfort/PV/catch-up alleen beïnvloeden wanneer de beschikbare prijshorizon aan de expliciete Planner-gates voldoet.
 
 ## Actuele keten
 
@@ -30,8 +32,9 @@ PBTH/DAP15 NL_Netherlands
         │ iedere 15 min via bestaande Context-scheduler
         │ null-safe normalisatie, geen tweede scheduler
         ▼
-EM v2 | 30 Context | Price + PV v0.3
-        └── EM2_Price_Context · schema EM2_PRICE_CONTEXT_V0.3
+EM v2 | 30 Context | Price + PV v0.4
+        ├── EM2_Price_Context · schema EM2_PRICE_CONTEXT_V0.4
+        └── EM2_WW_Planner · schema EM2_WW_PLANNER_V0.12
             PURE SHADOW / context-only / geen actuatorwrites
 
 P1 + PV + Easee + boiler + Quatt + overige devices + Homey Logic
@@ -49,7 +52,7 @@ EM v2 | 00 Core Tick | v0.9.7
         └── Publish → energy-state-v2.json · schema 2.5
 ```
 
-## PBTH PriceContext v0.3
+## PBTH PriceContext v0.4
 
 Vanaf 19 augustus 2026 is PBTH/DAP15 `NL_Netherlands` de genormaliseerde prijsbron voor de nieuwe v2-prijscontext. De adapter draait binnen de bestaande 15-minuten Context-flow; er is dus **geen extra scheduler** toegevoegd.
 
@@ -58,12 +61,12 @@ Vanaf 19 augustus 2026 is PBTH/DAP15 `NL_Netherlands` de genormaliseerde prijsbr
 - actuele import- en exportprijs;
 - kwartierprijzen `m15`, `m30` en `m45`;
 - beschikbare intraday/next-day horizonwaarden;
-- `quality` en `horizon_status`;
-- expliciete guards voor bronbeschikbaarheid, null-safety en write-safety.
+- `quality`, `horizon_status`, `horizon_hours` en `optimization_mode`;
+- expliciete guards voor bronbeschikbaarheid, null-safety, horizonbeleid en write-safety.
 
 De normalisatie is bewust strikt: `null`, `undefined` en lege PBTH-velden blijven `null` en worden nooit numeriek `0`. Velden waarvoor nog geen betrouwbare volledige tijdreeks beschikbaar is — zoals afgeleide nachtminimum- of `best_before_10`-waarden — worden niet verzonnen.
 
-De adapter is momenteel **PURE SHADOW/context-only**:
+De adapter is **PURE SHADOW/context-only**:
 
 ```text
 mode               = PURE_SHADOW
@@ -72,7 +75,24 @@ no_actuator_writes = true
 control_dependency = false
 ```
 
-Dat betekent dat PBTH v0.3 al als gevalideerde contextbron beschikbaar is, maar op dit documentatiemoment nog **niet** als fysieke stuurafhankelijkheid voor boiler, Tesla of Quatt geldt. De WW Planner mag pas na afzonderlijke shadowkoppeling en validatie van freshness, horizon, fallback en revision-alignment op deze context gaan beslissen. Fysieke actuatorwrites blijven daarbij buiten scope.
+### Prijshorizonbeleid voor WW Planner v0.12
+
+De warmwaterplanner gebruikt een expliciete kwaliteits- en horizongate voordat prijsinformatie sturend mag worden:
+
+| Geldige prijshorizon | Planner-modus | Toegestaan gebruik |
+|---|---|---|
+| ≥ 12 uur | `FULL` | Volwaardige prijsoptimalisatie |
+| 6–12 uur | `INTRADAY` | Alleen optimaliseren binnen de bekende intraday-horizon |
+| < 6 uur | `DIAGNOSTIC` | Prijs niet sturend |
+| `DEGRADED` / `MISSING` / stale | `DIAGNOSTIC` | Prijs niet sturend |
+
+Bij `DIAGNOSTIC` valt WW Planner deterministisch terug op **comfort, PV/export en catch-up**. Prijsdata blijft dan uitsluitend diagnostisch.
+
+Voor **nachtelijk voorverwarmen** geldt een extra harde gate: de prijscontext moet niet alleen `FULL` zijn, maar aantoonbaar minstens tot **10:00 de volgende ochtend** reiken. Zonder die dekking wordt geen nachtelijke voorverwarmingsbeslissing vrijgegeven.
+
+De huidige PBTH-bron levert op het validatiemoment een bruikbaar venster van circa 8 uur en nog geen next-day waarden. Daarom hoort de actuele plannerstatus conservatief `INTRADAY` te zijn: intraday-prijsoptimalisatie mag, maar nacht-/next-morning preheat niet.
+
+Belangrijk: v0.12 implementeert hiermee de **horizongates**. De aanvullende voorwaarden voor daadwerkelijke nachtvoorverwarming — bijvoorbeeld hoe laag de prijs moet zijn en hoe slecht de PV-verwachting moet zijn — worden afzonderlijk bepaald en niet uit ontbrekende data afgeleid.
 
 ## Quatt als first-class energieverbruiker
 
@@ -172,14 +192,16 @@ Hierdoor kan een modulerende Quatt niet ongemerkt dezelfde exportruimte claimen 
 
 ## Effect op Warm Water Control
 
-Warm Water Control is vanaf v0.9.7 `EM2_CONTROL_WW_V0.11` en blijft PURE SHADOW.
+Warm Water Control is vanaf v0.9.7 `EM2_CONTROL_WW_V0.11` en blijft PURE SHADOW. WW Planner v0.12 ligt daar als extra shadow-plannerlaag bovenop en kan prijsadviezen blokkeren wanneer de PBTH-horizon onvoldoende betrouwbaar is; hij voert zelf geen devicewrites uit.
 
 Voor PV-start wordt niet meer alleen naar ruwe export gekeken. De boilerstart vereist circa 1.900 W **flex-exportbudget ná grid- en Quatt-reserve**.
 
 Voor prijsstarts geldt daarnaast:
 
+- prijs mag alleen sturend zijn wanneer de WW Planner-horizongate dit toestaat;
 - negatieve prijs + voldoende tariefhorizon: toegestaan als economische opportunity;
 - goedkope prijs + voldoende tariefhorizon: alleen als geprojecteerde import inclusief circa 1.900 W boiler binnen het discretionaire importbudget blijft;
+- onvoldoende prijscontext: fallback naar comfort/PV/catch-up;
 - onvoldoende importbudget: `WAIT_IMPORT_BUDGET`.
 
 De bestaande run-locks blijven gelden:
@@ -255,9 +277,9 @@ Op het validatiemoment stond Quatt vrijwel in standby (10,3 W). De Quatt-reserve
 - 1 × `getDevices()` per 5 minuten, **inclusief Quatt**;
 - 1 × `getVariables()` per 5 minuten;
 - alle State/Decision/WW-berekeningen daarna in-memory;
-- PBTH prijscontext iedere 15 minuten via de bestaande Context-scheduler;
-- geen tweede PBTH-scheduler;
+- PBTH prijscontext + WW Planner horizon-evaluatie iedere 15 minuten via dezelfde bestaande Context-scheduler;
+- geen tweede PBTH- of Planner-scheduler;
 - GitHub-publicatie gethrottled;
 - website: nul Homey-calls.
 
-> Laatste update: **19 augustus 2026 — PBTH PriceContext v0.3.** PBTH/DAP15 `NL_Netherlands` is nu de gevalideerde, null-safe prijscontextbron in PURE SHADOW. De adapter gebruikt de bestaande 15-minuten Context-scheduler en heeft geen actuatorwrites. WW Planner/Control-koppeling volgt pas na afzonderlijke shadowvalidatie.
+> Laatste update: **19 augustus 2026 — PBTH PriceContext v0.4 + WW Planner v0.12.** De prijscontext is null-safe en PURE SHADOW. De afgesproken horizonregels zijn actief: ≥12 uur FULL, 6–12 uur INTRADAY en <6 uur/degraded DIAGNOSTIC; nachtvoorverwarming vereist bovendien dekking tot minstens 10:00 de volgende ochtend. Er zijn geen actuatorwrites toegevoegd.
