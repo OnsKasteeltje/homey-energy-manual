@@ -1,6 +1,6 @@
 # Energiecontracten: FIXED en DYNAMIC
 
-_Status: kandidaatarchitectuur — stappen 1 en 2 gebouwd op 19 augustus 2026; nog niet geactiveerd._
+_Status: kandidaatarchitectuur — stappen 1 en 2 gebouwd op 19 augustus 2026; stap 3 shadow-validatie gestart op 19 augustus 2026._
 
 ## Doel
 
@@ -18,7 +18,7 @@ De bestaande productieflows blijven ongewijzigd en actief:
 - `EM v2 | 30 Context | Price + PV v0.5`
 - `EM v2 | 00 Core Tick | v0.9.8`
 
-De nieuwe contractflows staan naast deze baseline, uitgeschakeld en zonder actuatorwrites.
+De nieuwe contractflows draaien tijdens stap 3 parallel naast deze baseline, uitsluitend in shadow en zonder actuatorwrites.
 
 ## Stap 1 — contractconfiguratie en Price Adapter
 
@@ -26,7 +26,7 @@ Kandidaatflow:
 
 - `EM v2 | 30 Context | Contract Price Adapter v0.7`
 - Homey flow-id: `b1c495cb-6ccd-4fb8-b4bf-365845dbb6e7`
-- status: `enabled=false`, `broken=false`
+- status: `enabled=true`, `broken=false`, `SHADOW_CANDIDATE`
 
 Centrale configuratie:
 
@@ -98,7 +98,7 @@ Kandidaatflow:
 
 - `EM v2 | 40 Decision | Contract-aware v0.1`
 - Homey flow-id: `56b87a5c-645c-4a95-9744-880c4d0353bd`
-- status: `enabled=false`, `broken=false`
+- status: `enabled=true`, `broken=false`, `SHADOW_CANDIDATE`
 
 Deze flow gebruikt de bestaande `EM2_State` en `EM2_WW_State`, zodat geen extra apparaatpolling nodig is. Voor prijsbesluiten leest hij uitsluitend `EM2_ContractPrice_*`.
 
@@ -118,25 +118,35 @@ Alle outputs staan op `SHADOW_CANDIDATE`. Er zijn geen writes naar Tesla, boiler
 ## Veiligheidsinvarianten
 
 1. De huidige actieve v0.5/v0.9.8-route wordt door stappen 1 en 2 niet gewijzigd.
-2. Beide nieuwe flows staan uit totdat shadow-validatie expliciet wordt gestart.
+2. Beide nieuwe flows draaien in stap 3 uitsluitend parallel in shadow.
 3. De kandidaatprijscontext heeft een eigen namespace en kan daardoor parallel naast productie draaien.
 4. `FIXED` heeft geen externe PBTH-afhankelijkheid.
 5. `DYNAMIC` classificeert prijs volledig binnen de adapter; downstream bestaat geen M7-prijsafhankelijkheid meer.
 6. Ontbrekende of verouderde prijscontext maakt prijsoptimalisatie onbruikbaar; deadline-, comfort-, PV- en veiligheidslogica blijven de fallback.
 7. Er zijn geen fysieke actuatorwrites in deze kandidaatflows.
 
-## Nog te doen
+## Stap 3 — shadow-validatie
 
-### Stap 3 — shadow-validatie
+_Status: gestart op 19 augustus 2026._
 
-- kandidaatadapter en kandidaatbeslisflow gecontroleerd activeren;
+Uitgevoerd:
+
+- kandidaatadapter gecontroleerd geactiveerd;
+- kandidaatbeslisflow gecontroleerd geactiveerd;
+- beide flows handmatig gestart zonder startfout;
+- safety-check bevestigd: `broken=false`, geïsoleerde kandidaatnamespace en geen actuatorwrites.
+
+Nog te valideren:
+
 - `DYNAMIC` kandidaatbesluiten vergelijken met de huidige v0.5/v0.9.8-besluiten;
 - de nieuwe P25/P75-classificaties observeren op verschillende prijsprofielen;
 - daarna dezelfde situaties met `FIXED` simuleren;
 - verschillen classificeren als verwacht contracteffect, logische verbetering of fout;
 - PBTH-callbelasting bewaken wanneer de kandidaatadapter parallel draait.
 
-### Stap 4 — selector en cut-over
+Observatiebeperking: de Homey Insights-connector levert voor de nieuw aangemaakte kandidaatvariabelen momenteel historische `null`-punten terug en kan die reeks daardoor niet correct parseren. Dit verhindert op dit moment een betrouwbare externe readback van de kandidaatwaarden; daarom is nog geen FIXED-simulatie gestart.
+
+## Stap 4 — selector en cut-over
 
 Na succesvolle shadow-validatie:
 
