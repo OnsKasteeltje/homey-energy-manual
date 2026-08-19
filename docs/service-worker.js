@@ -1,4 +1,4 @@
-const CACHE_NAME = 'home-energy-pwa-v1';
+const CACHE_NAME = 'home-energy-pwa-v2';
 const APP_SHELL = ['./', './manifest.webmanifest', './assets/home-energy-app-icon.svg'];
 
 self.addEventListener('install', event => {
@@ -20,18 +20,22 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Never cache live JSON/status feeds: these must stay fresh.
+  // Live JSON/status feeds must always stay fresh.
   if (url.pathname.endsWith('.json')) return;
 
-  if (request.mode === 'navigate') {
+  // Navigation and code/style assets are network-first so app updates become visible immediately.
+  const isMutableAsset = request.mode === 'navigate' || /\.(?:js|css)$/.test(url.pathname);
+  if (isMutableAsset) {
     event.respondWith(
       fetch(request)
         .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          }
           return response;
         })
-        .catch(() => caches.match(request).then(hit => hit || caches.match('./')))
+        .catch(() => caches.match(request).then(hit => hit || (request.mode === 'navigate' ? caches.match('./') : undefined)))
     );
     return;
   }
