@@ -28,7 +28,7 @@ function baseState(overrides = {}) {
   };
 }
 
-const modelContext = await loadBrowserScript('docs/javascripts/live-energy-model-v1.js');
+const modelContext = await loadBrowserScript('docs/javascripts/live-energy-model-v2.js');
 const Model = modelContext.window.LiveEnergyModel;
 
 test('20 W is standby; above 20 W is active', () => {
@@ -58,14 +58,22 @@ test('battery sign produces charge and discharge correctly', () => {
   assert.equal(discharging.discharge, 600);
 });
 
-test('house fallback is derived from PV, grid and battery when budget is missing', () => {
-  const state = baseState({
+test('house fallback prefers measured physical candidate before arithmetic fallback', () => {
+  const candidate = baseState({
     grid: { power_w: 300 },
     pv: { total_w: 700 },
     battery: { power_w: -200 },
     energy_budget: {},
+    balance: { physical_house_candidate_w: 987 },
   });
-  assert.equal(Model.buildViewModel(state, true).house, 1200);
+  const fromCandidate = Model.buildViewModel(candidate, true);
+  assert.equal(fromCandidate.house, 987);
+  assert.equal(fromCandidate.houseSource, 'BALANCE_PHYSICAL_HOUSE_CANDIDATE');
+
+  delete candidate.balance;
+  const fromMath = Model.buildViewModel(candidate, true);
+  assert.equal(fromMath.house, 1200);
+  assert.equal(fromMath.houseSource, 'MEASURED_PV_GRID_BATTERY');
 });
 
 test('other is residual after measured/known loads and never negative', () => {
@@ -87,6 +95,13 @@ test('other is residual after measured/known loads and never negative', () => {
   assert.equal(Model.buildViewModel(state, true).other, 0);
 });
 
+test('inactive appliance without measured power is normalized to 0 W in the model', () => {
+  const state = baseState({ loads: { washer: { active: false, power_w: null }, dryer: { active: false, power_w: null } } });
+  const vm = Model.buildViewModel(state, true);
+  assert.equal(vm.washer.value, '0 W');
+  assert.equal(vm.dryer.value, '0 W');
+});
+
 test('active appliance without measured power remains explicit and unestimated', () => {
   const state = baseState({ loads: { washer: { active: true, power_w: null }, dryer: { active: false, power_w: 0 } } });
   const vm = Model.buildViewModel(state, true);
@@ -94,6 +109,7 @@ test('active appliance without measured power remains explicit and unestimated',
   assert.equal(vm.washer.power, 0);
   assert.equal(vm.washer.active, false);
   assert.equal(vm.washer.stateActive, true);
+  assert.equal(vm.washer.value, '—');
   assert.match(vm.washer.sub, /vermogen niet apart gemeten/);
 });
 
