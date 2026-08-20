@@ -12,14 +12,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-BUNDLE_VERSION = "v1"
+BUNDLE_VERSION = "v2"
 
 JS_SOURCES = [
     "javascripts/energy-core-v2-adapter-v2.8.50.js",
     "javascripts/em-v2-health-v2.0.4.js",
     "javascripts/homey-status-v2.js",
     "javascripts/pv-phase-24h.js",
-    "javascripts/live-energy-v2.8.66.js",
+    "javascripts/live-energy-model-v1.js",
+    "javascripts/live-energy-v2.8.85.js",
     "javascripts/live-energy-inactive-zero-v2.8.52.js",
     "javascripts/live-energy-balance-guard-v2.8.77.js",
     "javascripts/live-energy-measured-house-fallback-v2.8.79.js",
