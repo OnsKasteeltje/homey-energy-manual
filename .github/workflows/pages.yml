@@ -65,7 +65,10 @@ jobs:
         run: python scripts/build_frontend_bundles.py
 
       - name: Check generated JavaScript bundle
-        run: node --check docs/javascripts/frontend-bundle-v4.js
+        shell: bash
+        run: |
+          VERSION="$(tr -d '\r\n' < frontend-version.txt)"
+          node --check "docs/javascripts/frontend-bundle-${VERSION}.js"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
