@@ -43,12 +43,21 @@ jobs:
           python scripts/validate_repository.py
       - name: Build frontend bundles
         run: python scripts/build_frontend_bundles.py
+      - name: Validate generated frontend artifact
+        run: python scripts/validate_frontend_artifact.py
       - name: Check generated JavaScript bundle
         run: |
           VERSION="$(tr -d '\r\n' < frontend-version.txt)"
           node --check "docs/javascripts/frontend-bundle-${VERSION}.js"
       - name: Build MkDocs
         run: mkdocs build --strict
+      - name: Verify built site references active frontend
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '\r\n' < frontend-version.txt)"
+          grep -R -q "frontend-bundle-${VERSION}.js" site
+          grep -R -q "frontend-bundle-${VERSION}.css" site
+          grep -R -q "Quooker" site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
