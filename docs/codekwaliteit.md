@@ -2,7 +2,7 @@
 
 Deze pagina beschrijft de actuele software-engineeringbaseline van de Homey Energy Manual / Energy Core v2-repository. De regels hieronder gelden naast de functionele architectuurregels in **Architectuur** en veranderen niets aan de fysieke Homey-Control-policy.
 
-## Actuele kwaliteitsbaseline — 20 augustus 2026
+## Actuele kwaliteitsbaseline — 21 augustus 2026
 
 De repository is stapsgewijs gehard op onderhoudbaarheid, testbaarheid, reproduceerbaarheid en fail-safe gedrag.
 
@@ -28,9 +28,10 @@ Belangrijke regels:
 - Business-/energielogica hoort in het model of de normalisatielaag, niet als DOM-correctie achteraf.
 - De Live Energy-renderer tekent het voorberekende view-model en hoort geen nieuwe energiebalansregels te introduceren.
 - De actieve vermogensdrempel is **>20 W**; 20 W of lager wordt niet als actieve energiestroom weergegeven.
-- Onbekend apparaatvermogen wordt niet geschat. Een apparaat kan statusmatig actief zijn terwijl het afzonderlijke vermogen onbekend blijft.
+- Onbekend apparaatvermogen wordt niet geschat.
 - `Overig` is een residuele meetcategorie na aftrek van bekende/gemeten belastingen en wordt nooit negatief weergegeven.
 - P1/netmeting blijft leidend voor de elektrische woningbalans.
+- Quooker is een first-class Live View-load: switchstatus bepaalt OFF/ON_IDLE; P1/L3 bepaalt alleen HEATING en het gemeten vermogen.
 
 ### Frontendbundling
 
@@ -45,7 +46,13 @@ Historische bronversies mogen voor rollback in Git blijven, maar alleen de expli
 De actuele websiteadapter en repositoryvalidator accepteren expliciet:
 
 ```text
-schema_version = 2.10
+schema_version = 2.11
+```
+
+Voor `loads.quooker` zijn minimaal `active`, `switch_on`, `power_w`, `status`, `source` en `fresh` verplicht. De actuele bron is:
+
+```text
+source = HOMEY_SWITCH_PLUS_P1_L3
 ```
 
 Een snapshot wordt alleen als geldig behandeld wanneer de verplichte secties aanwezig zijn en:
@@ -54,45 +61,24 @@ Een snapshot wordt alleen als geldig behandeld wanneer de verplichte secties aan
 state_revision = decision_revision = shadow_revision
 ```
 
-Een onbekende toekomstige `2.x`-versie wordt dus niet automatisch als compatibel beschouwd.
+Een onbekende toekomstige `2.x`-versie wordt niet automatisch als compatibel beschouwd. Een schemawijziging in Core moet daarom **atomair** worden doorgevoerd in publisher, adapter, fixtures/tests, repositoryvalidator en documentatie.
 
-Bij een fetch-, HTTP-, parsing- of contractfout blijft de laatste geldige snapshot beschikbaar als fallback. De frontend publiceert afzonderlijke state-, error- en stale-signalen zodat consumers geen fouttoestand uit impliciete globale state hoeven af te leiden.
-
-## Status-sync
-
-De lokale statusbuilder behandelt ontbrekende of ongeldige Homey-bronnen fail-safe:
-
-- `sync_ok` wordt uit de werkelijke bronstatus berekend en staat niet standaard op `true`;
-- ontbrekende brondata leidt tot `unknown` waar geen betrouwbare conclusie mogelijk is;
-- booleans worden expliciet genormaliseerd en niet via een generieke truthy/falsy-conversie geïnterpreteerd;
-- website/statusverwerking voegt geen extra Homey-devicepolling toe.
+Bij een fetch-, HTTP-, parsing- of contractfout blijft de laatste geldige snapshot beschikbaar als fallback.
 
 ## Automatische tests
 
-De repository bevat Python- en JavaScript-tests die vóór een Pages-deployment worden uitgevoerd.
-
-De huidige kernset controleert onder meer:
+De repository bevat Python- en JavaScript-tests die vóór een Pages-deployment worden uitgevoerd. De kernset controleert onder meer:
 
 - 20 W standby-/actiefgrens;
 - netimport versus netexport;
 - batterij laden versus ontladen;
-- prioriteit van gemeten/afgeleide huislastbronnen;
 - `Overig` als niet-negatief residu;
-- onbekend versus gemeten wasmachine-/drogervermogen;
 - Quatt + CV hybride classificatie;
-- `EnergyStore` state/error-publicatie en unsubscribe;
+- Quooker als zevende Live View-consument;
+- Quooker `ON_IDLE` zonder actieve energiestroom;
+- Quooker `HEATING` met gemeten vermogen en correcte aftrek uit `Overig`;
+- `EnergyStore` state/error-publicatie;
 - repository- en Energy State-contractvalidatie.
-
-### Nog gewenste testuitbreiding
-
-De volgende uitbreiding heeft prioriteit:
-
-1. adaptertests voor schemaacceptatie en schema-afwijzing;
-2. revision-mismatch;
-3. stale state en stale heartbeat;
-4. fetch/HTTP failure met behoud van laatste geldige snapshot;
-5. compatibility facade;
-6. minimaal één DOM-level smoke/integratietest van State → Store → Model → Renderer.
 
 ## CI/CD quality gates
 
@@ -101,108 +87,76 @@ De Pages-pipeline voert vóór deployment uit:
 ```text
 locked dependencies installeren
         ↓
-Python tests
-        ↓
-JavaScript tests
+Python + JavaScript tests
         ↓
 repository-/Energy State-validatie
         ↓
-Ruff correctness checks
-        ↓
-JavaScript syntaxcontrole
+Ruff + JavaScript syntaxcontrole
         ↓
 frontendbundling
         ↓
-bundle syntaxcontrole
+GENERATED BUNDLE INVARIANT
         ↓
 mkdocs build --strict
+        ↓
+DEPLOYED ARTIFACT INVARIANT
         ↓
 Pages artifact/deploy
 ```
 
-Wijzigingen uitsluitend aan runtime-energiedata gebruiken een aparte lichte workflow. Daarmee worden `homey-status.json`, `shadow-status.json` en `energy-state-v2.json` gevalideerd zonder onnodige volledige Pages-build.
+### Bundle- en artifact-invariant
 
-Externe GitHub Actions zijn op immutable commit-SHA's gepind.
+Sinds 21 augustus 2026 geldt een harde extra gate. CI bewijst na bundling dat:
 
-## Dependencies en reproduceerbaarheid
+1. `frontend-version.txt` overeenkomt met de actieve versiegebonden bundle;
+2. `mkdocs.yml` naar exact die bundle verwijst;
+3. alle geconfigureerde frontendbronnen daadwerkelijk in de gegenereerde bundle aanwezig zijn;
+4. kritieke Live View-contractmarkers, waaronder Quooker/`switch_on`/`HEATING`, in de bundle zitten;
+5. na `mkdocs build` het uiteindelijke `site/`-artifact dezelfde versie en markers bevat.
 
-De build gebruikt expliciet vastgelegde Python- en Node-versies. Directe én transitieve Python-dependencies zijn exact vastgelegd in `requirements.lock`; CI voert na installatie `pip check` uit.
+Hierdoor kan de toestand **“broncode op main is nieuw, productie serveert stilzwijgend een oude bundle”** niet meer als succesvolle build passeren.
 
-Bekende resterende hardening:
+### Incident 21 augustus 2026
 
-- dependency-hashes toevoegen en installeren met `pip --require-hashes`;
-- ook de gebruikte `pip`-versie deterministisch maken in plaats van ongepinnd te upgraden.
+Bij de introductie van Quooker in Live View bleef productie op een oude zes-blokkenbundle staan. De directe oorzaak was dat `validate_repository.py` nog uitsluitend Energy State-schema **2.10** accepteerde terwijl Core al schema **2.11** publiceerde. Iedere Pages-build faalde daardoor vóór bundling/deploy.
 
-`pymdownx.snippets` is bewust geblokkeerd zolang de gebruikte dependencylijn daarvoor niet als veilig is vrijgegeven. De repositoryvalidator faalt wanneer deze extensie toch in `mkdocs.yml` wordt geactiveerd.
+De correctie bestaat uit:
+
+- validator bijgewerkt naar schema 2.11;
+- Quooker-contract expliciet gevalideerd;
+- regressietests voor de zevende Live View-load;
+- bundle- en deployed-artifact-invarianten toegevoegd;
+- documentatie van schemawijzigingen aangescherpt.
+
+De productie-Live View publiceerde daarna opnieuw actueel en toont Quooker als afzonderlijke load.
 
 ## Repository-governance
 
-### Actuele tekortkoming
-
-`main` is op 20 augustus 2026 nog **niet beschermd**. De CI-controles zijn daardoor wel sterke post-push gates, maar nog geen verplichte pre-merge poort.
-
-### Gewenste doeltoestand
+`main` is nog niet volledig beschermd. Gewenste doeltoestand blijft:
 
 ```text
-feature/change
-      ↓
-Pull Request
-      ↓
-verplichte tests + validator + build
-      ↓
-alle required checks groen
-      ↓
-merge naar main
-      ↓
-Pages deployment
+feature/change → Pull Request → required checks groen → merge main → Pages deployment
 ```
 
-Daarvoor zijn nog nodig:
+Prioriteiten:
 
 1. branch protection/ruleset voor `main`;
-2. kwaliteitsworkflow ook op `pull_request` laten draaien;
-3. relevante checks als required status checks instellen;
+2. kwaliteitsworkflow ook op `pull_request`;
+3. relevante checks required maken;
 4. directe pushes naar `main` waar praktisch mogelijk beperken.
-
-Dit is de hoogste resterende repository-governanceprioriteit.
-
-## Build hygiene
-
-De frontendversie heeft één source of truth, maar de huidige bundler synchroniseert de placeholder in de tracked `mkdocs.yml` tijdens de build. Functioneel werkt dit, maar een lokale build kan daardoor de working tree wijzigen.
-
-Gewenste vervolgstap is een tijdelijke gegenereerde MkDocs-config te gebruiken, bijvoorbeeld:
-
-```text
-mkdocs.yml
-   ↓
-build/mkdocs.generated.yml
-   ↓
-mkdocs build -f build/mkdocs.generated.yml
-```
-
-De bronconfig blijft dan immutable tijdens een build.
 
 ## Reviewregels voor nieuwe code
 
-Bij iedere relevante codewijziging wordt naast de energiearchitectuur minimaal gecontroleerd:
+Bij iedere relevante wijziging wordt minimaal gecontroleerd:
 
-- is businesslogica testbaar en buiten DOM/rendering gehouden?
-- wordt centrale state hergebruikt in plaats van nieuwe globale state toegevoegd?
-- worden onbekende meetwaarden niet als `0` of als schatting behandeld?
-- blijven schema- en revision-invarianten intact?
-- bestaat voor nieuwe kritieke logica minimaal één regressietest?
-- voegt de wijziging geen nieuwe Homey-polling of dubbele publisher/writer toe?
-- blijft de build reproduceerbaar en CI fail-fast?
-- kan de wijziging veilig worden teruggedraaid?
-
-## Resterende verbeterprioriteiten
-
-1. branch protection + PR quality gate;
-2. adapter- en frontend-integratietests;
-3. dependency-hashes + gepinde pip;
-4. build zonder mutatie van tracked `mkdocs.yml`;
-5. resterende Live Energy-postprocessors geleidelijk naar model- of expliciete UI-modules verplaatsen;
-6. Energy State-contract later formaliseren als JSON Schema;
-7. optioneel commit signing invoeren.
+- businesslogica buiten DOM/rendering;
+- centrale state hergebruiken;
+- onbekende meetwaarden niet als `0` schatten;
+- schema- en revision-invarianten intact;
+- schemawijziging atomair door alle consumers/validators/tests;
+- regressietest voor kritieke nieuwe logica;
+- geen nieuwe onnodige Homey-polling of dubbele writer;
+- gegenereerde bundle én Pages-artifact aantoonbaar synchroon met de bron;
+- veilige rollback mogelijk.
 
 > Deze software-engineeringbaseline verandert geen Homey-Controlstatus. Fysieke actuatorroutes blijven onder de afzonderlijke Shadow-, writer- en cut-overregels van Energy Core v2 vallen.
