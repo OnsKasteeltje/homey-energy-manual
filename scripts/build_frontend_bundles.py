@@ -12,10 +12,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-BUNDLE_VERSION = "v2"
+BUNDLE_VERSION = "v3"
 
 JS_SOURCES = [
-    "javascripts/energy-core-v2-adapter-v2.8.50.js",
+    "javascripts/energy-core-v2-adapter-v2.8.86.js",
     "javascripts/em-v2-health-v2.0.4.js",
     "javascripts/homey-status-v2.js",
     "javascripts/pv-phase-24h.js",
