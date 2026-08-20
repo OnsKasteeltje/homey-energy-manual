@@ -258,6 +258,14 @@ Bij de gevalideerde runtime waren `state_revision`, `decision_revision` en `shad
 
 Website/app, Contract History en andere observatie-/documentatieconsumers staan buiten de kritische fysieke regelroute. Websitebezoek, app-refresh en History↔Live-navigatie mogen geen Homey-devicepolling veroorzaken.
 
+### 12.1 Bekend operationeel punt — periodieke Homey-trigger
+
+Op 20 augustus 2026 is incidenteel waargenomen dat een verwachte vijfminutenrun/publicatie niet aantoonbaar plaatsvond. Een gecontroleerde handmatige run van `EM v2 | 00 Core Tick | v0.10.4` publiceerde daarna direct succesvol een nieuwe, revision-consistente State/Decision/Shadow-snapshot. De Core-logica en GitHub-publicatieroute zijn daarmee functioneel aangetoond.
+
+De bestaande `EM v2 | 05 Watchdog | Core Freshness v0.2.1` blijft als lichte safety net actief en leest in normale werking alleen `EM2_State`; hij voegt geen zelfstandige devicepolling toe. Omdat zowel Core als watchdog periodieke Homey-triggers gebruiken, wordt **geen aanvullende scheduler-/watchdogarchitectuur gebouwd zolang dit niet aantoonbaar een terugkerend operationeel probleem is**.
+
+Status: **KNOWN / MONITOR — geen blocker voor de doelarchitectuur**. Heropenen alleen wanneer stale publicaties zich herhaaldelijk voordoen in normaal bedrijf. Dit voorkomt dat een incidentele schedulerafwijking leidt tot extra polling, parallelle schedulers of onnodige infrastructuurcomplexiteit.
+
 ## 13. Control- en writerdiscipline
 
 Per fysieke actuator geldt als doelarchitectuur:
@@ -321,4 +329,4 @@ Iedere relevante code-/flowwijziging wordt vóór vrijgave minimaal op deze punt
 - iedere inhoudelijke flowwijziging krijgt een nieuwe versie;
 - documentatie en architectuur worden tegelijk met operationele wijzigingen bijgewerkt.
 
-> Laatste architectuurupdate: **20 augustus 2026 — Energy Core v2 / runtimebaseline v0.10.4, schema 2.10.** Homey-load minimalisatie is expliciet geborgd als architectuur-invariant: één centrale read, gedeelde revision-consistente snapshot, in-memory consumers, event-driven waar nodig en geen UI-/history-devicepolling.
+> Laatste architectuurupdate: **20 augustus 2026 — Energy Core v2 / runtimebaseline v0.10.4, schema 2.10.** Homey-load minimalisatie is expliciet geborgd als architectuur-invariant: één centrale read, gedeelde revision-consistente snapshot, in-memory consumers, event-driven waar nodig en geen UI-/history-devicepolling. Incidenteel missen van een periodieke run/publicatie staat als `KNOWN / MONITOR` geregistreerd en leidt zonder herhaald bewijs niet tot extra schedulercomplexiteit.
