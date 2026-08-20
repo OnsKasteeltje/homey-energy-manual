@@ -68,14 +68,15 @@ CSS_SOURCES = [
 ]
 
 
-def build_bundle(sources: list[str], output: str, comment_prefix: str) -> None:
+def build_bundle(sources: list[str], output: str, kind: str) -> None:
     chunks: list[str] = []
     for relative in sources:
         source = DOCS / relative
         if not source.is_file():
             raise FileNotFoundError(f"Frontend source ontbreekt: {source}")
-        text = source.read_text(encoding="utf-8")
-        chunks.append(f"{comment_prefix} source: {relative}\n{text.rstrip()}\n")
+        text = source.read_text(encoding="utf-8").rstrip()
+        marker = f"// source: {relative}" if kind == "js" else f"/* source: {relative} */"
+        chunks.append(f"{marker}\n{text}\n")
 
     target = DOCS / output
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -84,15 +85,8 @@ def build_bundle(sources: list[str], output: str, comment_prefix: str) -> None:
 
 
 def main() -> None:
-    build_bundle(JS_SOURCES, "javascripts/app.bundle.js", "//")
-    build_bundle(CSS_SOURCES, "stylesheets/app.bundle.css", "/*")
-
-    # Close CSS comments opened by the generic source marker above.
-    css = DOCS / "stylesheets/app.bundle.css"
-    css.write_text(
-        css.read_text(encoding="utf-8").replace("/* source:", "/* source:").replace(".css\n", ".css */\n"),
-        encoding="utf-8",
-    )
+    build_bundle(JS_SOURCES, "javascripts/app.bundle.js", "js")
+    build_bundle(CSS_SOURCES, "stylesheets/app.bundle.css", "css")
 
 
 if __name__ == "__main__":
