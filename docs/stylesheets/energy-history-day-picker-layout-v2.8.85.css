@@ -1,0 +1,80 @@
+/* v2.8.85 — readable daily KPI cards + compact selector. */
+#energy-history-dashboard .eh-day-summary-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 190px;
+  gap:22px;
+  align-items:start;
+  margin-bottom:14px;
+}
+
+#energy-history-dashboard .eh-day-summary-row .eh-cards{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(180px,1fr));
+  gap:12px;
+  margin-bottom:0;
+  min-width:0;
+}
+
+#energy-history-dashboard .eh-day-summary-row .eh-card{
+  min-width:0;
+  padding:12px 14px;
+  overflow:visible;
+}
+
+#energy-history-dashboard .eh-day-summary-row .eh-card-label{
+  overflow-wrap:normal;
+  word-break:normal;
+  hyphens:none;
+}
+
+#energy-history-dashboard .eh-day-summary-row .eh-card-value{
+  font-size:1rem;
+  white-space:nowrap;
+  overflow:visible;
+}
+
+#energy-history-dashboard .eh-day-summary-row .eh-day-picker{
+  display:flex !important;
+  flex-direction:column;
+  width:190px;
+  max-width:190px;
+  gap:7px;
+  padding-top:2px;
+  justify-self:end;
+}
+
+#energy-history-dashboard .eh-day-summary-row .eh-day-picker select{
+  box-sizing:border-box;
+  width:190px;
+  min-height:44px;
+}
+
+@media(max-width:1280px){
+  #energy-history-dashboard .eh-day-summary-row{
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+  #energy-history-dashboard .eh-day-summary-row .eh-cards{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+  #energy-history-dashboard .eh-day-summary-row .eh-day-picker{
+    width:190px;
+    max-width:190px;
+    justify-self:end;
+  }
+}
+
+@media(max-width:900px){
+  #energy-history-dashboard .eh-day-summary-row .eh-cards{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(max-width:520px){
+  #energy-history-dashboard .eh-day-summary-row .eh-cards{
+    grid-template-columns:1fr 1fr;
+  }
+  #energy-history-dashboard .eh-day-summary-row .eh-card-value{
+    font-size:.94rem;
+  }
+}
