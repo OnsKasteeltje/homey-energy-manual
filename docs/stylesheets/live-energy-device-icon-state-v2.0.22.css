@@ -1,0 +1,17 @@
+/* Live energiestroom v2.0.22 — device-icoonstatus volgt werkelijk actief elektrisch verbruik.
+   Alleen het icoon verandert van kleur; titel, vermogen en statusregel blijven ongewijzigd.
+   De bestaande >20 W active-threshold uit live-energy-v2.8.66.js bepaalt flow-active/flow-idle. */
+
+#live-energy-flow .energy-node.load.flow-idle .energy-icon:not(.energy-icon-more) {
+  stroke: #edf3fb !important;
+}
+
+#live-energy-flow .energy-node.load.flow-active .energy-icon:not(.energy-icon-more) {
+  stroke: var(--live-orange) !important;
+}
+
+/* Expliciet voorkomen dat de statuskleur doorlekt naar tekst/meetwaarden. */
+#live-energy-flow .energy-node.load .energy-title,
+#live-energy-flow .energy-node.load .energy-value {
+  fill: var(--live-text) !important;
+}
