@@ -41,11 +41,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Run Python tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Run JavaScript tests
+        run: node --test tests/*.test.mjs
+
       - name: Validate repository contracts
         run: python scripts/validate_repository.py
 
       - name: Lint Python for correctness
-        run: ruff check scripts --select E9,F63,F7,F82
+        run: ruff check scripts tests --select E9,F63,F7,F82
 
       - name: Check JavaScript syntax
         shell: bash
