@@ -24,15 +24,52 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
-      - run: pip install -r requirements.txt
+          python-version: "3.13"
+          cache: pip
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install "ruff>=0.12,<1"
+
+      - name: Validate repository contracts
+        run: python scripts/validate_repository.py
+
+      - name: Lint Python for correctness
+        run: ruff check scripts --select E9,F63,F7,F82
+
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find docs/javascripts -type f -name '*.js' ! -name 'frontend-bundle-*.js' -print0)
+
       - name: Build frontend bundles
         run: python scripts/build_frontend_bundles.py
-      - uses: actions/configure-pages@v5
-      - run: mkdocs build --strict
-      - uses: actions/upload-pages-artifact@v4
+
+      - name: Check generated JavaScript bundle
+        run: node --check docs/javascripts/frontend-bundle-v2.js
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build MkDocs strictly
+        run: mkdocs build --strict
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
         with:
           path: site
 
