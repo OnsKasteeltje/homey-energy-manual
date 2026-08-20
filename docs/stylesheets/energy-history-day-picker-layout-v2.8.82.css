@@ -1,0 +1,62 @@
+/* v2.8.82 — place Dag selector to the right of the daily total cards, above the chart. */
+#energy-history-dashboard .eh-day-summary-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(150px,190px);
+  gap:14px;
+  align-items:stretch;
+  margin-bottom:14px;
+}
+
+#energy-history-dashboard .eh-day-summary-row .eh-cards{
+  margin-bottom:0;
+}
+
+#energy-history-dashboard .eh-day-summary-row .eh-day-picker{
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  align-self:stretch;
+  gap:7px;
+  min-width:0;
+  padding-top:2px;
+}
+
+#energy-history-dashboard .eh-day-summary-row .eh-day-picker label{
+  font-size:.78rem;
+  font-weight:600;
+  color:#d6e2ee;
+}
+
+#energy-history-dashboard .eh-day-summary-row .eh-day-picker select{
+  box-sizing:border-box;
+  width:100%;
+  min-height:44px;
+  padding:9px 34px 9px 12px;
+  border:1px solid var(--eh-border);
+  border-radius:10px;
+  background:#f3f4f6;
+  color:#1b2530;
+  font:inherit;
+}
+
+#energy-history-dashboard .eh-toolbar > .eh-day-picker{
+  display:none;
+}
+
+@media(max-width:1180px){
+  #energy-history-dashboard .eh-day-summary-row{
+    grid-template-columns:minmax(0,1fr) minmax(145px,175px);
+  }
+}
+
+@media(max-width:760px){
+  #energy-history-dashboard .eh-day-summary-row{
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+
+  #energy-history-dashboard .eh-day-summary-row .eh-day-picker{
+    width:min(220px,100%);
+    justify-self:end;
+  }
+}
