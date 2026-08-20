@@ -2,17 +2,21 @@
 """Build deterministic frontend bundles for MkDocs.
 
 The source files stay separate for maintainability and rollback. The generated
-bundles preserve the exact source order previously declared in mkdocs.yml.
-Bump BUNDLE_VERSION whenever the active frontend source set changes so deployed
-clients receive an explicit cache-busting asset URL.
+bundles preserve source order. frontend-version.txt is the single source of
+truth for the deployed bundle version; mkdocs.yml is synchronized at build time.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-BUNDLE_VERSION = "v4"
+VERSION_FILE = ROOT / "frontend-version.txt"
+MKDOCS = ROOT / "mkdocs.yml"
+BUNDLE_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
+if not re.fullmatch(r"v\d+", BUNDLE_VERSION):
+    raise ValueError(f"Ongeldige frontendversie: {BUNDLE_VERSION!r}")
 
 JS_SOURCES = [
     "javascripts/energy-store-v1.js",
@@ -89,9 +93,18 @@ def build_bundle(sources: list[str], output: str, kind: str) -> None:
     print(f"Built {target.relative_to(ROOT)} from {len(sources)} sources")
 
 
+def sync_mkdocs_assets() -> None:
+    text = MKDOCS.read_text(encoding="utf-8")
+    text = re.sub(r"frontend-bundle-(?:v\d+|__FRONTEND_VERSION__)\.js", f"frontend-bundle-{BUNDLE_VERSION}.js", text)
+    text = re.sub(r"frontend-bundle-(?:v\d+|__FRONTEND_VERSION__)\.css", f"frontend-bundle-{BUNDLE_VERSION}.css", text)
+    MKDOCS.write_text(text, encoding="utf-8")
+    print(f"Synced mkdocs.yml to frontend {BUNDLE_VERSION}")
+
+
 def main() -> None:
     build_bundle(JS_SOURCES, f"javascripts/frontend-bundle-{BUNDLE_VERSION}.js", "js")
     build_bundle(CSS_SOURCES, f"stylesheets/frontend-bundle-{BUNDLE_VERSION}.css", "css")
+    sync_mkdocs_assets()
 
 
 if __name__ == "__main__":
