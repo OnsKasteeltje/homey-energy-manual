@@ -14,7 +14,7 @@ async function loadBrowserScript(path, extra = {}) {
 
 function baseState(overrides = {}) {
   return {
-    meta: { schema_version: '2.10', state_revision: 1, decision_revision: 1, shadow_revision: 1 },
+    meta: { schema_version: '2.11', state_revision: 1, decision_revision: 1, shadow_revision: 1 },
     grid: { power_w: 500 },
     pv: { total_w: 1000, solaredge_w: 1000, goodwe_4200_w: 0, goodwe_2000_w: 0 },
     battery: { power_w: 0 },
@@ -22,7 +22,11 @@ function baseState(overrides = {}) {
     tesla: { power_w: 0, connected: false },
     hot_water: { boiler_power_w: 0, boiler_on: false },
     quatt: { power_w: 0, thermostat_heating_on: false, cv_requested: false, cv_flame: false },
-    loads: { washer: { active: false, power_w: 0 }, dryer: { active: false, power_w: 0 } },
+    loads: {
+      washer: { active: false, power_w: 0 },
+      dryer: { active: false, power_w: 0 },
+      quooker: { active: false, switch_on: false, power_w: 0, status: 'OFF', source: 'HOMEY_SWITCH_PLUS_P1_L3', fresh: true },
+    },
     manager: { decision: 'HOLD' },
     ...overrides,
   };
@@ -86,13 +90,45 @@ test('other is residual after measured/known loads and never negative', () => {
       washer: { active: true, power_w: 200 },
       dryer: { active: true, power_w: 100 },
       dishwasher: { power_w: 100 },
-      quooker: { power_w: 50 },
+      quooker: { active: true, switch_on: true, status: 'HEATING', power_w: 50 },
     },
   });
   assert.equal(Model.buildViewModel(state, true).other, 350);
 
   state.energy_budget.house_load_w = 100;
   assert.equal(Model.buildViewModel(state, true).other, 0);
+});
+
+test('Quooker is first-class: switch status is separate from heating and residual', () => {
+  const idle = baseState({
+    energy_budget: { house_load_w: 500 },
+    loads: {
+      washer: { active: false, power_w: 0 },
+      dryer: { active: false, power_w: 0 },
+      quooker: { active: false, switch_on: true, status: 'ON_IDLE', power_w: 0, source: 'HOMEY_SWITCH_PLUS_P1_L3', fresh: true },
+    },
+  });
+  const idleVm = Model.buildViewModel(idle, true);
+  assert.equal(idleVm.consumers.length, 7);
+  assert.equal(idleVm.consumers[5].title, 'Quooker');
+  assert.equal(idleVm.quooker.switchOn, true);
+  assert.equal(idleVm.quooker.active, false);
+  assert.equal(idleVm.quooker.sub, 'aan · op temperatuur/idle');
+  assert.equal(idleVm.other, 500);
+
+  const heating = baseState({
+    energy_budget: { house_load_w: 2000 },
+    loads: {
+      washer: { active: false, power_w: 0 },
+      dryer: { active: false, power_w: 0 },
+      quooker: { active: true, switch_on: true, status: 'HEATING', power_w: 1579, source: 'HOMEY_SWITCH_PLUS_P1_L3', fresh: true },
+    },
+  });
+  const heatingVm = Model.buildViewModel(heating, true);
+  assert.equal(heatingVm.quooker.active, true);
+  assert.equal(heatingVm.quooker.power, 1579);
+  assert.equal(heatingVm.consumers[5].active, true);
+  assert.equal(heatingVm.other, 421);
 });
 
 test('inactive appliance without measured power is normalized to 0 W in the model', () => {
