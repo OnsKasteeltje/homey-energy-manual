@@ -28,6 +28,8 @@ jobs:
         with:
           python-version: "3.x"
       - run: pip install -r requirements.txt
+      - name: Build frontend bundles
+        run: python scripts/build_frontend_bundles.py
       - uses: actions/configure-pages@v5
       - run: mkdocs build --strict
       - uses: actions/upload-pages-artifact@v4
