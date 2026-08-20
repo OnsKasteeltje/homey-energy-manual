@@ -1,6 +1,6 @@
 # Flows
 
-De operationele Homey-flows zijn geordend volgens de doelarchitectuur:
+De operationele Homey-flows zijn geordend volgens de Energy Core v2-doelarchitectuur:
 
 - **01 · Meten & observeren**
 - **02 · Context & forecast**
@@ -11,36 +11,52 @@ De operationele Homey-flows zijn geordend volgens de doelarchitectuur:
 - **90 · Historisch / uitgeschakeld**
 - **99 · Temp / diagnostiek**
 
-## Actuele energie-kern
+## Actuele v2-kern
 
-| Laag | Actieve flow | Ritme | Rol |
+De oudere v1-keten met zelfstandige State Collector/Allocator/Live-publicatie is niet meer leidend. De centrale v2-Core maakt één revision-consistente State/Decision/Shadow/publicatieketen.
+
+| Laag | Actieve flow / component | Ritme | Rol |
 |---|---|---:|---|
-| Meten & observeren | `Energy Manager State Collector v1.0` | 2 min | centrale runtime-snapshot |
-| Context & forecast | `M7 - Prijs en PV forecast context - read only` | 15 min | prijs- en PV-context |
-| Shadow / validatie | `Energie Manager PV - Shadow Mode v1.6.7` | 5 min | observeren, boiler-/Equalizeranalyse, shadowhistorie |
-| Shadow / beslissing | `Energy Manager Allocator - Shadow v0.2.4` | 5 min | centrale shadowbeslissing en validatie |
-| Aansturing | `Tesla laden v2.6` | 2 min | enige automatische Easee-writer |
-| Publicatie | `Live energie publicatie v1.2` | 5 min | live website-snapshot uit `EM_Runtime_State` |
-| Publicatie | `GitHub status sync - Homey lokaal v1.4` | 30 min | algemene flow-/shadowstatus |
+| Core | `EM v2 | 00 Core Tick | v0.10.5` | 5 min | centrale snapshot, State, Decision, Shadow, budget en publicatie |
+| Quooker observer | `EM v2 | 01 Quooker Detector | v0.3 SWITCH-AUTH + P1 HEATING` | licht/event-assisted | switchstatus + P1 heatingdetectie, geen fysieke write |
+| Context | `EM v2 | 30 Context | Price + PV v0.4` | 15 min | PBTH/PV-context en WW Planner |
+| Watchdog | `EM v2 | 05 Watchdog | Core Freshness v0.2.1` | periodiek | freshness safety net, geen zelfstandige devicepolling |
+| Publicatie | Core publisher `EM2_CORE_PUBLISH_V0.10.5` | gethrottled | `energy-state-v2.json`, schema 2.11 |
 
 ## Centrale dataketen
 
 ```text
 Homey devices + Logic
         ↓
-Energy Manager State Collector v1.0
-        ↓
-EM_Runtime_State
-        ├─→ Energy Manager Allocator - Shadow v0.2.4
-        └─→ Live energie publicatie v1.2
+EM v2 Core Tick
+        ├─→ State
+        ├─→ Decision
+        ├─→ Shadow
+        ├─→ WW State / Control intent
+        └─→ GitHub energy-state-v2.json
+                       ↓
+                  Website/app
 ```
 
-`Tesla laden v2.6` blijft bewust rechtstreeks actuele Homey/Easee-data lezen omdat de fysieke laadregeling veiligheidskritisch is.
+Voor Quooker geldt aanvullend:
+
+```text
+Homey Cooker-switch ─► OFF / ON_IDLE
+P1/L3 event ─────────► HEATING + power_w
+        ↓
+loads.quooker
+        ↓
+Core/GitHub → Live View
+```
+
+De Quooker-detector gebruikt geen volledige `getDevices()`-snapshot. De bestaande Quooker-flows blijven de fysieke aan/uit-regeling uitvoeren; de v0.3-detector observeert alleen.
+
+## Live View
+
+De Live View toont momenteel zeven afzonderlijke verbruikers: Tesla, Boiler, Ruimteverwarming, Wasmachine, Droger, Quooker en Overig. Alleen werkelijk actief verbruik boven 20 W krijgt een actieve energiestroom. Quooker `ON_IDLE` blijft daarom visueel inactief; `HEATING` wordt actief weergegeven met het gedetecteerde vermogen.
 
 ## Versieregel
 
-Van dezelfde functionele flowfamilie mag maximaal één versie actief zijn. Na de load-optimalisatie van 16 augustus 2026 zijn onder andere v1.6.6, allocator v0.2.3, live energie v1.1 en status-sync v1.3 uitgeschakeld ten gunste van de opvolgers hierboven.
+Van dezelfde functionele flowfamilie mag maximaal één productieversie actief zijn. Bij een inhoudelijke wijziging wordt een hogere versie gemaakt, gevalideerd en geactiveerd; de voorganger wordt uitgeschakeld/SUPERSEDED gehouden als rollback wanneer dat zinvol is.
 
-Gebruik de bestaande flowpagina’s in de navigatie voor de inhoudelijke details van Warm water, Energie Manager, M7, Quooker en GitHub-sync.
-
-> Laatste update: **16 augustus 2026** — centrale state collector en load-geoptimaliseerde flowketen verwerkt.
+> Laatste update: **21 augustus 2026** — v2-Core v0.10.5/schema 2.11, Quooker v0.3 switch-authoritative + P1 heating en actuele Live View verwerkt.
