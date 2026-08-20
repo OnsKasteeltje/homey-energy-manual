@@ -5,21 +5,14 @@
     if(!path) return;
     path.classList.toggle('is-active', !!active);
     path.classList.toggle('is-idle', !active);
-    if(active){
-      path.style.strokeWidth='3.5';
-      path.setAttribute('marker-end','url(#arrow-grid)');
-    } else {
-      path.style.strokeWidth='2';
-      path.removeAttribute('marker-end');
-    }
+    if(active){ path.style.strokeWidth='3.5'; path.setAttribute('marker-end','url(#arrow-grid)'); }
+    else { path.style.strokeWidth='2'; path.removeAttribute('marker-end'); }
   }
 
   function setBusNeutral(path){
     if(!path) return;
-    path.classList.remove('is-active');
-    path.classList.add('is-idle');
-    path.style.strokeWidth='2';
-    path.removeAttribute('marker-end');
+    path.classList.remove('is-active'); path.classList.add('is-idle');
+    path.style.strokeWidth='2'; path.removeAttribute('marker-end');
   }
 
   function confidenceLabel(v){
@@ -40,34 +33,26 @@
     const node=findNode(title);
     if(!node || !load) return;
     const active=load.active===true;
-
-    node.classList.toggle('flow-active',active);
-    node.classList.toggle('flow-idle',!active);
-
-    // De verticale lijn direct vóór de node is de echte apparaat-aftakking.
+    node.classList.toggle('flow-active',active); node.classList.toggle('flow-idle',!active);
     const connector=node.previousElementSibling;
     if(connector?.matches('path.energy-path')) setPathActive(connector,active);
-
     const value=node.querySelector('text.energy-value');
     const sub=node.querySelector('text.energy-sub');
     const numeric=load.power_w!==null && load.power_w!==undefined && Number.isFinite(Number(load.power_w));
 
     if(!active){
-      // In rust geen misleidende 0 W als er geen echte apparaatmeter is.
-      if(load.power_source==='P1_TRANSITION_MODEL' || load.power_estimated===true || !numeric || Number(load.power_w)===0){
-        if(value) value.textContent='—';
-        if(sub) sub.textContent='niet actief';
-      }
-      node.removeAttribute('data-power-estimated');
-      node.removeAttribute('title');
+      // Een betrouwbaar inactief apparaat wordt in de live UI consequent als 0 W weergegeven.
+      // Dit voorkomt dat de 5-seconden state-patch de aparte inactive-zero normalisatie overschrijft.
+      if(value) value.textContent='0 W';
+      if(sub) sub.textContent='niet actief';
+      node.removeAttribute('data-power-estimated'); node.removeAttribute('title');
       return;
     }
 
     if(!numeric){
       if(value) value.textContent='—';
       if(sub) sub.textContent='actief · vermogen niet apart gemeten';
-      node.removeAttribute('data-power-estimated');
-      node.removeAttribute('title');
+      node.removeAttribute('data-power-estimated'); node.removeAttribute('title');
       return;
     }
 
@@ -82,11 +67,9 @@
       return;
     }
 
-    // Echte meting: normale wattageweergave behouden.
     if(value) value.textContent=`${Math.round(Number(load.power_w)).toLocaleString('nl-NL')} W`;
     if(sub) sub.textContent='actief';
-    node.removeAttribute('data-power-estimated');
-    node.removeAttribute('title');
+    node.removeAttribute('data-power-estimated'); node.removeAttribute('title');
   }
 
   function apply(detail){
@@ -94,12 +77,7 @@
     const loads=raw?.loads;
     const root=document.getElementById('live-energy-flow');
     if(!loads || !root) return;
-
-    patchNode('Wasmachine',loads.washer);
-    patchNode('Droger',loads.dryer);
-
-    // De horizontale distributiebus is topologie, geen apparaatstroom.
-    // Houd hem neutraal zodat alleen echte verticale aftakkingen blauw worden.
+    patchNode('Wasmachine',loads.washer); patchNode('Droger',loads.dryer);
     setBusNeutral(root.querySelector('path.energy-right-to-washer'));
     setBusNeutral(root.querySelector('path.energy-washer-to-dryer'));
     setBusNeutral(root.querySelector('path.energy-dryer-to-other'));
