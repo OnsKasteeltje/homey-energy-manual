@@ -1,0 +1,30 @@
+name: Validate runtime energy data
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/data/homey-status.json"
+      - "docs/data/shadow-status.json"
+      - "docs/data/energy-state-v2.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-data-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.15"
+      - name: Validate repository and Energy State contract
+        run: python scripts/validate_repository.py
