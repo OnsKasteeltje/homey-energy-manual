@@ -65,7 +65,7 @@ CSS_SOURCES = [
     "stylesheets/energy-history-v2.8.35.css",
     "stylesheets/energy-history-v2.8.42.css",
     "stylesheets/energy-history-freshness-v2.8.58.css",
-    "stylesheets/energy-history-day-picker-layout-v2.8.83.css",
+    "stylesheets/energy-history-day-picker-layout-v2.8.84.css",
     "stylesheets/app-refresh-v2.0.17.css",
     "stylesheets/home-architecture-v1.css",
 ]
