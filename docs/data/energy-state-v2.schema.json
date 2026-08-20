@@ -3,17 +3,41 @@
   "$id": "energy-state-v2.schema.json",
   "title": "Homey Energy Core v2 State",
   "type": "object",
-  "required": ["meta", "grid", "pv", "battery", "tesla", "hot_water", "loads", "manager"],
+  "required": ["meta", "balance", "grid", "pv", "battery", "energy_budget", "tesla", "hot_water", "loads", "manager"],
   "properties": {
     "meta": {
       "type": "object",
       "required": ["schema_version", "generated_at", "heartbeat_at", "publisher_version", "control_mode"],
       "properties": {
-        "schema_version": {"const": "2.0"},
+        "schema_version": {"const": "2.10"},
         "generated_at": {"type": "string", "format": "date-time"},
         "heartbeat_at": {"type": "string", "format": "date-time"},
-        "publisher_version": {"type": "string"},
+        "publisher_version": {"const": "EM2_CORE_PUBLISH_V0.10.4"},
         "control_mode": {"enum": ["LEGACY", "SHADOW", "HYBRID", "ACTIVE"]}
+      },
+      "additionalProperties": true
+    },
+    "balance": {
+      "type": "object",
+      "required": ["valid", "reason", "control_gate", "fail_closed_flex_budget"],
+      "properties": {
+        "valid": {"type": "boolean", "description": "Backward-compatible alias for derived_house_balance_valid."},
+        "reason": {"type": "string"},
+        "control_gate": {
+          "type": "object",
+          "required": ["p1_fresh", "grid_measurement_valid", "derived_house_balance_valid", "flex_budget_source"],
+          "properties": {
+            "p1_fresh": {"type": "boolean"},
+            "grid_measurement_valid": {"type": "boolean", "description": "Authoritative gate for P1 net import/export and flex-export budget."},
+            "derived_house_balance_valid": {"type": "boolean", "description": "Validity of reconstructed house/PV balance, residual and related diagnostics."},
+            "flex_budget_source": {"enum": ["P1_NET_EXPORT", "P1_STALE"]}
+          },
+          "additionalProperties": true
+        },
+        "physical_house_candidate_w": {"type": ["number", "null"]},
+        "known_measured_load_w": {"type": ["number", "null"]},
+        "residual_w": {"type": ["number", "null"]},
+        "fail_closed_flex_budget": {"type": "boolean", "description": "True only when the P1/grid measurement gate is invalid; derived PV/house skew alone must not close P1 flex."}
       },
       "additionalProperties": true
     },
@@ -23,7 +47,9 @@
         "power_w": {"type": ["number", "null"], "description": "Positief = import, negatief = export"},
         "l1_w": {"type": ["number", "null"]},
         "l2_w": {"type": ["number", "null"]},
-        "l3_w": {"type": ["number", "null"]}
+        "l3_w": {"type": ["number", "null"]},
+        "import_w": {"type": ["number", "null"]},
+        "export_w": {"type": ["number", "null"]}
       },
       "additionalProperties": true
     },
@@ -42,7 +68,30 @@
       "properties": {
         "soc_pct": {"type": ["number", "null"]},
         "power_w": {"type": ["number", "null"], "description": "Positief = laden, negatief = ontladen"},
-        "state": {"type": ["string", "null"]}
+        "state": {"type": ["string", "null"]},
+        "integrated": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    },
+    "energy_budget": {
+      "type": "object",
+      "required": ["flex_export_budget_w", "flex_budget_source", "grid_measurement_valid", "derived_house_balance_valid", "balance_valid"],
+      "properties": {
+        "house_load_w": {"type": ["number", "null"]},
+        "known_flexible_load_w": {"type": ["number", "null"]},
+        "comfort_load_w": {"type": ["number", "null"]},
+        "other_house_load_w": {"type": ["number", "null"]},
+        "grid_safety_reserve_w": {"type": ["number", "null"]},
+        "quatt_ramp_reserve_w": {"type": ["number", "null"]},
+        "flex_export_budget_w": {"type": ["number", "null"]},
+        "flex_budget_source": {"enum": ["P1_NET_EXPORT", "P1_STALE"]},
+        "discretionary_import_budget_w": {"type": ["number", "null"]},
+        "battery_support_w": {"type": ["number", "null"]},
+        "battery_integrated": {"type": "boolean"},
+        "grid_measurement_valid": {"type": "boolean"},
+        "derived_house_balance_valid": {"type": "boolean"},
+        "balance_valid": {"type": "boolean", "description": "Backward-compatible alias for derived_house_balance_valid."},
+        "balance_reason": {"type": "string"}
       },
       "additionalProperties": true
     },
@@ -53,7 +102,7 @@
         "charging": {"type": ["boolean", "null"]},
         "power_w": {"type": ["number", "null"]},
         "requested_a": {"type": ["number", "null"]},
-        "deadline_at": {"type": ["string", "null"], "format": "date-time"},
+        "deadline_at": {"type": ["string", "null"]},
         "need": {"type": ["string", "null"]}
       },
       "additionalProperties": true
@@ -63,8 +112,9 @@
       "properties": {
         "boiler_on": {"type": ["boolean", "null"]},
         "boiler_power_w": {"type": ["number", "null"]},
-        "demand": {"type": ["string", "null"]},
-        "target_today": {"type": ["string", "null"]}
+        "mode": {},
+        "day_state": {"type": ["object", "null"]},
+        "control": {"type": ["object", "null"]}
       },
       "additionalProperties": true
     },
@@ -86,7 +136,9 @@
         "reason": {"type": ["string", "null"]},
         "priority": {"enum": ["MUST", "SHOULD", "MAY", "NONE", null]},
         "constraints": {"type": "array", "items": {"type": "string"}},
-        "state_dirty": {"type": "boolean"}
+        "state_dirty": {"type": "boolean"},
+        "flex_export_budget_w": {"type": ["number", "null"]},
+        "discretionary_import_budget_w": {"type": ["number", "null"]}
       },
       "additionalProperties": true
     }
