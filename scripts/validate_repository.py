@@ -52,8 +52,8 @@ def validate_energy_state() -> None:
 
     meta = require(raw, "meta", dict, "root")
     schema = require(meta, "schema_version", str, "meta")
-    if schema != "2.10":
-        raise SystemExit(f"Unsupported energy-state schema: {schema!r}; expected '2.10'")
+    if schema != "2.11":
+        raise SystemExit(f"Unsupported energy-state schema: {schema!r}; expected '2.11'")
 
     for field in ("generated_at", "heartbeat_at", "publisher_version", "control_mode"):
         require(meta, field, str, "meta")
@@ -73,6 +73,22 @@ def validate_energy_state() -> None:
     gate = require(balance, "control_gate", dict, "balance")
     require(gate, "grid_measurement_valid", bool, "balance.control_gate")
     require(gate, "derived_house_balance_valid", bool, "balance.control_gate")
+
+    loads = require(raw, "loads", dict, "root")
+    quooker = require(loads, "quooker", dict, "loads")
+    require(quooker, "active", bool, "loads.quooker")
+    require(quooker, "switch_on", bool, "loads.quooker")
+    require(quooker, "power_w", (int, float), "loads.quooker")
+    require(quooker, "status", str, "loads.quooker")
+    require(quooker, "source", str, "loads.quooker")
+    require(quooker, "fresh", bool, "loads.quooker")
+    if quooker["source"] != "HOMEY_SWITCH_PLUS_P1_L3":
+        raise SystemExit(
+            "Unsupported loads.quooker.source: "
+            f"{quooker['source']!r}; expected 'HOMEY_SWITCH_PLUS_P1_L3'"
+        )
+    if quooker["status"] not in {"OFF", "ON_IDLE", "HEATING", "STALE"}:
+        raise SystemExit(f"Unsupported loads.quooker.status: {quooker['status']!r}")
 
     revisions = {meta["state_revision"], meta["decision_revision"], meta["shadow_revision"]}
     if len(revisions) != 1:
