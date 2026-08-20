@@ -3,6 +3,8 @@
 
 The source files stay separate for maintainability and rollback. The generated
 bundles preserve the exact source order previously declared in mkdocs.yml.
+Bump BUNDLE_VERSION whenever the active frontend source set changes so deployed
+clients receive an explicit cache-busting asset URL.
 """
 from __future__ import annotations
 
@@ -10,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
+BUNDLE_VERSION = "v1"
 
 JS_SOURCES = [
     "javascripts/energy-core-v2-adapter-v2.8.50.js",
@@ -85,8 +88,8 @@ def build_bundle(sources: list[str], output: str, kind: str) -> None:
 
 
 def main() -> None:
-    build_bundle(JS_SOURCES, "javascripts/app.bundle.js", "js")
-    build_bundle(CSS_SOURCES, "stylesheets/app.bundle.css", "css")
+    build_bundle(JS_SOURCES, f"javascripts/frontend-bundle-{BUNDLE_VERSION}.js", "js")
+    build_bundle(CSS_SOURCES, f"stylesheets/frontend-bundle-{BUNDLE_VERSION}.css", "css")
 
 
 if __name__ == "__main__":
