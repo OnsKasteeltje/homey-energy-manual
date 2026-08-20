@@ -1,40 +1,40 @@
 {
   "meta": {
     "schema_version": "2.6",
-    "generated_at": "2026-08-20T06:50:00.425Z",
-    "heartbeat_at": "2026-08-20T06:50:00.425Z",
+    "generated_at": "2026-08-20T07:10:00.429Z",
+    "heartbeat_at": "2026-08-20T07:10:00.429Z",
     "publisher_version": "EM2_CORE_PUBLISH_V0.9.8",
     "control_mode": "SHADOW",
-    "source_sample_at": "2026-08-20T06:50:00.041Z",
-    "state_revision": 760,
-    "decision_revision": 760,
-    "shadow_revision": 760,
+    "source_sample_at": "2026-08-20T07:10:00.044Z",
+    "state_revision": 764,
+    "decision_revision": 764,
+    "shadow_revision": 764,
     "state_age_sec": 0,
     "publish_reason": "REVISION_THROTTLED",
     "min_publish_interval_sec": 300
   },
   "balance": {
-    "valid": true,
-    "reason": "OK",
+    "valid": false,
+    "reason": "NEGATIVE_HOUSE_BALANCE",
     "tolerance_w": 75,
-    "physical_house_candidate_w": 392.5,
+    "physical_house_candidate_w": -112.1,
     "known_measured_load_w": 10.3,
-    "residual_w": 382.2,
-    "fail_closed_flex_budget": false
+    "residual_w": null,
+    "fail_closed_flex_budget": true
   },
   "grid": {
-    "power_w": -493,
-    "l1_w": 152,
-    "l2_w": 52,
-    "l3_w": -697,
+    "power_w": -1684,
+    "l1_w": 310,
+    "l2_w": -379,
+    "l3_w": -1615,
     "import_w": 0,
-    "export_w": 493
+    "export_w": 1684
   },
   "pv": {
-    "total_w": 885.51,
-    "solaredge_w": 319.51,
+    "total_w": 1571.8600000000001,
+    "solaredge_w": 633.86,
     "goodwe_4200_w": 209,
-    "goodwe_2000_w": 357
+    "goodwe_2000_w": 729
   },
   "battery": {
     "soc_pct": null,
@@ -58,18 +58,18 @@
     "ramp_reserve_w": 100
   },
   "energy_budget": {
-    "house_load_w": 393,
+    "house_load_w": null,
     "known_flexible_load_w": 0,
     "comfort_load_w": 10,
-    "other_house_load_w": 382,
+    "other_house_load_w": null,
     "grid_safety_reserve_w": 200,
     "quatt_ramp_reserve_w": 100,
-    "flex_export_budget_w": 193,
+    "flex_export_budget_w": 0,
     "discretionary_import_budget_w": 4000,
     "battery_support_w": 0,
     "battery_integrated": false,
-    "balance_valid": true,
-    "balance_reason": "OK"
+    "balance_valid": false,
+    "balance_reason": "NEGATIVE_HOUSE_BALANCE"
   },
   "tesla": {
     "connected": false,
@@ -84,10 +84,10 @@
     "deadline_active": true
   },
   "equalizer": {
-    "power_w": -422,
-    "l1_a": 0,
-    "l2_a": 2,
-    "l3_a": -3
+    "power_w": -1740,
+    "l1_a": 1,
+    "l2_a": -2,
+    "l3_a": -7
   },
   "hot_water": {
     "boiler_on": false,
@@ -97,9 +97,9 @@
       "schema": "EM2_WW_STATE_V0.8",
       "date": "2026-08-20",
       "startedAt": "2026-08-19T22:00:00.047Z",
-      "updatedAt": "2026-08-20T06:50:00.396Z",
-      "sourceRevision": 760,
-      "lastStateSampleAt": "2026-08-20T06:50:00.041Z",
+      "updatedAt": "2026-08-20T07:10:00.401Z",
+      "sourceRevision": 764,
+      "lastStateSampleAt": "2026-08-20T07:10:00.044Z",
       "boilerOnMinToday": 415,
       "heatingMinToday": 40,
       "heatingAccountingQuality": "FROM_STATE_START",
@@ -118,7 +118,7 @@
       "boilerOn": false,
       "boilerPowerW": 0,
       "remainingFallbackMin": 200,
-      "minuteOfDay": 530,
+      "minuteOfDay": 550,
       "catchupRequired": false,
       "stateAgeSec": 0,
       "fallbackAccounting": "CONFIRMED_HEATING_MINUTES",
@@ -138,10 +138,10 @@
     },
     "control": {
       "schema": "EM2_CONTROL_WW_V0.11",
-      "generatedAt": "2026-08-20T06:50:00.410Z",
+      "generatedAt": "2026-08-20T07:10:00.416Z",
       "controlMode": "SHADOW",
       "readOnly": true,
-      "sourceRevision": 760,
+      "sourceRevision": 764,
       "action": "HOLD",
       "priority": "MAY",
       "reason": "Voor 09:30 wachten op PV/prijs-opportunity",
@@ -154,21 +154,21 @@
         "revisionMatch": true,
         "wwStateFresh": true,
         "contextFresh": false,
-        "priceHorizonOk": false,
+        "priceHorizonOk": true,
         "priceImportGuardOk": true,
-        "balanceValid": true
+        "balanceValid": false
       },
       "inputs": {
         "boilerOn": false,
         "boilerPowerW": 0,
         "mode": true,
-        "gridW": -493,
-        "exportW": 493,
+        "gridW": -1684,
+        "exportW": 1684,
         "importW": 0,
-        "flexExportBudgetW": 193,
+        "flexExportBudgetW": 0,
         "discretionaryImportBudgetW": 4000,
-        "balanceValid": true,
-        "balanceReason": "OK",
+        "balanceValid": false,
+        "balanceReason": "NEGATIVE_HOUSE_BALANCE",
         "quattPowerW": 10.3,
         "quattRampReserveW": 100,
         "goalReached": false,
@@ -189,10 +189,10 @@
         "priceNegative": false,
         "priceCheapNext4h": false,
         "priceExpensiveNext4h": false,
-        "priceHorizonMin": 10,
-        "priceHorizonOk": false,
+        "priceHorizonMin": 50,
+        "priceHorizonOk": true,
         "pvTop4h": false,
-        "wwStateUpdatedAt": "2026-08-20T06:50:00.396Z",
+        "wwStateUpdatedAt": "2026-08-20T07:10:00.401Z",
         "wwStateQuality": "PARTIAL_FROM_START_TIME"
       },
       "policy": {
@@ -245,17 +245,18 @@
     "quooker": null
   },
   "manager": {
-    "state": "SURPLUS",
+    "state": "SURPLUS_HIGH",
     "decision": "HOLD",
-    "reason": "Geen harde verplichting of sterke opportunity",
+    "reason": "Energiebalans ongeldig (NEGATIVE_HOUSE_BALANCE); flex-export opportunities geblokkeerd",
     "priority": "MAY",
     "constraints": [
       "QUATT_OBSERVE_ONLY_10W",
-      "QUATT_RAMP_RESERVE_100W"
+      "QUATT_RAMP_RESERVE_100W",
+      "BALANCE_INVALID_NEGATIVE_HOUSE_BALANCE"
     ],
     "state_dirty": true,
     "state_age_sec": 0,
-    "flex_export_budget_w": 193,
+    "flex_export_budget_w": 0,
     "discretionary_import_budget_w": 4000
   },
   "shadow": {
@@ -268,19 +269,19 @@
       "boilerOn": false,
       "boilerPowerW": 0,
       "quattPowerW": 10.3,
-      "flexExportBudgetW": 193,
-      "balanceValid": true
+      "flexExportBudgetW": 0,
+      "balanceValid": false
     },
     "decision": {
       "priority": "MAY",
       "intent": "HOLD",
-      "reason": "Geen harde verplichting of sterke opportunity"
+      "reason": "Energiebalans ongeldig (NEGATIVE_HOUSE_BALANCE); flex-export opportunities geblokkeerd"
     }
   },
   "context": {
     "updated_at": "2026-08-19T12:15:10.154Z",
     "fresh": false,
-    "age_sec": 66890,
+    "age_sec": 68090,
     "price_negative": false,
     "price_cheap_next4h": true,
     "price_expensive_next4h": false,
