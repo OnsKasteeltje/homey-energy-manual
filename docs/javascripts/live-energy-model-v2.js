@@ -46,6 +46,7 @@
     const heatingRaw=raw.quatt||raw.heating||{};
     const batteryRaw=raw.battery||{};
     const loadsRaw=raw.loads||{};
+    const quookerRaw=loadsRaw.quooker||{};
     const metaRaw=raw.meta||{};
 
     const solaredge=pos(pvRaw.solaredge_w);
@@ -69,12 +70,29 @@
     const washer=appliance(loadsRaw.washer);
     const dryer=appliance(loadsRaw.dryer);
 
-    const otherKnownExtras=['dishwasher','quooker'].reduce((sum,key)=>{
+    const quookerPower=finite(quookerRaw.power_w)?pos(quookerRaw.power_w):0;
+    const quookerSwitchOn=quookerRaw.switch_on===true;
+    const quookerStatus=String(quookerRaw.status||'UNKNOWN').toUpperCase();
+    const quookerHeating=quookerRaw.active===true&&quookerStatus==='HEATING'&&isActive(quookerPower);
+    const quookerSub=quookerHeating?'verwarmt':quookerSwitchOn?'aan · op temperatuur/idle':'uit';
+    const quooker={
+      known:finite(quookerRaw.power_w),
+      power:quookerPower,
+      active:quookerHeating,
+      switchOn:quookerSwitchOn,
+      status:quookerStatus,
+      value:fmt(quookerPower),
+      sub:quookerSub,
+      source:quookerRaw.source||null,
+      fresh:quookerRaw.fresh!==false
+    };
+
+    const otherKnownExtras=['dishwasher'].reduce((sum,key)=>{
       const load=loadsRaw[key];
       return sum+(load&&finite(load.power_w)?pos(load.power_w):0);
     },0);
 
-    const other=Math.max(0,house-tesla-boiler-quatt-washer.power-dryer.power-otherKnownExtras);
+    const other=Math.max(0,house-tesla-boiler-quatt-washer.power-dryer.power-quooker.power-otherKnownExtras);
 
     const thermal=pos(heatingRaw.thermal_power_w);
     const thermostatHeating=heatingRaw.thermostat_heating_on===true;
@@ -101,34 +119,27 @@
     const otherSub=uncertain.length?`incl. ${uncertain.join(' + ')}`:'rest na bekende vermogens';
 
     const consumers=[
-      {x:55,title:'Tesla',value:fmt(tesla),sub:isActive(tesla)?'laden':(teslaRaw.connected?'aangesloten · geen actief verbruik':'niet aangesloten'),w:tesla,active:isActive(tesla),ico:'car'},
-      {x:295,title:'Boiler',value:fmt(boiler),sub:isActive(boiler)?'verwarmt':(hotWaterRaw.boiler_on?'aan · geen actief verbruik':'uit'),w:boiler,active:isActive(boiler),ico:'boiler'},
-      {x:535,title:'Ruimteverwarming',value:fmt(quatt),sub:heatSub,w:quatt,active:quattFlowActive,ico:'heat'},
-      {x:775,title:'Wasmachine',value:washer.value,sub:washer.sub,w:washer.power,active:washer.active,ico:'washer'},
-      {x:1015,title:'Droger',value:dryer.value,sub:dryer.sub,w:dryer.power,active:dryer.active,ico:'dryer'},
+      {x:25,title:'Tesla',value:fmt(tesla),sub:isActive(tesla)?'laden':(teslaRaw.connected?'aangesloten · geen actief verbruik':'niet aangesloten'),w:tesla,active:isActive(tesla),ico:'car'},
+      {x:230,title:'Boiler',value:fmt(boiler),sub:isActive(boiler)?'verwarmt':(hotWaterRaw.boiler_on?'aan · geen actief verbruik':'uit'),w:boiler,active:isActive(boiler),ico:'boiler'},
+      {x:435,title:'Ruimteverwarming',value:fmt(quatt),sub:heatSub,w:quatt,active:quattFlowActive,ico:'heat'},
+      {x:640,title:'Wasmachine',value:washer.value,sub:washer.sub,w:washer.power,active:washer.active,ico:'washer'},
+      {x:845,title:'Droger',value:dryer.value,sub:dryer.sub,w:dryer.power,active:dryer.active,ico:'dryer'},
+      {x:1050,title:'Quooker',value:quooker.value,sub:quooker.sub,w:quooker.power,active:quooker.active,ico:'quooker'},
       {x:1255,title:'Overig',value:fmt(other),sub:isActive(other)?otherSub:'laag/stand-by restverbruik',w:other,active:isActive(other),ico:'more'}
     ];
 
-    const bus={
-      leftHeat:activeW(tesla)+activeW(boiler)+activeW(quatt),
-      leftBoiler:activeW(tesla)+activeW(boiler),
-      leftTesla:activeW(tesla),
-      rightWasher:activeW(washer.power)+activeW(dryer.power)+activeW(other),
-      rightDryer:activeW(dryer.power)+activeW(other),
-      rightOther:activeW(other)
-    };
-    bus.total=bus.leftHeat+bus.rightWasher;
+    const bus={total:consumers.reduce((sum,c)=>sum+activeW(c.w),0)};
 
     const cvState=cvRequested?'CV ondersteuning gevraagd':'CV niet gevraagd';
     const cvDiag=cvKnown?(cvFlame?'OpenTherm · brander actief':'OpenTherm · brander niet actief'):'OpenTherm · branderfeedback niet beschikbaar';
     const quattState=quattFlowActive?'verwarmt':thermostatHeating?'warmtevraag':'geen warmtevraag';
-    const assigned=tesla+boiler+quatt+washer.power+dryer.power+otherKnownExtras;
+    const assigned=tesla+boiler+quatt+washer.power+dryer.power+quooker.power+otherKnownExtras;
 
     return {
       thresholdW:ACTIVE_THRESHOLD_W,
       fresh:freshness!==false,
       meta:metaRaw,
-      raw:{tesla:teslaRaw,hotWater:hotWaterRaw,manager:raw.manager||{}},
+      raw:{tesla:teslaRaw,hotWater:hotWaterRaw,manager:raw.manager||{},quooker:quookerRaw},
       pv,
       grid,
       importW,
@@ -142,6 +153,7 @@
       quatt,
       washer,
       dryer,
+      quooker,
       other,
       otherKnownExtras,
       heatSub,
