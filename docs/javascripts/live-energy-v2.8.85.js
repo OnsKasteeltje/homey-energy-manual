@@ -22,6 +22,7 @@
     else if(name==='heat') a.push('<path d="M-22 15 V-7 L0-25 L22-7 V15 H8 V2 H-8 V15 Z M-15 26 C-21 20-8 16-15 10 M0 26 C-6 20 7 16 0 10 M15 26 C9 20 22 16 15 10"/>');
     else if(name==='washer') a.push('<rect x="-22" y="-28" width="44" height="56" rx="3"/><circle cx="0" cy="5" r="14"/><path d="M-14-18 H4 M12-18 H15"/>');
     else if(name==='dryer') a.push('<rect x="-22" y="-28" width="44" height="56" rx="3"/><circle cx="0" cy="5" r="14"/><path d="M-14-18 H4 M12-18 H15 M-7 5 C-2-3 4-3 9 5 C4 13-2 13-7 5"/>');
+    else if(name==='quooker') a.push('<path d="M-18-13 H12 V18 H-18 Z M12-7 H20 C28-7 28 9 20 9 H12 M-10-21 H4 M-3-21 V-13 M-11 27 C-17 21-5 17-11 11 M4 27 C-2 21 10 17 4 11"/>');
     else if(name==='more') a.push('<circle cx="-14" cy="0" r="3"/><circle cx="0" cy="0" r="3"/><circle cx="14" cy="0" r="3"/>');
     return `<g class="energy-icon energy-icon-${name}" transform="translate(${x} ${y}) scale(${s})">${a.join('')}</g>`;
   }
@@ -44,6 +45,35 @@
     return path(d,shown,'grid',active,`energy-consumption-segment ${extra}`,false);
   }
 
+  function renderConsumptionBus(consumers,busY,hubX){
+    let out='';
+    const withCenters=consumers.map(c=>({...c,cx:c.x+95}));
+    const total=withCenters.reduce((sum,c)=>sum+activeW(c.w),0);
+    out+=busPath(`M${hubX} 410 V${busY}`,total,'energy-feed');
+
+    const left=withCenters.filter(c=>c.cx<hubX).sort((a,b)=>b.cx-a.cx);
+    let remainingLeft=left.reduce((sum,c)=>sum+activeW(c.w),0),prevLeft=hubX;
+    left.forEach((c,index)=>{
+      out+=busPath(`M${prevLeft} ${busY} H${c.cx}`,remainingLeft,`energy-left-segment-${index}`);
+      remainingLeft-=activeW(c.w);
+      prevLeft=c.cx;
+    });
+
+    const right=withCenters.filter(c=>c.cx>hubX).sort((a,b)=>a.cx-b.cx);
+    let remainingRight=right.reduce((sum,c)=>sum+activeW(c.w),0),prevRight=hubX;
+    right.forEach((c,index)=>{
+      out+=busPath(`M${prevRight} ${busY} H${c.cx}`,remainingRight,`energy-right-segment-${index}`);
+      remainingRight-=activeW(c.w);
+      prevRight=c.cx;
+    });
+
+    withCenters.forEach(c=>{
+      out+=path(`M${c.cx} ${busY} V570`,activeW(c.w),'grid',c.active,'',true);
+      out+=smallNode(c.x,570,190,145,c.title,c.value,c.sub,c.title==='Overig'?'load residual':'load',c.ico,c.active);
+    });
+    return out;
+  }
+
   function renderRaw(raw,freshness){
     const root=document.getElementById('live-energy-flow');
     if(!root||!raw) return;
@@ -53,8 +83,8 @@
 
     const {
       pv,grid,importW,exportW,charge,discharge,house,tesla,boiler,quatt,
-      washer,dryer,other,heatSub,quattFlowActive,cvRequested,cvKnown,cvFlame,
-      cvState,cvDiag,quattState,assigned,consumers,bus,fresh,meta,raw:source
+      washer,dryer,quooker,other,heatSub,quattFlowActive,cvRequested,cvKnown,cvFlame,
+      cvState,cvDiag,quattState,assigned,consumers,fresh,meta,raw:source
     }=vm;
 
     const W=1500,H=900;
@@ -79,25 +109,13 @@
     svg+=`<text x="990" y="99" text-anchor="middle" class="energy-topology-label">AC-bus</text>`;
 
     const busY=505;
-    svg+=busPath(`M750 410 V${busY}`,bus.total,'energy-feed');
-    svg+=busPath(`M750 ${busY} H630`,bus.leftHeat,'energy-left-to-heating');
-    svg+=busPath(`M630 ${busY} H390`,bus.leftBoiler,'energy-heating-to-boiler');
-    svg+=busPath(`M390 ${busY} H150`,bus.leftTesla,'energy-boiler-to-tesla');
-    svg+=busPath(`M750 ${busY} H870`,bus.rightWasher,'energy-right-to-washer');
-    svg+=busPath(`M870 ${busY} H1110`,bus.rightDryer,'energy-washer-to-dryer');
-    svg+=busPath(`M1110 ${busY} H1350`,bus.rightOther,'energy-dryer-to-other');
-
-    consumers.forEach(c=>{
-      const cx=c.x+95;
-      svg+=path(`M${cx} ${busY} V570`,activeW(c.w),'grid',c.active,'',true);
-      svg+=smallNode(c.x,570,190,145,c.title,c.value,c.sub,c.title==='Overig'?'load residual':'load',c.ico,c.active);
-    });
+    svg+=renderConsumptionBus(consumers,busY,750);
 
     svg+=`<g class="energy-legend"><rect x="55" y="760" width="650" height="105" rx="15"/><line x1="82" y1="793" x2="126" y2="793" class="legend-pv"/><text x="145" y="798">Opwek / laden / export</text><line x1="82" y1="825" x2="126" y2="825" class="legend-grid"/><text x="145" y="830">Actief verbruik &gt; ${ACTIVE_THRESHOLD_W} W</text><line x1="380" y1="793" x2="424" y2="793" class="legend-topology"/><text x="443" y="798">Net ↔ accu via AC-bus</text><text x="380" y="830" class="legend-note">≤ ${ACTIVE_THRESHOLD_W} W = stand-by/laag · geen actieve pijl</text></g>`;
     svg+=`<text x="750" y="886" text-anchor="middle" class="energy-rule">Waarden blijven meetkundig zichtbaar; actieve verbruiksstromen worden pas boven ${ACTIVE_THRESHOLD_W} W gemarkeerd.</text></svg>`;
 
     const hybrid=`<div class="energy-manager-panel heating-hybrid-panel"><div class="energy-manager-title"><strong>Verwarmingsopwekking · Quatt Hybrid</strong><span>één functioneel verwarmingssysteem</span></div><div class="energy-manager-grid"><div><small>QUATT WARMTEPOMP</small><strong>${fmt(quatt)} elektrisch</strong><span>${esc(quattState)}</span></div><div><small>CV-KETEL</small><strong>${esc(cvState)}</strong><span>${esc(cvDiag)}</span></div><div><small>ENERGIEBALANS</small><strong>Woning ${fmt(house)}</strong><span>bekend toegewezen ${fmt(assigned)} · Overig ${fmt(other)}</span></div></div></div>`;
-    const manager=`<div class="energy-manager-panel"><div class="energy-manager-title"><strong>Energiemanager</strong><span>functionele status</span></div><div class="energy-manager-grid"><div><small>TESLA</small><strong>${isActive(tesla)?'● Laden':'○ Niet actief'}</strong><span>${esc(source.tesla.need||source.manager.decision||'HOLD')}</span></div><div><small>BOILER</small><strong>${source.hotWater.day_state?.goalReachedToday||source.hotWater.day_state?.goalReached?'● Dagdoel bereikt':isActive(boiler)?'● Verwarmt':'○ Geen actief verbruik'}</strong><span>${esc(source.hotWater.control?.reason||'')}</span></div><div><small>RUIMTEVERWARMING</small><strong>${quattFlowActive&&cvRequested?'● Hybride':quattFlowActive?'● Quatt verwarmt':cvRequested?'● CV gevraagd':'○ Geen actief elektrisch verbruik'}</strong><span>${esc(heatSub)}</span></div></div></div>`;
+    const manager=`<div class="energy-manager-panel"><div class="energy-manager-title"><strong>Energiemanager</strong><span>functionele status</span></div><div class="energy-manager-grid"><div><small>TESLA</small><strong>${isActive(tesla)?'● Laden':'○ Niet actief'}</strong><span>${esc(source.tesla.need||source.manager.decision||'HOLD')}</span></div><div><small>BOILER</small><strong>${source.hotWater.day_state?.goalReachedToday||source.hotWater.day_state?.goalReached?'● Dagdoel bereikt':isActive(boiler)?'● Verwarmt':'○ Geen actief verbruik'}</strong><span>${esc(source.hotWater.control?.reason||'')}</span></div><div><small>QUOOKER</small><strong>${quooker.active?'● Verwarmt':quooker.switchOn?'○ Aan · idle':'○ Uit'}</strong><span>${esc(quooker.active?fmt(quooker.power):quooker.sub)}</span></div><div><small>RUIMTEVERWARMING</small><strong>${quattFlowActive&&cvRequested?'● Hybride':quattFlowActive?'● Quatt verwarmt':cvRequested?'● CV gevraagd':'○ Geen actief elektrisch verbruik'}</strong><span>${esc(heatSub)}</span></div></div></div>`;
 
     root.innerHTML=`<div class="energy-topline"><span><strong>EM v2 revision ${meta.state_revision??'?'}</strong> · bron ${meta.source_sample_at?new Date(meta.source_sample_at).toLocaleString('nl-NL'):'onbekend'}</span><span class="${fresh?'energy-ok':'energy-stale'}">${fresh?'● actueel':'● vertraagd'}</span></div>${svg}${hybrid}${manager}`;
     root.dataset.activeConsumptionThresholdW=String(ACTIVE_THRESHOLD_W);
