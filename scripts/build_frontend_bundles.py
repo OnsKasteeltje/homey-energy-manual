@@ -42,7 +42,7 @@ JS_SOURCES = [
     "javascripts/energy-history-tesla-quality-v2.8.37.js",
     "javascripts/energy-history-autorefresh-v2.8.57.js",
     "javascripts/energy-history-freshness-v2.8.58.js",
-    "javascripts/energy-history-day-picker-layout-v2.8.83.js",
+    "javascripts/energy-history-day-picker-layout-v2.8.89.js",
     "javascripts/home-architecture-v2.0.3.js",
     "javascripts/home-architecture-kpi-cleanup-v2.0.4.js",
     "javascripts/home-space-heating-v2.0.5.js",
