@@ -66,6 +66,9 @@ jobs:
       - name: Build frontend bundles
         run: python scripts/build_frontend_bundles.py
 
+      - name: Validate generated frontend artifact
+        run: python scripts/validate_frontend_artifact.py
+
       - name: Check generated JavaScript bundle
         shell: bash
         run: |
@@ -77,6 +80,15 @@ jobs:
 
       - name: Build MkDocs strictly
         run: mkdocs build --strict
+
+      - name: Verify built site references active frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '\r\n' < frontend-version.txt)"
+          grep -R -q "frontend-bundle-${VERSION}.js" site
+          grep -R -q "frontend-bundle-${VERSION}.css" site
+          grep -R -q "Quooker" site
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
