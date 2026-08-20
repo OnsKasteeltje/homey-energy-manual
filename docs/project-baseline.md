@@ -8,11 +8,12 @@ Dit document is de centrale referentie voor toekomstige ontwerp-, code- en docum
 
 1. actuele, runtime-gevalideerde implementatie;
 2. recente expliciete projectbesluiten;
-3. `runtime-status-2026-08-20.md` en actuele GitHub-documentatie;
-4. Integraal energierapport Victron ESS v35.1 voor hardware-, energieprofiel- en ontwerpachtergrond;
-5. oudere rapport- en flowversies alleen als historie.
+3. `requirements-traceability.md`, `runtime-status-2026-08-20.md` en actuele GitHub-documentatie;
+4. Integraal energierapport Victron ESS + Home Energy Management System **v37** als actuele integrale projectbaseline;
+5. v35.1 voor historische PV-/hardwareanalyse voor zover v36/v37 die niet expliciet heeft vervangen;
+6. oudere rapport- en flowversies alleen als historie.
 
-Statuslabels: `VERIFIED`, `IMPLEMENTED`, `SHADOW`, `DECIDED`, `OPEN`, `SUPERSEDED`.
+Statuslabels: `VERIFIED`, `IMPLEMENTED`, `SHADOW`, `DECIDED`, `OPEN`, `KNOWN / MONITOR`, `SUPERSEDED`.
 
 ## 1. Architectuur
 
@@ -21,11 +22,12 @@ Statuslabels: `VERIFIED`, `IMPLEMENTED`, `SHADOW`, `DECIDED`, `OPEN`, `SUPERSEDE
 - `DECIDED` — Homey is huishoudelijke orkestratielaag. Installatieveiligheid en lokale apparaatbeveiligingen staan erboven.
 - `DECIDED` — Victron wordt na installatie primaire batterij-/netregelaar; Homey blijft orkestreren over EV, warm water en andere flexloads.
 - `VERIFIED` — Websitebezoek veroorzaakt geen Homey-devicecalls; de site leest gepubliceerde snapshots.
+- `IMPLEMENTED` — `requirements-traceability.md` is de vaste koppeling tussen v37-requirements, procesflow, implementatie en vrijgavecriteria.
 
 ## 2. Huidige Energy Core
 
 - `VERIFIED` — actuele publisher is `EM2_CORE_PUBLISH_V0.10.4` met publicatieschema `2.10`.
-- `VERIFIED` — gecontroleerde runtime publiceerde State, Decision en Shadow revision-consistent op revision 924 en `control_mode = SHADOW`.
+- `VERIFIED` — gecontroleerde runtime publiceerde State, Decision en Shadow revision-consistent; actuele versienummers zijn leidend boven oudere documentatie.
 - `VERIFIED` — Core v0.10.4 splitst `grid_measurement_valid` en `derived_house_balance_valid`. Verse P1-data blijft autoritatief voor netimport/-export en flexbudget wanneer de afgeleide huis/PV-balans door `SOURCE_SKEW` ongeldig is.
 - `IMPLEMENTED/VERIFIED` — Energy Core v2 bevat centrale State, Decision, Shadow, warmwaterstate/-intent en publicatie.
 - `IMPLEMENTED` — Quatt is `COMFORT_BASELOAD`, `OBSERVE_ONLY`, niet automatisch regelbaar.
@@ -33,8 +35,9 @@ Statuslabels: `VERIFIED`, `IMPLEMENTED`, `SHADOW`, `DECIDED`, `OPEN`, `SUPERSEDE
 - `DECIDED` — deadlines/MUST gaan vóór opportunistische PV-/prijsoptimalisatie.
 - `DECIDED` — per fysieke actuator uiteindelijk exact één automatische writer.
 - `DECIDED` — iedere fysieke Control-route gaat eerst door Shadow-validatie.
+- `KNOWN / MONITOR` — incidenteel is een verwachte periodieke Core/publicatierun niet aantoonbaar uitgevoerd. Handmatige Core-run en GitHub-publicatie functioneerden direct; geen extra schedulerarchitectuur bouwen tenzij dit herhaald terugkomt.
 
-Oudere documentatie die Core v0.9.7/schema 2.5 als actief noemt, beschrijft een eerdere gevalideerde toestand. Voor actuele versienummers is `runtime-status-2026-08-20.md` plus de live publicatie leidend.
+Oudere documentatie die Core v0.9.7/schema 2.5 als actief noemt, beschrijft een eerdere gevalideerde toestand. Voor actuele versienummers is `runtime-status-2026-08-20.md`, de live publicatie en de requirements-traceability leidend.
 
 ## 3. Contract- en prijsarchitectuur
 
@@ -102,37 +105,45 @@ Oudere documentatie die Core v0.9.7/schema 2.5 als actief noemt, beschrijft een 
 - `DECIDED` — VM staat in de meterkast; Cerbo/MultiPlus/batterij in de schuur; communicatie via lokaal netwerk.
 - `DECIDED` — bestaande schuurverbinding is circa 20 m 5G2,5 mm² en wordt als 3×16 A behandeld totdat installatiegegevens anders bevestigen.
 - `DECIDED` — GX Touch is optioneel.
-- `SUPERSEDED` — de hybride SmartSolar/DC-PV-route uit rapport v35.1 is niet automatisch de actuele doelarchitectuur. Na latere projectanalyse is teruggekeerd naar AC-coupled als werkhypothese wegens string-/Vmp-compatibiliteit. Dit punt moet vóór bestelling nog technisch tegen actuele paneel/stringgegevens en Victron-specificaties worden herbevestigd.
+- `SUPERSEDED` — de hybride SmartSolar/DC-PV-route uit rapport v35.1 is niet automatisch de actuele doelarchitectuur. AC-coupled is de werkhypothese; DC vereist nieuwe string-/Vmp/Voc-/temperatuurvalidatie.
 - `OPEN` — definitieve batterijconfiguratie/capaciteit en definitieve PV-koppeling vóór bestelling opnieuw vastleggen.
 
 ## 10. Documentstatus
 
-- `REFERENCE` — Integraal energierapport Victron ESS v35.1 blijft de laatste uitgebreide ontwerp-/analysebron voor hardware, PV-historie, dimensionering en businesscase.
-- `SUPERSEDED/PARTIAL` — v35.1 is niet volledig actueel voor Homey/website/contractlogica en bevat een hybride SmartSolar-architectuur die na publicatie opnieuw is heroverwogen.
-- `IMPLEMENTED` — `runtime-status-2026-08-20.md` legt de actuele Core v0.10.4/schema 2.10-status vast.
-- `IMPLEMENTED` — actuele GitHub-documentatie bevat nieuwere Energy Core-, contract-, warmwater- en app-refreshbesluiten.
-- `IN_PROGRESS` — Integraal energierapport v36 wordt opgebouwd vanuit deze canonieke baseline.
+- `REFERENCE / CANONICAL` — Integraal energierapport Victron ESS + Home Energy Management System **v37** is de actuele integrale rapportbaseline.
+- `REFERENCE` — v35.1 blijft historische bron voor uitgebreide PV-/degradatieanalyse en technische hardwarestudie voor zover v36/v37 die niet expliciet vervangt.
+- `IMPLEMENTED` — `runtime-status-2026-08-20.md` legt de actuele Core-runtime vast.
+- `IMPLEMENTED / CANONICAL` — `requirements-traceability.md` koppelt requirements aan procesflow, implementatie, status en vrijgavecriteria.
+- `IMPLEMENTED` — `docs/architectuur.md` bevat de bindende architectuurinvarianten, inclusief structurele Homey-loadminimalisatie.
+- `SUPERSEDED` — projectstatus waarin v36 nog als te genereren/in-progress stond.
 
 ## 11. Open validatieregister
 
 1. `RESOLVED` — runtime-versie Core Tick/publicatie geïnventariseerd: v0.10.4, schema 2.10, SHADOW; oudere v0.9.7-status is historisch.
-2. `OPEN` — exacte actuele Price/PV Context-flowversie bij volgende Homey-runtime-audit expliciet vastleggen indien die niet uit publicatie blijkt.
+2. `OPEN` — `docs/energy-core-v2.md` op actuele v0.10.4/schema 2.10 status brengen waar nog v0.9.7/schema 2.5 wordt genoemd.
 3. `OPEN` — Contract History voldoende FIXED- en DYNAMIC-samples laten verzamelen en agreement beoordelen.
 4. `OPEN` — WW Source Advice-kostenparameters valideren vóór enige fysieke cut-over.
-5. `OPEN` — definitieve Victron PV-topologie (AC-coupled versus eventuele DC-route) technisch herbevestigen vóór bestelling.
+5. `OPEN` — definitieve Victron PV-topologie technisch herbevestigen vóór bestelling.
 6. `OPEN` — definitieve batterijbank en vermogenslimieten na keuze van PV-topologie bevestigen.
-7. `OPEN` — Live Stream blijven toetsen op rekenkundige energiebalans, directe versus afgeleide meetbronnen en >20 W-actiefdrempel.
-8. `IN_PROGRESS` — Integraal energierapport v36 genereren en v35.1 als historische baseline markeren.
+7. `OPEN` — Live Stream blijven toetsen op rekenkundige energiebalans, directe versus afgeleide meetbronnen, >20 W-actiefdrempel en caching.
+8. `KNOWN / MONITOR` — incidentele gemiste Homey periodieke trigger/publicatie; geen blocker en geen aanleiding tot extra schedulercomplexiteit zonder herhaald bewijs.
+9. `RESOLVED` — v37 is actuele integrale projectreferentie en requirements traceability is als projectartefact opgenomen.
 
-## 12. Change-control
+## 12. Requirements traceability als change-control
+
+Iedere inhoudelijke wijziging die een functionele of niet-functionele requirement raakt, moet vanaf nu ook de betreffende ID in `requirements-traceability.md` bijwerken. Nieuwe requirements krijgen een nieuwe unieke ID. Een wijziging is niet documentair compleet wanneer alleen code, flow of chatbesluit is aangepast en de traceability achterblijft.
+
+## 13. Change-control
 
 Bij iedere relevante wijziging:
 
-1. wijziging ontwerpen;
-2. Shadow/test waar fysieke sturing betrokken is;
-3. runtime valideren;
-4. status in deze baseline aanpassen;
-5. bijbehorende GitHub-documentatie tegelijk bijwerken;
-6. oude aanpak expliciet `SUPERSEDED` markeren in plaats van stilzwijgend te laten voortbestaan.
+1. requirement-ID bepalen of toevoegen;
+2. wijziging ontwerpen;
+3. architectuur- en Homey-loadimpact controleren;
+4. Shadow/test waar fysieke sturing betrokken is;
+5. runtime valideren;
+6. requirements-traceability en deze projectbaseline aanpassen;
+7. bijbehorende gespecialiseerde GitHub-documentatie tegelijk bijwerken;
+8. oude aanpak expliciet `SUPERSEDED` markeren in plaats van stilzwijgend te laten voortbestaan.
 
-Dit voorkomt dat oude chatbesluiten, rapportteksten en actuele productiecode door elkaar als gelijktijdig waar worden behandeld.
+Dit voorkomt dat oude chatbesluiten, rapportteksten en actuele productiecode door elkaar als gelijktijdig waar worden behandeld en maakt aantoonbaar welke requirements volledig gerealiseerd, alleen SHADOW of nog OPEN zijn.
