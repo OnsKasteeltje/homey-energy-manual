@@ -78,7 +78,9 @@ jobs:
           CSS="docs/stylesheets/frontend-bundle-${VERSION}.css"
           node --check "$JS"
           grep -q "data-tesla-deadline-native" "$JS"
-          grep -q "teslaDeadlineController='2.8.104'" "$JS"
+          grep -q "teslaDeadlineController='2.8.105'" "$JS"
+          grep -q "rememberDraft" "$JS"
+          grep -q "applyDraft" "$JS"
           grep -q "Deadline actief" "$JS"
           grep -q "tesla-deadline-native-v2.8.104.css" "scripts/build_frontend_bundles.py"
           grep -q "\[data-tesla-deadline-native\]" "$CSS"
@@ -108,7 +110,9 @@ jobs:
           grep -R -q 'energy-right-segment-${index}' site
           grep -R -q "Quooker" site
           grep -R -q "data-tesla-deadline-native" site
-          grep -R -q "teslaDeadlineController='2.8.104'" site
+          grep -R -q "teslaDeadlineController='2.8.105'" site
+          grep -R -q "rememberDraft" site
+          grep -R -q "applyDraft" site
           grep -R -q "Deadline actief" site
           grep -R -q "\[data-tesla-deadline-native\]" site
           ! grep -R -q "tesla-deadline-migration-v2.8.17.js" site
