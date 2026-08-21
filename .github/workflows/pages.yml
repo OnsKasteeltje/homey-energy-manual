@@ -74,6 +74,8 @@ jobs:
         run: |
           VERSION="$(tr -d '\r\n' < frontend-version.txt)"
           node --check "docs/javascripts/frontend-bundle-${VERSION}.js"
+          grep -q "teslaDeadlineHost='compat-v2.8.98'" "docs/javascripts/frontend-bundle-${VERSION}.js"
+          grep -q "Tesla deadline" "docs/javascripts/frontend-bundle-${VERSION}.js"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
@@ -91,6 +93,8 @@ jobs:
           grep -R -q "consumptionBusSync='2.8.82'" site
           grep -R -q 'energy-right-segment-${index}' site
           grep -R -q "Quooker" site
+          grep -R -q "teslaDeadlineHost='compat-v2.8.98'" site
+          grep -R -q "Tesla deadline" site
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
