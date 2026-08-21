@@ -88,6 +88,8 @@ jobs:
           VERSION="$(tr -d '\r\n' < frontend-version.txt)"
           grep -R -q "frontend-bundle-${VERSION}.js" site
           grep -R -q "frontend-bundle-${VERSION}.css" site
+          grep -R -q "consumptionBusSync='2.8.82'" site
+          grep -R -q 'energy-right-segment-${index}' site
           grep -R -q "Quooker" site
 
       - name: Upload Pages artifact
