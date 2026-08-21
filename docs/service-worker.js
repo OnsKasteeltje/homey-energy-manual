@@ -1,8 +1,12 @@
-const CACHE_NAME = 'home-energy-pwa-v4';
+const CACHE_NAME = 'home-energy-pwa-v5';
 const APP_SHELL = ['./', './manifest.webmanifest', './assets/home-energy-app-icon.svg'];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', event => {
@@ -10,6 +14,14 @@ self.addEventListener('activate', event => {
     caches.keys()
       .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+      .then(clients => Promise.all(clients.map(client => {
+        try {
+          return client.navigate(client.url);
+        } catch (error) {
+          return null;
+        }
+      })))
   );
 });
 
