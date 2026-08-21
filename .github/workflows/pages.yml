@@ -79,7 +79,11 @@ jobs:
           node --check "$JS"
           grep -q "liveEnergyRenderer='2.8.108'" "$JS"
           grep -q "liveenergyrendered" "$JS"
-          grep -q "teslaDeadlineController='2.8.108'" "$JS"
+          grep -q "teslaDeadlineController='2.8.111'" "$JS"
+          grep -q "energy-state-v2.json" "$JS"
+          grep -q "Deadline gemist · doel wordt nog afgemaakt" "$JS"
+          grep -q "Tesla gereed · doel vóór deadline gehaald" "$JS"
+          grep -q "Tesla gereed · deadline gemist" "$JS"
           grep -q "rememberDraft" "$JS"
           grep -q "applyDraft" "$JS"
           grep -q "data-tesla-deadline-native" "$JS"
@@ -88,7 +92,7 @@ jobs:
           grep -q "CYCLIC_RESIDUAL_FINGERPRINT" "$JS"
           grep -q "load-fingerprint-classifier-v1.0.0.js" "scripts/build_frontend_bundles.py"
           grep -q "tesla-deadline-native-v2.8.110.css" "scripts/build_frontend_bundles.py"
-          grep -q "home-architecture-v2.0.4.js" "scripts/build_frontend_bundles.py"
+          grep -q "home-architecture-v2.0.5.js" "scripts/build_frontend_bundles.py"
           grep -q "deadlineParts" "$JS"
           grep -q "uiterlijk starten" "$JS"
           grep -q "grid-template-columns:repeat(2,minmax(0,1fr))" "$CSS"
@@ -115,9 +119,12 @@ jobs:
           grep -R -q "frontend-bundle-${VERSION}.css" site
           grep -R -q "liveEnergyRenderer='2.8.108'" site
           grep -R -q "liveenergyrendered" site
-          grep -R -q "teslaDeadlineController='2.8.108'" site
+          grep -R -q "teslaDeadlineController='2.8.111'" site
           grep -R -q "data-tesla-deadline-native" site
           grep -R -q "Deadline actief" site
+          grep -R -q "Deadline gemist · doel wordt nog afgemaakt" site
+          grep -R -q "Tesla gereed · doel vóór deadline gehaald" site
+          grep -R -q "Tesla gereed · deadline gemist" site
           grep -R -q "uiterlijk starten" site
           grep -R -q "grid-template-columns:repeat(2,minmax(0,1fr))" site
           grep -R -q "LoadFingerprintClassifier" site
