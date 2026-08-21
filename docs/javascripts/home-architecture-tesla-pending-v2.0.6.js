@@ -1,15 +1,14 @@
 (function(){
   'use strict';
-  // v2.0.6: voorkom misleidende oude Tesla/Core-state direct na een nieuwe website-opdracht.
-  // Leest uitsluitend de gepubliceerde GitHub command-state; geen extra Homey-devicecalls.
+  // v2.0.7: een recente website-command is tijdelijk leidend voor de Tesla-kaart
+  // wanneer Core nog ontbreekt of de vorige deadline publiceert. Geen Homey-devicecalls.
   window.HomeEnergyFrontend=window.HomeEnergyFrontend||{};
-  window.HomeEnergyFrontend.homeArchitectureTeslaPending='2.0.6';
+  window.HomeEnergyFrontend.homeArchitectureTeslaPending='2.0.7';
 
   const BASE='/homey-energy-manual/';
   const RECENT_MS=10*60*1000;
   let coreDetail=null,lastCommand=null,timer=null,loading=false;
 
-  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const fmtKWh=v=>Number(v).toLocaleString('nl-NL',{maximumFractionDigits:2});
   const fmtTime=value=>{const s=String(value||'').trim();if(!s)return '';const local=s.match(/T(\d{2}):(\d{2})(?::\d{2})?$/);if(local&&!/[zZ]|[+-]\d\d:?\d\d$/.test(s))return `${local[1]}:${local[2]}`;const d=new Date(s);return Number.isFinite(d.getTime())?new Intl.DateTimeFormat('nl-NL',{timeZone:'Europe/Amsterdam',hour:'2-digit',minute:'2-digit',hour12:false}).format(d):'';};
   const norm=s=>String(s||'').trim().replace(' ','T').slice(0,16);
@@ -21,11 +20,18 @@
   }
 
   function pendingState(cmd,detail){
-    if(!cmd||!detail?.raw)return null;
-    const t=detail.raw.tesla||{};
+    if(!cmd)return null;
     const requestedAt=Date.parse(String(cmd.requestedAt||cmd.socEnteredAt||''));
     if(!Number.isFinite(requestedAt)||Date.now()-requestedAt>RECENT_MS||requestedAt-Date.now()>60000)return null;
-    const commandActive=cmd.active===true,coreActive=t.deadline_active===true;
+
+    const commandActive=cmd.active===true;
+    const t=detail?.raw?.tesla||null;
+    // Fail-open voor de UX: als de actuele command al bevestigd is maar Core nog niet
+    // beschikbaar/gepubliceerd is, toon de command als 'wordt verwerkt' in plaats van
+    // misleidend 'geen deadline'. Zodra Core overeenkomt, wordt Core weer leidend.
+    if(!t)return {cmd,commandActive};
+
+    const coreActive=t.deadline_active===true;
     const commandDeadline=norm(cmd.deadline),coreDeadline=norm(t.deadline_at);
     const mismatch=commandActive!==coreActive||(commandActive&&commandDeadline&&commandDeadline!==coreDeadline);
     if(!mismatch)return null;
