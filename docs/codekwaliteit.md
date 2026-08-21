@@ -47,6 +47,7 @@ Voor interactieve frontendcomponenten gelden aanvullend de volgende harde coding
 - **Debug eerst de laag, wijzig daarna pas code.** Bij frontendproblemen wordt eerst vastgesteld of het defect in data, rendering, controller/binding, bundling, deployment/cache of responsive layout zit. In beginsel wordt alleen de aangetoonde foutlaag gewijzigd.
 - **Responsive layout volgt componentbreedte, niet alleen viewportbreedte.** Een component in een smalle grid-card kan ook op een brede desktop weinig ruimte hebben. Formulieren worden daarom ontworpen met intrinsiek robuuste grids/flex-layouts en `min-width: 0`; viewport media queries zijn aanvullend, niet de enige bescherming tegen overflow.
 - **Een functionele fix is niet klaar als de UI visueel stuk is.** Leesbaarheid, overflow, label-wrapping, bediening en relevante desktop/mobile toestanden maken onderdeel uit van dezelfde wijziging en dezelfde DoD.
+- **Iedere frontendwijziging eindigt met een smoke test op de daadwerkelijk gebouwde/gedeployde variant.** Een geslaagde build alleen is onvoldoende; minimaal moet worden bevestigd dat de pagina laadt, de gewijzigde feature actief is, kernstate/data nog binnenkomt, geen evidente regressie in de hoofdflow optreedt en de wijziging geen onbedoelde control-/writerroute activeert.
 
 ### Frontend Definition of Done
 
@@ -61,10 +62,21 @@ Iedere frontendwijziging wordt vóór afronding expliciet tegen deze DoD geverif
 7. selectors, componentcontracten en versies zijn consistent;
 8. relevante automatische regressietests en CI-invarianten zijn groen;
 9. de gebouwde en gedeployde frontend bevat aantoonbaar de geteste implementatie;
-10. visuele leesbaarheid en responsiveness zijn gecontroleerd op de relevante componentbreedtes;
-11. relevante documentatie/coding standards zijn bijgewerkt wanneer de wijziging een nieuw structureel patroon introduceert.
+10. een smoke test op de gebouwde/gedeployde frontend is succesvol uitgevoerd;
+11. visuele leesbaarheid en responsiveness zijn gecontroleerd op de relevante componentbreedtes;
+12. relevante documentatie/coding standards zijn bijgewerkt wanneer de wijziging een nieuw structureel patroon introduceert.
 
-Een frontendwijziging wordt niet als **DoD VERIFIED** gerapporteerd zolang één van deze toepasselijke controles nog open staat.
+De minimale smoke test bevat, voor zover van toepassing:
+
+- pagina/app opent zonder blokkerende frontendfout;
+- actuele Energy Core-/publicatiedata wordt nog correct geladen;
+- de gewijzigde feature of component is daadwerkelijk aanwezig en initialiseert zonder extra focus/tabwissel/timingtruc;
+- de belangrijkste bestaande gebruikersflow blijft functioneel;
+- geen onverwachte actuatorwrite, dubbele writer of extra Homey-polling is geïntroduceerd;
+- bij een wijziging aan classificatie/visualisatie blijft gemeten versus inferred/indicatief correct onderscheiden;
+- waar relevant wordt één bekende referentiesituatie gebruikt om de nieuwe functionaliteit functioneel te bevestigen.
+
+Een frontendwijziging wordt niet als **DoD VERIFIED** gerapporteerd zolang één van deze toepasselijke controles, inclusief de smoke test, nog open staat.
 
 ### Frontendbundling
 
@@ -135,7 +147,11 @@ mkdocs build --strict
 DEPLOYED ARTIFACT INVARIANT
         ↓
 Pages artifact/deploy
+        ↓
+SMOKE TEST op gebouwde/gedeployde frontend
 ```
+
+De CI-gates bewijzen structurele correctheid van build en artifact. De smoke test bewijst aanvullend dat de belangrijkste runtime-/gebruikersflow na de wijziging in de daadwerkelijk gebouwde of gedeployde variant basaal functioneert.
 
 ### Bundle- en artifact-invariant
 
@@ -168,7 +184,7 @@ De productie-Live View publiceerde daarna opnieuw actueel en toont Quooker als a
 `main` is nog niet volledig beschermd. Gewenste doeltoestand blijft:
 
 ```text
-feature/change → Pull Request → required checks groen → merge main → Pages deployment
+feature/change → Pull Request → required checks groen → merge main → Pages deployment → smoke test
 ```
 
 Prioriteiten:
@@ -193,6 +209,7 @@ Bij iedere relevante wijziging wordt minimaal gecontroleerd:
 - geen afhankelijkheid van focus/tabwissel/timing om een component correct te initialiseren;
 - responsive layout controleren op daadwerkelijke componentbreedte;
 - frontend-DoD expliciet verifiëren vóór afronding;
+- na frontendwijzigingen altijd een smoke test uitvoeren op de gebouwde/gedeployde variant;
 - gegenereerde bundle én Pages-artifact aantoonbaar synchroon met de bron;
 - veilige rollback mogelijk.
 
