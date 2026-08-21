@@ -53,13 +53,15 @@ if "__FRONTEND_VERSION__" in MKDOCS:
     raise SystemExit("mkdocs.yml still contains unresolved __FRONTEND_VERSION__ after bundle build")
 
 # Current Live View publication contract. These checks deliberately fail closed:
-# a build may not deploy if the first-class Quooker renderer is absent from the
-# actual artifact even when the editable source file was changed correctly.
+# a build may not deploy if required live rendering logic is absent from the
+# generated artifact even when the editable source file itself is correct.
 required_live_contract = {
     "Quooker consumer": "title:'Quooker'",
     "Quooker icon": "ico:'quooker'",
     "Homey switch status": "switch_on",
     "Heating status": "HEATING",
+    "Consumption bus downstream sync": "consumptionBusSync='2.8.82'",
+    "Consumption bus current segment class": "energy-right-segment-${index}",
 }
 for label, token in required_live_contract.items():
     if token not in js_bundle:
