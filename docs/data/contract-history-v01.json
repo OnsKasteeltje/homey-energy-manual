@@ -1,6 +1,6 @@
 {
   "schema": "EM2_CONTRACT_HISTORY_V0.1",
-  "generatedAt": "2026-08-21T20:00:00.917Z",
+  "generatedAt": "2026-08-21T20:15:00.977Z",
   "intervalMin": 15,
   "maxSamples": 672,
   "readOnly": true,
@@ -5351,6 +5351,106 @@
       "production": {
         "stateRevision": 1204,
         "teslaIntent": "HOLD",
+        "warmWaterAction": "HOLD"
+      },
+      "comparison": {
+        "sameRevision": false,
+        "teslaAgree": true,
+        "warmWaterAgree": true
+      }
+    },
+    {
+      "ts": "2026-08-21T20:15:00.977Z",
+      "contractType": "FIXED",
+      "price": {
+        "source": "FIXED_CONFIG",
+        "quality": "GOOD",
+        "updatedAt": "2026-08-21T20:00:01.186Z",
+        "importNow": 0.2379,
+        "exportNow": 0.15,
+        "negative": false,
+        "cheapNext4h": false,
+        "expensiveNext4h": false,
+        "horizon": "STATIC",
+        "horizonHours": 168
+      },
+      "candidate": {
+        "status": {
+          "status": "OK",
+          "at": "2026-08-21T20:10:00.567Z",
+          "version": "v0.2",
+          "contract": "FIXED",
+          "priceSource": "FIXED_CONFIG",
+          "priceQuality": "GOOD",
+          "priceFresh": true,
+          "priceUsable": true,
+          "sourceRevision": 1207,
+          "gridMeasurementValid": true,
+          "derivedHouseBalanceValid": false
+        },
+        "tesla": {
+          "revision": 1208,
+          "priority": "MUST",
+          "intent": "TESLA_CHARGE_DEADLINE",
+          "reason": "Tesla deadline catch-up: 1.18 kWh resterend"
+        },
+        "warmWater": {
+          "priority": "MUST",
+          "action": "HOLD",
+          "opportunity": "GOAL_REACHED",
+          "reason": "Dagdoel bereikt"
+        },
+        "wwSourceAdvice": {
+          "schema": "EM2_WW_SOURCE_ADVICE_V0.1",
+          "generatedAt": "2026-08-21T20:00:00.951Z",
+          "controlMode": "PURE_SHADOW",
+          "readOnly": true,
+          "deviceWrites": false,
+          "status": "OK",
+          "advice": "CV",
+          "productionSource": "BOILER",
+          "productionModeLeading": true,
+          "reason": "CV goedkoper per bruikbare kWh warmte",
+          "contract": "FIXED",
+          "price": {
+            "fresh": true,
+            "quality": "GOOD",
+            "importEurKWh": 0.2379,
+            "exportEurKWh": 0.15,
+            "electricMarginalBasis": "IMPORT",
+            "electricInputPriceEurKWh": 0.2379
+          },
+          "costPerUsableKWhHeat": {
+            "boiler": 0.24275510204081632,
+            "cv": 0.13563630160354828,
+            "deltaBoilerMinusCv": 0.10711880043726804,
+            "hysteresis": 0.015
+          },
+          "inputs": {
+            "gasPriceEurM3": 1.19265,
+            "gasUsableKWhPerM3": 9.77,
+            "cvDhwEfficiency": 0.9,
+            "boilerEfficiency": 0.98,
+            "gridW": 481,
+            "exporting": false,
+            "wwGoalReached": true
+          },
+          "guards": {
+            "noDeviceReads": true,
+            "noActuatorWrites": true,
+            "wwBoilermodusRemainsLeading": true,
+            "failSafeKeepCurrent": false
+          },
+          "assumptions": {
+            "gasUsableKWhPerM3": "configurable default 9.77",
+            "cvDhwEfficiency": "configurable default 0.90",
+            "boilerEfficiency": "configurable default 0.98"
+          }
+        }
+      },
+      "production": {
+        "stateRevision": 1209,
+        "teslaIntent": "TESLA_CHARGE_DEADLINE",
         "warmWaterAction": "HOLD"
       },
       "comparison": {
