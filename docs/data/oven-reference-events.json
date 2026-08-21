@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "device": "ATAG oven",
+  "purpose": "Ground-truth reference events for later P1/profile correlation. These events are not yet used as automatic detection rules.",
+  "timezone": "Europe/Amsterdam",
+  "events": [
+    {
+      "date_local": "2026-08-19",
+      "almost_done_local": "17:14",
+      "completed_local": "17:19",
+      "source": "ATAG notification screenshot"
+    },
+    {
+      "date_local": "2026-08-19",
+      "almost_done_local": "18:47",
+      "completed_local": "18:48",
+      "source": "ATAG notification screenshot"
+    },
+    {
+      "date_local": "2026-08-20",
+      "almost_done_local": "06:45",
+      "completed_local": "06:47",
+      "source": "ATAG notification screenshot",
+      "p1_correlation_note": "Around 04:45Z the day series shows ~2.34 kW net import, but boilerOn=true and L2 is ~2.23 kW. Therefore this sample cannot be attributed reliably to the oven."
+    },
+    {
+      "date_local": "2026-08-21",
+      "almost_done_local": "06:51",
+      "completed_local": "06:53",
+      "source": "ATAG notification screenshot",
+      "p1_correlation_note": "Around 04:45-04:55Z the 5-minute history is only ~0.30 kW net import. The finish notification therefore does not coincide with a visible high-power oven sample in the current 5-minute series."
+    }
+  ],
+  "detection_status": "REFERENCE_ONLY",
+  "implementation_rule": "Do not classify oven use from these timestamps alone. Require a repeated power/phase signature across multiple clean reference events before enabling automatic classification.",
+  "architecture_note": "Use existing EM v2 history/P1 data; do not add extra Homey polling solely for oven detection."
+}
