@@ -69,7 +69,7 @@ Actieve detector: `EM v2 | 01 Quooker Detector | v0.3 SWITCH-AUTH + P1 HEATING`.
 
 De detector gebruikt geen volledige `getDevices()`-snapshot. Alleen de Cooker wordt gericht gelezen; na een relevant P1-event kan aanvullend één gerichte P1-read plaatsvinden. Historisering gebruikt dezelfde reeds gedetecteerde toestand.
 
-## 4. Waarheidsbronnen
+## 4. Waarheidsbronnen en gescheiden meetvaliditeit
 
 Voor de elektrische woningbalans is P1 leidend:
 
@@ -79,6 +79,26 @@ P1 > 0 W → netto import
 ```
 
 Apparaatmetingen verklaren de belasting. Een belasting die al in P1 zit wordt niet nogmaals van P1 afgetrokken.
+
+De meetvaliditeit is bewust gesplitst:
+
+- `gridMeasurementValid`: verse/geldige P1-netmeting en **autoritatieve gate voor import, export en flex-exportbudget**;
+- `derivedHouseBalanceValid`: gereconstrueerde P1+PV/huisbalans, uitsluitend voor `house_load`, residual/Overig en diagnostiek;
+- `balanceValid` blijft alleen een compatibility-alias van `derivedHouseBalanceValid` en mag geen P1-gebaseerde flex-opportunity blokkeren.
+
+Daaruit volgt de harde invariant:
+
+```text
+P1 geldig + SOURCE_SKEW in PV/huisreconstructie
+→ flex-exportbudget blijft bruikbaar
+→ afgeleide huis/Overig-diagnostiek degradeert
+→ geen blokkade van P1-gebaseerde flexbesluiten
+
+P1 stale/ongeldig
+→ flex-exportbudget = 0 W (fail-closed)
+```
+
+Deze invariant geldt niet alleen in Core maar ook downstream in contract-aware Decision/WW-control.
 
 Voor Quooker zijn de waarheidsbronnen bewust gescheiden:
 
@@ -118,7 +138,7 @@ flex_export_budget
        - quatt_ramp_reserve)
 ```
 
-De actuele gridreserve is 200 W. Quatt krijgt bij lage belasting een kleine reserve en bij actieve modulatie een begrensde rampreserve. Installatieveiligheid en Easee-loadbalancing blijven boven dit softwarebudget staan.
+De actuele gridreserve is 200 W. Quatt krijgt bij lage belasting een kleine reserve en bij actieve modulatie een begrensde rampreserve. Installatieveiligheid en Easee-loadbalancing blijven boven dit softwarebudget staan. Het budget wordt uitsluitend vrijgegeven bij `gridMeasurementValid=true`; een ongeldige afgeleide huisbalans verandert deze P1-gate niet.
 
 ## 8. Decision-prioriteit
 
@@ -130,11 +150,27 @@ De actuele gridreserve is 200 W. Quatt krijgt bij lage belasting een kleine rese
 5. Rest naar net / later batterijbeleid
 ```
 
-## 9. Warm water en Tesla
+## 9. Contract-aware Decision baseline
+
+Prijsoptimalisatie loopt via de geïsoleerde `EM2_ContractPrice_*` interface. De beslislaag ondersteunt `FIXED` en `DYNAMIC`; legacy M7-prijsclassificaties zijn geen prijsinput voor de contract-aware candidate.
+
+Actieve geharde candidate per 21 augustus 2026:
+
+```text
+EM v2 | 40 Decision | Contract-aware v0.2
+controlMode = SHADOW_CANDIDATE
+noActuatorWrites = true
+```
+
+v0.2 past dezelfde split-validity-invariant toe als Core: `gridMeasurementValid` is de gate voor EXPORT/PV-flexopportunities; `derivedHouseBalanceValid` is diagnostisch. Voorganger `v0.1 [ROLLBACK]` is uitgeschakeld en alleen voor rollback behouden.
+
+## 10. Warm water en Tesla
 
 Warm water gebruikt bronkeuze, timing en een afzonderlijk gevalideerde actuatorroute. Comfortdoel/deadline gaan vóór opportunistische optimalisatie. Tesla gebruikt hetzelfde gedeelde flexbudget; Easee Equalizer blijft autonoom de feitelijke laadstroom begrenzen.
 
-## 10. Veiligheidshiërarchie
+De bronkeuze `BOILER ↔ CV` blijft in `EM v2 | 50 Decision | WW Source Advice v0.1 SHADOW` een pure advieslaag. `WW_Boilermodus` blijft productie-leidend; deze advieslaag verricht geen fysieke writes.
+
+## 11. Veiligheidshiërarchie
 
 ```text
 Installatieveiligheid / 3×25 A
@@ -143,18 +179,18 @@ Lokale apparaatbeveiligingen
           ↓
 Easee Equalizer
           ↓
-Victron EMS (later)
+Victron EMS / Dynamic ESS
           ↓
 Energy Core v2
           ↓
-Gevalideerde actuator-writers
+Gevalideerde huishoudelijke actuator-writers
 ```
 
-## 11. Victron-doelarchitectuur
+## 12. Victron-doelarchitectuur
 
-De geplande Victron-laag bestaat uit MultiPlus-II 48/5000, Cerbo GX MK2, VM-3P75CT en thuisbatterij. Victron wordt de primaire batterij-/netlaag; Homey blijft huishoudelijke orchestrator. Zolang Victron niet geïntegreerd is geldt batterijsteun als 0 W.
+De geplande Victron-laag bestaat uit MultiPlus-II 48/5000, Cerbo GX MK2, VM-3P75CT en thuisbatterij. Victron/Dynamic ESS wordt de primaire batterij-, SOC-, laad/ontlaad- en netveiligheidslaag. Homey blijft huishoudelijke orchestrator voor flexloads zoals Tesla en warm water en mag de Victron-safety/ESS-regels niet dupliceren of omzeilen. Zolang Victron niet geïntegreerd is geldt batterijsteun als 0 W.
 
-## 12. Publicatie, historie en website/app
+## 13. Publicatie, historie en website/app
 
 Actuele runtimebaseline per 21 augustus 2026:
 
@@ -163,6 +199,7 @@ Core              = EM v2 | 00 Core Tick | v0.10.5
 publisher_version = EM2_CORE_PUBLISH_V0.10.5
 schema_version    = 2.11
 control_mode      = SHADOW
+Contract Decision = EM v2 | 40 Decision | Contract-aware v0.2
 ```
 
 State, Decision en Shadow worden revision-consistent gepubliceerd. `loads.quooker` bevat switchstatus, heatingstatus, vermogen, freshness en transition history met bron `HOMEY_SWITCH_PLUS_P1_L3`.
@@ -173,7 +210,7 @@ Website/app leest uitsluitend de gepubliceerde toestand. De Live View toont zeve
 
 Een schemawijziging moet atomair worden verwerkt in publisher, adapter, tests, fixtures en repositoryvalidator. CI controleert daarnaast na bundling én na MkDocs-build dat de versiegebonden frontendbundle en het uiteindelijke Pages-artifact de actuele broncode/contractmarkers bevatten. Hiermee wordt voorkomen dat `main` nieuw is terwijl productie ongemerkt een oud artifact serveert.
 
-## 13. Control- en writerdiscipline
+## 14. Control- en writerdiscipline
 
 ```text
 State → Decision → Shadow/validatie → Control intent → exact één writer → actuator
@@ -181,20 +218,27 @@ State → Decision → Shadow/validatie → Control intent → exact één write
 
 Observatie-, historie-, website- en detectorlagen verrichten geen fysieke writes tenzij zij expliciet als gevalideerde writer zijn ontworpen.
 
-## 14. Flowversionering
+## 15. Flowversionering en stable baseline
 
-Bij een inhoudelijke wijziging wordt een hogere flowversie gemaakt, gevalideerd en geactiveerd; de voorganger wordt uitgeschakeld/SUPERSEDED gehouden wanneer rollbackwaarde bestaat. Maximaal één productieversie per automatische flowfamilie is actief.
+Bij een inhoudelijke wijziging wordt een hogere flowversie gemaakt, gevalideerd en geactiveerd; de voorganger wordt uitgeschakeld/SUPERSEDED of `[ROLLBACK]` gehouden wanneer rollbackwaarde bestaat. Maximaal één productieversie per automatische flowfamilie is actief.
 
-## 15. Architectuur-review
+De hardening-baseline van 21 augustus 2026 geldt als referentie voor vervolgwerk. Een wijziging die één van onderstaande invarianten raakt moet opnieuw door regressievalidatie voordat zij als nieuwe stable baseline geldt.
+
+## 16. Architectuur-review / regressiecriteria
 
 Iedere wijziging wordt getoetst op:
 
 - extra Homey-load/API-calls;
 - dubbele publishers/writers;
 - correcte waarheidsbron;
+- `gridMeasurementValid` versus `derivedHouseBalanceValid` correct gescheiden;
+- P1-authoritatieve flex niet geblokkeerd door `SOURCE_SKEW` in afgeleide PV/huisdata;
+- FIXED/DYNAMIC contractabstractie via `EM2_ContractPrice_*`;
+- `WW_Boilermodus` productie-leidend zolang WW Source Advice shadow-only is;
+- Victron/Dynamic ESS eigenaar van batterij/SOC/netveiligheid, Homey eigenaar van huishoudelijke flex-orchestratie;
 - revision- en schema-consistentie;
 - fail-safe gedrag bij stale/onbekende data;
 - testbaarheid en rollback;
 - synchroniteit tussen broncode, gegenereerde bundle en productie-artifact.
 
-> Laatste update: **21 augustus 2026** — Core v0.10.5/schema 2.11, Quooker v0.3 switch-authoritative + P1 heating, Live View en CI/deploy-invarianten verwerkt.
+> Laatste update: **21 augustus 2026** — hardening stable baseline: Core v0.10.5/schema 2.11, Contract-aware Decision v0.2 split-validity, Quooker v0.3, FIXED/DYNAMIC prijsabstractie, WW Source Advice shadow-only, Victron/Homey ownership en CI/deploy-invarianten integraal vastgelegd.
