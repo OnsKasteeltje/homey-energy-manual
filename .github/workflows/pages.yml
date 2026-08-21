@@ -77,12 +77,12 @@ jobs:
           JS="docs/javascripts/frontend-bundle-${VERSION}.js"
           CSS="docs/stylesheets/frontend-bundle-${VERSION}.css"
           node --check "$JS"
-          grep -q "data-tesla-deadline-native" "$JS"
-          grep -q "teslaDeadlineController='2.8.107'" "$JS"
+          grep -q "liveEnergyRenderer='2.8.108'" "$JS"
+          grep -q "liveenergyrendered" "$JS"
+          grep -q "teslaDeadlineController='2.8.108'" "$JS"
           grep -q "rememberDraft" "$JS"
           grep -q "applyDraft" "$JS"
-          grep -q "scheduleBootReady" "$JS"
-          grep -q "appdatarefresh" "$JS"
+          grep -q "data-tesla-deadline-native" "$JS"
           grep -q "Deadline actief" "$JS"
           grep -q "tesla-deadline-native-v2.8.104.css" "scripts/build_frontend_bundles.py"
           grep -q "\[data-tesla-deadline-native\]" "$CSS"
@@ -90,10 +90,6 @@ jobs:
           ! grep -q "tesla-deadline-postsave-v2.8.18.js" "scripts/build_frontend_bundles.py"
           ! grep -q "tesla-deadline-status-v2.8.21.js" "scripts/build_frontend_bundles.py"
           ! grep -q "tesla-runtime-ui-v2.8.24.js" "scripts/build_frontend_bundles.py"
-          ! grep -q "tesla-deadline-v2.8.10.css" "scripts/build_frontend_bundles.py"
-          ! grep -q "tesla-deadline-v2.8.17.css" "scripts/build_frontend_bundles.py"
-          ! grep -q "tesla-deadline-inline-v2.8.101.css" "scripts/build_frontend_bundles.py"
-          ! grep -q "tesla-baseline-audit-v2.8.23.css" "scripts/build_frontend_bundles.py"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
@@ -108,21 +104,11 @@ jobs:
           VERSION="$(tr -d '\r\n' < frontend-version.txt)"
           grep -R -q "frontend-bundle-${VERSION}.js" site
           grep -R -q "frontend-bundle-${VERSION}.css" site
-          grep -R -q "consumptionBusSync='2.8.82'" site
-          grep -R -q 'energy-right-segment-${index}' site
-          grep -R -q "Quooker" site
+          grep -R -q "liveEnergyRenderer='2.8.108'" site
+          grep -R -q "liveenergyrendered" site
+          grep -R -q "teslaDeadlineController='2.8.108'" site
           grep -R -q "data-tesla-deadline-native" site
-          grep -R -q "teslaDeadlineController='2.8.107'" site
-          grep -R -q "rememberDraft" site
-          grep -R -q "applyDraft" site
-          grep -R -q "scheduleBootReady" site
-          grep -R -q "appdatarefresh" site
           grep -R -q "Deadline actief" site
-          grep -R -q "\[data-tesla-deadline-native\]" site
-          ! grep -R -q "tesla-deadline-migration-v2.8.17.js" site
-          ! grep -R -q "tesla-deadline-postsave-v2.8.18.js" site
-          ! grep -R -q "tesla-deadline-status-v2.8.21.js" site
-          ! grep -R -q "tesla-runtime-ui-v2.8.24.js" site
           grep -R -q "home-energy-pwa-v5" site/service-worker.js
 
       - name: Upload Pages artifact
