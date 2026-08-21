@@ -1,4 +1,4 @@
-const CACHE_NAME = 'home-energy-pwa-v3';
+const CACHE_NAME = 'home-energy-pwa-v4';
 const APP_SHELL = ['./', './manifest.webmanifest', './assets/home-energy-app-icon.svg'];
 
 self.addEventListener('install', event => {
