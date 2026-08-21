@@ -26,7 +26,7 @@ if not re.fullmatch(r"v\d+", BUNDLE_VERSION):
 JS_SOURCES = [
     "javascripts/energy-store-v1.js",
     "javascripts/energy-contract-v2.generated.js",
-    "javascripts/energy-core-v2-adapter-v2.8.91.js",
+    "javascripts/energy-core-v2-adapter-v2.8.93.js",
     "javascripts/em-v2-health-v2.0.4.js",
     "javascripts/homey-status-v2.js",
     "javascripts/pv-phase-24h.js",
