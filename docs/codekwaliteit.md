@@ -33,6 +33,39 @@ Belangrijke regels:
 - P1/netmeting blijft leidend voor de elektrische woningbalans.
 - Quooker is een first-class Live View-load: switchstatus bepaalt OFF/ON_IDLE; P1/L3 bepaalt alleen HEATING en het gemeten vermogen.
 
+### Frontend lifecycle, ownership en interactieve componenten
+
+Voor interactieve frontendcomponenten gelden aanvullend de volgende harde coding standards:
+
+- **Eén feature heeft één duidelijke eigenaar.** Een interactieve UI-feature heeft in beginsel één renderer, één controller en één actieve stylesheet. Aanvullende migration-, status-, postsave- of DOM-patchmodules mogen alleen actief zijn wanneer daar een aantoonbare tijdelijke noodzaak voor bestaat.
+- **Vervangen implementaties worden ook uit de actieve bundle verwijderd.** Het toevoegen van een nieuwe route is niet voldoende; obsolete selectors, listeners, runtime-modules en CSS mogen niet actief mee blijven draaien.
+- **DOM-contracten zijn expliciet.** Renderer, controller, CSS en tests koppelen via één canonieke selector/interface. Versiegenummerde CSS-classes mogen niet de enige functionele koppeling tussen componenten vormen.
+- **Renderer en controller hebben een expliciet lifecycle-contract.** Als een renderer met `innerHTML`, node replacement of vergelijkbare techniek interactieve DOM vervangt, moet hij na iedere succesvolle render een deterministisch `...rendered`/`...ready`-event publiceren. De bijbehorende controller hydrateert op dat event opnieuw. Een toevallige timer, tab-focus of browser-visibility-event mag nooit nodig zijn om een component correct te initialiseren.
+- **Lokale gebruikersinvoer mag niet door live refresh worden vernietigd.** Zolang een gebruiker een formulier bewerkt, wordt de lokale draft-state behouden over render- en datarefreshcycli. Alleen een expliciete save/cancel of aantoonbaar nieuwe authoritatieve configuratie mag deze toestand vervangen.
+- **Editable config en runtime telemetry hebben een vastgelegde bronprioriteit.** Voor configuratieformulieren is de laatst opgeslagen configuratie/command de primaire source of truth; asynchrone runtime-snapshots mogen een formulier niet tijdelijk terugrollen wanneer zij aantoonbaar achterlopen.
+- **Geen MutationObserver- of timerketens als structurele componentbinding.** Zulke mechanismen zijn alleen toegestaan als expliciet gedocumenteerde compatibility fallback. De normale route moet event-driven en deterministisch zijn.
+- **Debug eerst de laag, wijzig daarna pas code.** Bij frontendproblemen wordt eerst vastgesteld of het defect in data, rendering, controller/binding, bundling, deployment/cache of responsive layout zit. In beginsel wordt alleen de aangetoonde foutlaag gewijzigd.
+- **Responsive layout volgt componentbreedte, niet alleen viewportbreedte.** Een component in een smalle grid-card kan ook op een brede desktop weinig ruimte hebben. Formulieren worden daarom ontworpen met intrinsiek robuuste grids/flex-layouts en `min-width: 0`; viewport media queries zijn aanvullend, niet de enige bescherming tegen overflow.
+- **Een functionele fix is niet klaar als de UI visueel stuk is.** Leesbaarheid, overflow, label-wrapping, bediening en relevante desktop/mobile toestanden maken onderdeel uit van dezelfde wijziging en dezelfde DoD.
+
+### Frontend Definition of Done
+
+Iedere frontendwijziging wordt vóór afronding expliciet tegen deze DoD geverifieerd:
+
+1. de gewenste functie werkt end-to-end in de relevante gebruikersflow;
+2. er is één aantoonbare actieve implementatieroute;
+3. obsolete JS/CSS/selectors worden niet actief meegebundeld;
+4. renderer/controller lifecycle is deterministisch en niet afhankelijk van tabwissel, focus of toevallige timing;
+5. lokale edit-state blijft intact over live refresh/rendercycli waar dat functioneel vereist is;
+6. source-of-truth en bronprioriteit zijn expliciet en consistent;
+7. selectors, componentcontracten en versies zijn consistent;
+8. relevante automatische regressietests en CI-invarianten zijn groen;
+9. de gebouwde en gedeployde frontend bevat aantoonbaar de geteste implementatie;
+10. visuele leesbaarheid en responsiveness zijn gecontroleerd op de relevante componentbreedtes;
+11. relevante documentatie/coding standards zijn bijgewerkt wanneer de wijziging een nieuw structureel patroon introduceert.
+
+Een frontendwijziging wordt niet als **DoD VERIFIED** gerapporteerd zolang één van deze toepasselijke controles nog open staat.
+
 ### Frontendbundling
 
 De browser laadt één versieerbare JavaScript-bundle en één CSS-bundle. De afzonderlijke bronmodules blijven in Git leesbaar en rollbackbaar.
@@ -156,6 +189,10 @@ Bij iedere relevante wijziging wordt minimaal gecontroleerd:
 - schemawijziging atomair door alle consumers/validators/tests;
 - regressietest voor kritieke nieuwe logica;
 - geen nieuwe onnodige Homey-polling of dubbele writer;
+- voor interactieve frontend: expliciet lifecycle-/ownershipcontract en behoud van lokale edit-state;
+- geen afhankelijkheid van focus/tabwissel/timing om een component correct te initialiseren;
+- responsive layout controleren op daadwerkelijke componentbreedte;
+- frontend-DoD expliciet verifiëren vóór afronding;
 - gegenereerde bundle én Pages-artifact aantoonbaar synchroon met de bron;
 - veilige rollback mogelijk.
 
