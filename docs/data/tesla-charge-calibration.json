@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "status": "COLLECTING",
+  "targetValidSessions": 5,
+  "validSessions": 0,
+  "operationalCalibrationKWhPerPercent": 0.59,
+  "autoAdjustOperationalCalibration": false,
+  "measurementBasis": "Easee wall-energy delta from immutable session baseline divided by user-confirmed Tesla SOC delta",
+  "notes": [
+    "Tesla SOC is not available automatically in Homey.",
+    "Start SOC comes from the user's deadline command; end SOC must be confirmed by the user from the Tesla app.",
+    "The operational 0.59 kWh/% factor remains frozen until five valid calibration sessions have been collected and reviewed.",
+    "Charging losses are therefore not added separately during the collection period; the empirical wall-kWh/% factor already includes them implicitly."
+  ],
+  "sessions": [],
+  "observations": [
+    {
+      "date": "2026-08-21",
+      "requestId": "8a2d1cb7-6827-404f-bf92-81f197f44ae8",
+      "enteredStartSoc": 30,
+      "observedTeslaSoc": 37,
+      "easeeLastChargeKWh": 4.21,
+      "indicativeDeltaSoc": 7,
+      "indicativeKWhPerPercent": 0.6014,
+      "included": false,
+      "reason": "Useful indication only: Easee lastCharge is not proven to share the exact immutable deadline baseline, so this point is not counted among the five valid calibration sessions."
+    }
+  ]
+}
