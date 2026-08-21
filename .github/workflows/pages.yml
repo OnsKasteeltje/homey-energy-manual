@@ -74,8 +74,8 @@ jobs:
         run: |
           VERSION="$(tr -d '\r\n' < frontend-version.txt)"
           node --check "docs/javascripts/frontend-bundle-${VERSION}.js"
-          grep -q "teslaDeadlineUi='2.8.99'" "docs/javascripts/frontend-bundle-${VERSION}.js"
-          grep -q "Tesla deadline" "docs/javascripts/frontend-bundle-${VERSION}.js"
+          grep -q "teslaDeadlineInline='2.8.101'" "docs/javascripts/frontend-bundle-${VERSION}.js"
+          grep -q "Deadline actief" "docs/javascripts/frontend-bundle-${VERSION}.js"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
@@ -93,8 +93,9 @@ jobs:
           grep -R -q "consumptionBusSync='2.8.82'" site
           grep -R -q 'energy-right-segment-${index}' site
           grep -R -q "Quooker" site
-          grep -R -q "teslaDeadlineUi='2.8.99'" site
-          grep -R -q "Tesla deadline" site
+          grep -R -q "teslaDeadlineInline='2.8.101'" site
+          grep -R -q "Deadline actief" site
+          grep -R -q "tesla-deadline-inline-v2.8.101.css" "scripts/build_frontend_bundles.py"
           grep -R -q "home-energy-pwa-v5" site/service-worker.js
 
       - name: Upload Pages artifact
