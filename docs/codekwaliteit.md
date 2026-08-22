@@ -2,7 +2,7 @@
 
 Deze pagina beschrijft de actuele software-engineeringbaseline van de Homey Energy Manual / Energy Core v2-repository. De regels hieronder gelden naast de functionele architectuurregels in **Architectuur** en veranderen niets aan de fysieke Homey-Control-policy.
 
-## Actuele kwaliteitsbaseline — 21 augustus 2026
+## Actuele kwaliteitsbaseline — 22 augustus 2026
 
 De repository is stapsgewijs gehard op onderhoudbaarheid, testbaarheid, reproduceerbaarheid en fail-safe gedrag.
 
@@ -41,6 +41,9 @@ Voor interactieve frontendcomponenten gelden aanvullend de volgende harde coding
 - **Vervangen implementaties worden ook uit de actieve bundle verwijderd.** Het toevoegen van een nieuwe route is niet voldoende; obsolete selectors, listeners, runtime-modules en CSS mogen niet actief mee blijven draaien.
 - **DOM-contracten zijn expliciet.** Renderer, controller, CSS en tests koppelen via één canonieke selector/interface. Versiegenummerde CSS-classes mogen niet de enige functionele koppeling tussen componenten vormen.
 - **Renderer en controller hebben een expliciet lifecycle-contract.** Als een renderer met `innerHTML`, node replacement of vergelijkbare techniek interactieve DOM vervangt, moet hij na iedere succesvolle render een deterministisch `...rendered`/`...ready`-event publiceren. De bijbehorende controller hydrateert op dat event opnieuw. Een toevallige timer, tab-focus of browser-visibility-event mag nooit nodig zijn om een component correct te initialiseren.
+- **Complexe samengestelde views worden atomair zichtbaar gemaakt.** Wanneer meerdere presentation-modules noodzakelijkerwijs dezelfde view tijdens initialisatie verrijken, mag de gebruiker geen gedeeltelijk opgebouwde tussenstates zien. De container reserveert vooraf zijn layoutruimte, blijft tijdens de initiële hydratie visueel verborgen en wordt pas zichtbaar nadat de eerste complete presentation-state gereed is. Dit voorkomt flicker en layout shift zonder business- of control-logica te mengen met presentatie.
+- **Atomic render is een presentatiegrens, geen excuus voor timerketens.** De voorkeursarchitectuur blijft `data → één presentation model → één deterministische render → zichtbaar`. Een atomic visibility gate mag tijdelijke of asynchrone presentation-lagen afschermen, maar nieuwe features mogen niet standaard als extra post-render overlay worden toegevoegd. Bestaande timer-/patchlagen worden bij relevante refactors geconsolideerd.
+- **Geen zichtbare default-state vóór authoritatieve state beschikbaar is.** Bij refresh wordt een complexe statusview niet eerst met placeholders, nulwaarden of incomplete blokken getoond om die direct daarna te overschrijven. Toon óf een expliciete loading-state buiten de uiteindelijke view, óf publiceer de complete view atomair zodra de benodigde initiële state beschikbaar is.
 - **Lokale gebruikersinvoer mag niet door live refresh worden vernietigd.** Zolang een gebruiker een formulier bewerkt, wordt de lokale draft-state behouden over render- en datarefreshcycli. Alleen een expliciete save/cancel of aantoonbaar nieuwe authoritatieve configuratie mag deze toestand vervangen.
 - **Editable config en runtime telemetry hebben een vastgelegde bronprioriteit.** Voor configuratieformulieren is de laatst opgeslagen configuratie/command de primaire source of truth; asynchrone runtime-snapshots mogen een formulier niet tijdelijk terugrollen wanneer zij aantoonbaar achterlopen.
 - **Geen MutationObserver- of timerketens als structurele componentbinding.** Zulke mechanismen zijn alleen toegestaan als expliciet gedocumenteerde compatibility fallback. De normale route moet event-driven en deterministisch zijn.
@@ -57,20 +60,22 @@ Iedere frontendwijziging wordt vóór afronding expliciet tegen deze DoD geverif
 2. er is één aantoonbare actieve implementatieroute;
 3. obsolete JS/CSS/selectors worden niet actief meegebundeld;
 4. renderer/controller lifecycle is deterministisch en niet afhankelijk van tabwissel, focus of toevallige timing;
-5. lokale edit-state blijft intact over live refresh/rendercycli waar dat functioneel vereist is;
-6. source-of-truth en bronprioriteit zijn expliciet en consistent;
-7. selectors, componentcontracten en versies zijn consistent;
-8. relevante automatische regressietests en CI-invarianten zijn groen;
-9. de gebouwde en gedeployde frontend bevat aantoonbaar de geteste implementatie;
-10. een smoke test op de gebouwde/gedeployde frontend is succesvol uitgevoerd;
-11. visuele leesbaarheid en responsiveness zijn gecontroleerd op de relevante componentbreedtes;
-12. relevante documentatie/coding standards zijn bijgewerkt wanneer de wijziging een nieuw structureel patroon introduceert.
+5. complexe samengestelde views tonen bij initiële load geen zichtbare gedeeltelijke tussenstate of onnodige layout shift;
+6. lokale edit-state blijft intact over live refresh/rendercycli waar dat functioneel vereist is;
+7. source-of-truth en bronprioriteit zijn expliciet en consistent;
+8. selectors, componentcontracten en versies zijn consistent;
+9. relevante automatische regressietests en CI-invarianten zijn groen;
+10. de gebouwde en gedeployde frontend bevat aantoonbaar de geteste implementatie;
+11. een smoke test op de gebouwde/gedeployde frontend is succesvol uitgevoerd;
+12. visuele leesbaarheid en responsiveness zijn gecontroleerd op de relevante componentbreedtes;
+13. relevante documentatie/coding standards zijn bijgewerkt wanneer de wijziging een nieuw structureel patroon introduceert.
 
 De minimale smoke test bevat, voor zover van toepassing:
 
 - pagina/app opent zonder blokkerende frontendfout;
 - actuele Energy Core-/publicatiedata wordt nog correct geladen;
 - de gewijzigde feature of component is daadwerkelijk aanwezig en initialiseert zonder extra focus/tabwissel/timingtruc;
+- bij een harde refresh verschijnt een complexe samengestelde view als complete eerste presentation-state en niet zichtbaar in opeenvolgende deelstappen;
 - de belangrijkste bestaande gebruikersflow blijft functioneel;
 - geen onverwachte actuatorwrite, dubbele writer of extra Homey-polling is geïntroduceerd;
 - bij een wijziging aan classificatie/visualisatie blijft gemeten versus inferred/indicatief correct onderscheiden;
@@ -206,6 +211,8 @@ Bij iedere relevante wijziging wordt minimaal gecontroleerd:
 - regressietest voor kritieke nieuwe logica;
 - geen nieuwe onnodige Homey-polling of dubbele writer;
 - voor interactieve frontend: expliciet lifecycle-/ownershipcontract en behoud van lokale edit-state;
+- complexe samengestelde views initieel atomair zichtbaar maken en geen zichtbare tussenstates tonen;
+- atomic render niet gebruiken als vervanging voor het structureel consolideren van post-render patches/timers;
 - geen afhankelijkheid van focus/tabwissel/timing om een component correct te initialiseren;
 - responsive layout controleren op daadwerkelijke componentbreedte;
 - frontend-DoD expliciet verifiëren vóór afronding;
