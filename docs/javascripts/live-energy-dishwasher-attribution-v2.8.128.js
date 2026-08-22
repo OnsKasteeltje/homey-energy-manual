@@ -38,7 +38,14 @@
     const loads=r.loads||{};
     const sonos=knownPower(loads.sonos||loads.sonos_kitchen||loads.kitchen_sonos);
     const kitchen=knownPower(loads.kitchen||loads.kitchen_appliances||loads.keukenapparaten);
-    const residual=Math.max(0,n(vm.other)-dish-sonos-kitchen);
+
+    // Belangrijk: gebruik dezelfde Overig-totaalwaarde als de reeds gerenderde
+    // verdiepingslaag. Bij asynchrone PV-bronnen kan vm.other bewust 0 zijn,
+    // terwijl live-energy-overig-detail een geldige indicatieve Overig-rest toont.
+    // De subcategorie Onverdeeld moet altijd die zichtbare hoofdgroep sluiten:
+    // Overig = Vaatwasser + Sonos + Keukenapparaten + Onverdeeld.
+    const renderedOverig=finite(root.dataset.overigTotalW)?n(root.dataset.overigTotalW):n(vm.other);
+    const residual=Math.max(0,renderedOverig-dish-sonos-kitchen);
 
     const dishCard=findCard(layer,'Vaatwasser');
     if(dishCard){
@@ -53,7 +60,7 @@
     if(residualCard){
       const texts=residualCard.querySelectorAll('text');
       if(texts[1])texts[1].textContent=fmt(residual);
-      if(texts[2])texts[2].textContent=residual>THRESHOLD?'rest na vaatwasser-fingerprint':'laag / stand-by rest';
+      if(texts[2])texts[2].textContent=residual>THRESHOLD?'rest na geïdentificeerde subcategorieën':'laag / stand-by rest';
       residualCard.classList.toggle('flow-active',residual>THRESHOLD);
       residualCard.classList.toggle('flow-idle',residual<=THRESHOLD);
     }
@@ -61,13 +68,14 @@
     const dishBranch=layer.querySelector('.detail-branch-0');
     if(dishBranch){dishBranch.style.strokeWidth=String(width(dish));dishBranch.classList.toggle('is-active',dish>THRESHOLD);dishBranch.classList.toggle('is-idle',dish<=THRESHOLD);if(dish>THRESHOLD)dishBranch.setAttribute('marker-end','url(#arrow-grid)');}
     const residualBranch=layer.querySelector('.detail-branch-3');
-    if(residualBranch){residualBranch.style.strokeWidth=String(width(residual));residualBranch.classList.toggle('is-active',residual>THRESHOLD);residualBranch.classList.toggle('is-idle',residual<=THRESHOLD);}
+    if(residualBranch){residualBranch.style.strokeWidth=String(width(residual));residualBranch.classList.toggle('is-active',residual>THRESHOLD);residualBranch.classList.toggle('is-idle',residual<=THRESHOLD);if(residual>THRESHOLD)residualBranch.setAttribute('marker-end','url(#arrow-grid)');else residualBranch.removeAttribute('marker-end');}
 
     root.dataset.dishwasherAttribution='P1_FINGERPRINT';
     root.dataset.dishwasherPowerW=String(Math.round(dish));
     root.dataset.dishwasherFingerprintConfidence=String(fp.confidence);
     root.dataset.dishwasherFingerprintVersion=String(fp.version||'');
     root.dataset.overigUnattributedW=String(Math.round(residual));
+    root.dataset.overigReconciliationW=String(Math.round(renderedOverig-(dish+sonos+kitchen+residual)));
   }
 
   function schedule(raw,delay=140){setTimeout(()=>apply(raw),delay);}
