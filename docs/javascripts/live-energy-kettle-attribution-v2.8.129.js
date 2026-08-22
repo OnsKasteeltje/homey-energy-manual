@@ -1,0 +1,20 @@
+(function(){
+'use strict';
+const THRESHOLD=20;let lastRaw=null;
+const finite=v=>v!==null&&v!==undefined&&Number.isFinite(Number(v));
+const n=v=>finite(v)?Math.max(0,Number(v)):0;
+const fmt=v=>`${Math.round(n(v)).toLocaleString('nl-NL')} W`;
+const width=v=>n(v)>THRESHOLD?Math.max(3.5,Math.min(8.5,3+n(v)/850)):2;
+const titleOf=g=>[...g.querySelectorAll('text')].map(t=>t.textContent?.trim()).find(Boolean)||'';
+function setSegment(p,w){if(!p)return;p.style.strokeWidth=String(width(w));p.classList.toggle('is-active',w>THRESHOLD);p.classList.toggle('is-idle',w<=THRESHOLD);}
+function kettleIcon(card){const g=card?.querySelector('.energy-overig-detail-icon');if(!g)return;g.className.baseVal='energy-overig-detail-icon icon-kettle';g.replaceChildren();const ns='http://www.w3.org/2000/svg';const path=document.createElementNS(ns,'path');path.setAttribute('d','M-14 -12 H10 V10 C10 17 -10 17 -10 10 V-12 M10 -7 H16 C23 -7 23 7 16 7 H10 M-5 -20 C-10 -15 0 -12 -5 -7 M5 -20 C0 -15 10 -12 5 -7');g.appendChild(path);}
+function apply(raw){const root=document.getElementById('live-energy-flow'),r=raw||lastRaw||window.EnergyCoreV2?.state?.raw,fp=window.KettleFingerprint?.state,layer=root?.querySelector('.energy-overig-detail-layer');if(!root||!r||!layer)return;lastRaw=r;
+if(!fp?.active||!finite(fp.power_w)||Number(fp.confidence)<0.90){root.dataset.kettleAttribution='NONE';root.dataset.kettleFingerprintConfidence=String(fp?.confidence||0);return;}
+const kettle=n(fp.power_w),overig=finite(root.dataset.overigTotalW)?n(root.dataset.overigTotalW):0,dish=n(root.dataset.dishwasherPowerW),loads=r.loads||{},sonos=n((loads.sonos||loads.sonos_kitchen||loads.kitchen_sonos)?.power_w),residual=Math.max(0,overig-dish-kettle-sonos);
+const cards=[...layer.querySelectorAll('.energy-overig-detail-node')],card=cards.find(g=>titleOf(g)==='Keukenapparaten');if(card){const t=card.querySelectorAll('text');if(t[0])t[0].textContent='Waterkoker';if(t[1])t[1].textContent=`≈ ${fmt(kettle)}`;if(t[2])t[2].textContent=`actief · fingerprint ${Math.round(Number(fp.confidence)*100)}%`;card.classList.add('flow-active');card.classList.remove('flow-idle');kettleIcon(card);}
+const residualCard=cards.find(g=>['Onverdeeld','Overig klein'].includes(titleOf(g)));if(residualCard){const t=residualCard.querySelectorAll('text');if(t[1])t[1].textContent=fmt(residual);if(t[2])t[2].textContent=residual>THRESHOLD?'rest na geïdentificeerde subcategorieën':'laag / stand-by rest';residualCard.classList.toggle('flow-active',residual>THRESHOLD);residualCard.classList.toggle('flow-idle',residual<=THRESHOLD);}
+const branch=layer.querySelector('.detail-branch-2');setSegment(branch,kettle);if(branch&&kettle>THRESHOLD)branch.setAttribute('marker-end','url(#arrow-grid)');const residualBranch=layer.querySelector('.detail-branch-3');setSegment(residualBranch,residual);if(residualBranch){if(residual>THRESHOLD)residualBranch.setAttribute('marker-end','url(#arrow-grid)');else residualBranch.removeAttribute('marker-end');}
+const seg4=layer.querySelector('.detail-seg-4'),seg3=layer.querySelector('.detail-seg-3'),seg2=layer.querySelector('.detail-seg-2'),seg1=layer.querySelector('.detail-seg-1');setSegment(seg4,overig);setSegment(seg3,dish+sonos+kettle);setSegment(seg2,dish+sonos);setSegment(seg1,dish);
+root.dataset.kettleAttribution='P1_FINGERPRINT';root.dataset.kettlePowerW=String(Math.round(kettle));root.dataset.kettleFingerprintConfidence=String(fp.confidence);root.dataset.kettleFingerprintVersion=String(fp.version||'');root.dataset.overigUnattributedW=String(Math.round(residual));}
+const schedule=(r,d=120)=>setTimeout(()=>apply(r),d);document.addEventListener('energycorev2state',e=>schedule(e.detail?.raw,220));document.addEventListener('kettlefingerprintstate',()=>schedule(lastRaw,120));document.addEventListener('dishwasherfingerprintstate',()=>schedule(lastRaw,180));document.addEventListener('DOMContentLoaded',()=>{schedule(null,1100);schedule(null,1900);});document.addEventListener('DOMContentSwitch',()=>schedule(null,500));
+})();
