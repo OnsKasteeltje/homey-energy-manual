@@ -11,6 +11,7 @@ De wasmachine en droger leveren in Homey wel programma-/apparaatstatus, maar gee
 - Statuswissels van wasmachine/droger worden event-first bemonsterd. De periodieke 5-minutenroute gebruikt `EM2_State` en doet geen extra `getDevices()`.
 - Alleen geïsoleerde overgangen worden als bewijs gebruikt. Grote gelijktijdige veranderingen in PV, Tesla, boiler of Quatt worden gefilterd.
 - Het model bepaalt per apparaat dominante fase, typisch overgangsvermogen, aantal bewijsmetingen, faseconsistentie en confidence.
+- Voor de wasmachine bestaat daarnaast een browser-side fingerprintfallback. Een sterke sequentiële P1-fingerprint kan een foutieve AEG `Idle`-status degraderen tot inconsistent en de status als **waarschijnlijk actief** tonen. Als de fase-reconstructie tijdelijk onbruikbaar is, kan een tweede fail-safe alleen bij een geldige woningbalans, een persistente niet-toegewezen belasting van 0,9–2,9 kW en afwezigheid van Tesla, droger, Quooker en actieve ruimteverwarming dezelfde inferred-status zetten.
 
 ## Confidence en veiligheidsregels
 
@@ -20,15 +21,17 @@ De wasmachine en droger leveren in Homey wel programma-/apparaatstatus, maar gee
 - `HIGH`: minimaal 4 bewijsmetingen en hoge faseconsistentie.
 - Een geschat vermogen wordt alleen gepubliceerd bij `MEDIUM` of `HIGH` én boven de algemene actieve-verbruiksdrempel van 20 W.
 - Bij onvoldoende bewijs blijft `power_w = null` als het apparaat actief is. De UI toont dan `—` en laat het verbruik onderdeel van `Overig` blijven.
+- Een inferred actieve status uit de fingerprintfallback krijgt nooit automatisch een verzonnen wattage; het verbruik blijft dus in `Overig` totdat een voldoende betrouwbare vermogensschatting beschikbaar is.
+- De persistente residual-fallback vereist minimaal twee samples over ten minste vier minuten en wordt uitgeschakeld zodra de afgeleide woningbalans ongeldig is.
 
 ## Publicatie en Live Stroom
 
 `Energie | Wasmachine & Droger publicatie | v1.1.1` leest uitsluitend het gedeelde Logic-model en `EM2_State` en publiceert iedere 5 minuten `data/laundry-analysis.json`. Hiervoor worden geen extra apparaten gepolld.
 
-De browser-overlay `live-energy-laundry-model-v2.8.70.js` voegt alleen verse, voldoende betrouwbare schattingen samen met de bestaande Energy Core-state. `live-energy-appliance-state-v2.8.71.js` markeert zo'n waarde zichtbaar als **geschat** en vermeldt de betrouwbaarheid. Hierdoor kan een P1-afleiding niet worden verward met een echte apparaatmeter.
+De browser-overlay `live-energy-laundry-model-v2.8.118.js` voegt verse, voldoende betrouwbare schattingen samen met de bestaande Energy Core-state en bevat de conflict/fallbacklogica voor de wasmachine. `live-energy-appliance-state-v2.8.97.js` vertaalt de resulterende status naar de Live Stream.
 
-Wanneer een betrouwbare schatting beschikbaar is, trekt de bestaande Live Stroom-renderer dit vermogen af van `Overig`. Daarmee blijft de woningbalans intact en ontstaat geen dubbeltelling.
+Wanneer een betrouwbare vermogensschatting beschikbaar is, trekt de bestaande Live Stroom-renderer dit vermogen af van `Overig`. Daarmee blijft de woningbalans intact en ontstaat geen dubbeltelling. Een alleen inferred actieve status verandert de wattageverdeling niet.
 
 ## Fail-safe gedrag
 
-Ontbrekende, oude of onvoldoende betrouwbare modeldata wordt nooit als wattage gebruikt. De Energy Core-hoofdstream blijft leidend voor de actuele apparaatstatus. De P1-modeloverlay mag uitsluitend vermogen toevoegen; hij mag een actuele Homey-status niet zelfstandig op actief zetten.
+Ontbrekende, oude of onvoldoende betrouwbare modeldata wordt nooit als wattage gebruikt. De Energy Core-hoofdstream blijft leidend, behalve wanneer de directe AEG-status aantoonbaar conflicteert met voldoende sterke elektrische evidence. In dat geval wordt uitsluitend de status naar `WAARSCHIJNLIJK_ACTIEF` verheven; de bron, conflictstatus, methode en confidence worden expliciet in `raw.meta.laundry_fingerprint_fallback` vastgelegd.
