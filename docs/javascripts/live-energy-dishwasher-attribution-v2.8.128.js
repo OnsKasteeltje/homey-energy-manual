@@ -10,6 +10,7 @@
   function knownPower(load){return load&&finite(load.power_w)?n(load.power_w):0;}
   function titleOf(g){return [...g.querySelectorAll('text')].map(t=>t.textContent?.trim()).find(Boolean)||'';}
   function findCard(layer,title){return [...layer.querySelectorAll('.energy-overig-detail-node')].find(g=>titleOf(g)===title)||null;}
+  function setSegment(path,power){if(!path)return;path.style.strokeWidth=String(width(power));path.classList.toggle('is-active',power>THRESHOLD);path.classList.toggle('is-idle',power<=THRESHOLD);}
 
   function apply(raw){
     const root=document.getElementById('live-energy-flow');
@@ -38,12 +39,6 @@
     const loads=r.loads||{};
     const sonos=knownPower(loads.sonos||loads.sonos_kitchen||loads.kitchen_sonos);
     const kitchen=knownPower(loads.kitchen||loads.kitchen_appliances||loads.keukenapparaten);
-
-    // Belangrijk: gebruik dezelfde Overig-totaalwaarde als de reeds gerenderde
-    // verdiepingslaag. Bij asynchrone PV-bronnen kan vm.other bewust 0 zijn,
-    // terwijl live-energy-overig-detail een geldige indicatieve Overig-rest toont.
-    // De subcategorie Onverdeeld moet altijd die zichtbare hoofdgroep sluiten:
-    // Overig = Vaatwasser + Sonos + Keukenapparaten + Onverdeeld.
     const renderedOverig=finite(root.dataset.overigTotalW)?n(root.dataset.overigTotalW):n(vm.other);
     const residual=Math.max(0,renderedOverig-dish-sonos-kitchen);
 
@@ -66,9 +61,25 @@
     }
 
     const dishBranch=layer.querySelector('.detail-branch-0');
-    if(dishBranch){dishBranch.style.strokeWidth=String(width(dish));dishBranch.classList.toggle('is-active',dish>THRESHOLD);dishBranch.classList.toggle('is-idle',dish<=THRESHOLD);if(dish>THRESHOLD)dishBranch.setAttribute('marker-end','url(#arrow-grid)');}
+    setSegment(dishBranch,dish);
+    if(dishBranch&&dish>THRESHOLD)dishBranch.setAttribute('marker-end','url(#arrow-grid)');
+
     const residualBranch=layer.querySelector('.detail-branch-3');
-    if(residualBranch){residualBranch.style.strokeWidth=String(width(residual));residualBranch.classList.toggle('is-active',residual>THRESHOLD);residualBranch.classList.toggle('is-idle',residual<=THRESHOLD);if(residual>THRESHOLD)residualBranch.setAttribute('marker-end','url(#arrow-grid)');else residualBranch.removeAttribute('marker-end');}
+    setSegment(residualBranch,residual);
+    if(residualBranch){if(residual>THRESHOLD)residualBranch.setAttribute('marker-end','url(#arrow-grid)');else residualBranch.removeAttribute('marker-end');}
+
+    // Horizontale Overig-detailbus: ieder segment krijgt de dikte van het
+    // vermogen dat daadwerkelijk door dat segment stroomt. De lange route van
+    // Overig naar de vaatwasser draagt dus het vaatwasservermogen (plus eventuele
+    // downstream bekende lasten), in plaats van de oorspronkelijke dunne idle-lijn.
+    const seg4=layer.querySelector('.detail-seg-4');
+    const seg3=layer.querySelector('.detail-seg-3');
+    const seg2=layer.querySelector('.detail-seg-2');
+    const seg1=layer.querySelector('.detail-seg-1');
+    setSegment(seg4,renderedOverig);
+    setSegment(seg3,dish+sonos+kitchen);
+    setSegment(seg2,dish+sonos);
+    setSegment(seg1,dish);
 
     root.dataset.dishwasherAttribution='P1_FINGERPRINT';
     root.dataset.dishwasherPowerW=String(Math.round(dish));
@@ -76,6 +87,7 @@
     root.dataset.dishwasherFingerprintVersion=String(fp.version||'');
     root.dataset.overigUnattributedW=String(Math.round(residual));
     root.dataset.overigReconciliationW=String(Math.round(renderedOverig-(dish+sonos+kitchen+residual)));
+    root.dataset.overigBusWidthSource='DOWNSTREAM_LOAD';
   }
 
   function schedule(raw,delay=140){setTimeout(()=>apply(raw),delay);}
