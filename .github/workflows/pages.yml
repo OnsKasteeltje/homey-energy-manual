@@ -98,8 +98,12 @@ jobs:
           grep -q "AEG_IDLE_DEGRADED_BY_STRONG_SEQUENTIAL_P1_EVIDENCE" "$JS"
           grep -q "WAARSCHIJNLIJK_ACTIEF" "$JS"
           grep -q "directSourceQualityEffective:'INCONSISTENT'" "$JS"
-          grep -q "load-fingerprint-classifier-v1.1.2.js" "scripts/build_frontend_bundles.py"
+          grep -q "goodwe_4200_w" "$JS"
+          grep -q "boiler_compensated" "$JS"
+          grep -q "P1_L2 + GoodWe4200" "$JS"
+          grep -q "load-fingerprint-classifier-v1.1.3.js" "scripts/build_frontend_bundles.py"
           grep -q "live-energy-laundry-model-v2.8.117.js" "scripts/build_frontend_bundles.py"
+          ! grep -q "load-fingerprint-classifier-v1.1.2.js" "scripts/build_frontend_bundles.py"
           grep -q "tesla-deadline-native-v2.8.110.css" "scripts/build_frontend_bundles.py"
           grep -q "home-architecture-v2.0.5.js" "scripts/build_frontend_bundles.py"
           grep -q "deadlineParts" "$JS"
@@ -108,7 +112,6 @@ jobs:
           grep -q "label:first-child{grid-column:1/-1}" "$CSS"
           grep -q "label:last-child{grid-column:1/-1}" "$CSS"
           grep -q "\[data-tesla-deadline-native\]" "$CSS"
-          ! grep -q "load-fingerprint-classifier-v1.1.1.js" "scripts/build_frontend_bundles.py"
           ! grep -q "live-energy-laundry-model-v2.8.116.js" "scripts/build_frontend_bundles.py"
           ! grep -q "live-energy-laundry-model-v2.8.115.js" "scripts/build_frontend_bundles.py"
           ! grep -q "tesla-deadline-migration-v2.8.17.js" "scripts/build_frontend_bundles.py"
@@ -148,6 +151,9 @@ jobs:
           grep -R -q "fallback_allowed" site
           grep -R -q "AEG_IDLE_DEGRADED_BY_STRONG_SEQUENTIAL_P1_EVIDENCE" site
           grep -R -q "WAARSCHIJNLIJK_ACTIEF" site
+          grep -R -q "goodwe_4200_w" site
+          grep -R -q "boiler_compensated" site
+          grep -R -q "P1_L2 + GoodWe4200" site
           grep -R -q "home-energy-pwa-v5" site/service-worker.js
 
       - name: Upload Pages artifact
