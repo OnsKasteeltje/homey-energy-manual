@@ -92,7 +92,10 @@ jobs:
           grep -q "CYCLIC_RESIDUAL_FINGERPRINT" "$JS"
           grep -q "SEQUENTIAL_L2_FINGERPRINT" "$JS"
           grep -q "WASMACHINE_CANDIDATE" "$JS"
-          grep -q "load-fingerprint-classifier-v1.1.0.js" "scripts/build_frontend_bundles.py"
+          grep -q "AEG_IDLE_BUT_SEQUENTIAL_P1_EVIDENCE" "$JS"
+          grep -q "P1_SEQUENCE_CONFLICT" "$JS"
+          grep -q "load-fingerprint-classifier-v1.1.1.js" "scripts/build_frontend_bundles.py"
+          grep -q "live-energy-laundry-model-v2.8.115.js" "scripts/build_frontend_bundles.py"
           grep -q "tesla-deadline-native-v2.8.110.css" "scripts/build_frontend_bundles.py"
           grep -q "home-architecture-v2.0.5.js" "scripts/build_frontend_bundles.py"
           grep -q "deadlineParts" "$JS"
@@ -133,6 +136,8 @@ jobs:
           grep -R -q "CYCLIC_RESIDUAL_FINGERPRINT" site
           grep -R -q "SEQUENTIAL_L2_FINGERPRINT" site
           grep -R -q "WASMACHINE_CANDIDATE" site
+          grep -R -q "AEG_IDLE_BUT_SEQUENTIAL_P1_EVIDENCE" site
+          grep -R -q "P1_SEQUENCE_CONFLICT" site
           grep -R -q "home-energy-pwa-v5" site/service-worker.js
 
       - name: Upload Pages artifact
