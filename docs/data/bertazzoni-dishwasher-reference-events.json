@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "timezone": "Europe/Amsterdam",
+  "purpose": "Ground-truth overlap events for separating Bertazzoni oven and dishwasher signatures from P1 phase data. Reference-only; not yet used for automatic attribution.",
+  "events": [
+    {
+      "date_local": "2026-08-22",
+      "window_local": "around 18:00",
+      "ground_truth": {
+        "dishwasher_on": true,
+        "bertazzoni_oven_on": true,
+        "source": "user report"
+      },
+      "energy_core": {
+        "state_revision": 1424,
+        "source_sample_local": "18:00:00",
+        "grid_w": 3291,
+        "grid_l1_w": 2067,
+        "grid_l2_w": 2017,
+        "grid_l3_w": -792,
+        "pv_total_w": 749.35,
+        "physical_house_candidate_w": 4040.4,
+        "derived_house_balance_valid": false,
+        "balance_reason": "ASYNC_PV_RECONSTRUCTION_UNCERTAIN",
+        "source_skew_warning": true
+      },
+      "known_other_loads": {
+        "tesla_w": 0,
+        "boiler_w": 0,
+        "quatt_w": 10.3,
+        "quooker_w": 0
+      },
+      "interpretation": "Strong combined-load reference. L1 and L2 both show ~2 kW net import while L3 remains exporting. Because dishwasher and Bertazzoni oven overlap, this sample must not be used to assign the full ~4.0 kW house candidate to either appliance individually. Use it only as overlap evidence when compared with future clean single-appliance ON/OFF transitions.",
+      "classification_status": "REFERENCE_ONLY"
+    }
+  ],
+  "implementation_rule": "Do not auto-attribute this overlap event to either appliance. Require at least one clean Bertazzoni-only transition and one clean dishwasher-only transition, preferably with direct P1 phase samples before/after the transition, then solve the overlap as a residual consistency check.",
+  "architecture_note": "Use direct Homey P1 readings for short fingerprint calibration windows; do not increase continuous Homey polling load solely for fingerprinting."
+}
