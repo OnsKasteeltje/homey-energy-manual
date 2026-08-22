@@ -1,5 +1,67 @@
 # Load fingerprints
 
+## Wasmachine
+
+Status: **ground-truth run vastgelegd; REFERENCE_ONLY voor classifier**.
+
+### Bevestigde referentierun 22 augustus 2026
+
+- Geplande start: rond 04:34 lokale tijd.
+- Analysevenster: circa 04:20 tot 06:25 lokale tijd.
+- Directe AEG-status stond gedurende de run op actief en was uiterlijk rond 06:25 weer inactief.
+- Tesla stond tijdens het relevante venster gepauzeerd (`teslaW = 0`), de boiler was uit en de droger was inactief. Daardoor was dit een relatief schoon nachtvenster voor fingerprint-analyse.
+
+Belangrijk: de directe AEG-status geldt als status-ground-truth, niet als directe vermogensmeting. De fase- en vermogensfasen hieronder zijn uit P1/Energy Core afgeleid en blijven daarom `inferred`.
+
+### Waargenomen P1/fase-signatuur
+
+| Lokale tijd | Waarneming | Interpretatie | Bewijsstatus |
+|---|---:|---|---|
+| ~04:15 | P1 ~401 W; L2 ~271 W | pre-run / huishoudbaseline | gemeten P1/fase |
+| ~04:25 | P1 ~2422 W; L2 ~2291 W; L1 ~89 W; L3 ~42 W | sterke kandidaat voor start-/verwarmingspuls | inferred, MEDIUM |
+| ~04:35-05:45 | L2 herhaald circa 280-630 W, met tussenliggende lagere blokken | trommel/motor/pomp/wash-agitation patroon | inferred, MEDIUM-HIGH |
+| ~05:55-06:15 | L2 circa 147-216 W | staartfase / spoelen-pompen-einde; 5-min resolutie is te grof voor exacte subfase | inferred, MEDIUM |
+| uiterlijk ~06:25 | AEG-status inactief; P1 terug rond normale nachtlast | programma-einde | directe status, HIGH |
+
+De duidelijkste hoge gebeurtenis in deze run zit dus op **L2**. De eerdere fase-analyse bevat bovendien een bruikbare, geïsoleerde wasmachinestart op 16 augustus 2026 met een L2-sprong van circa **+1268 W**. Samen maakt dit L2 aanzienlijk waarschijnlijker dan de huidige `laundry-analysis`-modelwaarde L3.
+
+### Confidence
+
+- Totale fingerprint als referentie: **0,82 — MEDIUM-HIGH**.
+- Fase = L2: **0,90 — HIGH**.
+- Initiële ~2,29 kW L2-puls als wasmachineverwarming/start: **0,75 — MEDIUM**.
+- Recurrente L2-werkband ~0,28-0,63 kW: **0,82 — MEDIUM-HIGH**.
+- Staartfase ~0,15-0,22 kW: **0,65 — MEDIUM**.
+- Programma-einde op basis van AEG-status: **0,95 — HIGH**.
+
+### Belangrijke modelcorrectie
+
+De actuele `laundry-analysis` publiceert voor de wasmachine nog `phase = L3`, maar met `confidence = LOW`, `evidence_count = 5` en `phase_consistency = 0.6`. Deze nieuwe nacht-run plus de eerdere geïsoleerde L2-start spreken die L3-toewijzing tegen. **L3 mag daarom niet als gevalideerde wasmachinefase worden gebruikt.** De referentie voor verdere classifierontwikkeling is vanaf nu L2, totdat meerdere onafhankelijke runs het tegendeel aantonen.
+
+### Aanbevolen classifier-signatuur
+
+Gebruik deze run voorlopig als `REFERENCE_ONLY`; activeer nog geen harde automatische vermogensattributie op basis van één piek. Een kandidaat `WASMACHINE` moet bij voorkeur als sequentie worden herkend:
+
+1. directe AEG-status actief of een betrouwbaar programmastartanker;
+2. op L2 binnen ongeveer ±15 minuten rond fysieke start een mogelijke hoge verwarmingspuls in de orde 1,8-2,5 kW;
+3. daarna gedurende minimaal circa 45-60 minuten herhaalde L2-werkblokken grofweg 0,25-0,70 kW met tussenliggende lagere perioden;
+4. totale cyclus grofweg 90-150 minuten;
+5. terminale AEG-overgang naar inactief en terugkeer van L2 richting huishoudbaseline.
+
+De classifier moet **de sequentie gebruiken, niet één hoog datapunt**. Een losse piek rond 2 kW kan ook bij Quooker, waterkoker, oven of een andere weerstandslast horen. Omdat de 5-minuten Core-cadans korte pomp-, motor- en centrifugepieken kan middelen of missen, mogen exacte subfases niet uit deze run als harde drempels worden afgeleid.
+
+### Overlap en uitsluitingen
+
+- L1 vertoonde tijdens de cyclus kleine periodieke wisselingen en lijkt achtergrondverbruik; niet opnemen in de wasmachinefingerprint.
+- L3 bleef grotendeels op lage achtergrondwaarden en ondersteunt geen L3-toewijzing voor deze run.
+- Tesla, boiler en droger waren in het relevante venster geen verklarende grootverbruikers.
+- Quooker-status zit niet in deze specifieke day-series export; de initiële hoge L2-puls kan daarom op zichzelf niet uniek aan de wasmachine worden toegeschreven.
+- Directe AEG-status blijft altijd hoger in bronhiërarchie dan fingerprint-inference. De fingerprint is bedoeld om vermogen/fase en plausibiliteit te ondersteunen, niet om betrouwbare directe status te overrulen.
+
+### Vrijgavecriterium
+
+Na minimaal één extra schone, onafhankelijke wascyclus met dezelfde L2-sequentie kan een read-only `WASMACHINE_CANDIDATE` aan de classifier worden toegevoegd. Tot die tijd blijft deze fingerprint documentatie-/validatiereferentie.
+
 ## Waterkoker
 
 Status: **ground-truth uitgebreid; herkenning nog conservatief**.
