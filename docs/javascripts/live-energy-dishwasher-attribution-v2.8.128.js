@@ -43,8 +43,8 @@
     const dishCard=findCard(layer,'Vaatwasser');
     if(dishCard){
       const texts=dishCard.querySelectorAll('text');
-      if(texts[2])texts[2].textContent=`≈ ${fmt(dish)}`;
-      if(texts[3])texts[3].textContent=`actief · fingerprint ${Math.round(Number(fp.confidence)*100)}%`;
+      if(texts[1])texts[1].textContent=`≈ ${fmt(dish)}`;
+      if(texts[2])texts[2].textContent=`actief · fingerprint ${Math.round(Number(fp.confidence)*100)}%`;
       dishCard.classList.add('flow-active');
       dishCard.classList.remove('flow-idle');
     }
@@ -52,8 +52,8 @@
     const residualCard=[...layer.querySelectorAll('.energy-overig-detail-node')].find(g=>['Onverdeeld','Overig klein'].includes(titleOf(g)));
     if(residualCard){
       const texts=residualCard.querySelectorAll('text');
-      if(texts[2])texts[2].textContent=fmt(residual);
-      if(texts[3])texts[3].textContent=residual>THRESHOLD?'rest na vaatwasser-fingerprint':'laag / stand-by rest';
+      if(texts[1])texts[1].textContent=fmt(residual);
+      if(texts[2])texts[2].textContent=residual>THRESHOLD?'rest na vaatwasser-fingerprint':'laag / stand-by rest';
       residualCard.classList.toggle('flow-active',residual>THRESHOLD);
       residualCard.classList.toggle('flow-idle',residual<=THRESHOLD);
     }
