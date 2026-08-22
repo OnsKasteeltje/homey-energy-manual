@@ -1,29 +1,29 @@
 {
   "meta": {
     "schema_version": "2.11",
-    "generated_at": "2026-08-22T11:41:00.265Z",
-    "heartbeat_at": "2026-08-22T11:41:00.265Z",
+    "generated_at": "2026-08-22T11:46:00.185Z",
+    "heartbeat_at": "2026-08-22T11:46:00.185Z",
     "publisher_version": "EM2_PUBLISHER_V1.0.3",
     "control_mode": "SHADOW",
-    "source_sample_at": "2026-08-22T11:40:00.540Z",
-    "state_revision": 1371,
-    "decision_revision": 1371,
-    "shadow_revision": 1371,
+    "source_sample_at": "2026-08-22T11:45:00.099Z",
+    "state_revision": 1372,
+    "decision_revision": 1372,
+    "shadow_revision": 1372,
     "state_age_sec": 1,
     "publish_reason": "REVISION_RETRY",
     "min_publish_interval_sec": 300
   },
   "balance": {
     "valid": false,
-    "reason": "SOURCE_STALE_OR_MISSING",
+    "reason": "KNOWN_LOADS_EXCEED_HOUSE",
     "tolerance_w": 75,
     "source_timing": {
-      "valid": false,
-      "fresh": false,
+      "valid": true,
+      "fresh": true,
       "synchronized": false,
-      "warning": null,
-      "maxAgeSec": 890,
-      "skewSec": 888,
+      "warning": "SOURCE_SKEW_WARNING",
+      "maxAgeSec": 637,
+      "skewSec": 635,
       "maxAllowedAgeSec": 1200,
       "maxAllowedSkewSec": 180,
       "p1Fresh": true,
@@ -32,24 +32,24 @@
       "freshness": {
         "solarEdge": {
           "fresh": true,
-          "ageSec": 337,
+          "ageSec": 637,
           "maxAgeSec": 1200
         },
         "goodWe4200": {
-          "fresh": false,
-          "ageSec": 890,
+          "fresh": true,
+          "ageSec": 288,
           "maxAgeSec": 600
         },
         "goodWe2000": {
           "fresh": true,
-          "ageSec": 290,
+          "ageSec": 590,
           "maxAgeSec": 600
         }
       },
       "sources": {
-        "p1": "2026-08-22T11:39:59.000Z",
+        "p1": "2026-08-22T11:44:59.000Z",
         "solarEdge": "2026-08-22T11:34:24.000Z",
-        "goodWe4200": "2026-08-22T11:25:11.000Z",
+        "goodWe4200": "2026-08-22T11:40:13.000Z",
         "goodWe2000": "2026-08-22T11:35:11.000Z"
       }
     },
@@ -59,23 +59,23 @@
       "derived_house_balance_valid": false,
       "flex_budget_source": "P1_NET_EXPORT"
     },
-    "physical_house_candidate_w": 2421.3,
-    "known_measured_load_w": 10.3,
+    "physical_house_candidate_w": 1563.3,
+    "known_measured_load_w": 5825.3,
     "residual_w": null,
     "fail_closed_flex_budget": false
   },
   "grid": {
-    "power_w": -2462,
-    "l1_w": 135,
-    "l2_w": -739,
-    "l3_w": -1858,
+    "power_w": -2912,
+    "l1_w": 2041,
+    "l2_w": -1623,
+    "l3_w": -3331,
     "import_w": 0,
-    "export_w": 2462
+    "export_w": 2912
   },
   "pv": {
-    "total_w": 4883.280000000001,
+    "total_w": 4475.280000000001,
     "solaredge_w": 3091.28,
-    "goodwe_4200_w": 1331,
+    "goodwe_4200_w": 923,
     "goodwe_2000_w": 461
   },
   "battery": {
@@ -101,12 +101,12 @@
   },
   "energy_budget": {
     "house_load_w": null,
-    "known_flexible_load_w": 0,
+    "known_flexible_load_w": 5815,
     "comfort_load_w": 10,
     "other_house_load_w": null,
     "grid_safety_reserve_w": 200,
     "quatt_ramp_reserve_w": 100,
-    "flex_export_budget_w": 2162,
+    "flex_export_budget_w": 2612,
     "flex_budget_source": "P1_NET_EXPORT",
     "discretionary_import_budget_w": 4000,
     "battery_support_w": 0,
@@ -114,26 +114,26 @@
     "grid_measurement_valid": true,
     "derived_house_balance_valid": false,
     "balance_valid": false,
-    "balance_reason": "SOURCE_STALE_OR_MISSING"
+    "balance_reason": "KNOWN_LOADS_EXCEED_HOUSE"
   },
   "tesla": {
     "connected": true,
-    "charging": false,
-    "power_w": 0,
-    "requested_a": 0,
+    "charging": true,
+    "power_w": 5815,
+    "requested_a": 8,
     "deadline_at": "2026-08-22T09:20",
     "latest_start_at": "",
     "need": "TESLA_BUFFER_EXPORT",
-    "charge_state": "plugged_in_paused",
+    "charge_state": "plugged_in_charging",
     "remaining_kwh": 0,
     "deadline_active": false,
-    "deadline_status": "OPPORTUNITY_WACHT_OVERSCHOT"
+    "deadline_status": "OPPORTUNITY_PV_OVERSCHOT"
   },
   "equalizer": {
-    "power_w": -2187,
-    "l1_a": 0,
-    "l2_a": -3,
-    "l3_a": -7
+    "power_w": -3542,
+    "l1_a": 8,
+    "l2_a": -7,
+    "l3_a": -14
   },
   "hot_water": {
     "boiler_on": true,
@@ -143,15 +143,15 @@
       "schema": "EM2_WW_STATE_V0.8",
       "date": "2026-08-22",
       "startedAt": "2026-08-21T22:00:00.252Z",
-      "updatedAt": "2026-08-22T11:40:01.109Z",
-      "sourceRevision": 1371,
-      "lastStateSampleAt": "2026-08-22T11:40:00.540Z",
-      "boilerOnMinToday": 220,
+      "updatedAt": "2026-08-22T11:45:00.849Z",
+      "sourceRevision": 1372,
+      "lastStateSampleAt": "2026-08-22T11:45:00.099Z",
+      "boilerOnMinToday": 225,
       "heatingMinToday": 190,
       "heatingAccountingQuality": "FROM_STATE_START",
-      "currentOnRunMin": 220,
+      "currentOnRunMin": 225,
       "heatingConfirmMin": 189.99661666666668,
-      "lowAfterHeatingMin": 30.00545,
+      "lowAfterHeatingMin": 35.00111666666667,
       "heatingConfirmed": true,
       "goalReached": true,
       "goalReachedToday": true,
@@ -164,7 +164,7 @@
       "boilerOn": true,
       "boilerPowerW": 0,
       "remainingFallbackMin": 0,
-      "minuteOfDay": 820,
+      "minuteOfDay": 825,
       "catchupRequired": false,
       "stateAgeSec": 0,
       "fallbackAccounting": "CONFIRMED_HEATING_MINUTES",
@@ -184,10 +184,10 @@
     },
     "control": {
       "schema": "EM2_CONTROL_WW_V0.11",
-      "generatedAt": "2026-08-22T11:40:01.135Z",
+      "generatedAt": "2026-08-22T11:45:00.947Z",
       "controlMode": "SHADOW",
       "readOnly": true,
-      "sourceRevision": 1371,
+      "sourceRevision": 1372,
       "action": "BOILER_OFF",
       "priority": "MUST",
       "reason": "Dagdoel OP_TEMPERATUUR eerder vandaag bereikt; geen heropwarming dezelfde dag",
@@ -210,24 +210,24 @@
         "boilerOn": true,
         "boilerPowerW": 0,
         "mode": true,
-        "gridW": -2462,
-        "exportW": 2462,
+        "gridW": -2912,
+        "exportW": 2912,
         "importW": 0,
-        "flexExportBudgetW": 2162,
+        "flexExportBudgetW": 2612,
         "discretionaryImportBudgetW": 4000,
         "gridMeasurementValid": true,
         "derivedHouseBalanceValid": false,
         "balanceValid": false,
-        "balanceReason": "SOURCE_STALE_OR_MISSING",
+        "balanceReason": "KNOWN_LOADS_EXCEED_HOUSE",
         "quattPowerW": 10.3,
         "quattRampReserveW": 100,
         "goalReached": true,
         "goalReachedToday": true,
         "goalLatchDate": "2026-08-22",
-        "boilerOnMinToday": 220,
+        "boilerOnMinToday": 225,
         "heatingMinToday": 190,
         "heatingAccountingQuality": "FROM_STATE_START",
-        "currentOnRunMin": 220,
+        "currentOnRunMin": 225,
         "runStartReason": "UNKNOWN",
         "runStartedAt": "2026-08-22T08:05:00.136Z",
         "activeRunLockMin": 15,
@@ -239,10 +239,10 @@
         "priceNegative": false,
         "priceCheapNext4h": false,
         "priceExpensiveNext4h": false,
-        "priceHorizonMin": 20,
+        "priceHorizonMin": 15,
         "priceHorizonOk": false,
         "pvTop4h": true,
-        "wwStateUpdatedAt": "2026-08-22T11:40:01.109Z",
+        "wwStateUpdatedAt": "2026-08-22T11:45:00.849Z",
         "wwStateQuality": "PARTIAL_FROM_START_TIME"
       },
       "policy": {
@@ -320,7 +320,7 @@
       "source": "HOMEY_SWITCH_PLUS_P1_L3",
       "inferred": true,
       "fresh": true,
-      "last_sample_at": "2026-08-22T11:39:00.207Z",
+      "last_sample_at": "2026-08-22T11:44:00.255Z",
       "baseline_l3_w": 0.1,
       "threshold_delta_w": [
         1400,
@@ -417,31 +417,32 @@
   "manager": {
     "state": "SURPLUS_HIGH",
     "decision": "TESLA_BUFFER_EXPORT",
-    "reason": "Geen deadline; flex-exportbudget 2162 W na Quatt-reserve",
+    "reason": "Geen deadline; flex-exportbudget 2612 W na Quatt-reserve",
     "priority": "MAY",
     "constraints": [
       "QUATT_OBSERVE_ONLY_10W",
       "QUATT_RAMP_RESERVE_100W",
-      "DERIVED_BALANCE_INVALID_SOURCE_STALE_OR_MISSING"
+      "SOURCE_SKEW_WARNING",
+      "DERIVED_BALANCE_INVALID_KNOWN_LOADS_EXCEED_HOUSE"
     ],
     "state_dirty": true,
     "state_age_sec": 0,
-    "flex_export_budget_w": 2162,
+    "flex_export_budget_w": 2612,
     "discretionary_import_budget_w": 4000
   },
   "shadow": {
     "comparison": {
-      "tesla": "DIFFER"
+      "tesla": "AGREE"
     },
     "observed": {
-      "tesla": "NOT_CHARGING",
-      "teslaPowerW": 0,
+      "tesla": "CHARGING",
+      "teslaPowerW": 5815,
       "boilerOn": true,
       "boilerPowerW": 0,
       "quattPowerW": 10.3,
       "quookerActive": false,
       "quookerPowerW": 0,
-      "flexExportBudgetW": 2162,
+      "flexExportBudgetW": 2612,
       "gridMeasurementValid": true,
       "derivedHouseBalanceValid": false,
       "balanceValid": false
@@ -449,13 +450,13 @@
     "decision": {
       "priority": "MAY",
       "intent": "TESLA_BUFFER_EXPORT",
-      "reason": "Geen deadline; flex-exportbudget 2162 W na Quatt-reserve"
+      "reason": "Geen deadline; flex-exportbudget 2612 W na Quatt-reserve"
     }
   },
   "context": {
     "updated_at": "2026-08-22T11:30:10.490Z",
     "fresh": true,
-    "age_sec": 590,
+    "age_sec": 890,
     "price_negative": false,
     "price_cheap_next4h": false,
     "price_expensive_next4h": false,
