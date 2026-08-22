@@ -1,0 +1,11 @@
+/* Atomic initial render for Live View: prevent progressive block build-up on refresh. */
+#live-energy-flow:not([data-atomic-ready="true"]){
+  visibility:hidden;
+  min-height:760px;
+}
+#live-energy-flow[data-atomic-ready="true"]{
+  visibility:visible;
+}
+@media (max-width: 900px){
+  #live-energy-flow:not([data-atomic-ready="true"]){min-height:620px;}
+}
