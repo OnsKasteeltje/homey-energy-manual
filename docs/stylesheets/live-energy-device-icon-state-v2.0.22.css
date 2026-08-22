@@ -2,16 +2,20 @@
    Alleen het icoon verandert van kleur; titel, vermogen en statusregel blijven ongewijzigd.
    De bestaande >20 W active-threshold uit live-energy-v2.8.66.js bepaalt flow-active/flow-idle. */
 
-#live-energy-flow .energy-node.load.flow-idle .energy-icon:not(.energy-icon-more) {
+#live-energy-flow .energy-node.load.flow-idle .energy-icon:not(.energy-icon-more),
+#live-energy-flow .energy-overig-detail-node.flow-idle .energy-overig-detail-icon:not(.icon-more) {
   stroke: #edf3fb !important;
 }
 
-#live-energy-flow .energy-node.load.flow-active .energy-icon:not(.energy-icon-more) {
+#live-energy-flow .energy-node.load.flow-active .energy-icon:not(.energy-icon-more),
+#live-energy-flow .energy-overig-detail-node.flow-active .energy-overig-detail-icon:not(.icon-more) {
   stroke: var(--live-orange) !important;
 }
 
 /* Expliciet voorkomen dat de statuskleur doorlekt naar tekst/meetwaarden. */
 #live-energy-flow .energy-node.load .energy-title,
-#live-energy-flow .energy-node.load .energy-value {
+#live-energy-flow .energy-node.load .energy-value,
+#live-energy-flow .energy-overig-detail-node .energy-overig-detail-title,
+#live-energy-flow .energy-overig-detail-node .energy-overig-detail-value {
   fill: var(--live-text) !important;
 }
