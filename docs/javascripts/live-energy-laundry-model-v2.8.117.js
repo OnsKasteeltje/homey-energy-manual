@@ -40,7 +40,7 @@
     return false;
   }
 
-  function applyWasherInferredActive(washer,candidate,raw,result,reason){
+  function applyWasherInferredActive(state,washer,candidate,raw,result,reason){
     const originalQuality=candidate.direct_source_quality?.status||'UNAVAILABLE';
     washer.active=true;
     washer.power_w=null;
@@ -94,13 +94,13 @@
     // reaches MEDIUM confidence it is treated as operationally inconsistent for this device.
     // Live Stream may then show 'waarschijnlijk actief'. We never invent a wattage.
     if(candidate.status_conflict===true && candidate.direct_source_quality?.status==='HEALTHY_IDLE'){
-      applyWasherInferredActive(washer,candidate,raw,result,'AEG_IDLE_DEGRADED_BY_STRONG_SEQUENTIAL_P1_EVIDENCE');
+      applyWasherInferredActive(state,washer,candidate,raw,result,'AEG_IDLE_DEGRADED_BY_STRONG_SEQUENTIAL_P1_EVIDENCE');
       return;
     }
 
     // Generic fallback only when the direct source is unavailable, stale or already inconsistent.
     if(candidate.fallback_allowed!==true) return;
-    applyWasherInferredActive(washer,candidate,raw,result,`AEG_${candidate.direct_source_quality?.status||'UNAVAILABLE'}_P1_SEQUENCE_FALLBACK`);
+    applyWasherInferredActive(state,washer,candidate,raw,result,`AEG_${candidate.direct_source_quality?.status||'UNAVAILABLE'}_P1_SEQUENCE_FALLBACK`);
   }
 
   async function apply(){
