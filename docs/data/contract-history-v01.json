@@ -1,6 +1,6 @@
 {
   "schema": "EM2_CONTRACT_HISTORY_V0.1",
-  "generatedAt": "2026-08-22T12:00:00.474Z",
+  "generatedAt": "2026-08-22T12:45:00.922Z",
   "intervalMin": 15,
   "maxSamples": 672,
   "readOnly": true,
@@ -10656,6 +10656,106 @@
       "comparison": {
         "sameRevision": false,
         "teslaAgree": false,
+        "warmWaterAgree": true
+      }
+    },
+    {
+      "ts": "2026-08-22T12:45:00.922Z",
+      "contractType": "FIXED",
+      "price": {
+        "source": "FIXED_CONFIG",
+        "quality": "GOOD",
+        "updatedAt": "2026-08-22T12:30:01.103Z",
+        "importNow": 0.2379,
+        "exportNow": 0.15,
+        "negative": false,
+        "cheapNext4h": false,
+        "expensiveNext4h": false,
+        "horizon": "STATIC",
+        "horizonHours": 168
+      },
+      "candidate": {
+        "status": {
+          "status": "OK",
+          "at": "2026-08-22T12:40:00.445Z",
+          "version": "v0.2",
+          "contract": "FIXED",
+          "priceSource": "FIXED_CONFIG",
+          "priceQuality": "GOOD",
+          "priceFresh": true,
+          "priceUsable": true,
+          "sourceRevision": 1382,
+          "gridMeasurementValid": true,
+          "derivedHouseBalanceValid": false
+        },
+        "tesla": {
+          "revision": 1383,
+          "priority": "MAY",
+          "intent": "HOLD",
+          "reason": "Geen harde verplichting of sterke opportunity"
+        },
+        "warmWater": {
+          "priority": "MUST",
+          "action": "BOILER_OFF",
+          "opportunity": "GOAL_REACHED",
+          "reason": "Dagdoel bereikt"
+        },
+        "wwSourceAdvice": {
+          "schema": "EM2_WW_SOURCE_ADVICE_V0.1",
+          "generatedAt": "2026-08-22T12:30:00.930Z",
+          "controlMode": "PURE_SHADOW",
+          "readOnly": true,
+          "deviceWrites": false,
+          "status": "OK",
+          "advice": "CV",
+          "productionSource": "BOILER",
+          "productionModeLeading": true,
+          "reason": "CV goedkoper per bruikbare kWh warmte",
+          "contract": "FIXED",
+          "price": {
+            "fresh": true,
+            "quality": "GOOD",
+            "importEurKWh": 0.2379,
+            "exportEurKWh": 0.15,
+            "electricMarginalBasis": "IMPORT",
+            "electricInputPriceEurKWh": 0.2379
+          },
+          "costPerUsableKWhHeat": {
+            "boiler": 0.24275510204081632,
+            "cv": 0.13563630160354828,
+            "deltaBoilerMinusCv": 0.10711880043726804,
+            "hysteresis": 0.015
+          },
+          "inputs": {
+            "gasPriceEurM3": 1.19265,
+            "gasUsableKWhPerM3": 9.77,
+            "cvDhwEfficiency": 0.9,
+            "boilerEfficiency": 0.98,
+            "gridW": 6042,
+            "exporting": false,
+            "wwGoalReached": true
+          },
+          "guards": {
+            "noDeviceReads": true,
+            "noActuatorWrites": true,
+            "wwBoilermodusRemainsLeading": true,
+            "failSafeKeepCurrent": false
+          },
+          "assumptions": {
+            "gasUsableKWhPerM3": "configurable default 9.77",
+            "cvDhwEfficiency": "configurable default 0.90",
+            "boilerEfficiency": "configurable default 0.98"
+          }
+        }
+      },
+      "production": {
+        "stateRevision": 1383,
+        "teslaIntent": "HOLD",
+        "warmWaterAction": "BOILER_OFF"
+      },
+      "comparison": {
+        "sameRevision": true,
+        "teslaAgree": true,
         "warmWaterAgree": true
       }
     }
