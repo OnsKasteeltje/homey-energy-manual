@@ -2,7 +2,7 @@
 
 ## Wasmachine
 
-Status: **ground-truth run vastgelegd; REFERENCE_ONLY voor classifier**.
+Status: **sequentiële classifier IMPLEMENTED; REFERENCE_ONLY voor vermogensattributie**.
 
 ### Bevestigde referentierun 22 augustus 2026
 
@@ -38,29 +38,33 @@ De duidelijkste hoge gebeurtenis in deze run zit dus op **L2**. De eerdere fase-
 
 De actuele `laundry-analysis` publiceert voor de wasmachine nog `phase = L3`, maar met `confidence = LOW`, `evidence_count = 5` en `phase_consistency = 0.6`. Deze nieuwe nacht-run plus de eerdere geïsoleerde L2-start spreken die L3-toewijzing tegen. **L3 mag daarom niet als gevalideerde wasmachinefase worden gebruikt.** De referentie voor verdere classifierontwikkeling is vanaf nu L2, totdat meerdere onafhankelijke runs het tegendeel aantonen.
 
-### Aanbevolen classifier-signatuur
+### Sequentiële classifier v1.1.0
 
-Gebruik deze run voorlopig als `REFERENCE_ONLY`; activeer nog geen harde automatische vermogensattributie op basis van één piek. Een kandidaat `WASMACHINE` moet bij voorkeur als sequentie worden herkend:
+`load-fingerprint-classifier-v1.1.0.js` implementeert nu read-only `WASMACHINE_CANDIDATE` met methode `SEQUENTIAL_L2_FINGERPRINT`. De classifier gebruikt bewust een **volgorde van fasen** en nooit één los hoog datapunt:
 
-1. directe AEG-status actief of een betrouwbaar programmastartanker;
-2. op L2 binnen ongeveer ±15 minuten rond fysieke start een mogelijke hoge verwarmingspuls in de orde 1,8-2,5 kW;
-3. daarna gedurende minimaal circa 45-60 minuten herhaalde L2-werkblokken grofweg 0,25-0,70 kW met tussenliggende lagere perioden;
-4. totale cyclus grofweg 90-150 minuten;
-5. terminale AEG-overgang naar inactief en terugkeer van L2 richting huishoudbaseline.
+1. directe AEG-status levert uitsluitend het programma-/startanker; dit is geen vermogensmeter;
+2. in de vroege fase zoekt de classifier op L2 naar een mogelijke verwarmingspuls grofweg 1,8-2,6 kW;
+3. daarna moeten meerdere L2-werkblokken in de band 0,25-0,70 kW voorkomen;
+4. tussen die werkblokken moeten lagere/rustsamples optreden en meerdere werk/rust-overgangen zichtbaar zijn;
+5. cyclusduur en een latere L2-staartband rond 0,10-0,26 kW verhogen de confidence;
+6. samples met bekende gelijktijdige grote lasten (Tesla, boiler, droger of Quooker) worden uit de sequentiebewijslijn gefilterd.
 
-De classifier moet **de sequentie gebruiken, niet één hoog datapunt**. Een losse piek rond 2 kW kan ook bij Quooker, waterkoker, oven of een andere weerstandslast horen. Omdat de 5-minuten Core-cadans korte pomp-, motor- en centrifugepieken kan middelen of missen, mogen exacte subfases niet uit deze run als harde drempels worden afgeleid.
+De classifier houdt maximaal ongeveer drie uur lokale browserhistorie bij zodat een volledige wascyclus over meerdere 5-minuten Core-publicaties kan worden beoordeeld. De output bevat naast confidence ook de afzonderlijke aantallen voor verwarmingssamples, werkblokken, rustsamples, werk/rust-overgangen en staartsamples.
+
+### Veiligheidsgrens / vrijgave
+
+De sequentiële herkenning is **IMPLEMENTED**, maar blijft `validation_status = REFERENCE_ONLY`. Confidence is voorlopig softwarematig begrensd op maximaal 0,84 en `power_w` / `attribution_w` blijven `null`. Daardoor mag deze eerste sequentiële classifier nog geen vermogen automatisch van `Overig` aftrekken.
+
+Vrijgave voor echte vermogensattributie vereist minimaal één extra schone, onafhankelijke wascyclus die dezelfde L2-sequentie bevestigt. Daarna kunnen drempels/confidence opnieuw worden beoordeeld en kan eventueel een hogere productiestatus worden vrijgegeven.
 
 ### Overlap en uitsluitingen
 
 - L1 vertoonde tijdens de cyclus kleine periodieke wisselingen en lijkt achtergrondverbruik; niet opnemen in de wasmachinefingerprint.
 - L3 bleef grotendeels op lage achtergrondwaarden en ondersteunt geen L3-toewijzing voor deze run.
 - Tesla, boiler en droger waren in het relevante venster geen verklarende grootverbruikers.
-- Quooker-status zit niet in deze specifieke day-series export; de initiële hoge L2-puls kan daarom op zichzelf niet uniek aan de wasmachine worden toegeschreven.
-- Directe AEG-status blijft altijd hoger in bronhiërarchie dan fingerprint-inference. De fingerprint is bedoeld om vermogen/fase en plausibiliteit te ondersteunen, niet om betrouwbare directe status te overrulen.
-
-### Vrijgavecriterium
-
-Na minimaal één extra schone, onafhankelijke wascyclus met dezelfde L2-sequentie kan een read-only `WASMACHINE_CANDIDATE` aan de classifier worden toegevoegd. Tot die tijd blijft deze fingerprint documentatie-/validatiereferentie.
+- Een losse piek rond 2 kW kan ook bij Quooker, waterkoker, oven of een andere weerstandslast horen; daarom is een meerfasige sequentie verplicht.
+- Omdat de 5-minuten Core-cadans korte pomp-, motor- en centrifugepieken kan middelen of missen, worden exacte subfasepieken niet als harde vereiste gebruikt.
+- Directe AEG-status blijft altijd hoger in bronhiërarchie dan fingerprint-inference. De fingerprint ondersteunt herkenning/plausibiliteit en mag betrouwbare directe status niet overrulen.
 
 ## Waterkoker
 
