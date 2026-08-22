@@ -1,6 +1,6 @@
 # Canonieke projectbaseline — Home Energy Management System
 
-_Status: 20 augustus 2026_
+_Status: 22 augustus 2026_
 
 ## Doel en bronhiërarchie
 
@@ -8,7 +8,7 @@ Dit document is de centrale referentie voor toekomstige ontwerp-, code- en docum
 
 1. actuele, runtime-gevalideerde implementatie;
 2. recente expliciete projectbesluiten;
-3. `requirements-traceability.md`, `runtime-status-2026-08-20.md` en actuele GitHub-documentatie;
+3. `requirements-traceability.md`, runtime-status en actuele GitHub-documentatie;
 4. Integraal energierapport Victron ESS + Home Energy Management System **v37** als actuele integrale projectbaseline;
 5. v35.1 voor historische PV-/hardwareanalyse voor zover v36/v37 die niet expliciet heeft vervangen;
 6. oudere rapport- en flowversies alleen als historie.
@@ -22,116 +22,180 @@ Statuslabels: `VERIFIED`, `IMPLEMENTED`, `SHADOW`, `DECIDED`, `OPEN`, `KNOWN / M
 - `DECIDED` — Homey is huishoudelijke orkestratielaag. Installatieveiligheid en lokale apparaatbeveiligingen staan erboven.
 - `DECIDED` — Victron wordt na installatie primaire batterij-/netregelaar; Homey blijft orkestreren over EV, warm water en andere flexloads.
 - `VERIFIED` — Websitebezoek veroorzaakt geen Homey-devicecalls; de site leest gepubliceerde snapshots.
-- `IMPLEMENTED` — `requirements-traceability.md` is de vaste koppeling tussen v37-requirements, procesflow, implementatie en vrijgavecriteria.
+- `IMPLEMENTED` — `requirements-traceability.md` is de vaste koppeling tussen requirements, procesflow, implementatie en vrijgavecriteria.
 
 ## 2. Huidige Energy Core
 
-- `VERIFIED` — actuele publisher is `EM2_CORE_PUBLISH_V0.10.4` met publicatieschema `2.10`.
-- `VERIFIED` — gecontroleerde runtime publiceerde State, Decision en Shadow revision-consistent; actuele versienummers zijn leidend boven oudere documentatie.
-- `VERIFIED` — Core v0.10.4 splitst `grid_measurement_valid` en `derived_house_balance_valid`. Verse P1-data blijft autoritatief voor netimport/-export en flexbudget wanneer de afgeleide huis/PV-balans door `SOURCE_SKEW` ongeldig is.
+De actuele runtime-implementatie en versienummers worden vastgelegd in de runtime-status en gespecialiseerde softwaredocumentatie. Architectuurinvarianten blijven leidend boven historische versienummers in deze baseline.
+
 - `IMPLEMENTED/VERIFIED` — Energy Core v2 bevat centrale State, Decision, Shadow, warmwaterstate/-intent en publicatie.
 - `IMPLEMENTED` — Quatt is `COMFORT_BASELOAD`, `OBSERVE_ONLY`, niet automatisch regelbaar.
 - `IMPLEMENTED` — gedeeld `energy_budget` houdt rekening met gridreserve, Quatt-rampreserve, flex-exportbudget en discretionair importbudget.
 - `DECIDED` — deadlines/MUST gaan vóór opportunistische PV-/prijsoptimalisatie.
 - `DECIDED` — per fysieke actuator uiteindelijk exact één automatische writer.
 - `DECIDED` — iedere fysieke Control-route gaat eerst door Shadow-validatie.
-- `KNOWN / MONITOR` — incidenteel is een verwachte periodieke Core/publicatierun niet aantoonbaar uitgevoerd. Handmatige Core-run en GitHub-publicatie functioneerden direct; geen extra schedulerarchitectuur bouwen tenzij dit herhaald terugkomt.
-
-Oudere documentatie die Core v0.9.7/schema 2.5 als actief noemt, beschrijft een eerdere gevalideerde toestand. Voor actuele versienummers is `runtime-status-2026-08-20.md`, de live publicatie en de requirements-traceability leidend.
 
 ## 3. Contract- en prijsarchitectuur
 
 - `IMPLEMENTED/SHADOW` — ondersteunde contracttypes zijn uitsluitend `FIXED` en `DYNAMIC`.
 - `IMPLEMENTED/SHADOW` — beide contracttypes normaliseren naar één uniforme prijscontext voordat downstream beslislogica de prijs gebruikt.
-- `IMPLEMENTED/SHADOW` — `FIXED` gebruikt configureerbare import-/exporttarieven en heeft geen PBTH-afhankelijkheid.
-- `IMPLEMENTED/SHADOW` — `DYNAMIC` gebruikt PBTH/DAP15 en classificeert prijs in de adapter; downstream M7-prijsafhankelijkheid is niet de doelarchitectuur.
 - `DECIDED` — vaste dagelijkse contractkosten zijn geen marginale optimalisatie-input.
 - `IMPLEMENTED` — prijscontext is null-safe; ontbrekende prijs is nooit impliciet EUR 0/kWh.
-- `IMPLEMENTED/SHADOW` — prijshorizon bepaalt of prijs FULL, INTRADAY of alleen DIAGNOSTIC mag worden gebruikt.
-- `IMPLEMENTED/SHADOW` — Contract History v0.1 verzamelt rolling kwartierdata zonder devicepolling of actuatorwrites.
 
 ## 4. Warm water
 
 - `DECIDED` — comfortdoel en catch-up/deadline hebben voorrang op pure economische optimalisatie.
 - `IMPLEMENTED/SHADOW` — confirmed-heating gebruikt werkelijk boilervermogen, niet alleen relais-aan-tijd.
-- `VERIFIED` — actuele warmwaterstate is `EM2_WW_STATE_V0.8`.
-- `VERIFIED` — actuele Warm Water Control is `EM2_CONTROL_WW_V0.11`, `SHADOW` en read-only.
 - `IMPLEMENTED/SHADOW` — BOILER↔CV-bronkeuze vergelijkt marginale kosten per bruikbare kWh warmte.
-- `IMPLEMENTED/SHADOW` — bij PV-export telt gemiste terugleverwaarde als opportunity cost; PV is economisch niet automatisch gratis.
-- `IMPLEMENTED/SHADOW` — bronselector gebruikt hysterese en fail-safe `KEEP_CURRENT` bij stale/ongeldige inputs.
-- `VERIFIED` — `WW_Boilermodus` blijft tijdens Shadow operationeel leidend; WW Source Advice verricht geen fysieke write.
 - `OPEN` — rendementen, calorische gaswaarde en hysterese valideren vóór operationele cut-over.
-- `OPEN` — voldoende FIXED- en DYNAMIC-shadowhistorie verzamelen vóór koppeling aan bron-/actuatorwrite.
 
 ## 5. Tesla / Easee
 
 - `DECIDED` — Tesla is flexload met deadline/MUST boven opportunistische optimalisatie.
 - `IMPLEMENTED` — PV-opportunity gebruikt beschikbaar flexbudget in plaats van blind kale P1-export.
 - `VERIFIED` — Easee Equalizer blijft autonome harde load-balancing en mag door Homey niet worden overruled.
+- `VERIFIED` — Tesla/Easee laadt 3-fase nagenoeg symmetrisch; tijdens de gevalideerde deadline-run werd circa 2,35 kW per fase waargenomen.
 - `DECIDED` — werkelijk laadvermogen is belangrijker voor classificatie dan alleen gevraagd setpoint.
 
 ## 6. Quatt
 
-- `IMPLEMENTED/VERIFIED` — primaire elektrische bron is Quatt CIC `measure_power` uit dezelfde Core-snapshot.
-- `VERIFIED` — runtime publiceert Quatt als `COMFORT_BASELOAD`, `OBSERVE_ONLY`, `controllable=false`.
+- `IMPLEMENTED/VERIFIED` — primaire elektrische Quatt-bron is Quatt CIC `measure_power` uit dezelfde Core-snapshot.
 - `DECIDED` — Quatt is comfortload, niet automatisch flexload.
 - `DECIDED` — thermisch vermogen/COP zijn diagnostiek en worden niet bij de elektrische energiebalans opgeteld.
-- `OPEN` — fysieke Quatt-sturing vereist later een afzonderlijke veilige Control-policy en Shadow-validatie.
 
-## 7. Live energie, meetkwaliteit en classificatie
+## 7. Live energie, meetkwaliteit en fasebewaking
 
-- `VERIFIED` — P1/netmeting kan geldig blijven terwijl de afgeleide huis/PV-balans ongeldig is; `SOURCE_SKEW` in PV-bronnen degradeert de directe P1-meting niet.
 - `DECIDED` — werkelijk gemeten P1-data wordt als gemeten behandeld, niet als indicatief.
 - `DECIDED` — directe betrouwbare device-metingen hebben voor apparaatvermogen voorrang op afleiding.
-- `VERIFIED` — wasmachine en droger kunnen via directe AEG-status worden geclassificeerd; idle wordt gepubliceerd als `AEG_DIRECT_IDLE` zonder geschat vermogen.
-- `DECIDED` — alleen waar directe meting ontbreekt mag vermogen worden afgeleid uit de woningbalans/context; dit moet als afgeleid/indicatief herkenbaar blijven.
-- `DECIDED` — kleine niet-herleidbare restbelasting hoort semantisch bij `Overig klein`/restlast en niet bij een willekeurig inactief apparaat.
 - `DECIDED` — standby/lekstroom onder 20 W wordt niet als actieve energieverbruiker weergegeven.
 - `DECIDED` — energiebalans moet rekenkundig sluiten; `NEGATIVE_HOUSE_BALANCE` is een diagnose die onderzoek vereist, geen normale toestand.
+- `DECIDED` — fase-onbalans is op zichzelf geen foutconditie. Het EMS gebruikt zowel totaal P1-vermogen als L1/L2/L3 afzonderlijk als regelinput.
+- `DECIDED` — de 3×25 A fasegrenzen en lokale beveiligingen hebben voorrang op opportunistische flexsturing.
 
 ## 8. Website/app-refresh
 
 - `IMPLEMENTED` — appdata wordt bij boot/openen expliciet opnieuw opgevraagd.
 - `IMPLEMENTED` — periodieke datarefresh iedere 5 minuten.
 - `IMPLEMENTED` — refresh bij terugkeer via visibility/pageshow/focus en opnieuw online komen.
-- `IMPLEMENTED` — pull-to-refresh forceert eerst datarefresh; service-worker/assets en reload zijn aanvullend en niet de enige refreshstrategie.
-- `IMPLEMENTED` — freshness-indicatie onderscheidt actueel, vertraagd en verouderd.
 - `DECIDED` — navigeren History↔Live mag geen oude cached foutmelding/context terugbrengen.
 
-## 9. Victron-doelarchitectuur
+## 9. Hardwarearchitectuur — Victron ESS en PV-fasen
 
-- `DECIDED` — hoofdaansluiting 3×25 A; MultiPlus-II 48/5000 als 1-fase ESS op L1; Cerbo GX MK2; VM-3P75CT centrale 3-fasemeting.
-- `DECIDED` — VM meet L1/L2/L3 centraal; ESS gebruikt `Total of all phases` voor de netbalans terwijl MultiPlus fysiek op L1 werkt.
+### 9.1 Hoofdaansluiting en ESS
+
+- `DECIDED` — hoofdaansluiting **3×25 A**.
+- `DECIDED` — **MultiPlus-II 48/5000 als 1-fase ESS op L1**.
+- `DECIDED` — **Cerbo GX** als GX-/communicatielaag.
+- `DECIDED` — **VM-3P75CT** in de meterkast als centrale 3-fasemeting van L1/L2/L3.
+- `DECIDED` — ESS gebruikt **`Total of all phases`**: de MultiPlus werkt fysiek op L1, terwijl de netregeling de som L1+L2+L3 gebruikt.
 - `DECIDED` — VM staat in de meterkast; Cerbo/MultiPlus/batterij in de schuur; communicatie via lokaal netwerk.
-- `DECIDED` — bestaande schuurverbinding is circa 20 m 5G2,5 mm² en wordt als 3×16 A behandeld totdat installatiegegevens anders bevestigen.
 - `DECIDED` — GX Touch is optioneel.
-- `SUPERSEDED` — de hybride SmartSolar/DC-PV-route uit rapport v35.1 is niet automatisch de actuele doelarchitectuur. AC-coupled is de werkhypothese; DC vereist nieuwe string-/Vmp/Voc-/temperatuurvalidatie.
-- `OPEN` — definitieve batterijconfiguratie/capaciteit en definitieve PV-koppeling vóór bestelling opnieuw vastleggen.
+
+Voor een single-phase ESS op een 3-fase net is L1 de ontwerp-/installatiefase. De centrale 3-fasemeter blijft alle fasen afzonderlijk meten; de fysieke batterij-injectie/-afname vindt op L1 plaats.
+
+### 9.2 Gevalideerde PV-fasemapping — 22 augustus 2026
+
+De drie PV-omvormers zijn gecontroleerd fysiek uit- en ingeschakeld terwijl de directe P1-fasewaarden werden gevolgd. De fysieke schakelactie en P1-respons waren ground truth; vertraagde Homey/inverterstatus is niet als primaire fase-identificatie gebruikt.
+
+| Fase | PV-omvormer(s) | Status |
+|---|---|---|
+| **L1** | geen PV-omvormer | `VALIDATED` |
+| **L2** | GoodWe GW4200D-NS, grote GoodWe in schuur, 12 panelen | `VALIDATED / HIGH` |
+| **L3** | SolarEdge SE3680H-RW000BEN4 + GoodWe GW2000-XS, kleine GoodWe/CV, 6 panelen | `VALIDATED / HIGH` |
+
+Hierdoor is een structurele fase-onbalans bij PV-productie verklaarbaar: L3 kan aanzienlijk sterker exporteren dan L1/L2. Dit is geen storing zolang de installatie- en fasegrenzen worden gerespecteerd.
+
+### 9.3 Fysieke doelstructuur
+
+```text
+NET / HOOFDAANSLUITING 3×25 A
+          │
+     hoofdschakelaar
+          │
+      VM-3P75CT
+     meet L1/L2/L3
+          │
+ ┌────────┼────────┐
+ L1       L2       L3
+ │        │        ├─ SolarEdge SE3680H
+ │        │        └─ GoodWe GW2000-XS
+ │        └────────── GoodWe GW4200D-NS
+ │
+ └─ bestaande schuurvoeding 5G2,5 mm², circa 20 m
+          │
+      beveiliging
+          │
+ MultiPlus-II 48/5000
+      AC-IN L1
+       │     │
+    AC-OUT  48 V DC
+       │     │
+ geselecteerde  batterijbank
+ backupgroepen     │
+                 Cerbo GX
+```
+
+### 9.4 Bestaande schuurverbinding en AC-limiet
+
+- `DECIDED` — bestaande meterkast–schuurverbinding: circa **20 m 5G2,5 mm²**.
+- `DECIDED` — deze wordt als **3×16 A** behandeld totdat installatiegegevens of een installatietechnische herbeoordeling anders bevestigen.
+- `DECIDED` — zolang deze infrastructuur niet wordt verzwaard geldt als ontwerpgrens **MultiPlus AC input current limit ≤16 A**.
+- Bij circa 230 V is 16 A ongeveer **3,68 kVA** op de betreffende fase.
+- PowerAssist kan batterijvermogen toevoegen aan AC-out, maar verhoogt niet de toegestane stroom door de bestaande voedingskabel of beveiliging.
+
+### 9.5 AC-out / noodstroom
+
+- `DECIDED` — niet de volledige woning/schuur achter AC-out; een aparte selectie essentiële backupgroepen heeft de voorkeur.
+- `DECIDED` — Tesla, elektrische boiler en andere zware niet-kritische flexloads komen niet standaard op AC-out.
+- `DECIDED` — één MultiPlus op L1 vormt geen 3-fase eiland. De bestaande PV-omvormers op L2/L3 zijn in deze basisarchitectuur daarom niet beschikbaar als noodstroom-PV.
+- Een echte 3-fase ESS/backuparchitectuur vereist ten minste één inverter/charger per fase.
+
+### 9.6 DC-zijde
+
+- `OPEN` — definitieve batterijbank/capaciteit.
+- `OPEN` — definitieve DC-kabeldoorsnede, hoofdzekering, DC-disconnect, rails en batterijbeveiliging.
+- Deze waarden worden vóór bestelling uit de actuele handleidingen van exact de gekozen MultiPlus-II- en batterijvariant gedimensioneerd.
+
+### 9.7 Phase-aware ontwerpregel
+
+De hardware- en softwarearchitectuur behandelen drie verschillende begrippen afzonderlijk:
+
+1. **netto energiebalans** — som L1+L2+L3;
+2. **fasebalans** — verdeling van import/export over L1/L2/L3;
+3. **faseveiligheid** — stroom en beveiligingsgrens per afzonderlijke fase.
+
+Een gunstige netto energiebalans betekent dus niet automatisch dat iedere fase lokaal in balans is. Dit wordt meegenomen in Tesla/Easee-, Victron- en toekomstige flexloadbesluiten.
+
+### 9.8 Superseded hardwarevariant
+
+- `SUPERSEDED` — de hybride SmartSolar/DC-PV-route uit rapport v35.1 is niet automatisch de actuele doelarchitectuur.
+- `DECIDED` — de huidige werkarchitectuur houdt de bestaande PV-omvormers **AC-coupled**.
+- Een DC-PV-route vereist een nieuwe string-/Vmp-/Voc-/temperatuurvalidatie voordat die opnieuw kandidaat kan worden.
+
+Voor detailengineering geldt `docs/victron-hardware-baseline.md` als gespecialiseerde hardwarebron.
 
 ## 10. Documentstatus
 
-- `REFERENCE / CANONICAL` — Integraal energierapport Victron ESS + Home Energy Management System **v37** is de actuele integrale rapportbaseline.
-- `REFERENCE` — v35.1 blijft historische bron voor uitgebreide PV-/degradatieanalyse en technische hardwarestudie voor zover v36/v37 die niet expliciet vervangt.
-- `IMPLEMENTED` — `runtime-status-2026-08-20.md` legt de actuele Core-runtime vast.
+- `REFERENCE / CANONICAL` — Integraal energierapport Victron ESS + Home Energy Management System **v37** blijft de integrale rapportbaseline totdat een nieuwe formele rapportversie wordt uitgebracht.
+- `REFERENCE` — v35.1 blijft historische bron voor uitgebreide PV-/degradatieanalyse voor zover nieuwere besluiten die niet vervangen.
 - `IMPLEMENTED / CANONICAL` — `requirements-traceability.md` koppelt requirements aan procesflow, implementatie, status en vrijgavecriteria.
-- `IMPLEMENTED` — `docs/architectuur.md` bevat de bindende architectuurinvarianten, inclusief structurele Homey-loadminimalisatie.
-- `SUPERSEDED` — projectstatus waarin v36 nog als te genereren/in-progress stond.
+- `IMPLEMENTED` — `docs/architectuur.md` bevat de bindende softwarearchitectuurinvarianten.
+- `IMPLEMENTED` — `docs/victron-hardware-baseline.md` bevat de actuele gespecialiseerde Victron-hardwarearchitectuur.
+- `IMPLEMENTED` — `docs/phase-aware-ems.md` bevat de fasebewuste EMS-regels.
 
 ## 11. Open validatieregister
 
-1. `RESOLVED` — runtime-versie Core Tick/publicatie geïnventariseerd: v0.10.4, schema 2.10, SHADOW; oudere v0.9.7-status is historisch.
-2. `OPEN` — `docs/energy-core-v2.md` op actuele v0.10.4/schema 2.10 status brengen waar nog v0.9.7/schema 2.5 wordt genoemd.
-3. `OPEN` — Contract History voldoende FIXED- en DYNAMIC-samples laten verzamelen en agreement beoordelen.
-4. `OPEN` — WW Source Advice-kostenparameters valideren vóór enige fysieke cut-over.
-5. `OPEN` — definitieve Victron PV-topologie technisch herbevestigen vóór bestelling.
-6. `OPEN` — definitieve batterijbank en vermogenslimieten na keuze van PV-topologie bevestigen.
+1. `OPEN` — Contract History voldoende FIXED- en DYNAMIC-samples laten verzamelen en agreement beoordelen.
+2. `OPEN` — WW Source Advice-kostenparameters valideren vóór enige fysieke cut-over.
+3. `RESOLVED` — actuele Victron PV-topologie: bestaande PV blijft AC-coupled; faseposities zijn fysiek gevalideerd.
+4. `OPEN` — definitieve batterijbank en vermogenslimieten bevestigen.
+5. `OPEN` — definitieve Victron beveiligingsmatrix AC/DC.
+6. `OPEN` — definitieve lijst backupgroepen achter AC-out.
 7. `OPEN` — Live Stream blijven toetsen op rekenkundige energiebalans, directe versus afgeleide meetbronnen, >20 W-actiefdrempel en caching.
-8. `KNOWN / MONITOR` — incidentele gemiste Homey periodieke trigger/publicatie; geen blocker en geen aanleiding tot extra schedulercomplexiteit zonder herhaald bewijs.
-9. `RESOLVED` — v37 is actuele integrale projectreferentie en requirements traceability is als projectartefact opgenomen.
 
 ## 12. Requirements traceability als change-control
 
-Iedere inhoudelijke wijziging die een functionele of niet-functionele requirement raakt, moet vanaf nu ook de betreffende ID in `requirements-traceability.md` bijwerken. Nieuwe requirements krijgen een nieuwe unieke ID. Een wijziging is niet documentair compleet wanneer alleen code, flow of chatbesluit is aangepast en de traceability achterblijft.
+Iedere inhoudelijke wijziging die een functionele of niet-functionele requirement raakt, moet ook de betreffende ID in `requirements-traceability.md` bijwerken. Nieuwe requirements krijgen een nieuwe unieke ID.
 
 ## 13. Change-control
 
@@ -145,5 +209,3 @@ Bij iedere relevante wijziging:
 6. requirements-traceability en deze projectbaseline aanpassen;
 7. bijbehorende gespecialiseerde GitHub-documentatie tegelijk bijwerken;
 8. oude aanpak expliciet `SUPERSEDED` markeren in plaats van stilzwijgend te laten voortbestaan.
-
-Dit voorkomt dat oude chatbesluiten, rapportteksten en actuele productiecode door elkaar als gelijktijdig waar worden behandeld en maakt aantoonbaar welke requirements volledig gerealiseerd, alleen SHADOW of nog OPEN zijn.
