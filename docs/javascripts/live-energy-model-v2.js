@@ -17,12 +17,21 @@
     return {known,power,active,stateActive,value:known?fmt(power):(stateActive?'—':'0 W'),sub:active?'actief':stateActive?(known?'stand-by / laag verbruik':'actief · vermogen niet apart gemeten'):'niet actief'};
   }
 
+  function derivedHouseGate(raw){
+    const gate=raw?.balance?.control_gate?.derived_house_balance_valid;
+    if(typeof gate==='boolean')return gate;
+    const budgetGate=raw?.energy_budget?.derived_house_balance_valid;
+    return typeof budgetGate==='boolean'?budgetGate:null;
+  }
+
   function resolveHouse(raw,pv,grid,charge,discharge){
+    const gate=derivedHouseGate(raw);
+    if(gate===false)return {power:0,source:'DERIVED_BALANCE_UNAVAILABLE',valid:false};
     const budget=raw.energy_budget||{};
-    if(finite(budget.house_load_w)) return {power:pos(budget.house_load_w),source:'ENERGY_BUDGET'};
+    if(finite(budget.house_load_w)) return {power:pos(budget.house_load_w),source:'ENERGY_BUDGET',valid:true};
     const candidate=raw.balance?.physical_house_candidate_w;
-    if(finite(candidate)&&Number(candidate)>=0) return {power:pos(candidate),source:'BALANCE_PHYSICAL_HOUSE_CANDIDATE'};
-    return {power:Math.max(0,pv+grid+discharge-charge),source:'MEASURED_PV_GRID_BATTERY'};
+    if(finite(candidate)&&Number(candidate)>=0) return {power:pos(candidate),source:'BALANCE_PHYSICAL_HOUSE_CANDIDATE',valid:true};
+    return {power:Math.max(0,pv+grid+discharge-charge),source:'MEASURED_PV_GRID_BATTERY',valid:gate!==false};
   }
 
   function detailLoad(load){return load&&finite(load.power_w)?pos(load.power_w):0;}
@@ -33,23 +42,23 @@
     const solaredge=pos(pvRaw.solaredge_w),goodwe4200=pos(pvRaw.goodwe_4200_w),goodwe2000=pos(pvRaw.goodwe_2000_w),pv=pos(pvRaw.total_w)||solaredge+goodwe4200+goodwe2000;
     const grid=n(gridRaw.power_w),importW=Math.max(0,grid),exportW=Math.max(0,-grid);
     const battery=n(batteryRaw.power_w),charge=battery>0?battery:0,discharge=battery<0?Math.abs(battery):0;
-    const resolvedHouse=resolveHouse(raw,pv,grid,charge,discharge),house=resolvedHouse.power;
+    const resolvedHouse=resolveHouse(raw,pv,grid,charge,discharge),house=resolvedHouse.power,houseValid=resolvedHouse.valid!==false;
     const tesla=pos(teslaRaw.power_w),boiler=pos(hotWaterRaw.boiler_power_w),quatt=pos(heatingRaw.power_w??heatingRaw.quatt_power_w),washer=appliance(loadsRaw.washer),dryer=appliance(loadsRaw.dryer);
     const quookerPower=finite(quookerRaw.power_w)?pos(quookerRaw.power_w):0,quookerSwitchOn=quookerRaw.switch_on===true,quookerStatus=String(quookerRaw.status||'UNKNOWN').toUpperCase(),quookerHeating=quookerRaw.active===true&&quookerStatus==='HEATING'&&isActive(quookerPower);
     const quooker={known:finite(quookerRaw.power_w),power:quookerPower,active:quookerHeating,switchOn:quookerSwitchOn,status:quookerStatus,value:fmt(quookerPower),sub:quookerHeating?'verwarmt':quookerSwitchOn?'aan · op temperatuur/idle':'uit',source:quookerRaw.source||null,fresh:quookerRaw.fresh!==false};
 
-    // Overig is the residual after consumers that are explicitly shown in the top row.
-    // Secondary measured loads (e.g. dishwasher/Sonos/kitchen) stay inside Overig and
-    // are decomposed only in the detail layer, preventing double subtraction.
+    // Overig is a derived residual and therefore only exists when Core explicitly permits
+    // the P1+PV house reconstruction. Diagnostic physical_house_candidate_w must never
+    // be promoted back into presentation when derived_house_balance_valid=false.
     const topLevelAssigned=tesla+boiler+quatt+washer.power+dryer.power+quooker.power;
-    const other=Math.max(0,house-topLevelAssigned);
+    const other=houseValid?Math.max(0,house-topLevelAssigned):0;
     const detailKnown={
       dishwasher:detailLoad(loadsRaw.dishwasher),
       sonos:detailLoad(loadsRaw.sonos||loadsRaw.sonos_kitchen||loadsRaw.kitchen_sonos),
       kitchen:detailLoad(loadsRaw.kitchen||loadsRaw.kitchen_appliances||loadsRaw.keukenapparaten)
     };
     const detailKnownTotal=detailKnown.dishwasher+detailKnown.sonos+detailKnown.kitchen;
-    const unattributedOther=Math.max(0,other-detailKnownTotal);
+    const unattributedOther=houseValid?Math.max(0,other-detailKnownTotal):0;
 
     const thermal=pos(heatingRaw.thermal_power_w),thermostatHeating=heatingRaw.thermostat_heating_on===true,cvRequested=heatingRaw.cv_requested===true,cvKnown=typeof heatingRaw.cv_flame==='boolean',cvFlame=heatingRaw.cv_flame===true;
     const working=[heatingRaw.working_mode_1,heatingRaw.working_mode_2].some(v=>String(v??'0')!=='0'&&String(v??'').toLowerCase()!=='unknown');
@@ -64,12 +73,12 @@
       {x:640,title:'Wasmachine',value:washer.value,sub:washer.sub,w:washer.power,active:washer.active,ico:'washer'},
       {x:845,title:'Droger',value:dryer.value,sub:dryer.sub,w:dryer.power,active:dryer.active,ico:'dryer'},
       {x:1050,title:'Quooker',value:quooker.value,sub:quooker.sub,w:quooker.power,active:quooker.active,ico:'quooker'},
-      {x:1255,title:'Overig',value:fmt(other),sub:isActive(other)?otherSub:'laag/stand-by restverbruik',w:other,active:isActive(other),ico:'more'}
+      {x:1255,title:'Overig',value:houseValid?fmt(other):'—',sub:houseValid?(isActive(other)?otherSub:'laag/stand-by restverbruik'):'P1/PV niet tijdgelijk',w:houseValid?other:0,active:houseValid&&isActive(other),ico:'more'}
     ];
     const bus={total:consumers.reduce((sum,c)=>sum+activeW(c.w),0)};
     const cvState=cvRequested?'CV ondersteuning gevraagd':'CV niet gevraagd',cvDiag=cvKnown?(cvFlame?'OpenTherm · brander actief':'OpenTherm · brander niet actief'):'OpenTherm · branderfeedback niet beschikbaar',quattState=quattFlowActive?'verwarmt':thermostatHeating?'warmtevraag':'geen warmtevraag';
-    return {thresholdW:ACTIVE_THRESHOLD_W,fresh:freshness!==false,meta:metaRaw,raw:{tesla:teslaRaw,hotWater:hotWaterRaw,manager:raw.manager||{},quooker:quookerRaw},pv,grid,importW,exportW,charge,discharge,house,houseSource:resolvedHouse.source,tesla,boiler,quatt,washer,dryer,quooker,other,detailKnown,detailKnownTotal,unattributedOther,heatSub,quattFlowActive,cvRequested,cvKnown,cvFlame,thermostatHeating,cvState,cvDiag,quattState,assigned:topLevelAssigned,consumers,bus};
+    return {thresholdW:ACTIVE_THRESHOLD_W,fresh:freshness!==false,meta:metaRaw,raw:{tesla:teslaRaw,hotWater:hotWaterRaw,manager:raw.manager||{},quooker:quookerRaw},pv,grid,importW,exportW,charge,discharge,house,houseValid,houseSource:resolvedHouse.source,tesla,boiler,quatt,washer,dryer,quooker,other,detailKnown,detailKnownTotal,unattributedOther,heatSub,quattFlowActive,cvRequested,cvKnown,cvFlame,thermostatHeating,cvState,cvDiag,quattState,assigned:topLevelAssigned,consumers,bus};
   }
 
-  window.LiveEnergyModel={ACTIVE_THRESHOLD_W,n,pos,fmt,activeW,isActive,appliance,resolveHouse,buildViewModel};
+  window.LiveEnergyModel={ACTIVE_THRESHOLD_W,n,pos,fmt,activeW,isActive,appliance,derivedHouseGate,resolveHouse,buildViewModel};
 })();
