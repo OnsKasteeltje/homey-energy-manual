@@ -1,7 +1,7 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "timezone": "Europe/Amsterdam",
-  "purpose": "Ground-truth overlap events for separating Bertazzoni oven and dishwasher signatures from P1 phase data. Reference-only; not yet used for automatic attribution.",
+  "purpose": "Ground-truth overlap and transition events for separating Bertazzoni oven and dishwasher signatures from direct P1 phase data. Reference-only; not yet used for automatic attribution.",
   "events": [
     {
       "date_local": "2026-08-22",
@@ -30,10 +30,58 @@
         "quatt_w": 10.3,
         "quooker_w": 0
       },
-      "interpretation": "Strong combined-load reference. L1 and L2 both show ~2 kW net import while L3 remains exporting. Because dishwasher and Bertazzoni oven overlap, this sample must not be used to assign the full ~4.0 kW house candidate to either appliance individually. Use it only as overlap evidence when compared with future clean single-appliance ON/OFF transitions.",
+      "interpretation": "Strong combined-load reference. L1 and L2 both show ~2 kW net import while L3 remains exporting. Because dishwasher and Bertazzoni oven overlap, this sample must not be used to assign the full ~4.0 kW house candidate to either appliance individually. Use it only as overlap evidence when compared with clean single-appliance ON/OFF transitions.",
+      "classification_status": "REFERENCE_ONLY"
+    },
+    {
+      "date_local": "2026-08-22",
+      "sample_local": "around 18:25",
+      "trigger": "scheduled clean-transition measurement near expected dishwasher completion",
+      "ground_truth_quality": "TRANSITION_WINDOW_EXPECTED; dishwasher completion not independently exposed by Homey connector",
+      "direct_homey_p1": {
+        "grid_w": 2316,
+        "grid_l1_w": 222,
+        "grid_l2_w": 2297,
+        "grid_l3_w": -203,
+        "current_l1_a": 0.94,
+        "current_l2_a": 9.91,
+        "current_l3_a": -0.86,
+        "voltage_l1_v": 234.8,
+        "voltage_l2_v": 231.8,
+        "voltage_l3_v": 235.2
+      },
+      "direct_homey_pv": {
+        "solaredge_w": 424.43,
+        "goodwe_4200_w": 325,
+        "goodwe_2000_w": 146,
+        "total_w": 895.43
+      },
+      "known_other_loads": {
+        "tesla_w": 0,
+        "boiler_w": 0,
+        "quatt_w": 10.3
+      },
+      "comparison_to_revision_1424": {
+        "delta_grid_w": -975,
+        "delta_l1_w": -1845,
+        "delta_l2_w": 280,
+        "delta_l3_w": 589,
+        "delta_pv_w": 146.08,
+        "indicative_house_w_now": 3211.43,
+        "delta_indicative_house_w": -828.97
+      },
+      "interpretation": "The dominant structural change versus the dishwasher+Bertazzoni overlap is the collapse of L1 from ~2.07 kW import to ~0.22 kW, while L2 remains a strong ~2.30 kW import. This is strong evidence that the two simultaneous ~2 kW phase loads in revision 1424 were separate appliances rather than one ~4 kW load. If the dishwasher had completed by this sample and the Bertazzoni oven remained active, the surviving L2 ~2.3 kW load is a strong Bertazzoni candidate and the disappearing L1 component is a dishwasher-heating candidate. However that appliance-to-phase assignment remains provisional because Homey does not expose dishwasher state and oven state was not independently sampled at this exact instant. PV also changed, so net phase deltas cannot be treated as exact appliance wattages.",
+      "fingerprint_update": {
+        "bertazzoni_candidate_phase": "L2",
+        "bertazzoni_candidate_high_band_w": "~2.0-2.3 kW net phase signature during heating",
+        "dishwasher_candidate_phase": "L1",
+        "dishwasher_candidate_high_band_w": "~1.8-2.0 kW net phase signature during heating",
+        "confidence": "MEDIUM",
+        "automatic_attribution": false
+      },
       "classification_status": "REFERENCE_ONLY"
     }
   ],
-  "implementation_rule": "Do not auto-attribute this overlap event to either appliance. Require at least one clean Bertazzoni-only transition and one clean dishwasher-only transition, preferably with direct P1 phase samples before/after the transition, then solve the overlap as a residual consistency check.",
+  "implementation_rule": "Do not auto-attribute from one transition. The 18:25 sample raises the hypothesis Bertazzoni=L2 and dishwasher=L1 to MEDIUM confidence. Require another clean dishwasher ON/OFF transition with oven state known, or a clean Bertazzoni ON/OFF transition with dishwasher state known, before enabling automatic power attribution.",
   "architecture_note": "Use direct Homey P1 readings for short fingerprint calibration windows; do not increase continuous Homey polling load solely for fingerprinting."
 }
