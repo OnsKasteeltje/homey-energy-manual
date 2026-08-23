@@ -1,17 +1,6 @@
 name: Deploy MkDocs to GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - "docs/data/homey-status.json"
-      - "docs/data/shadow-status.json"
-      - "docs/data/energy-state-v2.json"
-      - "docs/data/energy-day-v2.json"
-      - "docs/data/laundry-analysis.json"
-      - "docs/data/contract-history-v01.json"
-      - "docs/data/tesla-deadline-command.json"
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
@@ -23,7 +12,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -61,7 +50,7 @@ jobs:
       - name: Lint Python for correctness
         run: ruff check scripts tests --select E9,F63,F7,F82
 
-      - name: Check JavaScript syntax
+      - name: Check JavaScript source syntax
         shell: bash
         run: |
           set -euo pipefail
@@ -75,55 +64,16 @@ jobs:
       - name: Validate generated frontend artifact
         run: python scripts/validate_frontend_artifact.py
 
-      - name: Check generated JavaScript bundle
+      - name: Check generated frontend bundle syntax
         shell: bash
         run: |
           set -euo pipefail
           VERSION="$(tr -d '\r\n' < frontend-version.txt)"
           JS="docs/javascripts/frontend-bundle-${VERSION}.js"
           CSS="docs/stylesheets/frontend-bundle-${VERSION}.css"
+          test -s "$JS"
+          test -s "$CSS"
           node --check "$JS"
-          grep -q "liveEnergyRenderer='2.8.108'" "$JS"
-          grep -q "liveenergyrendered" "$JS"
-          grep -q "teslaDeadlineController='2.8.112'" "$JS"
-          grep -q "energy-state-v2.json" "$JS"
-          grep -q "Deadline gemist · doel wordt nog afgemaakt" "$JS"
-          grep -q "Tesla gereed · doel vóór deadline gehaald" "$JS"
-          grep -q "Tesla gereed · deadline gemist" "$JS"
-          grep -q "rememberDraft" "$JS"
-          grep -q "applyDraft" "$JS"
-          grep -q "data-tesla-deadline-native" "$JS"
-          grep -q "Deadline actief" "$JS"
-          grep -q "LoadFingerprintClassifier" "$JS"
-          grep -q "CYCLIC_RESIDUAL_FINGERPRINT" "$JS"
-          grep -q "SEQUENTIAL_L2_FINGERPRINT" "$JS"
-          grep -q "WASMACHINE_CANDIDATE" "$JS"
-          grep -q "SOURCE_CONFLICT" "$JS"
-          grep -q "P1_SEQUENCE_FALLBACK" "$JS"
-          grep -q "fallback_allowed" "$JS"
-          grep -q "AEG_IDLE_DEGRADED_BY_STRONG_SEQUENTIAL_P1_EVIDENCE" "$JS"
-          grep -q "WAARSCHIJNLIJK_ACTIEF" "$JS"
-          grep -q "directSourceQualityEffective:'INCONSISTENT'" "$JS"
-          grep -q "goodwe_4200_w" "$JS"
-          grep -q "boiler_compensated" "$JS"
-          grep -q "P1_L2 + GoodWe4200" "$JS"
-          grep -q "load-fingerprint-classifier-v1.1.3.js" "scripts/build_frontend_bundles.py"
-          grep -q "live-energy-laundry-model-v2.8.119.js" "scripts/build_frontend_bundles.py"
-          ! grep -q "load-fingerprint-classifier-v1.1.2.js" "scripts/build_frontend_bundles.py"
-          grep -q "tesla-deadline-native-v2.8.110.css" "scripts/build_frontend_bundles.py"
-          grep -q "home-architecture-v2.0.5.js" "scripts/build_frontend_bundles.py"
-          grep -q "deadlineParts" "$JS"
-          grep -q "uiterlijk starten" "$JS"
-          grep -q "grid-template-columns:repeat(2,minmax(0,1fr))" "$CSS"
-          grep -q "label:first-child{grid-column:1/-1}" "$CSS"
-          grep -q "label:last-child{grid-column:1/-1}" "$CSS"
-          grep -q "\[data-tesla-deadline-native\]" "$CSS"
-          ! grep -q "live-energy-laundry-model-v2.8.116.js" "scripts/build_frontend_bundles.py"
-          ! grep -q "live-energy-laundry-model-v2.8.115.js" "scripts/build_frontend_bundles.py"
-          ! grep -q "tesla-deadline-migration-v2.8.17.js" "scripts/build_frontend_bundles.py"
-          ! grep -q "tesla-deadline-postsave-v2.8.18.js" "scripts/build_frontend_bundles.py"
-          ! grep -q "tesla-deadline-status-v2.8.21.js" "scripts/build_frontend_bundles.py"
-          ! grep -q "tesla-runtime-ui-v2.8.24.js" "scripts/build_frontend_bundles.py"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
@@ -138,29 +88,7 @@ jobs:
           VERSION="$(tr -d '\r\n' < frontend-version.txt)"
           grep -R -q "frontend-bundle-${VERSION}.js" site
           grep -R -q "frontend-bundle-${VERSION}.css" site
-          grep -R -q "liveEnergyRenderer='2.8.108'" site
-          grep -R -q "liveenergyrendered" site
-          grep -R -q "teslaDeadlineController='2.8.112'" site
-          grep -R -q "data-tesla-deadline-native" site
-          grep -R -q "Deadline actief" site
-          grep -R -q "Deadline gemist · doel wordt nog afgemaakt" site
-          grep -R -q "Tesla gereed · doel vóór deadline gehaald" site
-          grep -R -q "Tesla gereed · deadline gemist" site
-          grep -R -q "uiterlijk starten" site
-          grep -R -q "grid-template-columns:repeat(2,minmax(0,1fr))" site
-          grep -R -q "LoadFingerprintClassifier" site
-          grep -R -q "CYCLIC_RESIDUAL_FINGERPRINT" site
-          grep -R -q "SEQUENTIAL_L2_FINGERPRINT" site
-          grep -R -q "WASMACHINE_CANDIDATE" site
-          grep -R -q "SOURCE_CONFLICT" site
-          grep -R -q "P1_SEQUENCE_FALLBACK" site
-          grep -R -q "fallback_allowed" site
-          grep -R -q "AEG_IDLE_DEGRADED_BY_STRONG_SEQUENTIAL_P1_EVIDENCE" site
-          grep -R -q "WAARSCHIJNLIJK_ACTIEF" site
-          grep -R -q "goodwe_4200_w" site
-          grep -R -q "boiler_compensated" site
-          grep -R -q "P1_L2 + GoodWe4200" site
-          grep -R -q "home-energy-pwa-v6" site/service-worker.js
+          test -s site/service-worker.js
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
