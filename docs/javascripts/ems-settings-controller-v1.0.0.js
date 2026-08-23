@@ -20,6 +20,10 @@
     return null;
   }
 
+  function routeReady(){
+    return Boolean(String(config?.worker_url||'').trim()) && config?.ems_settings_supported===true;
+  }
+
   function template(){
     return `<div class="energy-manager-panel ems-settings-panel" data-ems-settings>
       <div class="energy-manager-title"><strong>EMS instellingen</strong><span>canonieke gebruikerskeuzes</span></div>
@@ -52,16 +56,19 @@
     const requestedHot=String(command?.hotWaterSource||actualHotWaterSource()||'BOILER').toUpperCase();
     if(contract)contract.value=['FIXED','DYNAMIC'].includes(contractType)?contractType:'FIXED';
     if(hot)hot.value=['BOILER','CV'].includes(requestedHot)?requestedHot:'BOILER';
-    const linked=Boolean(String(config?.worker_url||'').trim());
+    const linked=routeReady();
     if(button)button.disabled=!linked;
     if(msg){
       const actual=actualHotWaterSource();
-      if(actual&&actual!==requestedHot){
+      if(!linked){
+        msg.textContent='Selector gereed · write-route nog niet vrijgegeven';
+        msg.dataset.state='pending';
+      }else if(actual&&actual!==requestedHot){
         msg.textContent=`Opdracht ${requestedHot} opgeslagen · Homey meldt nog ${actual}`;
         msg.dataset.state='pending';
       }else{
-        msg.textContent=linked?`Actief: ${contractType} · warm water ${actual||requestedHot}`:'Write-route niet gekoppeld';
-        msg.dataset.state=linked?'ok':'error';
+        msg.textContent=`Actief: ${contractType} · warm water ${actual||requestedHot}`;
+        msg.dataset.state='ok';
       }
     }
   }
@@ -84,7 +91,7 @@
     const hotWaterSource=panel.querySelector('[data-ems-hot-water]')?.value||'BOILER';
     const button=panel.querySelector('[data-ems-save]');
     const msg=panel.querySelector('[data-ems-message]');
-    if(!worker){if(msg)msg.textContent='Write-route niet gekoppeld';return;}
+    if(!routeReady()){if(msg)msg.textContent='Write-route nog niet vrijgegeven';return;}
     const pin=window.prompt('Voer de control PIN in:');if(pin===null)return;
     if(button)button.disabled=true;if(msg)msg.textContent='Opslaan…';
     try{
