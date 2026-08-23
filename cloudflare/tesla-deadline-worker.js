@@ -26,6 +26,13 @@ function validDeadline(v) {
   return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(v || ''));
 }
 
+function deadlineEpochMs(value) {
+  const s = String(value || '').trim();
+  if (!validDeadline(s)) return NaN;
+  const d = new Date(s);
+  return d.getTime();
+}
+
 function toBase64(text) {
   return btoa(unescape(encodeURIComponent(text)));
 }
@@ -65,6 +72,8 @@ export default {
       targetSoc = Math.round(Number(input.targetSoc));
       maxA = Math.round(Number(input.maxA));
       if (!validDeadline(deadline)) return json({ ok: false, error: 'invalid_deadline' }, 400, origin);
+      const deadlineMs = deadlineEpochMs(deadline);
+      if (!Number.isFinite(deadlineMs) || deadlineMs <= Date.now()) return json({ ok: false, error: 'deadline_not_in_future' }, 400, origin);
       if (!Number.isFinite(currentSoc) || currentSoc < 0 || currentSoc > 100) return json({ ok: false, error: 'invalid_current_soc' }, 400, origin);
       if (!Number.isFinite(targetSoc) || targetSoc < 1 || targetSoc > 100 || targetSoc <= currentSoc) return json({ ok: false, error: 'invalid_target_soc' }, 400, origin);
       if (!Number.isFinite(maxA) || maxA < 6 || maxA > 16) return json({ ok: false, error: 'invalid_max_a' }, 400, origin);
