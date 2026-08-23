@@ -11,6 +11,9 @@ on:
       - 'docs/javascripts/**'
       - 'docs/stylesheets/**'
       - 'docs/service-worker.js'
+      - 'docs/planner-shadow.md'
+      - 'docs/data/energy-planner-shadow.json'
+      - 'docs/data/energy-day-series-7d.json'
       - 'docs/data/tesla-deadline-command.json'
   schedule:
     - cron: "*/5 * * * *"
@@ -100,6 +103,8 @@ jobs:
           grep -R -q "frontend-bundle-${VERSION}.js" site
           grep -R -q "frontend-bundle-${VERSION}.css" site
           test -s site/service-worker.js
+          test -s site/data/energy-planner-shadow.json
+          test -s site/data/energy-day-series-7d.json
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
