@@ -1,14 +1,15 @@
 (function(){
   'use strict';
   const TOLERANCE_W=75;
-  const DETAIL_TITLES=['Tesla','Boiler','Ruimteverwarming','Wasmachine','Droger','Quooker'];
   let latestRaw=null,applying=false;
   const num=v=>Number.isFinite(Number(v))?Number(v):null;
   const pos=v=>Math.max(0,Number(v)||0);
   const fmt=v=>`${Math.round(Number(v)||0).toLocaleString('nl-NL')} W`;
 
   // PRESENTATION BOUNDARY: House is the authoritative total-consumption bucket.
-  // Device cards only allocate that total and may never redefine or exceed it.
+  // Direct device measurements remain authoritative for their own device card, even when
+  // the P1/PV-derived house total is temporarily asynchronous. Only residual allocation
+  // (Overig) depends on a coherent house balance.
   function presentationSnapshot(raw){
     if(!raw)return null;
     try{return typeof structuredClone==='function'?structuredClone(raw):JSON.parse(JSON.stringify(raw));}
@@ -28,14 +29,11 @@
   const findNode=(root,title)=>[...root.querySelectorAll('.energy-node')].find(n=>n.querySelector('.energy-title')?.textContent?.trim()===title);
   function setNode(node,value,sub){if(!node)return;const v=node.querySelector('.energy-value'),s=node.querySelector('.energy-sub');if(v)v.textContent=value;if(s)s.textContent=sub;}
   function purgeLegacySourceSkew(root){if(!root)return;root.querySelectorAll('.energy-balance-warning').forEach(el=>el.remove());}
-  function suppressBreakdown(root){
-    for(const title of DETAIL_TITLES){
-      const node=findNode(root,title);
-      if(!node)continue;
-      setNode(node,'—','tijdelijk niet tijdgelijk met P1-huistotaal');
-    }
+  function suppressResidual(root){
+    // IMPORTANT: never blank Tesla/Boiler/Quatt/etc. here. Their own direct device source
+    // remains valid independently of P1/PV synchronization. Only Overig is a residual.
     const otherNode=findNode(root,'Overig');
-    setNode(otherNode,'—','uitsplitsing tijdelijk niet valide');
+    setNode(otherNode,'—','restverbruik tijdelijk niet betrouwbaar te bepalen');
   }
   function setPanel(root,mode,house,measuredAssigned,estimatedAssigned,other,breakdownCoherent){
     const panels=[...root.querySelectorAll('.heating-hybrid-panel .energy-manager-grid > div')],b=panels.find(x=>x.querySelector('small')?.textContent?.trim()==='ENERGIEBALANS');if(!b)return;
@@ -45,16 +43,16 @@
       if(span){const estimatedPart=estimatedAssigned>0?` · indicatief toegewezen ${fmt(estimatedAssigned)}`:'';span.textContent=`top-level toegewezen ${fmt(measuredAssigned)}${estimatedPart} · Overig ${fmt(other)}`;}
     }else if(mode==='async'){
       if(strong)strong.textContent=house!==null?`Woning ≈ ${fmt(house)}`:'Woning —';
-      if(span)span.textContent=house===null?'P1/PV niet tijdgelijk · huisbalans niet beschikbaar · geen control-impact':breakdownCoherent?'P1/PV niet tijdgelijk · huistotaal indicatief · uitsplitsing binnen totaal':'P1-huistotaal leidend · apparaatmetingen niet tijdgelijk · uitsplitsing onderdrukt';
+      if(span)span.textContent=house===null?'P1/PV niet tijdgelijk · huisbalans niet beschikbaar · directe apparaatmetingen blijven geldig':breakdownCoherent?'P1/PV niet tijdgelijk · huistotaal indicatief · uitsplitsing binnen totaal':'P1/PV niet tijdgelijk · directe apparaatmetingen blijven zichtbaar · Overig onderdrukt';
     }else{
       if(strong)strong.textContent='Woning —';
-      if(span)span.textContent='weergavebalans onzeker · geen control-impact';
+      if(span)span.textContent='weergavebalans onzeker · directe apparaatmetingen blijven geldig · geen control-impact';
     }
   }
   function setWarning(root,mode,breakdownCoherent){
     purgeLegacySourceSkew(root);const top=root.querySelector('.energy-topline');if(!top||mode==='valid')return;
     const w=document.createElement('span');w.className='energy-balance-warning energy-stale';
-    w.textContent=mode==='async'?(breakdownCoherent?'● P1/PV niet tijdgelijk':'● apparaatuitsplitsing niet tijdgelijk'):'● weergavebalans onzeker';
+    w.textContent=mode==='async'?(breakdownCoherent?'● P1/PV niet tijdgelijk':'● restbalans niet tijdgelijk'):'● weergavebalans onzeker';
     top.appendChild(w);
   }
 
@@ -70,6 +68,7 @@
       const pv=num(p.total_w)!==null?pos(p.total_w):pos(p.solaredge_w)+pos(p.goodwe_4200_w)+pos(p.goodwe_2000_w),grid=num(g.power_w),batt=num(b.power_w),charge=batt!==null&&batt>0?batt:0,discharge=batt!==null&&batt<0?Math.abs(batt):0;
 
       // P1/net balance determines the house total. Device measurements are NEVER added on top.
+      // Conversely, an uncertain house reconstruction may NEVER invalidate a valid direct device reading.
       const rawHouse=grid!==null?pv+grid+discharge-charge:NaN;
       const directBase=pos(t.power_w)+pos(hw.boiler_power_w)+pos(q.power_w??q.quatt_power_w);
       const loadInfos=[loads.washer,loads.dryer,loads.quooker].map(powerInfo),measuredLoads=loadInfos.filter(x=>!x.estimated).reduce((s,x)=>s+x.value,0),estimatedLoads=loadInfos.filter(x=>x.estimated).reduce((s,x)=>s+x.value,0),measuredAssigned=directBase+measuredLoads,assigned=measuredAssigned+estimatedLoads;
@@ -91,18 +90,18 @@
         if(house!==null)setNode(houseNode,`≈ ${fmt(house)}`,'totaal verbruik uit P1/netbalans; PV/P1 niet tijdgelijk');
         else setNode(houseNode,'—','huisverbruik tijdelijk niet betrouwbaar te bepalen');
         if(breakdownCoherent)setNode(otherNode,fmt(Math.max(0,house-assigned)),'rest van Huis; bronnen niet tijdgelijk');
-        else suppressBreakdown(root);
+        else suppressResidual(root);
       }else{
         setNode(houseNode,'—','weergavebalans onzeker');
-        suppressBreakdown(root);
+        suppressResidual(root);
       }
 
       setPanel(root,mode,house,measuredAssigned,estimatedLoads,other,breakdownCoherent);setWarning(root,mode,breakdownCoherent);
       root.dataset.balanceStatus=mode;
       root.dataset.breakdownCoherent=String(Boolean(breakdownCoherent));
-      root.dataset.balanceMeasurementPolicy='p1-house-total-device-breakdown-only';
+      root.dataset.balanceMeasurementPolicy='p1-house-total-direct-device-independent-residual-guarded';
       root.dataset.balanceControlImpact='none';
-      root.dataset.balanceGuardVersion='2.8.130';
+      root.dataset.balanceGuardVersion='2.8.130-hotfix1';
     }finally{applying=false;}
   }
 
