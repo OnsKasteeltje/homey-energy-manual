@@ -43,13 +43,18 @@
     const grid=n(gridRaw.power_w),importW=Math.max(0,grid),exportW=Math.max(0,-grid);
     const battery=n(batteryRaw.power_w),charge=battery>0?battery:0,discharge=battery<0?Math.abs(battery):0;
     const resolvedHouse=resolveHouse(raw,pv,grid,charge,discharge),house=resolvedHouse.power,houseValid=resolvedHouse.valid!==false;
-    const tesla=pos(teslaRaw.power_w),boiler=pos(hotWaterRaw.boiler_power_w),quatt=pos(heatingRaw.power_w??heatingRaw.quatt_power_w),washer=appliance(loadsRaw.washer),dryer=appliance(loadsRaw.dryer);
+
+    // Direct device measurements are authoritative for their own cards. They are never
+    // invalidated by P1/PV source skew. The Core field hot_water.boiler_power_w is the
+    // direct Homey Boiler measure_power publication, analogous to tesla.power_w from Easee.
+    const teslaKnown=finite(teslaRaw.power_w),tesla=teslaKnown?pos(teslaRaw.power_w):0;
+    const boilerKnown=finite(hotWaterRaw.boiler_power_w),boiler=boilerKnown?pos(hotWaterRaw.boiler_power_w):0;
+    const quatt=pos(heatingRaw.power_w??heatingRaw.quatt_power_w),washer=appliance(loadsRaw.washer),dryer=appliance(loadsRaw.dryer);
     const quookerPower=finite(quookerRaw.power_w)?pos(quookerRaw.power_w):0,quookerSwitchOn=quookerRaw.switch_on===true,quookerStatus=String(quookerRaw.status||'UNKNOWN').toUpperCase(),quookerHeating=quookerRaw.active===true&&quookerStatus==='HEATING'&&isActive(quookerPower);
     const quooker={known:finite(quookerRaw.power_w),power:quookerPower,active:quookerHeating,switchOn:quookerSwitchOn,status:quookerStatus,value:fmt(quookerPower),sub:quookerHeating?'verwarmt':quookerSwitchOn?'aan · op temperatuur/idle':'uit',source:quookerRaw.source||null,fresh:quookerRaw.fresh!==false};
 
     // Overig is a derived residual and therefore only exists when Core explicitly permits
-    // the P1+PV house reconstruction. Diagnostic physical_house_candidate_w must never
-    // be promoted back into presentation when derived_house_balance_valid=false.
+    // the P1+PV house reconstruction. Direct device cards above remain valid independently.
     const topLevelAssigned=tesla+boiler+quatt+washer.power+dryer.power+quooker.power;
     const other=houseValid?Math.max(0,house-topLevelAssigned):0;
     const detailKnown={
@@ -66,9 +71,11 @@
     let heatSub='geen warmtevraag'; if(quattFlowActive&&cvFlame)heatSub='Quatt + CV · hybride'; else if(quattFlowActive&&cvRequested&&!cvKnown)heatSub='Quatt · CV gevraagd'; else if(quattFlowActive)heatSub='Quatt actief'; else if(cvFlame)heatSub='CV verwarmt'; else if(cvRequested)heatSub='CV ondersteuning gevraagd'; else if(thermostatHeating||quattDemand)heatSub='warmtevraag · laag elektrisch verbruik';
     const uncertain=[!washer.known&&washer.stateActive?'wasmachine':'',!dryer.known&&dryer.stateActive?'droger':''].filter(Boolean);
     const otherSub=uncertain.length?`incl. ${uncertain.join(' + ')}`:(detailKnownTotal>0?'incl. bekende kleine verbruikers':'rest na bekende top-level vermogens');
+    const boilerValue=boilerKnown?fmt(boiler):'—';
+    const boilerSub=!boilerKnown?'directe Homey-meting niet beschikbaar':isActive(boiler)?'verwarmt · direct Homey':(hotWaterRaw.boiler_on?'aan · 0 W direct Homey':'uit · direct Homey');
     const consumers=[
-      {x:25,title:'Tesla',value:fmt(tesla),sub:isActive(tesla)?'laden':(teslaRaw.connected?'aangesloten · geen actief verbruik':'niet aangesloten'),w:tesla,active:isActive(tesla),ico:'car'},
-      {x:230,title:'Boiler',value:fmt(boiler),sub:isActive(boiler)?'verwarmt':(hotWaterRaw.boiler_on?'aan · geen actief verbruik':'uit'),w:boiler,active:isActive(boiler),ico:'boiler'},
+      {x:25,title:'Tesla',value:teslaKnown?fmt(tesla):'—',sub:isActive(tesla)?'laden':(teslaRaw.connected?'aangesloten · geen actief verbruik':'niet aangesloten'),w:tesla,active:teslaKnown&&isActive(tesla),ico:'car'},
+      {x:230,title:'Boiler',value:boilerValue,sub:boilerSub,w:boiler,active:boilerKnown&&isActive(boiler),ico:'boiler'},
       {x:435,title:'Ruimteverwarming',value:fmt(quatt),sub:heatSub,w:quatt,active:quattFlowActive,ico:'heat'},
       {x:640,title:'Wasmachine',value:washer.value,sub:washer.sub,w:washer.power,active:washer.active,ico:'washer'},
       {x:845,title:'Droger',value:dryer.value,sub:dryer.sub,w:dryer.power,active:dryer.active,ico:'dryer'},
@@ -77,7 +84,7 @@
     ];
     const bus={total:consumers.reduce((sum,c)=>sum+activeW(c.w),0)};
     const cvState=cvRequested?'CV ondersteuning gevraagd':'CV niet gevraagd',cvDiag=cvKnown?(cvFlame?'OpenTherm · brander actief':'OpenTherm · brander niet actief'):'OpenTherm · branderfeedback niet beschikbaar',quattState=quattFlowActive?'verwarmt':thermostatHeating?'warmtevraag':'geen warmtevraag';
-    return {thresholdW:ACTIVE_THRESHOLD_W,fresh:freshness!==false,meta:metaRaw,raw:{tesla:teslaRaw,hotWater:hotWaterRaw,manager:raw.manager||{},quooker:quookerRaw},pv,grid,importW,exportW,charge,discharge,house,houseValid,houseSource:resolvedHouse.source,tesla,boiler,quatt,washer,dryer,quooker,other,detailKnown,detailKnownTotal,unattributedOther,heatSub,quattFlowActive,cvRequested,cvKnown,cvFlame,thermostatHeating,cvState,cvDiag,quattState,assigned:topLevelAssigned,consumers,bus};
+    return {thresholdW:ACTIVE_THRESHOLD_W,fresh:freshness!==false,meta:metaRaw,raw:{tesla:teslaRaw,hotWater:hotWaterRaw,manager:raw.manager||{},quooker:quookerRaw},pv,grid,importW,exportW,charge,discharge,house,houseValid,houseSource:resolvedHouse.source,tesla,teslaKnown,boiler,boilerKnown,boilerSource:'HOMEY_DIRECT_MEASURE_POWER',quatt,washer,dryer,quooker,other,detailKnown,detailKnownTotal,unattributedOther,heatSub,quattFlowActive,cvRequested,cvKnown,cvFlame,thermostatHeating,cvState,cvDiag,quattState,assigned:topLevelAssigned,consumers,bus};
   }
 
   window.LiveEnergyModel={ACTIVE_THRESHOLD_W,n,pos,fmt,activeW,isActive,appliance,derivedHouseGate,resolveHouse,buildViewModel};
