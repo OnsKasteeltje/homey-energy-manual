@@ -1,6 +1,6 @@
 {
   "schema": "EM2_CONTRACT_HISTORY_V0.1",
-  "generatedAt": "2026-08-23T10:30:00.804Z",
+  "generatedAt": "2026-08-23T11:00:00.986Z",
   "intervalMin": 15,
   "maxSamples": 672,
   "readOnly": true,
@@ -16096,6 +16096,70 @@
       "comparison": {
         "sameRevision": false,
         "teslaAgree": true,
+        "warmWaterAgree": true
+      }
+    },
+    {
+      "ts": "2026-08-23T11:00:00.986Z",
+      "contractType": "FIXED",
+      "price": {
+        "source": "FIXED_CONFIG",
+        "quality": "GOOD",
+        "updatedAt": "2026-08-23T10:45:01.075Z",
+        "importNow": 0.2379,
+        "exportNow": 0.15,
+        "negative": false,
+        "cheapNext4h": false,
+        "expensiveNext4h": false,
+        "horizon": "STATIC",
+        "horizonHours": 168
+      },
+      "candidate": {
+        "status": {
+          "status": "OK",
+          "at": "2026-08-23T10:55:00.262Z",
+          "version": "v0.2",
+          "contract": "FIXED",
+          "priceSource": "FIXED_CONFIG",
+          "priceQuality": "GOOD",
+          "priceFresh": true,
+          "priceUsable": true,
+          "sourceRevision": 1605,
+          "gridMeasurementValid": true,
+          "derivedHouseBalanceValid": false
+        },
+        "tesla": {
+          "revision": 1605,
+          "priority": "MAY",
+          "intent": "HOLD",
+          "reason": "Geen harde verplichting of sterke opportunity"
+        },
+        "warmWater": {
+          "priority": "MUST",
+          "action": "BOILER_OFF",
+          "opportunity": "GOAL_REACHED",
+          "reason": "Dagdoel bereikt"
+        },
+        "wwSourceAdvice": {
+          "schema": "EM2_WW_SOURCE_ADVICE_DEPRECATED",
+          "generatedAt": "2026-08-23T00:05:07.851Z",
+          "status": "SUPERSEDED_BY_SEASONAL_V0.2",
+          "advice": "KEEP_CURRENT",
+          "productionSource": "BOILER",
+          "productionModeLeading": true,
+          "readOnly": true,
+          "deviceWrites": false,
+          "reason": "15-minute BOILER/CV source advice is retired; use EM2_WW_Seasonal_Advice. WW_Boilermodus remains operational truth."
+        }
+      },
+      "production": {
+        "stateRevision": 1607,
+        "teslaIntent": "TESLA_BUFFER_EXPORT",
+        "warmWaterAction": "BOILER_OFF"
+      },
+      "comparison": {
+        "sameRevision": false,
+        "teslaAgree": false,
         "warmWaterAgree": true
       }
     }
