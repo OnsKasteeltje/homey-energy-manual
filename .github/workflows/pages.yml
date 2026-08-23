@@ -1,6 +1,17 @@
 name: Deploy MkDocs to GitHub Pages
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend-version.txt'
+      - 'mkdocs.yml'
+      - 'scripts/build_frontend_bundles.py'
+      - 'docs/javascripts/**'
+      - 'docs/stylesheets/**'
+      - 'docs/service-worker.js'
+      - 'docs/data/tesla-deadline-command.json'
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
