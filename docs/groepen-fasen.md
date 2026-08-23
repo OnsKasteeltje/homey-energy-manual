@@ -39,9 +39,9 @@ Deze pagina is een **levend overzicht van de elektrische indeling van de woning*
 | Koffiezetapparaat | Nog te bepalen | Nog te bepalen | Nog te bepalen | Fasekoppeling nog niet betrouwbaar bevestigd. |
 | Quooker | Nog te bepalen | Nog te bepalen | Nog te bepalen | Nog te valideren. |
 | Quatt warmtepomp / CV-installatie | Nog te bepalen | Nog te bepalen | Nog te bepalen | Nog te valideren. |
-| SolarEdge SE3680H | **Wordt gemonitord** | Nog te bepalen | Volgt uit groep | Automatische fasecorrelatie actief. |
-| GoodWe GW4200D-NS | **Wordt gemonitord** | Nog te bepalen | Volgt uit groep | Automatische fasecorrelatie actief. |
-| GoodWe GW2000-XS | **Wordt gemonitord** | Nog te bepalen | Volgt uit groep | Automatische fasecorrelatie actief. |
+| SolarEdge SE3680H | **L3** | Nog te bepalen | Volgt uit groep | **Bevestigd / HIGH.** Fysieke aan/uit-test op 22-08-2026 met directe P1-fasewaarden. |
+| GoodWe GW4200D-NS | **L2** | Nog te bepalen | Volgt uit groep | **Bevestigd / HIGH.** Fysieke aan/uit-test op 22-08-2026 met directe P1-fasewaarden. |
+| GoodWe GW2000-XS | **L3** | Nog te bepalen | Volgt uit groep | **Bevestigd / HIGH.** Fysieke aan/uit-test op 22-08-2026 met directe P1-fasewaarden. |
 | Schuurvoeding | **L1 + L2 + L3** | **Groep 14, 3-polig B16** | Apart / n.v.t. in schema 1–13 | **Bevestigd.** Fysiek in de meterkast gecontroleerd. |
 
 ## Wat is nu al zeker?
@@ -54,17 +54,29 @@ Deze pagina is een **levend overzicht van de elektrische indeling van de woning*
 - **aardlek 4 → groepen 11–13**;
 - **groep 14 → 3-polige B16-schuurvoeding**;
 - Tesla/Easee is een 3-fase verbruiker;
-- boiler en waterkoker zijn aan L2 gekoppeld.
+- boiler en waterkoker zijn aan L2 gekoppeld;
+- **GoodWe GW4200D-NS → L2**;
+- **SolarEdge SE3680H → L3**;
+- **GoodWe GW2000-XS → L3**;
+- **L1 heeft geen PV-omvormer**.
 
 De vaatwasser is beperkt tot twee kandidaten: **groep 5 (aardlek 2)** of **groep 12 (aardlek 4)**. De **ATAG-oven heeft L3 als kandidaatfase**, maar is nog niet als bevestigd aangemerkt.
 
+## Gevalideerde PV-fasemapping
+
+Op **22 augustus 2026** zijn de drie PV-omvormers afzonderlijk fysiek aan/uit geschakeld terwijl de **directe P1-fasewaarden** zijn gevolgd. De fysieke schakeling was ground truth; vertraagde Homey-/omvormerwaarden zijn niet gebruikt als primaire fase-identificatie.
+
+| Omvormer | Fase | Validatie |
+|---|---:|---|
+| SolarEdge SE3680H-RW000BEN4 | **L3** | **VALIDATED / HIGH** |
+| GoodWe GW4200D-NS | **L2** | **VALIDATED / HIGH** |
+| GoodWe GW2000-XS | **L3** | **VALIDATED / HIGH** |
+
+Daarmee geldt fysiek: **L1 geen PV-omvormer, L2 de grote GoodWe, L3 SolarEdge + kleine GoodWe**. De daardoor zichtbare fase-onbalans bij PV-productie is verklaarbaar en is op zichzelf geen storing.
+
 ## Automatische PV-fasemonitor
 
-De 24-uurs fasemeting wordt gepubliceerd door de actieve Homey Advanced Flow **`Fase 24h publicatie v1.4`**. Iedere **5 minuten** wordt één tijd-consistente snapshot gemaakt van P1 L1/L2/L3, totaal P1, de drie PV-omvormers en de relevante live belastingen. De laatste 24 uur worden gepubliceerd naar `docs/data/pv-phase-24h.json`.
-
-De analyse in v1.4 is **tijdgebaseerd** en rekent niet met een vast aantal samples. Voor de omvormer-correlatie worden de werkelijke observatieduur en timestamps gebruikt; confidence kan vanaf 60 minuten naar middel en vanaf 120 minuten naar hoog, mits ook aan de correlatie- en margecriteria wordt voldaan. Start/stop-events van wasmachine en droger worden beoordeeld met meetpunten binnen een tijdvenster van circa **±7 minuten**. Daardoor blijft de analyse correct wanneer de meetfrequentie later opnieuw wordt aangepast.
-
-De status van een omvormer wordt pas naar **Bevestigd** gewijzigd wanneer de correlatie voldoende eenduidig is of aanvullend met een gecontroleerde test is gevalideerd.
+De 24-uurs fasemeting blijft beschikbaar als **diagnostiek en historische controle**, maar is niet langer nodig om de drie PV-fasen te bepalen: die zijn inmiddels fysiek bevestigd. De monitor publiceert tijd-consistente snapshots van P1 L1/L2/L3, totaal P1 en de drie PV-omvormers naar `docs/data/pv-phase-24h.json`.
 
 ## Live 24-uurs fase-analyse
 
@@ -73,11 +85,11 @@ De status van een omvormer wordt pas naar **Bevestigd** gewijzigd wanneer de cor
 </div>
 
 !!! note "Interpretatie"
-    **Beste fase** is de fase met de sterkste gemeten samenhang. **Confidence** is een indicatie op basis van de correlatiescore, de marge ten opzichte van nummer twee en voldoende werkelijke observatieduur. Het aantal samples is alleen informatief; timestamps bepalen de analyse. Een automatische uitkomst wordt niet zonder aanvullende beoordeling als fysiek bevestigd beschouwd.
+    De live correlatie is nu aanvullend diagnostisch. Voor de drie PV-omvormers is de fysieke aan/uit-test van 22-08-2026 leidend.
 
 ## Meetmethode voor fase en groep
 
-Voor een betrouwbare fasekoppeling wordt bij voorkeur één apparaat tegelijk getest. Voor PV-omvormers gebruiken we daarnaast automatische correlatie. Een exact groepnummer wordt pas als bevestigd gemarkeerd wanneer de koppeling fysiek is vastgesteld via een gecontroleerde uitschakeltest of fysieke verificatie.
+Voor een betrouwbare fasekoppeling wordt bij voorkeur één apparaat tegelijk getest. Voor PV-omvormers is de fase inmiddels bevestigd met een gecontroleerde fysieke uitschakeltest en directe P1-fasewaarden. Een exact groepnummer wordt pas als bevestigd gemarkeerd wanneer de koppeling fysiek is vastgesteld via een gecontroleerde uitschakeltest of fysieke verificatie.
 
 ### ATAG-oven: kandidaatfase L3
 
@@ -90,7 +102,7 @@ Dit is voldoende om **L3 als kandidaatfase / waarschijnlijk** te registreren, ma
 
 ## Fasebelasting
 
-Wasmachine, boiler en waterkoker zijn aan L2 gekoppeld. Vooral boiler en waterkoker kunnen samen ongeveer 4,1 kW toevoegen. De droger is aan L3 gekoppeld. De ATAG-oven is voorlopig eveneens een **L3-kandidaat**, wat relevant kan worden voor toekomstige fasebalancering zodra die koppeling is bevestigd. Dit blijft relevant voor de voorbereiding van de Victron-opstelling.
+Wasmachine, boiler en waterkoker zijn aan L2 gekoppeld. Vooral boiler en waterkoker kunnen samen ongeveer 4,1 kW toevoegen. De **GoodWe GW4200D-NS produceert eveneens op L2**. De droger is aan L3 gekoppeld; daarnaast produceren **SolarEdge SE3680H en GoodWe GW2000-XS beide op L3**. De ATAG-oven is voorlopig eveneens een **L3-kandidaat**. Dit fasebeeld is relevant voor de voorbereiding van de Victron-opstelling; de single-phase MultiPlus is daarom in de hardwarebaseline op **L1** voorzien.
 
 ## Beheerregel
 
@@ -98,6 +110,6 @@ Nieuwe betrouwbare inzichten over **fase-, groep- of aardlekindeling** worden di
 
 ## Open vervolgstappen
 
-De vaatwasser moet nog definitief tussen **groep 5 en groep 12** worden onderscheiden. De **ATAG-oven moet met aanvullende app-gemarkeerde start/stop- of voorverwarmmomenten worden gevalideerd voordat L3 naar Bevestigd kan**. Daarnaast blijven onder meer kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt qua exacte groep/fase nog open. De exacte groepen van boiler en waterkoker moeten eveneens nog fysiek worden gekoppeld.
+De vaatwasser moet nog definitief tussen **groep 5 en groep 12** worden onderscheiden. De **ATAG-oven moet met aanvullende app-gemarkeerde start/stop- of voorverwarmmomenten worden gevalideerd voordat L3 naar Bevestigd kan**. Daarnaast blijven onder meer kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt qua exacte groep/fase nog open. De exacte groepen van boiler, waterkoker en de drie PV-omvormers moeten eveneens nog fysiek aan groep/automaat worden gekoppeld.
 
-> Laatste inhoudelijke update: 19 augustus 2026. ATAG-oven toegevoegd met **L3 als kandidaatfase (Waarschijnlijk)** op basis van correlatie tussen ATAG-appmelding en historische P1-fasemetingen; bevestiging volgt pas na extra onafhankelijke meetmomenten.
+> Laatste inhoudelijke update: 23 augustus 2026. De fysiek gevalideerde PV-fasemapping van 22 augustus is verwerkt: **GoodWe GW4200D-NS = L2; SolarEdge SE3680H = L3; GoodWe GW2000-XS = L3; L1 heeft geen PV-omvormer**.
