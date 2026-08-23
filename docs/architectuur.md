@@ -32,7 +32,7 @@ Contract-/prijscontext · Tesla/WW-verplichtingen · PV-context
       24h Energy Planner SHADOW / 15 min
                     │
                     ▼
- prijsvensters + verplichtingen + toekomstig batterijmodel
+  kostenvensters + flexplanning + Victron SHADOW-scenario
                     │
                     └──► uitsluitend Logic-state / advies
 
@@ -65,8 +65,6 @@ Website/app veroorzaakt nul Homey-devicecalls. Publicatie, historie en planning 
 
 ### Quooker als gevalideerd voorbeeld
 
-De Quooker-route is sinds 21 augustus 2026:
-
 ```text
 Homey Cooker-switch = autoritatief OFF/ON
               │
@@ -97,7 +95,7 @@ De meetvaliditeit is bewust gesplitst:
 - `derivedHouseBalanceValid`: gereconstrueerde P1+PV/huisbalans, uitsluitend voor `house_load`, residual/Overig en diagnostiek;
 - afgeleide PV-/huisweergave mag degraderen zonder de geldige P1-meting ongeldig te verklaren.
 
-Daaruit volgt de harde invariant:
+Harde invariant:
 
 ```text
 P1 geldig + SOURCE_SKEW in PV/huisreconstructie
@@ -109,12 +107,9 @@ P1 stale/ongeldig
 → flex-exportbudget = 0 W (fail-closed)
 ```
 
-Deze invariant geldt niet alleen in Core maar ook downstream in contract-aware Decision/WW-control. De website blijft observability en mag geen control-gates terugschrijven.
+Deze invariant geldt ook downstream in contract-aware Decision/WW-control. De website blijft observability en mag geen control-gates terugschrijven.
 
-Voor Quooker zijn de waarheidsbronnen bewust gescheiden:
-
-- Homey switch → beschikbaar/aan-uit;
-- P1/L3 → daadwerkelijk verwarmen en vermogen.
+Voor Quooker zijn de waarheidsbronnen bewust gescheiden: Homey switch voor beschikbaar/aan-uit; P1/L3 voor daadwerkelijk verwarmen en vermogen.
 
 ## 5. Rollen van energieverbruikers
 
@@ -125,7 +120,7 @@ Voor Quooker zijn de waarheidsbronnen bewust gescheiden:
 | Boiler | flexload met comfortdoel | ja | Shadow/gevalideerde writer |
 | Tesla | flexload met optionele deadline | ja | afzonderlijke writer |
 | Quooker | comfort/gebruikspatroon + gemeten load | beperkt | bestaande Quooker-flows; detector observe-only |
-| Victron-batterij | toekomstige energie-/netbuffer | ja | later via Victron EMS |
+| Victron-batterij | energie-/netbuffer | ja | later via Victron EMS/ESS; nu uitsluitend SHADOW-simulatie |
 
 ## 6. Quatt als comfortlast
 
@@ -149,7 +144,7 @@ flex_export_budget
        - quatt_ramp_reserve)
 ```
 
-De actuele gridreserve is 200 W. Quatt krijgt bij lage belasting een kleine reserve en bij actieve modulatie een begrensde rampreserve. Installatieveiligheid en Easee-loadbalancing blijven boven dit softwarebudget staan. Het budget wordt uitsluitend vrijgegeven bij `gridMeasurementValid=true`; een ongeldige afgeleide huisbalans verandert deze P1-gate niet.
+De actuele gridreserve is 200 W. Installatieveiligheid en Easee-loadbalancing blijven boven dit softwarebudget staan. Het budget wordt uitsluitend vrijgegeven bij `gridMeasurementValid=true`; een ongeldige afgeleide huisbalans verandert deze P1-gate niet.
 
 ## 8. Decision-prioriteit
 
@@ -161,13 +156,11 @@ De actuele gridreserve is 200 W. Quatt krijgt bij lage belasting een kleine rese
 5. Rest naar net / later Victron-batterijbeleid
 ```
 
-De 24h-planner mag deze prioriteit niet omkeren. Hij legt harde verplichtingen juist expliciet vast zodat latere kostenoptimalisatie rondom die verplichtingen kan plannen.
+De 24h-planner mag deze prioriteit niet omkeren. Harde Tesla- en warmwaterverplichtingen worden expliciet vastgelegd voordat economische vensters worden gerangschikt.
 
 ## 9. Contract-aware Decision baseline
 
 Prijsoptimalisatie loopt via de geïsoleerde `EM2_ContractPrice_*` interface. De beslislaag ondersteunt `FIXED` en `DYNAMIC`; legacy M7-prijsclassificaties zijn geen prijsinput voor de contract-aware candidate.
-
-Actieve geharde candidate:
 
 ```text
 EM v2 | 40 Decision | Contract-aware v0.2
@@ -175,7 +168,7 @@ controlMode = SHADOW_CANDIDATE
 noActuatorWrites = true
 ```
 
-v0.2 past dezelfde split-validity-invariant toe als Core: `gridMeasurementValid` is de gate voor EXPORT/PV-flexopportunities; `derivedHouseBalanceValid` is diagnostisch. Voorganger `v0.1 [ROLLBACK]` is uitgeschakeld en alleen voor rollback behouden.
+v0.2 past dezelfde split-validity-invariant toe als Core: `gridMeasurementValid` is de gate voor EXPORT/PV-flexopportunities; `derivedHouseBalanceValid` is diagnostisch.
 
 ## 10. Warm water en Tesla
 
@@ -190,62 +183,100 @@ De bronkeuze `BOILER ↔ CV` blijft een pure advieslaag totdat parameters en wri
 Actieve flow:
 
 ```text
-EM v2 | 45 Planner | 24h Energy Plan v0.1 SHADOW
-flow-id = dedb7e15-8795-478b-995a-734f85025a74
-cadans = 15 min + 30 s stagger
+EM v2 | 45 Planner | 24h Energy Plan v0.2 SHADOW
+flow-id = 27617767-0a64-43a3-9bcb-e34b0dd6a5c0
+cadans = 15 min + 45 s stagger
 controlMode = SHADOW
 noActuatorWrites = true
 ```
 
-De planner vormt de hogere-horizon planningsspine voor kostenoptimalisatie vóór de Victron-installatie. Hij leest bestaande Logic-state en context; er worden geen extra devices gepolld.
-
-### 11.1 Procesflow — actuele gecodeerde v0.1
+Rollback:
 
 ```text
-15-min trigger ──► 30 s delay ──┐
-                               ▼
-manual start ───────────────► planner
-                               │
-                               ▼
-Lees EM2_State + WW-state + uniforme prijscontext
-+ bestaande PBTH-buffer + Tesla deadline + PV Top4h
-                               │
-                               ▼
-                    Contracttype?
-                  ┌────────────┴────────────┐
-                  ▼                         ▼
-               DYNAMIC                    FIXED
-        max. 96 × 15-min slots       STATIC_FIXED
-        P25/P75 + goedkoop/duur      geen kunstmatige slots
-                  └────────────┬────────────┘
-                               ▼
-Leg harde verplichtingen vast:
-Tesla MUST_BY_DEADLINE
-WW MUST_BY_19:00 / MUST_CATCHUP
-                               │
-                               ▼
-Zijn alle expliciete batterijparameters geldig?
-                  ┌────────────┴────────────┐
-                 NEE                        JA
-                  │                         │
- READY_NO_BATTERY_MODEL       READY_WITH_BATTERY_MODEL
- WAIT_FOR_VICTRON_            SIMULATE_BATTERY_AND_
- BATTERY_PARAMETERS           FLEX_ALLOCATION
-                  └────────────┬────────────┘
-                               ▼
-Publiceer EM2_Energy_Plan_24h + EM2_Energy_Planner_Status
-                               │
-                               ▼
-STOP — geen Easee/boiler/Quatt/Victron/device writes
+EM v2 | 45 Planner | 24h Energy Plan v0.1 [ROLLBACK]
+flow-id = dedb7e15-8795-478b-995a-734f85025a74
+enabled = false
 ```
 
-### 11.2 Scope v0.1
+De planner vormt de hogere-horizon planningsspine voor kostenoptimalisatie vóór de Victron-installatie. Hij leest bestaande Logic-state/context en verricht geen aanvullende devicepolls.
 
-v0.1 rangschikt bij DYNAMIC maximaal 96 aaneengesloten 15-minutenprijzen, publiceert goedkope/dure vensters en legt Tesla-/warmwaterverplichtingen vast. Bij FIXED wordt statische prijscontext gebruikt. De PV-forecast is bewust alleen `SUMMARY_ONLY`; v0.1 verzint geen 24-uurs PV-profiel.
+### 11.1 SHADOW-hardwaremodel
 
-De batterijbank is hardwarematig nog OPEN. Daarom worden capaciteit, SOC-grenzen en laad-/ontlaadvermogen niet aangenomen. De planner beschouwt het batterijmodel alleen als geconfigureerd wanneer alle expliciete `EM2_Victron_*` parameters later geldig aanwezig zijn.
+Het huidige simulatiescenario is expliciet:
 
-De volledige flowdocumentatie en actuele procesflow staan in `energy-planner-24h-v0.1.md`.
+```text
+MultiPlus-II 48/5000/70-50
+Cerbo GX MK2
+VM-3P75CT
+3 × Pylontech US5000
+nominaal                 = 14,4 kWh
+SHADOW SOC-band          = 20–90%
+SHADOW bruikbaar venster = 10,08 kWh
+SHADOW AC charge limit   = 3,3 kW
+SHADOW AC discharge      = 3,3 kW
+SHADOW η charge          = 95%
+SHADOW η discharge       = 95%
+SHADOW roundtrip         = 90,25%
+```
+
+SOC-band, vermogenslimiet en efficiënties zijn **simulatieaannames en geen commissioninginstellingen**. Definitieve waarden worden pas tijdens Victron/Pylontech commissioning vastgesteld.
+
+### 11.2 Procesflow — actuele gecodeerde v0.2
+
+```text
+15-min trigger ──► 45 s stagger ──┐
+                                  ▼
+manual start ─────────────────► planner
+                                  │
+                                  ▼
+Lees EM2_State + WW-state + uniforme prijscontext
++ PBTH kwartierprijzen + Tesla deadline + PV Top4h
+                                  │
+                                  ▼
+                         Contracttype?
+                  ┌───────────────┴───────────────┐
+                  ▼                               ▼
+               DYNAMIC                           FIXED
+      max. 96 geldige 15-min slots          statische context
+      P25/P75 classificatie                 geen verzonnen slots
+                  │                               │
+                  └───────────────┬───────────────┘
+                                  ▼
+                     Harde verplichtingen
+            Tesla deadline + WW vóór 19:00/catch-up
+                                  │
+             ┌────────────────────┼────────────────────┐
+             ▼                    ▼                    ▼
+       Tesla prijsvensters   WW kwartierallocatie   Batterij
+       rangschikken vóór     op bestaand 1,9 kW     charge/discharge
+       deadline; geen        boilermodel             candidates
+       kWh/slot verzinnen                            op prijs
+             │                    │                    │
+             └────────────────────┼────────────────────┘
+                                  ▼
+                 Bouw kwartier-SHADOW-acties
+                 HOLD / kandidaat / preferred
+                                  │
+                                  ▼
+       Theoretische arbitragekansen + upper bound
+       geen geclaimde gerealiseerde besparing
+                                  │
+                                  ▼
+Publiceer EM2_Energy_Plan_24h + EM2_Energy_Planner_Status
+                                  │
+                                  ▼
+STOP — geen Victron/Easee/boiler/device writes
+```
+
+### 11.3 Datakwaliteit en begrenzing
+
+De planner heeft nog geen actuele batterij-SOC, geen gedetailleerde 15-minuten huishoudlastforecast en geen gedetailleerde 15-minuten PV-forecast. `M7_PV_Top4h` is alleen samenvattende context. Daarom zijn batterijacties `CHARGE_CANDIDATE`/`DISCHARGE_CANDIDATE` en is `theoreticalUpperBoundEuro` uitsluitend een theoretische prijs-arbitrage-indicatie, **geen voorspelde gerealiseerde besparing**.
+
+Tesla gebruikt de bestaande deadline en resterende kWh, maar v0.2 verzint geen laadvermogen of kWh per kwartier. Warm water hergebruikt het reeds gecodeerde boilermodel van circa 1,9 kW, dus 0,475 kWh per kwartier.
+
+Ontbrekende toekomstige prijzen worden nooit aangevuld of geschat. DYNAMIC horizonstatus is `FULL_24H`, `PARTIAL` of `DIAGNOSTIC` afhankelijk van werkelijk beschikbare aaneengesloten kwartierprijzen.
+
+Volledige flowdocumentatie: `energy-planner-24h-v0.2.md`.
 
 ## 12. Veiligheidshiërarchie
 
@@ -267,9 +298,9 @@ De planner staat niet als veiligheidslaag in deze keten: hij is uitsluitend shad
 
 ## 13. Victron-doelarchitectuur
 
-De geplande Victron-laag bestaat uit MultiPlus-II 48/5000, Cerbo GX MK2, VM-3P75CT en thuisbatterij. Victron/ESS wordt de primaire batterij-, SOC-, laad/ontlaad- en netveiligheidslaag. Homey blijft huishoudelijke orchestrator voor flexloads zoals Tesla en warm water en mag de Victron-safety/ESS-regels niet dupliceren of omzeilen. Zolang Victron niet geïntegreerd is geldt batterijsteun als 0 W.
+De geplande Victron-laag bestaat in het actuele SHADOW-scenario uit MultiPlus-II 48/5000, Cerbo GX MK2, VM-3P75CT en 3 × Pylontech US5000. De bestaande PV-omvormers blijven AC-gekoppeld. Victron/ESS wordt na installatie de primaire batterij-, SOC-, laad/ontlaad- en netveiligheidslaag. Homey blijft huishoudelijke orchestrator voor flexloads zoals Tesla en warm water en mag de Victron-safety/ESS-regels niet dupliceren of omzeilen.
 
-De softwarevoorbereiding start al vóór installatie via de 24h-planner in SHADOW. Dit verandert de hardwaregrens niet: fysieke Victron-communicatie en writes worden pas na installatie/commissioning ontworpen en gevalideerd.
+Zolang Victron niet fysiek geïntegreerd is, geldt batterijsteun in realtime Core/control als 0 W. Alleen de 24h-planner simuleert het afgesproken scenario. Fysieke Victron-communicatie en writes worden pas na installatie/commissioning ontworpen en gevalideerd.
 
 ## 14. Publicatie, historie en website/app
 
@@ -280,9 +311,10 @@ Core              = EM v2 | 00 Core Tick | v0.10.12 (WW post-goal SHOULD)
 Core cadence       = 5 min
 Contract Context   = EM v2 | 30 Context | Contract Price Adapter v0.7
 Contract Decision  = EM v2 | 40 Decision | Contract-aware v0.2
-24h Planner        = EM v2 | 45 Planner | 24h Energy Plan v0.1 SHADOW
-Planner cadence    = 15 min + 30 s stagger
+24h Planner        = EM v2 | 45 Planner | 24h Energy Plan v0.2 SHADOW
+Planner cadence    = 15 min + 45 s stagger
 Planner outputs    = EM2_Energy_Plan_24h + EM2_Energy_Planner_Status
+Planner rollback   = v0.1 [ROLLBACK], disabled
 ```
 
 State, Decision en Shadow worden revision-consistent gepubliceerd. Website/app leest uitsluitend gepubliceerde toestand en blijft buiten de fysieke control-loop.
@@ -291,7 +323,7 @@ Voor de Live View geldt sinds 23 augustus een bewuste scopegrens: deze is observ
 
 ### CI/publicatie-invariant
 
-Een schemawijziging moet atomair worden verwerkt in publisher, adapter, tests, fixtures en repositoryvalidator. CI controleert daarnaast na bundling én na MkDocs-build dat de versiegebonden frontendbundle en het uiteindelijke Pages-artifact de actuele broncode/contractmarkers bevatten. Hiermee wordt voorkomen dat `main` nieuw is terwijl productie ongemerkt een oud artifact serveert.
+Een schemawijziging moet atomair worden verwerkt in publisher, adapter, tests, fixtures en repositoryvalidator. CI controleert na bundling én na MkDocs-build dat de versiegebonden frontendbundle en het uiteindelijke Pages-artifact de actuele broncode/contractmarkers bevatten.
 
 ## 15. Control- en writerdiscipline
 
@@ -304,6 +336,8 @@ Context + State → 24h Planner SHADOW → plan/advies
 ```
 
 Observatie-, historie-, website-, detector- en plannerlagen verrichten geen fysieke writes tenzij een toekomstige component expliciet als gevalideerde writer is ontworpen en via een aparte cut-over is vrijgegeven.
+
+Voor Easee geldt aanvullend: FLASH-belastende configuratieacties worden niet gebruikt voor frequente automatische regeling. Normale dynamische stroomsturing en de autonome Equalizer-functie blijven gescheiden van zulke persistente configuratiewrites.
 
 ## 16. Flowversionering en stable baseline
 
@@ -323,13 +357,16 @@ Iedere wijziging wordt getoetst op:
 - `gridMeasurementValid` versus `derivedHouseBalanceValid` correct gescheiden;
 - P1-authoritatieve flex niet geblokkeerd door `SOURCE_SKEW` in afgeleide PV/huisdata;
 - FIXED/DYNAMIC contractabstractie via `EM2_ContractPrice_*`;
-- 24h-planner blijft SHADOW en gebruikt uitsluitend expliciete, niet-verzonnen batterijparameters;
+- 24h-planner blijft SHADOW;
+- simulatieaannames expliciet gescheiden van commissioningwaarden;
+- geen gerealiseerde besparing claimen zonder SOC/load/PV-data die dit ondersteunt;
 - Tesla/WW MUST-verplichtingen blijven boven economische optimalisatie;
 - `WW_Boilermodus` productie-leidend zolang WW Source Advice shadow-only is;
 - Victron/ESS eigenaar van batterij/SOC/netveiligheid, Homey eigenaar van huishoudelijke flex-orchestratie;
+- Easee FLASH-belastende configuratieacties niet frequent automatisch gebruiken;
 - revision- en schema-consistentie;
 - fail-safe gedrag bij stale/onbekende data;
 - testbaarheid en rollback;
 - synchroniteit tussen broncode, procesdiagrammen, gegenereerde bundle en productie-artifact.
 
-> Laatste update: **23 augustus 2026** — Core v0.10.12/post-goal SHOULD, Contract Price Adapter v0.7, Contract-aware Decision v0.2, pre-Victron 24h Energy Planner v0.1 SHADOW, frontend expliciet observability-only en procesdiagrammen gelijkgetrokken met de actuele code.
+> Laatste update: **23 augustus 2026** — Core v0.10.12, Contract Price Adapter v0.7, Contract-aware Decision v0.2, pre-Victron 24h Energy Planner v0.2 SHADOW met 14,4-kWh 3×US5000-simulatiescenario; v0.1 disabled als rollback. Frontend blijft expliciet observability-only en procesdiagrammen zijn gelijkgetrokken met de actuele code.
