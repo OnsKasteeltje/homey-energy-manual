@@ -65,9 +65,7 @@
   function renderTimeline(payload){
     const p=payload.plan||{}, actions=p.plan?.actions||[];
     const sec=el('section','ps-section'); sec.append(el('h2','', '24-uurs plan'));
-    if(!actions.length){
-      sec.append(el('div','ps-empty','De huidige v0.2-planner publiceert bij FIXED geen kunstmatige kwartierprijzen. Daarom zijn er nu geen dispatch-slots om te tekenen. De historische replay hieronder is wél bruikbaar voor het batterijscenario.')); return sec;
-    }
+    if(!actions.length){sec.append(el('div','ps-empty','De huidige v0.2-planner publiceert bij FIXED geen kunstmatige kwartierprijzen. Daarom zijn er nu geen dispatch-slots om te tekenen. De historische replay hieronder is wél bruikbaar voor het batterijscenario.')); return sec;}
     const scroller=el('div','ps-timeline-scroll'), table=el('table','ps-timeline');
     const trh=el('tr'); ['Tijd','Prijs','Batterij','Tesla','Warm water'].forEach(x=>trh.append(el('th','',x))); const thead=el('thead');thead.append(trh);table.append(thead);
     const tb=el('tbody'); actions.forEach(a=>{const tr=el('tr'); const cells=[new Date(a.start).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}),Number.isFinite(Number(a.price))?`€ ${Number(a.price).toFixed(3)}`:'—',a.battery||'HOLD',a.tesla||'HOLD',a.warmWater||'HOLD']; cells.forEach((x,j)=>{const td=el('td',j>1&&x!=='HOLD'?'ps-active':'',x);tr.append(td)});tb.append(tr)}); table.append(tb);scroller.append(table);sec.append(scroller);return sec;
@@ -81,16 +79,8 @@
       const s=samples[idx], next=samples[idx+1]; let dtH=5/60;
       if(next){const d=(new Date(next.ts)-new Date(s.ts))/3600000;if(d>0&&d<0.5)dtH=d;}
       const p=Number(s.p1W);
-      if(p<0){
-        const exportKWh=(-p)*dtH/1000; exportRaw+=exportKWh;
-        const acIn=Math.max(0,Math.min(exportKWh,cfg.maxW*dtH/1000,(cfg.usableKWh-stored)/cfg.etaC));
-        if(acIn>0){const add=acIn*cfg.etaC;stored+=add;chargedGrid+=acIn;losses+=acIn-add;}
-        clippedExport+=Math.max(0,exportKWh-acIn);
-      } else if(p>0){
-        const importKWh=p*dtH/1000; importRaw+=importKWh;
-        const acOut=Math.max(0,Math.min(importKWh,cfg.maxW*dtH/1000,stored*cfg.etaD));
-        if(acOut>0){const take=acOut/cfg.etaD;stored-=take;dischargedGrid+=acOut;losses+=take-acOut;}
-      }
+      if(p<0){const exportKWh=(-p)*dtH/1000; exportRaw+=exportKWh; const acIn=Math.max(0,Math.min(exportKWh,cfg.maxW*dtH/1000,(cfg.usableKWh-stored)/cfg.etaC)); if(acIn>0){const add=acIn*cfg.etaC;stored+=add;chargedGrid+=acIn;losses+=acIn-add;} clippedExport+=Math.max(0,exportKWh-acIn);}
+      else if(p>0){const importKWh=p*dtH/1000; importRaw+=importKWh; const acOut=Math.max(0,Math.min(importKWh,cfg.maxW*dtH/1000,stored*cfg.etaD)); if(acOut>0){const take=acOut/cfg.etaD;stored-=take;dischargedGrid+=acOut;losses+=take-acOut;}}
     }
     const throughput=chargedGrid+dischargedGrid;
     const avoidedImportValue=dischargedGrid*BUSINESS_CASE.import2027;
@@ -99,9 +89,7 @@
   }
 
   function replayRows(history,cfg){ return (history.days||[]).map(d=>simulateDay(d,cfg)).filter(Boolean).slice(-7); }
-  function aggregate(rows){
-    return rows.reduce((a,r)=>{['chargedGrid','dischargedGrid','losses','cycles','exportRaw','importRaw','clippedExport','avoidedImportValue','lostExportCredit','netEuro'].forEach(k=>a[k]+=r[k]||0);return a;},{chargedGrid:0,dischargedGrid:0,losses:0,cycles:0,exportRaw:0,importRaw:0,clippedExport:0,avoidedImportValue:0,lostExportCredit:0,netEuro:0});
-  }
+  function aggregate(rows){return rows.reduce((a,r)=>{['chargedGrid','dischargedGrid','losses','cycles','exportRaw','importRaw','clippedExport','avoidedImportValue','lostExportCredit','netEuro'].forEach(k=>a[k]+=r[k]||0);return a;},{chargedGrid:0,dischargedGrid:0,losses:0,cycles:0,exportRaw:0,importRaw:0,clippedExport:0,avoidedImportValue:0,lostExportCredit:0,netEuro:0});}
 
   function renderDecision(history,payload){
     const sec=el('section','ps-section ps-decision'); sec.append(el('h2','', 'Potentiële besparing'));
@@ -112,29 +100,29 @@
     if(!mainRows.length){sec.append(el('div','ps-empty','Nog onvoldoende afgeronde daghistorie voor financiële vergelijking.'));return sec;}
     const deltaEuro=main.netEuro-small.netEuro, deltaImport=main.dischargedGrid-small.dischargedGrid;
     const simplePayback=BUSINESS_CASE.investmentEuro/BUSINESS_CASE.annualCentralEuro;
-    const lead=el('div','ps-decision-lead');
-    lead.append(
-      el('strong','',`Centrale jaarreferentie vanaf 2027: circa € ${fmt(BUSINESS_CASE.annualCentralEuro,0)}/jaar`),
-      el('span','',` · bandbreedte € ${fmt(BUSINESS_CASE.annualLowEuro,0)}–€ ${fmt(BUSINESS_CASE.annualHighEuro,0)} · eenvoudige TVT circa ${fmt(simplePayback,1)} jaar`)
-    );
-    sec.append(lead);
-    const grid=el('div','ps-grid'); grid.append(
-      card('Jaarpotentieel batterij',`€ ${fmt(BUSINESS_CASE.annualCentralEuro,0)} / jaar`,`${fmt(BUSINESS_CASE.annualUsefulOutputKWh,0)} kWh bruikbare accu-output als centrale referentie`),
-      card('Replay 2027+-tarief',euro(main.netEuro),`${mainRows.length} gemeten dagen · netto P1, dus na direct Tesla/boiler-verbruik`),
+
+    sec.append(el('h3','', 'Businesscase · jaarprognose vanaf 2027'));
+    sec.append(el('p','ps-footnote','Dit zijn rekenaannames voor een gemiddeld jaar; deze waarden zijn niet uit de onderstaande paar meetdagen geëxtrapoleerd.'));
+    const forecast=el('div','ps-grid'); forecast.append(
+      card('Jaarpotentieel batterij',`€ ${fmt(BUSINESS_CASE.annualCentralEuro,0)} / jaar`,`bandbreedte € ${fmt(BUSINESS_CASE.annualLowEuro,0)}–€ ${fmt(BUSINESS_CASE.annualHighEuro,0)} per jaar`),
+      card('Bruikbare accu-output',`${fmt(BUSINESS_CASE.annualUsefulOutputKWh,0)} kWh / jaar`,'centrale businesscase-aanname'),
+      card('Investering AC-coupled',`€ ${fmt(BUSINESS_CASE.investmentEuro,0)}`,'3 × US5000 · zonder SmartSolar MPPT/DC-ombouw'),
+      card('Eenvoudige TVT',`${fmt(simplePayback,1)} jaar`,'€ 4.880 ÷ € 687/jaar')
+    ); sec.append(forecast);
+
+    sec.append(el('h3','', `Validatie met gemeten P1-data · ${mainRows.length} dagen`));
+    sec.append(el('p','ps-footnote','Dit deel is wél rechtstreeks berekend uit de beschikbare netto P1-meetdata en wordt gewaardeerd alsof de 2027+-tarieven gelden. Het is geen jaarprognose.'));
+    const measured=el('div','ps-grid'); measured.append(
+      card('Besparing in replay',euro(main.netEuro),`${mainRows.length} gemeten dagen · netto P1`),
       card('Vermeden netinkoop',euro(main.avoidedImportValue),`${fmtKWh(main.dischargedGrid)} × € ${fmt(BUSINESS_CASE.import2027,4)}/kWh`),
       card('Gemiste terugleverwaarde',euro(main.lostExportCredit),`${fmtKWh(main.chargedGrid)} × € ${fmt(BUSINESS_CASE.netExport2027,4)}/kWh`),
       card('Conversieverlies',fmtKWh(main.losses),`AC→accu→AC · ηRT ${fmt(BUSINESS_CASE.roundTripEfficiency*100,0)}%`),
-      card('Extra vs 9,6 kWh',euro(deltaEuro),`${fmtKWh(deltaImport)} extra vermeden import in replay`),
-      card('Resterende export',fmtKWh(main.clippedExport),'niet opgeslagen door timing, vermogen of capaciteit'),
-      card('Investering AC-coupled',`€ ${fmt(BUSINESS_CASE.investmentEuro,0)}`,'3 × US5000 · zonder SmartSolar MPPT/DC-ombouw')
-    ); sec.append(grid);
+      card('Extra 14,4 vs 9,6 kWh',euro(deltaEuro),`${fmtKWh(deltaImport)} extra vermeden import in deze meetperiode`),
+      card('Resterende export',fmtKWh(main.clippedExport),'niet opgeslagen door timing, vermogen of capaciteit')
+    ); sec.append(measured);
 
-    sec.append(el('div','ps-empty',
-      '26-09-2026 t/m 31-12-2026: salderen blijft van kracht, waardoor batterijopslag voor puur PV-verschuiven financieel vrijwel neutraal is. Vanaf 01-01-2027 rekent deze analyse met € 0,255/kWh netafname en € 0,0025/kWh netto terugleverwaarde. Direct PV-verbruik door Tesla en boiler wordt niet nogmaals als batterijbesparing geteld: de replay gebruikt netto P1-export en -import en voorkomt zo dubbeltelling.'
-    ));
-    sec.append(el('p','ps-footnote',
-      'Batterijkeuze: 3 × Pylontech US5000 = 14,4 kWh nominaal. Circa 10 kWh blijft energetisch de sweet spot; de derde module is vooral gekozen om de gewenste 3,0–3,3 kW AC-ESS-regeling volledig te kunnen benutten en voor extra buffer. De jaarreferentie is een businesscase-aanname; de gemeten replay blijft de empirische validatielaag.'
-    ));
+    sec.append(el('div','ps-empty','26-09-2026 t/m 31-12-2026: salderen blijft van kracht, waardoor batterijopslag voor puur PV-verschuiven financieel vrijwel neutraal is. Vanaf 01-01-2027 rekent de businesscase met € 0,255/kWh netafname en € 0,0025/kWh netto terugleverwaarde. Direct PV-verbruik door Tesla en boiler wordt niet nogmaals als batterijbesparing geteld: de replay gebruikt netto P1-export en -import.'));
+    sec.append(el('p','ps-footnote','Batterijkeuze: 3 × Pylontech US5000 = 14,4 kWh nominaal. Circa 10 kWh blijft energetisch de sweet spot; de derde module is vooral gekozen om de gewenste 3,0–3,3 kW AC-ESS-regeling volledig te benutten en voor extra buffer.'));
     return sec;
   }
 
@@ -160,10 +148,7 @@
   async function load(){
     const status=document.getElementById('ps-status');
     try{
-      const [payload,history]=await Promise.all([
-        fetchJson(root.dataset.source,'energy-planner-shadow.json',true),
-        fetchJson(root.dataset.history,'energy-day-series-7d.json',false)
-      ]);
+      const [payload,history]=await Promise.all([fetchJson(root.dataset.source,'energy-planner-shadow.json',true),fetchJson(root.dataset.history,'energy-day-series-7d.json',false)]);
       if(payload.observabilityOnly!==true||payload.controlImpact!=='NONE')throw new Error('observability safety marker ontbreekt');
       status.replaceChildren(renderDecision(history,payload),renderScore(payload),renderTimeline(payload),renderReplay(history,payload));
     }catch(e){status.replaceChildren(el('div','ps-error',`Planner Shadow kon niet worden geladen: ${e.message}`));}
