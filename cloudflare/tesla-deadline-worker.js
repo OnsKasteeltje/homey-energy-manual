@@ -3,7 +3,7 @@ const REPO = 'homey-energy-manual';
 const BRANCH = 'main';
 const PATH = 'docs/data/tesla-deadline-command.json';
 const ALLOWED_ORIGIN = 'https://onskasteeltje.github.io';
-const KWH_PER_SOC_PERCENT = 0.59; // eerste praktijkkalibratie: 71% -> 90%, 3x10A, ETA 95 min, ~7.1 kW
+const KWH_PER_SOC_PERCENT = 0.55; // conservative interim calibration; first valid measured session = 0.5246 kWh/%
 
 function cors(origin) {
   return {
