@@ -2,12 +2,27 @@
   const root = document.getElementById('planner-shadow');
   if (!root) return;
 
+  const RAW_BASE = 'https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/';
   const el = (tag, cls, text) => { const n=document.createElement(tag); if(cls)n.className=cls; if(text!==undefined)n.textContent=text; return n; };
   const fmt = (v,d=1) => Number.isFinite(Number(v)) ? Number(v).toFixed(d) : '—';
   const fmtKWh = v => `${fmt(v,2)} kWh`;
   const fmtW = v => Number.isFinite(Number(v)) ? `${Math.round(Number(v))} W` : '—';
   const local = iso => { if(!iso)return '—'; const d=new Date(iso); return Number.isNaN(d.getTime())?'—':d.toLocaleString('nl-NL',{dateStyle:'short',timeStyle:'short'}); };
-  const badge = (text,kind='') => { const b=el('span',`ps-badge ${kind}`,text); return b; };
+  const badge = (text,kind='') => el('span',`ps-badge ${kind}`,text);
+
+  async function fetchJson(primary, rawFile, required=true){
+    const candidates=[primary, `${RAW_BASE}${rawFile}?ts=${Date.now()}`].filter(Boolean);
+    let last='geen bron geprobeerd';
+    for(const url of candidates){
+      try{
+        const r=await fetch(url,{cache:'no-store'});
+        if(!r.ok){last=`HTTP ${r.status} op ${url}`;continue;}
+        return await r.json();
+      }catch(e){last=`${e.message} op ${url}`;}
+    }
+    if(required) throw new Error(last);
+    return {days:[]};
+  }
 
   function card(title,value,sub=''){
     const c=el('div','ps-card'); c.append(el('div','ps-card-title',title),el('div','ps-card-value',value)); if(sub)c.append(el('div','ps-card-sub',sub)); return c;
@@ -35,7 +50,7 @@
     const p=payload.plan||{}, actions=p.plan?.actions||[];
     const sec=el('section','ps-section'); sec.append(el('h2','', '24-uurs plan'));
     if(!actions.length){
-      const note=el('div','ps-empty','De huidige v0.2-planner publiceert bij FIXED geen kunstmatige kwartierprijzen. Daarom zijn er nu geen dispatch-slots om te tekenen. De historische replay hieronder is wél bruikbaar voor het batterijscenario.'); sec.append(note); return sec;
+      sec.append(el('div','ps-empty','De huidige v0.2-planner publiceert bij FIXED geen kunstmatige kwartierprijzen. Daarom zijn er nu geen dispatch-slots om te tekenen. De historische replay hieronder is wél bruikbaar voor het batterijscenario.')); return sec;
     }
     const scroller=el('div','ps-timeline-scroll'), table=el('table','ps-timeline');
     const trh=el('tr'); ['Tijd','Prijs','Batterij','Tesla','Warm water'].forEach(x=>trh.append(el('th','',x))); const thead=el('thead');thead.append(trh);table.append(thead);
@@ -80,8 +95,10 @@
   async function load(){
     const status=document.getElementById('ps-status');
     try{
-      const [pr,hr]=await Promise.all([fetch(root.dataset.source,{cache:'no-store'}),fetch(root.dataset.history,{cache:'no-store'})]);
-      if(!pr.ok)throw new Error(`planner HTTP ${pr.status}`); const payload=await pr.json(); const history=hr.ok?await hr.json():{days:[]};
+      const [payload,history]=await Promise.all([
+        fetchJson(root.dataset.source,'energy-planner-shadow.json',true),
+        fetchJson(root.dataset.history,'energy-day-series-7d.json',false)
+      ]);
       if(payload.observabilityOnly!==true||payload.controlImpact!=='NONE')throw new Error('observability safety marker ontbreekt');
       status.replaceChildren(renderScore(payload),renderTimeline(payload),renderReplay(history,payload));
     }catch(e){status.replaceChildren(el('div','ps-error',`Planner Shadow kon niet worden geladen: ${e.message}`));}
