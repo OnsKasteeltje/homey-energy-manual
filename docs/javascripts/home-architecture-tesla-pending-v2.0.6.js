@@ -1,12 +1,13 @@
 (function(){
   'use strict';
-  // v2.0.7: een recente website-command is tijdelijk leidend voor de Tesla-kaart
-  // wanneer Core nog ontbreekt of de vorige deadline publiceert. Geen Homey-devicecalls.
+  // v2.0.8: recente website-command overbrugt alleen kort de Core-publicatielag.
+  // Na 120 s zonder Core-ack wordt expliciet een foutstatus getoond.
   window.HomeEnergyFrontend=window.HomeEnergyFrontend||{};
-  window.HomeEnergyFrontend.homeArchitectureTeslaPending='2.0.7';
+  window.HomeEnergyFrontend.homeArchitectureTeslaPending='2.0.8';
 
   const BASE='/homey-energy-manual/';
   const RECENT_MS=10*60*1000;
+  const ACK_TIMEOUT_MS=120000;
   let coreDetail=null,lastCommand=null,timer=null,loading=false;
 
   const fmtKWh=v=>Number(v).toLocaleString('nl-NL',{maximumFractionDigits:2});
@@ -26,31 +27,38 @@
 
     const commandActive=cmd.active===true;
     const t=detail?.raw?.tesla||null;
-    // Fail-open voor de UX: als de actuele command al bevestigd is maar Core nog niet
-    // beschikbaar/gepubliceerd is, toon de command als 'wordt verwerkt' in plaats van
-    // misleidend 'geen deadline'. Zodra Core overeenkomt, wordt Core weer leidend.
-    if(!t)return {cmd,commandActive};
+    const age=Math.max(0,Date.now()-requestedAt);
+    if(!t)return {cmd,commandActive,age,mismatch:true};
 
     const coreActive=t.deadline_active===true;
     const commandDeadline=norm(cmd.deadline),coreDeadline=norm(t.deadline_at);
     const mismatch=commandActive!==coreActive||(commandActive&&commandDeadline&&commandDeadline!==coreDeadline);
     if(!mismatch)return null;
-    return {cmd,commandActive};
+    return {cmd,commandActive,age,mismatch:true};
   }
 
   function apply(){
     const goal=teslaGoal(),pending=pendingState(lastCommand,coreDetail);
     if(!goal||!pending)return false;
     const state=goal.querySelector('.ha-goal-state'),small=goal.querySelector('small');
-    if(state){state.classList.remove('ok','off');state.classList.add('warn');state.textContent=pending.commandActive?'Nieuwe deadline wordt verwerkt':'Deadline uitschakelen wordt verwerkt';}
+    const timedOut=pending.age>ACK_TIMEOUT_MS;
+    if(state){
+      state.classList.remove('ok','off','warn');
+      state.classList.add('warn');
+      state.textContent=timedOut
+        ?(pending.commandActive?'Deadline niet door Core bevestigd':'Uitschakelen niet door Core bevestigd')
+        :(pending.commandActive?'Nieuwe deadline wordt verwerkt':'Deadline uitschakelen wordt verwerkt');
+    }
     if(small){
-      if(pending.commandActive){
+      if(timedOut){
+        small.textContent='Write-route/Core-publicatie controleren';
+      }else if(pending.commandActive){
         const c=pending.cmd,time=fmtTime(c.deadline),soc=(Number.isFinite(Number(c.currentSoc))&&Number.isFinite(Number(c.targetSoc)))?`${Number(c.currentSoc)}→${Number(c.targetSoc)}%`:'';
         const bits=[time?`Deadline ${time}`:'',soc,Number.isFinite(Number(c.goalKWh))?`${fmtKWh(c.goalKWh)} kWh`:'' ].filter(Boolean);
         small.textContent=bits.join(' · ');
       }else small.textContent='Nieuwe opdracht bevestigd; wachten op Homey/Core-publicatie';
     }
-    goal.dataset.teslaCommandPending='true';
+    goal.dataset.teslaCommandPending=timedOut?'failed':'true';
     return true;
   }
 
@@ -71,6 +79,6 @@
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refresh(coreDetail);});
   document.addEventListener('DOMContentLoaded',()=>refresh(window.EnergyCoreV2?.state||coreDetail));
   if(document.readyState!=='loading')refresh(window.EnergyCoreV2?.state||coreDetail);
-  timer=setInterval(()=>{if(document.visibilityState==='visible'&&document.getElementById('home-architecture'))loadCommand();},10000);
+  timer=setInterval(()=>{if(document.visibilityState==='visible'&&document.getElementById('home-architecture')){apply();loadCommand();}},10000);
   window.addEventListener('beforeunload',()=>clearInterval(timer),{once:true});
 })();
