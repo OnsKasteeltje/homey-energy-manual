@@ -1,0 +1,115 @@
+{
+  "schema": "EM2_PLANNER_SHADOW_PUBLISH_V0.1",
+  "publishedAt": "2026-08-23T14:44:11.371Z",
+  "observabilityOnly": true,
+  "controlImpact": "NONE",
+  "plan": {
+    "schema": "EM2_ENERGY_PLAN_24H_V0.2",
+    "generatedAt": "2026-08-23T14:30:45.820Z",
+    "controlMode": "SHADOW",
+    "readOnly": true,
+    "physicalWritePerformed": false,
+    "purpose": "PRE_VICTRON_COST_OPTIMIZATION_SIMULATION",
+    "scenario": {
+      "id": "VICTRON_3X_US5000_SHADOW_V0.1",
+      "simulationOnly": true,
+      "multiplus": "MultiPlus-II 48/5000/70-50",
+      "battery": "3x Pylontech US5000",
+      "nominalCapacityKWh": 14.4,
+      "acChargeLimitW": 3300,
+      "acDischargeLimitW": 3300,
+      "minSocPct": 20,
+      "maxSocPct": 90,
+      "chargeEfficiency": 0.95,
+      "dischargeEfficiency": 0.95,
+      "roundTripEfficiency": 0.9025,
+      "usableWindowKWh": 10.08,
+      "assumptions": [
+        "SOC-band 20-90% is SHADOW assumption, not commissioning value",
+        "3.3 kW AC limit represents conservative shed-feed scenario",
+        "95% charge and 95% discharge efficiency are simulation assumptions",
+        "Actual SOC/base-load/detailed PV forecast are not yet available to this planner"
+      ]
+    },
+    "inputs": {
+      "sourceRevision": 1653,
+      "contract": "FIXED",
+      "priceQuality": "GOOD",
+      "priceFresh": true,
+      "priceUsable": true,
+      "priceHorizonHours": 24,
+      "pvForecast": {
+        "quality": "SUMMARY_ONLY",
+        "top4h": false,
+        "updatedAt": "2026-08-23T14:30:10.707Z",
+        "note": "No detailed 15-min PV forecast used; no fabricated PV dispatch."
+      },
+      "tesla": {
+        "deadlineActive": false,
+        "remainingKWh": 0,
+        "deadlineAt": "2026-08-23T16:00",
+        "latestStart": "",
+        "throughputModel": "NOT_ASSUMED",
+        "note": "Price windows are ranked; exact Tesla slot kWh is not invented."
+      },
+      "warmWater": {
+        "goalReachedToday": true,
+        "remainingFallbackMin": 0,
+        "catchupRequired": false,
+        "modeledPowerW": 1900,
+        "derivedEnergyKWh": 0,
+        "deadlineLocal": "19:00"
+      }
+    },
+    "plan": {
+      "slotMinutes": 15,
+      "horizonQuality": "STATIC",
+      "slotsAvailable": 0,
+      "actions": [],
+      "tesla": {
+        "preferredPriceSlots": [],
+        "obligationKWh": 0,
+        "deadlineAt": "2026-08-23T16:00"
+      },
+      "warmWater": {
+        "allocatedSlots": [],
+        "unallocatedKWh": 0
+      },
+      "battery": {
+        "mode": "THEORETICAL_ARBITRAGE_CANDIDATES_ONLY",
+        "chargeCandidates": [],
+        "dischargeCandidates": [],
+        "economicPairs": [],
+        "theoreticalUpperBoundEuro": 0,
+        "note": "Upper bound is not a realized savings forecast; actual SOC, household load and detailed PV forecast are missing."
+      }
+    },
+    "plannerStatus": "READY_SHADOW_SCENARIO",
+    "nextPhase": "RUN_AND_COMPARE_SHADOW_RECOMMENDATIONS_WITH_REAL_OUTCOMES",
+    "safety": {
+      "noDeviceWrites": true,
+      "noVictronWrites": true,
+      "noEaseeWrites": true,
+      "noBoilerWrites": true,
+      "existingWritersUnchanged": true,
+      "p1ControlPolicyUnchanged": true,
+      "simulationOnly": true,
+      "commissioningValuesUnchanged": true
+    }
+  },
+  "status": {
+    "status": "READY_SHADOW_SCENARIO",
+    "at": "2026-08-23T14:30:45.820Z",
+    "version": "EM2_ENERGY_PLAN_24H_V0.2",
+    "scenario": "VICTRON_3X_US5000_SHADOW_V0.1",
+    "scenarioConfigured": true,
+    "contract": "FIXED",
+    "priceUsable": true,
+    "horizonHours": 24,
+    "horizonQuality": "STATIC",
+    "teslaObligation": false,
+    "wwObligation": false,
+    "theoreticalBatteryUpperBoundEuro": 0,
+    "noActuatorWrites": true
+  }
+}
