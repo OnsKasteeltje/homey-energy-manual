@@ -3,10 +3,9 @@
 
   // DISPLAY ONLY. This module never affects EMS control decisions.
   // Simple presentation policy:
-  // - Net = direct P1 measurement.
-  // - PV = direct inverter measurement.
-  // - House = PV + grid + battery discharge - battery charge, only when physically coherent.
-  // - If PV/P1 are not coherent enough, House is unknown ('—'), never estimated or cached.
+  // - Net = direct P1 measurement and remains visible.
+  // - PV = direct inverter total, but only shown when it is physically coherent with P1.
+  // - House = PV + grid + battery discharge - battery charge, only when coherent.
   // - Direct device cards always keep their own measurements.
   // - Overig is only shown when House is known.
   const TOLERANCE_W=75;
@@ -40,15 +39,6 @@
 
   function clearWarnings(root){root?.querySelectorAll('.energy-balance-warning').forEach(el=>el.remove());}
 
-  function addWarning(root,text){
-    const top=root?.querySelector('.energy-topline');
-    if(!top)return;
-    const w=document.createElement('span');
-    w.className='energy-balance-warning energy-stale';
-    w.textContent=`● ${text}`;
-    top.appendChild(w);
-  }
-
   function setPanel(root,house,assigned,other,coherent){
     const panels=[...root.querySelectorAll('.heating-hybrid-panel .energy-manager-grid > div')];
     const panel=panels.find(x=>x.querySelector('small')?.textContent?.trim()==='ENERGIEBALANS');
@@ -59,7 +49,7 @@
       if(span)span.textContent=`bekend toegewezen ${fmt(assigned)} · Overig ${fmt(other)}`;
     }else{
       if(strong)strong.textContent='Woning —';
-      if(span)span.textContent='PV/P1 tijdelijk niet tijdgelijk';
+      if(span)span.textContent='PV-meting niet tijdgelijk met P1';
     }
   }
 
@@ -81,30 +71,32 @@
       const assigned=directAssigned(r);
       const candidate=grid!==null?pv+grid+discharge-charge:NaN;
 
-      // One display-only physical check. If export exceeds available PV + battery discharge,
-      // or the derived house load would be materially negative, PV and P1 are not time-coherent.
+      // One display-only physical check. If the measured combination cannot represent one
+      // physical moment, do not draw it as one. P1 remains visible; PV/House/Overig become unknown.
       const coherent=Number.isFinite(candidate)&&candidate>=-TOLERANCE_W&&exportW<=pv+discharge+TOLERANCE_W;
+      const pvNode=findNode(root,'PV Opwek');
       const houseNode=findNode(root,'Huis');
       const otherNode=findNode(root,'Overig');
 
       if(coherent){
         const house=Math.max(0,candidate);
         const other=Math.max(0,house-assigned);
+        setNode(pvNode,fmt(pv),'actuele PV-opwek');
         setNode(houseNode,fmt(house),'totaal huisverbruik uit PV + P1/netbalans');
         setNode(otherNode,fmt(other),'rest van Huis na bekende apparaten');
         setPanel(root,house,assigned,other,true);
         root.dataset.balanceStatus='valid';
       }else{
-        setNode(houseNode,'—','PV/P1 tijdelijk niet tijdgelijk');
+        setNode(pvNode,'—','PV-bron tijdelijk niet tijdgelijk met actuele P1-meting');
+        setNode(houseNode,'—','huisverbruik niet berekend uit niet-tijdgelijke bronnen');
         setNode(otherNode,'—','restverbruik niet berekend zolang Huis onbekend is');
         setPanel(root,null,assigned,null,false);
-        addWarning(root,'PV/P1 tijdelijk niet tijdgelijk');
         root.dataset.balanceStatus='async';
       }
 
-      root.dataset.balanceMeasurementPolicy='display-only-simple-p1-pv-house-unknown-when-incoherent';
+      root.dataset.balanceMeasurementPolicy='display-only-p1-visible-pv-house-residual-hidden-when-incoherent';
       root.dataset.balanceControlImpact='none';
-      root.dataset.balanceGuardVersion='2.8.130-simple2';
+      root.dataset.balanceGuardVersion='2.8.130-simple3';
     }finally{
       applying=false;
     }
