@@ -1,4 +1,4 @@
-const CACHE_NAME = 'home-energy-pwa-v6';
+const CACHE_NAME = 'home-energy-pwa-v7';
 const APP_SHELL = ['./', './manifest.webmanifest', './assets/home-energy-app-icon.svg'];
 
 self.addEventListener('install', event => {
@@ -32,11 +32,8 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Live JSON/status feeds must always bypass the service-worker cache.
   if (url.pathname.endsWith('.json')) return;
 
-  // Navigation and executable/style assets are network-first. Never serve a cached
-  // version while the network is available; cached copies are offline fallback only.
   const isMutableAsset = request.mode === 'navigate' || /\.(?:js|css)$/.test(url.pathname);
   if (isMutableAsset) {
     event.respondWith(
