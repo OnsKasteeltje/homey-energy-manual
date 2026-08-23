@@ -1,6 +1,17 @@
 name: Deploy MkDocs to GitHub Pages
 
 on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "docs/data/homey-status.json"
+      - "docs/data/shadow-status.json"
+      - "docs/data/energy-state-v2.json"
+      - "docs/data/energy-day-v2.json"
+      - "docs/data/laundry-analysis.json"
+      - "docs/data/contract-history-v01.json"
+      - "docs/data/tesla-deadline-command.json"
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
@@ -12,7 +23,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -21,7 +32,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        uses: actions/setup-python@a26af69be951a213d495a4c2d9c7362e8dae4041e # v5.6.0
         with:
           python-version: "3.13.15"
           cache: pip
@@ -149,7 +160,7 @@ jobs:
           grep -R -q "goodwe_4200_w" site
           grep -R -q "boiler_compensated" site
           grep -R -q "P1_L2 + GoodWe4200" site
-          grep -R -q "home-energy-pwa-v5" site/service-worker.js
+          grep -R -q "home-energy-pwa-v6" site/service-worker.js
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
