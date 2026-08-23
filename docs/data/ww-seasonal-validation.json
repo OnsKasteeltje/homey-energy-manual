@@ -1,0 +1,154 @@
+{
+  "generatedAt": "2026-08-23T00:06:32.705Z",
+  "wwBoilermodus": true,
+  "seasonal": {
+    "schema": "EM2_WW_SEASONAL_SOURCE_V0.2",
+    "generatedAt": "2026-08-23T00:05:07.851Z",
+    "controlMode": "PURE_SHADOW",
+    "readOnly": true,
+    "manualSwitchOnly": true,
+    "productionModeLeading": true,
+    "currentMode": "BOILER",
+    "policy": {
+      "windowDays": 14,
+      "minValidDays": 7,
+      "confirmDays": 5,
+      "hysteresisEurPerUsableKWh": 0.03,
+      "analysisCadence": "DAILY_20:30",
+      "boilerSimulationWindow": "09:30-19:00",
+      "boilerExpectedW": 1900
+    },
+    "safety": {
+      "deviceReads": false,
+      "deviceWrites": false,
+      "physicalWritePerformed": false,
+      "wwBoilermodusWritten": false,
+      "automaticSourceSwitch": false
+    },
+    "status": "WARMUP_INSUFFICIENT_HISTORY",
+    "advice": "KEEP_CURRENT",
+    "candidate": "KEEP_CURRENT",
+    "reason": "3/7 geldige dagen in 14-daags venster",
+    "confirmation": {
+      "streakDays": 0,
+      "requiredDays": 5,
+      "confirmed": false
+    },
+    "analysis": {
+      "asOfDate": "2026-08-22",
+      "windowDays": 14,
+      "validDays": 3,
+      "minValidDays": 7,
+      "referenceBoilerInputKWh": 4.667,
+      "referenceDemandSource": "MEDIAN_RECENT_MEASURED_BOILER_DAYS",
+      "boilerCostEurPerUsableKWh": 0.15873,
+      "cvCostEurPerUsableKWh": 0.13564,
+      "deltaBoilerMinusCv": 0.02309,
+      "pvOpportunityShare": 0.9367,
+      "costMethod": "COUNTERFACTUAL_1900W_SMART_SCHEDULING_FROM_MEASURED_P1_PLUS_HISTORICAL_PRICES",
+      "gasCostBasis": "CURRENT_CONFIGURED_GAS_PRICE"
+    },
+    "notification": {
+      "sent": false,
+      "reason": "NOT_CONFIRMED_OR_ALREADY_SENT"
+    }
+  },
+  "postGoal": {
+    "schema": "EM2_WW_POST_GOAL_OPPORTUNITY_V0.4",
+    "generatedAt": "2026-08-23T00:06:08.856Z",
+    "integrationStatus": "SHADOW_PENDING_CORE_CUTOVER",
+    "trackingIssue": "GitHub #4",
+    "controlMode": "PURE_SHADOW",
+    "readOnly": true,
+    "deviceReads": false,
+    "deviceWrites": false,
+    "decision": "HOLD",
+    "eligible": false,
+    "reason": "GOAL_NOT_REACHED",
+    "priority": "MAY",
+    "mandatoryReheat": false,
+    "goal": {
+      "reachedToday": false,
+      "reachedAt": null,
+      "reachedHourLocal": null,
+      "minutesSinceGoal": null,
+      "reachedBefore18": false,
+      "eveningDrawLikelihood": "LOW"
+    },
+    "thermal": {
+      "standbyLossKWhPerDay": 1.9,
+      "estimatedStandbyHeadroomKWh": 0,
+      "minDelayMin": 60,
+      "minHeadroomKWh": 0.25,
+      "roomFromStandby": false,
+      "roomFromExpectedEveningDraw": false,
+      "roomLikely": false,
+      "modelQuality": "FIRST_ORDER_PLUS_EVENING_USE_PRIOR"
+    },
+    "economics": {
+      "priceFresh": true,
+      "negativeNow": false,
+      "cheapNow": false,
+      "importPriceNowEurKWh": 0.2379,
+      "avgNext4hEurKWh": 0.2379,
+      "savingVsNext4hEurKWh": 0,
+      "economicThresholdEurKWh": 0.05,
+      "priceAttractive": false,
+      "pvOpportunity": false,
+      "flexExportBudgetW": 0
+    },
+    "source": {
+      "productionSource": "BOILER",
+      "productionModeLeading": true,
+      "allowsBoiler": true,
+      "seasonalAdvisorRuntimeGate": false
+    },
+    "safety": {
+      "goalReachedBlocksMustOnly": true,
+      "doesNotClearGoalLatch": true,
+      "neverMustAfterGoal": true,
+      "physicalWritePerformed": false,
+      "oneWriterArchitecturePreserved": true,
+      "seasonalAdviceCannotSwitchRuntimeSource": true
+    }
+  },
+  "deprecatedSourceAdvice": {
+    "schema": "EM2_WW_SOURCE_ADVICE_DEPRECATED",
+    "generatedAt": "2026-08-23T00:05:07.851Z",
+    "status": "SUPERSEDED_BY_SEASONAL_V0.2",
+    "advice": "KEEP_CURRENT",
+    "productionSource": "BOILER",
+    "productionModeLeading": true,
+    "readOnly": true,
+    "deviceWrites": false,
+    "reason": "15-minute BOILER/CV source advice is retired; use EM2_WW_Seasonal_Advice. WW_Boilermodus remains operational truth."
+  },
+  "historySummary": {
+    "schema": "EM2_WW_SEASONAL_HISTORY_V0.2",
+    "days": 3,
+    "evaluations": 1,
+    "latestDay": {
+      "date": "2026-08-22",
+      "quality": "MEASURED_P1_PRICE_COUNTERFACTUAL",
+      "referenceInputKWh": 4.667,
+      "simulatedInputKWh": 4.667,
+      "simulatedUsableHeatKWh": 4.574,
+      "simulatedCostEur": 0.7,
+      "boilerCostEurPerUsableKWh": 0.15306,
+      "pvOpportunityShare": 1,
+      "importShare": 0,
+      "observedBoilerInputKWh": 7.626,
+      "observedBoilerCostEur": 1.259,
+      "priceCoverage": true
+    }
+  },
+  "invariants": {
+    "seasonalExists": true,
+    "seasonalManualOnly": true,
+    "seasonalNoDeviceWrites": true,
+    "seasonalNoModeWrite": true,
+    "postGoalV04": true,
+    "postGoalSeasonalNotGate": true,
+    "oldAdviceSuperseded": true
+  }
+}
