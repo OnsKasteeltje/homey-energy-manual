@@ -84,11 +84,10 @@
       card('Opgeslagen PV/netexport',fmtKWh(sum.chargedGrid),'AC energie richting gesimuleerde accu'),
       card('Vermeden netimport',fmtKWh(sum.dischargedGrid),'theoretisch geleverd uit accu'),
       card('Conversieverlies',fmtKWh(sum.losses),'η laden/ontladen volgens shadow-scenario'),
-      card('Equivalent cycli',fmt(sum.cycles,2),'over getoonde afgeronde dagen'),
-      card('€ effect','Nog niet berekend','wacht op expliciet reproduceerbaar tariefmodel')
+      card('Equivalent cycli',fmt(sum.cycles,2),'over getoonde afgeronde dagen')
     ); sec.append(grid);
     const table=el('table','ps-replay-table'); const th=el('tr');['Dag','Export gemeten','Naar accu','Import gemeten','Vermeden import','Verlies','Cycli'].forEach(x=>th.append(el('th','',x)));const head=el('thead');head.append(th);table.append(head);const tb=el('tbody');rows.forEach(r=>{const tr=el('tr');[r.date,fmtKWh(r.exportRaw),fmtKWh(r.chargedGrid),fmtKWh(r.importRaw),fmtKWh(r.dischargedGrid),fmtKWh(r.losses),fmt(r.cycles,2)].forEach(x=>tr.append(el('td','',x)));tb.append(tr)});table.append(tb);const sc=el('div','ps-timeline-scroll');sc.append(table);sec.append(sc);
-    sec.append(el('p','ps-footnote','Replay is een energetische upper-bound op basis van P1 en het afgesproken batterijmodel. Hij kent nog geen echte batterij-SOC, degradatiekosten, net-/fasebeperkingen of tariefwaarde per interval en is daarom geen gerealiseerde besparing.'));
+    sec.append(el('p','ps-footnote','Replay is een energetische upper-bound op basis van P1 en het afgesproken batterijmodel. Het financiële effect staat uitsluitend in de beslissamenvatting bovenaan, zodat er één financiële waarheid op deze pagina is.'));
     return sec;
   }
 
