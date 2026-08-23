@@ -1,7 +1,8 @@
 const OWNER = 'OnsKasteeltje';
 const REPO = 'homey-energy-manual';
 const BRANCH = 'main';
-const PATH = 'docs/data/tesla-deadline-command.json';
+const TESLA_PATH = 'docs/data/tesla-deadline-command.json';
+const EMS_SETTINGS_PATH = 'docs/data/ems-settings-command.json';
 const ALLOWED_ORIGIN = 'https://onskasteeltje.github.io';
 const KWH_PER_SOC_PERCENT = 0.55; // conservative interim calibration; first valid measured session = 0.5246 kWh/%
 
@@ -41,6 +42,43 @@ function round3(n) {
   return Math.round(Number(n) * 1000) / 1000;
 }
 
+async function writeJsonFile(env, path, value, message, origin) {
+  const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`;
+  const ghHeaders = {
+    'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'homey-energy-manual-control-worker'
+  };
+
+  let sha;
+  const current = await fetch(`${apiUrl}?ref=${encodeURIComponent(BRANCH)}`, { headers: ghHeaders });
+  if (current.ok) {
+    const meta = await current.json();
+    sha = meta.sha;
+  } else if (current.status !== 404) {
+    return json({ ok: false, error: 'github_read_failed', status: current.status }, 502, origin);
+  }
+
+  const payload = {
+    message,
+    content: toBase64(JSON.stringify(value, null, 2) + '\n'),
+    branch: BRANCH
+  };
+  if (sha) payload.sha = sha;
+
+  const written = await fetch(apiUrl, {
+    method: 'PUT',
+    headers: { ...ghHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!written.ok) {
+    const detail = await written.text();
+    return json({ ok: false, error: 'github_write_failed', status: written.status, detail: detail.slice(0, 300) }, 502, origin);
+  }
+  return null;
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
@@ -58,6 +96,26 @@ export default {
     let input;
     try { input = await request.json(); }
     catch { return json({ ok: false, error: 'invalid_json' }, 400, origin); }
+
+    if (input.kind === 'ems_settings') {
+      const contractType = String(input.contractType || '').trim().toUpperCase();
+      const hotWaterSource = String(input.hotWaterSource || '').trim().toUpperCase();
+      if (!['FIXED', 'DYNAMIC'].includes(contractType)) return json({ ok: false, error: 'invalid_contract_type' }, 400, origin);
+      if (!['BOILER', 'CV'].includes(hotWaterSource)) return json({ ok: false, error: 'invalid_hot_water_source' }, 400, origin);
+
+      const command = {
+        schema: 1,
+        kind: 'ems_settings',
+        requestId: crypto.randomUUID(),
+        requestedAt: new Date().toISOString(),
+        source: 'website',
+        contractType,
+        hotWaterSource
+      };
+      const failed = await writeJsonFile(env, EMS_SETTINGS_PATH, command, `Set EMS settings: ${contractType}, ${hotWaterSource}`, origin);
+      if (failed) return failed;
+      return json({ ok: true, command }, 200, origin);
+    }
 
     const active = input.active === true;
     let deadline = '';
@@ -96,40 +154,8 @@ export default {
       maxA
     };
 
-    const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
-    const ghHeaders = {
-      'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
-      'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'homey-energy-manual-tesla-worker'
-    };
-
-    let sha;
-    const current = await fetch(`${apiUrl}?ref=${encodeURIComponent(BRANCH)}`, { headers: ghHeaders });
-    if (current.ok) {
-      const meta = await current.json();
-      sha = meta.sha;
-    } else if (current.status !== 404) {
-      return json({ ok: false, error: 'github_read_failed', status: current.status }, 502, origin);
-    }
-
-    const payload = {
-      message: active ? `Set Tesla deadline ${currentSoc}% to ${targetSoc}% by ${deadline}` : 'Disable Tesla deadline',
-      content: toBase64(JSON.stringify(command, null, 2) + '\n'),
-      branch: BRANCH
-    };
-    if (sha) payload.sha = sha;
-
-    const written = await fetch(apiUrl, {
-      method: 'PUT',
-      headers: { ...ghHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!written.ok) {
-      const detail = await written.text();
-      return json({ ok: false, error: 'github_write_failed', status: written.status, detail: detail.slice(0, 300) }, 502, origin);
-    }
-
+    const failed = await writeJsonFile(env, TESLA_PATH, command, active ? `Set Tesla deadline ${currentSoc}% to ${targetSoc}% by ${deadline}` : 'Disable Tesla deadline', origin);
+    if (failed) return failed;
     return json({ ok: true, command }, 200, origin);
   }
 };
