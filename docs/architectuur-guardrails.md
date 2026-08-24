@@ -84,6 +84,38 @@ Voor iedere kandidaat-app, plugin of nieuwe integratie wordt vóór productiegeb
 | Is fail-safe/fail-closed gedrag duidelijk? | Vereist voor control |
 | Is de integratie observeerbaar/testbaar? | Vereist voor productie |
 
+## G4 — RC branching en change management
+
+**De gebruiker hoeft bij een wijzigingsverzoek niet zelf aan te geven of de wijziging op `main` of op de actieve RC-branch thuishoort. Branchselectie is onderdeel van de engineeringdiscipline.**
+
+Standaard geldt:
+
+- nieuwe functionaliteit, optimalisaties, refactoring, experimenten, documentatie van toekomstige architectuur en andere niet-noodzakelijke verbeteringen → `main`;
+- uitsluitend een defect dat aantoonbaar aanwezig is in de actieve RC én opgelost moet worden voordat die RC naar stable kan promoveren → actieve RC-branch;
+- bij twijfel → `main` en de RC blijft ongewijzigd;
+- een RC-fix is minimaal, gericht en bevat geen opportunistische refactoring of nieuwe functionaliteit;
+- na een RC-fix worden minimaal de geraakte regressie-/RC-criteria opnieuw gevalideerd;
+- iedere relevante RC-fix wordt ook teruggebracht naar `main`, zodat de ontwikkellijn de correctie niet verliest;
+- wijzigingen aan de RC worden expliciet gemeld voordat ze worden uitgevoerd wanneer uit het verzoek niet reeds ondubbelzinnig blijkt dat het om een release-blocking defect gaat.
+
+### Beslisregel
+
+```text
+Wijzigingsverzoek
+      │
+      ├─ nieuwe feature / verbetering / refactor / experiment? ──► main
+      │
+      └─ defect in actieve RC?
+             │
+             ├─ release-blocking en fix nodig vóór stable? ──► RC-fix
+             │                                             └──► daarna ook main
+             └─ nee / twijfel ─────────────────────────────► main
+```
+
+### Acceptatiecriterium
+
+Een wijziging op de RC is alleen toegestaan wanneer kan worden benoemd welk bestaand RC-gedrag defect is, waarom dit promotie naar stable blokkeert en welke gerichte validatie na de fix wordt uitgevoerd. Ontbreekt één van deze drie elementen, dan hoort de wijziging op `main`.
+
 ## Relatie met RC en toekomstige wijzigingen
 
 Deze guardrails veranderen geen bestaande RC-controlpaden op zichzelf. Zij gelden vanaf opname als verplichte architectuurtoets voor nieuwe wijzigingen en voor toekomstige herbeoordeling van bestaande integraties.
