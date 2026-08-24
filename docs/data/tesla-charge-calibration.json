@@ -2,7 +2,7 @@
   "schema": 1,
   "status": "COLLECTING",
   "targetValidSessions": 5,
-  "validSessions": 1,
+  "validSessions": 2,
   "operationalCalibrationKWhPerPercent": 0.59,
   "autoAdjustOperationalCalibration": false,
   "measurementBasis": "Easee wall-energy delta from immutable session baseline divided by user-confirmed Tesla SOC delta",
@@ -11,7 +11,8 @@
     "Start SOC comes from the user's deadline command or a user-confirmed SOC boundary; end SOC must be confirmed by the user from the Tesla app.",
     "Operational factor remains fixed at 0.59 kWh/% during the five-session calibration watch; interim observations do not change it.",
     "Five valid sessions are required before reporting average, median, range and a recommended wall-kWh/% calibration.",
-    "Charging losses are not added separately; the empirical wall-kWh/% factor already includes them implicitly."
+    "Charging losses are not added separately; the empirical wall-kWh/% factor already includes them implicitly.",
+    "Session 2 is a high outlier and must not change the operational factor before the five-session review."
   ],
   "sessions": [
     {
@@ -28,6 +29,22 @@
       "equalizerLimitation": "NOT_PROVEN; no limitation visible at end snapshot, but offered/current context was not fully clean during the session",
       "included": true,
       "notes": "Immutable lifetime-meter baseline/end pair used for the completed session. A later Homey snapshot showed the charger paused at 7781.01 kWh; that later movement is outside this captured calibration endpoint and is not added to this session."
+    },
+    {
+      "date": "2026-08-23",
+      "sessionType": "OPPORTUNITY_80_TO_90_SOC",
+      "enteredStartSoc": 80,
+      "confirmedEndSoc": 90,
+      "deltaSoc": 10,
+      "easeeMeterBaselineKWh": 7791.49,
+      "easeeMeterEndKWh": 7802.12,
+      "deliveredKWh": 10.63,
+      "wallKWhPerPercent": 1.063,
+      "requestedCurrentAObserved": 7,
+      "requestedMaxCurrentA": null,
+      "equalizerLimitation": "NOT_PROVEN; a 7 A charging sample at revision 1617 showed about 4.99 kW and no evidence of Equalizer reducing below the requested current at that sample. Session-wide limitation history is unavailable.",
+      "included": true,
+      "notes": "Start boundary is the user-confirmed 80% endpoint at Easee 7791.49 kWh. The user later confirmed current Tesla SOC 90% after the watch had observed Easee paused at 7802.12 kWh, making 7802.12 the contemporaneous immutable end boundary. Homey on 2026-08-24 04:48 local still showed Paused/0 W at 7802.13 kWh; the later 0.01 kWh meter increment is not added. This result is an unusually high outlier and should be reviewed together with the remaining sessions rather than used for interim operational adjustment."
     }
   ],
   "observations": [
@@ -54,25 +71,6 @@
       "requestedMaxCurrentA": 10,
       "included": false,
       "reason": "Start SOC 76% and end SOC 80% are user-confirmed for this charging session. The exact immutable Easee lifetime-meter baseline for this request has not yet been proven, so the session remains a pending calibration candidate until that baseline is reconstructed from request/audit history."
-    },
-    {
-      "date": "2026-08-23",
-      "sessionType": "OPPORTUNITY_AFTER_80_SOC",
-      "enteredStartSoc": 80,
-      "confirmedEndSoc": 90,
-      "reportedEndSocAt": "2026-08-23T22:57:00+02:00",
-      "deltaSocIfSingleContinuousBoundary": 10,
-      "easeeMeterBaselineKWh": 7791.49,
-      "easeeMeterEndKWh": 7795.62,
-      "deliveredKWh": 4.13,
-      "postSegmentMeterObservedKWh": 7802.12,
-      "easeeStatusAtCapture": "Paused",
-      "easeeChargingAtCapture": false,
-      "requestedCurrentAObserved": 7,
-      "requestedMaxCurrentA": null,
-      "equalizerLimitation": "NO_LIMITATION_OBSERVED_AT_SAMPLE; while charging at revision 1617 Tesla requested 7 A and delivered about 4.99 kW. No evidence of Equalizer reducing below the requested current in that sample; session-wide absence of limitation is not proven.",
-      "included": false,
-      "reason": "User confirmed current Tesla SOC 90%, but this SOC was supplied after later Easee meter movement beyond the captured 7795.62 kWh endpoint (a later watch observed 7802.12 kWh). Therefore 90% cannot be paired safely with the 7795.62 endpoint and the 4.13 kWh segment is not promoted to a valid calibration session. A new immutable end boundary contemporaneous with SOC 90% is required to validate the 80->90 interval."
     }
   ]
 }
