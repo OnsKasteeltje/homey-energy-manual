@@ -1,11 +1,11 @@
 {
   "schema": "EM2_PLANNER_SHADOW_PUBLISH_V0.1",
-  "publishedAt": "2026-08-24T10:46:30.385Z",
+  "publishedAt": "2026-08-24T11:01:30.598Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
   "plan": {
     "schema": "EM2_ENERGY_PLAN_24H_V0.2",
-    "generatedAt": "2026-08-24T10:45:45.408Z",
+    "generatedAt": "2026-08-24T11:00:45.561Z",
     "controlMode": "SHADOW",
     "readOnly": true,
     "physicalWritePerformed": false,
@@ -32,16 +32,16 @@
       ]
     },
     "inputs": {
-      "sourceRevision": 1864,
+      "sourceRevision": 1867,
       "contract": "DYNAMIC",
       "priceQuality": "GOOD",
       "priceFresh": true,
       "priceUsable": true,
-      "priceHorizonHours": 11.5,
+      "priceHorizonHours": 11.25,
       "pvForecast": {
         "quality": "SUMMARY_ONLY",
         "top4h": true,
-        "updatedAt": "2026-08-24T10:45:10.424Z",
+        "updatedAt": "2026-08-24T11:00:10.427Z",
         "note": "No detailed 15-min PV forecast used; no fabricated PV dispatch."
       },
       "tesla": {
@@ -53,27 +53,19 @@
         "note": "Price windows are ranked; exact Tesla slot kWh is not invented."
       },
       "warmWater": {
-        "goalReachedToday": false,
-        "remainingFallbackMin": 75,
+        "goalReachedToday": true,
+        "remainingFallbackMin": 0,
         "catchupRequired": false,
         "modeledPowerW": 1900,
-        "derivedEnergyKWh": 2.375,
+        "derivedEnergyKWh": 0,
         "deadlineLocal": "19:00"
       }
     },
     "plan": {
       "slotMinutes": 15,
       "horizonQuality": "PARTIAL",
-      "slotsAvailable": 46,
+      "slotsAvailable": 45,
       "actions": [
-        {
-          "start": "2026-08-24T10:45:00.000Z",
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "price": 0.0552,
-          "class": "CHEAP"
-        },
         {
           "start": "2026-08-24T11:00:00.000Z",
           "battery": "HOLD",
@@ -102,7 +94,7 @@
           "start": "2026-08-24T11:45:00.000Z",
           "battery": "CHARGE_CANDIDATE",
           "tesla": "HOLD",
-          "warmWater": "PREFERRED_BEFORE_19",
+          "warmWater": "HOLD",
           "price": 0.0262,
           "class": "CHEAP"
         },
@@ -110,7 +102,7 @@
           "start": "2026-08-24T12:00:00.000Z",
           "battery": "CHARGE_CANDIDATE",
           "tesla": "HOLD",
-          "warmWater": "PREFERRED_BEFORE_19",
+          "warmWater": "HOLD",
           "price": 0.0201,
           "class": "CHEAP"
         },
@@ -118,7 +110,7 @@
           "start": "2026-08-24T12:15:00.000Z",
           "battery": "CHARGE_CANDIDATE",
           "tesla": "HOLD",
-          "warmWater": "PREFERRED_BEFORE_19",
+          "warmWater": "HOLD",
           "price": 0.0298,
           "class": "CHEAP"
         },
@@ -126,7 +118,7 @@
           "start": "2026-08-24T12:30:00.000Z",
           "battery": "CHARGE_CANDIDATE",
           "tesla": "HOLD",
-          "warmWater": "PREFERRED_BEFORE_19",
+          "warmWater": "HOLD",
           "price": 0.0364,
           "class": "CHEAP"
         },
@@ -134,7 +126,7 @@
           "start": "2026-08-24T12:45:00.000Z",
           "battery": "CHARGE_CANDIDATE",
           "tesla": "HOLD",
-          "warmWater": "PREFERRED_BEFORE_19",
+          "warmWater": "HOLD",
           "price": 0.0336,
           "class": "CHEAP"
         },
@@ -184,7 +176,7 @@
           "tesla": "HOLD",
           "warmWater": "HOLD",
           "price": 0.0602,
-          "class": "NORMAL"
+          "class": "CHEAP"
         },
         {
           "start": "2026-08-24T14:30:00.000Z",
@@ -441,104 +433,63 @@
         "deadlineAt": "2026-08-23T16:00"
       },
       "warmWater": {
-        "allocatedSlots": [
-          {
-            "i": 5,
-            "start": "2026-08-24T12:00:00.000Z",
-            "end": "2026-08-24T12:15:00.000Z",
-            "price_eur_kwh": 0.0201,
-            "class": "CHEAP",
-            "allocatedKWh": 0.475
-          },
-          {
-            "i": 4,
-            "start": "2026-08-24T11:45:00.000Z",
-            "end": "2026-08-24T12:00:00.000Z",
-            "price_eur_kwh": 0.0262,
-            "class": "CHEAP",
-            "allocatedKWh": 0.475
-          },
-          {
-            "i": 6,
-            "start": "2026-08-24T12:15:00.000Z",
-            "end": "2026-08-24T12:30:00.000Z",
-            "price_eur_kwh": 0.0298,
-            "class": "CHEAP",
-            "allocatedKWh": 0.475
-          },
-          {
-            "i": 8,
-            "start": "2026-08-24T12:45:00.000Z",
-            "end": "2026-08-24T13:00:00.000Z",
-            "price_eur_kwh": 0.0336,
-            "class": "CHEAP",
-            "allocatedKWh": 0.475
-          },
-          {
-            "i": 7,
-            "start": "2026-08-24T12:30:00.000Z",
-            "end": "2026-08-24T12:45:00.000Z",
-            "price_eur_kwh": 0.0364,
-            "class": "CHEAP",
-            "allocatedKWh": 0.475
-          }
-        ],
+        "allocatedSlots": [],
         "unallocatedKWh": 0
       },
       "battery": {
         "mode": "THEORETICAL_ARBITRAGE_CANDIDATES_ONLY",
         "chargeCandidates": [
           {
-            "i": 5,
+            "i": 4,
             "start": "2026-08-24T12:00:00.000Z",
             "end": "2026-08-24T12:15:00.000Z",
             "price_eur_kwh": 0.0201,
             "class": "CHEAP"
           },
           {
-            "i": 4,
+            "i": 3,
             "start": "2026-08-24T11:45:00.000Z",
             "end": "2026-08-24T12:00:00.000Z",
             "price_eur_kwh": 0.0262,
             "class": "CHEAP"
           },
           {
-            "i": 6,
+            "i": 5,
             "start": "2026-08-24T12:15:00.000Z",
             "end": "2026-08-24T12:30:00.000Z",
             "price_eur_kwh": 0.0298,
             "class": "CHEAP"
           },
           {
-            "i": 8,
+            "i": 7,
             "start": "2026-08-24T12:45:00.000Z",
             "end": "2026-08-24T13:00:00.000Z",
             "price_eur_kwh": 0.0336,
             "class": "CHEAP"
           },
           {
-            "i": 7,
+            "i": 6,
             "start": "2026-08-24T12:30:00.000Z",
             "end": "2026-08-24T12:45:00.000Z",
             "price_eur_kwh": 0.0364,
             "class": "CHEAP"
           },
           {
-            "i": 3,
+            "i": 2,
             "start": "2026-08-24T11:30:00.000Z",
             "end": "2026-08-24T11:45:00.000Z",
             "price_eur_kwh": 0.0369,
             "class": "CHEAP"
           },
           {
-            "i": 9,
+            "i": 8,
             "start": "2026-08-24T13:00:00.000Z",
             "end": "2026-08-24T13:15:00.000Z",
             "price_eur_kwh": 0.0374,
             "class": "CHEAP"
           },
           {
-            "i": 2,
+            "i": 1,
             "start": "2026-08-24T11:15:00.000Z",
             "end": "2026-08-24T11:30:00.000Z",
             "price_eur_kwh": 0.0434,
@@ -547,56 +498,56 @@
         ],
         "dischargeCandidates": [
           {
-            "i": 29,
+            "i": 28,
             "start": "2026-08-24T18:00:00.000Z",
             "end": "2026-08-24T18:15:00.000Z",
             "price_eur_kwh": 0.2424,
             "class": "EXPENSIVE"
           },
           {
-            "i": 30,
+            "i": 29,
             "start": "2026-08-24T18:15:00.000Z",
             "end": "2026-08-24T18:30:00.000Z",
             "price_eur_kwh": 0.232,
             "class": "EXPENSIVE"
           },
           {
-            "i": 28,
+            "i": 27,
             "start": "2026-08-24T17:45:00.000Z",
             "end": "2026-08-24T18:00:00.000Z",
             "price_eur_kwh": 0.2249,
             "class": "EXPENSIVE"
           },
           {
-            "i": 31,
+            "i": 30,
             "start": "2026-08-24T18:30:00.000Z",
             "end": "2026-08-24T18:45:00.000Z",
             "price_eur_kwh": 0.218,
             "class": "EXPENSIVE"
           },
           {
-            "i": 32,
+            "i": 31,
             "start": "2026-08-24T18:45:00.000Z",
             "end": "2026-08-24T19:00:00.000Z",
             "price_eur_kwh": 0.2121,
             "class": "EXPENSIVE"
           },
           {
-            "i": 25,
+            "i": 24,
             "start": "2026-08-24T17:00:00.000Z",
             "end": "2026-08-24T17:15:00.000Z",
             "price_eur_kwh": 0.212,
             "class": "EXPENSIVE"
           },
           {
-            "i": 27,
+            "i": 26,
             "start": "2026-08-24T17:30:00.000Z",
             "end": "2026-08-24T17:45:00.000Z",
             "price_eur_kwh": 0.2061,
             "class": "EXPENSIVE"
           },
           {
-            "i": 34,
+            "i": 33,
             "start": "2026-08-24T19:15:00.000Z",
             "end": "2026-08-24T19:30:00.000Z",
             "price_eur_kwh": 0.1997,
@@ -704,16 +655,16 @@
             "maxDischargeAcKWhPerSlot": 0.825
           },
           {
-            "chargeStart": "2026-08-24T10:45:00.000Z",
+            "chargeStart": "2026-08-24T14:15:00.000Z",
             "dischargeStart": "2026-08-24T16:45:00.000Z",
-            "chargePrice": 0.0552,
+            "chargePrice": 0.0602,
             "dischargePrice": 0.1837,
-            "netValuePerGridKWh": 0.1106,
+            "netValuePerGridKWh": 0.1056,
             "maxChargeGridKWhPerSlot": 0.825,
             "maxDischargeAcKWhPerSlot": 0.825
           }
         ],
-        "theoreticalUpperBoundEuro": 1.57,
+        "theoreticalUpperBoundEuro": 1.55,
         "note": "Upper bound is not a realized savings forecast; actual SOC, household load and detailed PV forecast are missing."
       }
     },
@@ -732,17 +683,17 @@
   },
   "status": {
     "status": "READY_SHADOW_SCENARIO",
-    "at": "2026-08-24T10:45:45.408Z",
+    "at": "2026-08-24T11:00:45.561Z",
     "version": "EM2_ENERGY_PLAN_24H_V0.2",
     "scenario": "VICTRON_3X_US5000_SHADOW_V0.1",
     "scenarioConfigured": true,
     "contract": "DYNAMIC",
     "priceUsable": true,
-    "horizonHours": 11.5,
+    "horizonHours": 11.25,
     "horizonQuality": "PARTIAL",
     "teslaObligation": false,
-    "wwObligation": true,
-    "theoreticalBatteryUpperBoundEuro": 1.57,
+    "wwObligation": false,
+    "theoreticalBatteryUpperBoundEuro": 1.55,
     "noActuatorWrites": true
   }
 }
