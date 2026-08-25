@@ -8,7 +8,7 @@ sources:
   - Homey Advanced Flow: EM v2 | 45 Planner | 24h Energy Plan v0.2 SHADOW
   - Homey Advanced Flow: EM v2 | 20 Power Intent | P1 v0.2 SHADOW
   - Homey Advanced Flow: EM v2 | 60 Adapter | EV Power v0.1 SHADOW
-  - Homey Advanced Flow: EM v2 | 60 Adapter | Actuator Commands v0.1 SHADOW
+  - Homey Advanced Flow: EM v2 | 60 Adapter | Actuator Commands v0.2 SHADOW
 ---
 
 # 24h Energy Planner and Power Intent
@@ -141,17 +141,20 @@ Voorbeeldstatussen:
 - `WAITING_FOR_ELECTRICAL_CONTEXT`
 - `REVISION_MISMATCH`
 
-## 8. Bekende integratie-afwijking
+## 8. Generieke Actuator Commands v0.2 SHADOW
 
-`EM v2 | 60 Adapter | Actuator Commands v0.1 SHADOW` valideert momenteel uitsluitend:
+De eerder aangetroffen schema-mismatch is op 2026-08-25 gecorrigeerd in de live Homey-flow `EM v2 | 60 Adapter | Actuator Commands v0.2 SHADOW`.
 
-`intent.schema === EM2_POWER_INTENT_V0.1`
+De adapter accepteert nu expliciet beide overgangsschema's:
 
-De live Power Intent producer schrijft echter `EM2_POWER_INTENT_V0.2`.
+- `EM2_POWER_INTENT_V0.1`;
+- `EM2_POWER_INTENT_V0.2`.
 
-Daarom is deze generieke adapter op dit moment schema-incompatibel en zal hij voor de actuele Power Intent `INVALID_POWER_INTENT` publiceren.
+De output is opgehoogd naar `EM2_ACTUATOR_COMMANDS_V0.2` en bevat `inputSchema` voor traceerbaarheid. Dedupe gebeurt op source revision én input schema, zodat een schema-overgang niet door een eerder geldig resultaat met dezelfde revision kan worden onderdrukt.
 
-Dit is geen probleem voor de aparte EV Power Adapter, omdat die zowel v0.1 als v0.2 accepteert. Voor een toekomstige generieke actuator-cut-over moet `Actuator Commands` eerst expliciet naar Power Intent v0.2 worden bijgewerkt en gevalideerd.
+De generieke adapter blijft bewust geen EV W->A-conversie uitvoeren. Voor EV wordt de elektrische vertaling gedelegeerd aan de gekalibreerde `EV Power Adapter v0.1`; warm water wordt alleen binair vertaald en batterij blijft SHADOW/NOT_INTEGRATED.
+
+Een expliciete runtime-start van v0.2 is succesvol uitgevoerd. De beschikbare Homey-connector exposeert geen directe Logic-variable readback, waardoor de resulterende `EM2_Actuator_Commands`-JSON in deze validatiestap niet afzonderlijk kon worden teruggelezen. De flow zelf is enabled, not broken en de handmatige run werd door Homey succesvol geaccepteerd.
 
 ## 9. Single-writer boundary
 
@@ -184,7 +187,7 @@ Deze laag moet altijd voldoen aan:
 | 24h Planner v0.2 | ACTIVE SHADOW |
 | Power Intent v0.2 | ACTIVE SHADOW |
 | EV Power Adapter v0.1 | ACTIVE SHADOW, v0.2 compatible |
-| Actuator Commands v0.1 | ACTIVE SHADOW, schema mismatch met Power Intent v0.2 |
+| Actuator Commands v0.2 | ACTIVE SHADOW, Power Intent v0.1/v0.2 compatible |
 | EV fysieke writer via nieuwe adapterketen | NIET ACTIEF |
 | Victron fysieke writer | NIET ACTIEF |
 | WW fysieke writer via nieuwe adapterketen | NIET ACTIEF |

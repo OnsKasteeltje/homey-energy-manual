@@ -74,18 +74,26 @@ flowchart TD
     L --> M[No Easee write]
 ```
 
-## 5. Generieke adapter schema mismatch
+## 5. Generieke Actuator Commands v0.2
 
 ```mermaid
 flowchart TD
     A[Power Intent producer] --> B[EM2_POWER_INTENT_V0.2]
-    B --> C[Actuator Commands v0.1]
-    C --> D{Schema == V0.1?}
+    B --> C[Actuator Commands v0.2]
+    C --> D{Schema V0.1 or V0.2?}
     D -->|No| E[INVALID_POWER_INTENT]
-    B --> F[EV Power Adapter v0.1]
-    F --> G{Schema V0.1 or V0.2?}
-    G -->|Yes| H[Continue translation]
+    D -->|Yes| F{intent valid + deviceWrites false + revision present?}
+    F -->|No| E
+    F -->|Yes| G[Publish EM2_ACTUATOR_COMMANDS_V0.2]
+    G --> H[EV translation delegated to EV Power Adapter]
+    G --> I[WW binary shadow translation]
+    G --> J[Battery shadow / not integrated]
+    H --> K[No physical writes]
+    I --> K
+    J --> K
 ```
+
+Dedupe gebruikt `sourceRevision + inputSchema`. Daarmee is de eerdere V0.1-only schema-mismatch opgelost zonder de SHADOW-boundary te wijzigen.
 
 ## 6. Beoogde cut-overgrens
 
