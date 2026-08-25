@@ -8,6 +8,8 @@ on:
       - 'scripts/qa_software_architecture.py'
       - 'scripts/generate_process_diagrams.py'
       - 'scripts/migrate_legacy_mermaid.py'
+      - 'scripts/build_architecture_publication.py'
+      - 'scripts/mermaid-puppeteer-config.json'
       - '.github/workflows/software-architecture-build.yml'
   push:
     branches: [main]
@@ -17,6 +19,8 @@ on:
       - 'scripts/qa_software_architecture.py'
       - 'scripts/generate_process_diagrams.py'
       - 'scripts/migrate_legacy_mermaid.py'
+      - 'scripts/build_architecture_publication.py'
+      - 'scripts/mermaid-puppeteer-config.json'
       - '.github/workflows/software-architecture-build.yml'
   workflow_dispatch:
 
@@ -34,6 +38,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc libreoffice-writer
+          npm install --global @mermaid-js/mermaid-cli
 
       - name: Reject legacy hand-maintained Mermaid
         run: python3 scripts/migrate_legacy_mermaid.py --check
@@ -52,18 +57,37 @@ jobs:
           test -s docs/software-architecture/generated/software-architecture.md
           grep -q '^# Softwarearchitectuur Home Energy Management System$' docs/software-architecture/generated/software-architecture.md
 
-      - name: Build DOCX
+      - name: Build publication Markdown and render diagrams
+        run: python3 scripts/build_architecture_publication.py
+
+      - name: Build publication DOCX
         run: |
-          mkdir -p build
           pandoc \
-            docs/software-architecture/generated/software-architecture.md \
+            build/software-architecture-publication.md \
             --from=gfm \
             --to=docx \
+            --resource-path=build \
             --toc \
             --number-sections \
             --metadata title='Softwarearchitectuur Home Energy Management System' \
             --output=build/Softwarearchitectuur_Home_Energy_Management_System.docx
           test -s build/Softwarearchitectuur_Home_Energy_Management_System.docx
+
+      - name: Verify publication source is hidden
+        run: |
+          pandoc build/Softwarearchitectuur_Home_Energy_Management_System.docx -t plain > /tmp/publication.txt
+          if grep -q '"kind": "mermaid-source"' /tmp/publication.txt; then
+            echo 'FAIL: process-model source leaked into publication DOCX'
+            exit 1
+          fi
+          if grep -q 'GENERATED_MERMAID:' /tmp/publication.txt; then
+            echo 'FAIL: generated marker leaked into publication DOCX'
+            exit 1
+          fi
+          if grep -q '^flowchart ' /tmp/publication.txt; then
+            echo 'FAIL: Mermaid source leaked into publication DOCX'
+            exit 1
+          fi
 
       - name: Build PDF from DOCX
         run: |
@@ -82,6 +106,7 @@ jobs:
           name: software-architecture
           path: |
             docs/software-architecture/generated/software-architecture.md
+            build/software-architecture-publication.md
             build/Softwarearchitectuur_Home_Energy_Management_System.docx
             build/Softwarearchitectuur_Home_Energy_Management_System.pdf
           if-no-files-found: error
