@@ -6,6 +6,7 @@ on:
       - 'docs/software-architecture/**'
       - 'scripts/build_software_architecture.py'
       - 'scripts/qa_software_architecture.py'
+      - 'scripts/generate_process_diagrams.py'
       - '.github/workflows/software-architecture-build.yml'
   push:
     branches: [main]
@@ -13,6 +14,7 @@ on:
       - 'docs/software-architecture/**'
       - 'scripts/build_software_architecture.py'
       - 'scripts/qa_software_architecture.py'
+      - 'scripts/generate_process_diagrams.py'
       - '.github/workflows/software-architecture-build.yml'
   workflow_dispatch:
 
@@ -30,6 +32,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc libreoffice-writer
+
+      - name: Verify process diagrams are generated from process-model
+        run: python3 scripts/generate_process_diagrams.py --check
 
       - name: Build master Markdown
         run: python3 scripts/build_software_architecture.py
