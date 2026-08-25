@@ -6,14 +6,18 @@ import json,re,sys
 ROOT=Path(__file__).resolve().parents[1]
 FLOW_ROOT=ROOT/'docs'/'software-architecture'/'flows'
 MODEL_RE=re.compile(r'```process-model\s*\n(.*?)\n```',re.S)
-GEN_RE=re.compile(r'<!-- GENERATED_MERMAID:(?P<id>[A-Za-z0-9_.-]+) START -->.*?<!-- GENERATED_MERMAID:(?P=id) END -->',re.S)
 
 def esc(s:str)->str:
     return s.replace('"','\\"')
 
 def render(model:dict)->str:
-    mid=model['id']; direction=model.get('direction','TD'); nodes=model['nodes']; edges=model['edges']
-    lines=[f'```mermaid',f'flowchart {direction}']
+    mid=model['id']
+    if model.get('kind')=='mermaid-source':
+        declaration=model.get('declaration','flowchart TD')
+        lines=['```mermaid',declaration,*model.get('lines',[]),'```']
+        return f'<!-- GENERATED_MERMAID:{mid} START -->\n'+"\n".join(lines)+f'\n<!-- GENERATED_MERMAID:{mid} END -->'
+    direction=model.get('direction','TD'); nodes=model['nodes']; edges=model['edges']
+    lines=['```mermaid',f'flowchart {direction}']
     ids={n['id'] for n in nodes}
     for n in nodes:
         nid=n['id']; label=esc(n['label']); typ=n.get('type','step')

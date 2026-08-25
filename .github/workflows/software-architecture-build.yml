@@ -7,6 +7,7 @@ on:
       - 'scripts/build_software_architecture.py'
       - 'scripts/qa_software_architecture.py'
       - 'scripts/generate_process_diagrams.py'
+      - 'scripts/migrate_legacy_mermaid.py'
       - '.github/workflows/software-architecture-build.yml'
   push:
     branches: [main]
@@ -15,6 +16,7 @@ on:
       - 'scripts/build_software_architecture.py'
       - 'scripts/qa_software_architecture.py'
       - 'scripts/generate_process_diagrams.py'
+      - 'scripts/migrate_legacy_mermaid.py'
       - '.github/workflows/software-architecture-build.yml'
   workflow_dispatch:
 
@@ -32,6 +34,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc libreoffice-writer
+
+      - name: Reject legacy hand-maintained Mermaid
+        run: python3 scripts/migrate_legacy_mermaid.py --check
 
       - name: Verify process diagrams are generated from process-model
         run: python3 scripts/generate_process_diagrams.py --check
