@@ -1,0 +1,40 @@
+name: Software Architecture Build
+
+on:
+  pull_request:
+    paths:
+      - 'docs/software-architecture/**'
+      - 'scripts/build_software_architecture.py'
+      - '.github/workflows/software-architecture-build.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/software-architecture/**'
+      - 'scripts/build_software_architecture.py'
+      - '.github/workflows/software-architecture-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build master Markdown
+        run: python3 scripts/build_software_architecture.py
+
+      - name: Verify generated artifact
+        run: |
+          test -s docs/software-architecture/generated/software-architecture.md
+          grep -q '^# Softwarearchitectuur Home Energy Management System$' docs/software-architecture/generated/software-architecture.md
+
+      - name: Upload master Markdown
+        uses: actions/upload-artifact@v4
+        with:
+          name: software-architecture-markdown
+          path: docs/software-architecture/generated/software-architecture.md
+          if-no-files-found: error
