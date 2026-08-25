@@ -1,12 +1,12 @@
 {
   "schema": "EM2_CONTRACT_HISTORY_V0.2",
-  "generatedAt": "2026-08-25T14:15:00.893Z",
+  "generatedAt": "2026-08-25T14:45:01.090Z",
   "intervalMin": 15,
   "maxSamples": 672,
   "readOnly": true,
   "idempotency": {
     "key": "UTC_15_MIN_SLOT",
-    "slotId": 1986297,
+    "slotId": 1986299,
     "upsert": true,
     "replacedInSlot": 0
   },
@@ -25245,6 +25245,71 @@
       },
       "production": {
         "stateRevision": 2169,
+        "teslaIntent": "HOLD",
+        "warmWaterAction": "BOILER_OFF"
+      },
+      "comparison": {
+        "sameRevision": false,
+        "teslaAgree": true,
+        "warmWaterAgree": true
+      }
+    },
+    {
+      "ts": "2026-08-25T14:45:01.090Z",
+      "slotId": 1986299,
+      "contractType": "DYNAMIC",
+      "price": {
+        "source": "PBTH_DAP15_DIRECT_CLASSIFIER",
+        "quality": "GOOD",
+        "updatedAt": "2026-08-25T14:30:02.223Z",
+        "importNow": 0.1001,
+        "exportNow": 0.1001,
+        "negative": false,
+        "cheapNext4h": false,
+        "expensiveNext4h": false,
+        "horizon": "FULL",
+        "horizonHours": 31.75
+      },
+      "candidate": {
+        "status": {
+          "status": "OK",
+          "at": "2026-08-25T14:40:00.325Z",
+          "version": "v0.2",
+          "contract": "DYNAMIC",
+          "priceSource": "PBTH_DAP15_DIRECT_CLASSIFIER",
+          "priceQuality": "GOOD",
+          "priceFresh": true,
+          "priceUsable": true,
+          "sourceRevision": 2174,
+          "gridMeasurementValid": true,
+          "derivedHouseBalanceValid": false
+        },
+        "tesla": {
+          "revision": 2174,
+          "priority": "MAY",
+          "intent": "HOLD",
+          "reason": "Geen harde verplichting of sterke opportunity"
+        },
+        "warmWater": {
+          "priority": "MUST",
+          "action": "BOILER_OFF",
+          "opportunity": "GOAL_REACHED",
+          "reason": "Dagdoel bereikt"
+        },
+        "wwSourceAdvice": {
+          "schema": "EM2_WW_SOURCE_ADVICE_DEPRECATED",
+          "generatedAt": "2026-08-24T19:43:05.394Z",
+          "status": "SUPERSEDED_BY_SEASONAL_V0.2",
+          "advice": "KEEP_CURRENT",
+          "productionSource": "BOILER",
+          "productionModeLeading": true,
+          "readOnly": true,
+          "deviceWrites": false,
+          "reason": "15-minute BOILER/CV source advice is retired; use EM2_WW_Seasonal_Advice. WW_Boilermodus remains operational truth."
+        }
+      },
+      "production": {
+        "stateRevision": 2175,
         "teslaIntent": "HOLD",
         "warmWaterAction": "BOILER_OFF"
       },
