@@ -1,6 +1,6 @@
 ---
 component: architecture
- title: Architectuurprincipes
+title: Architectuurprincipes
 version: 0.1.0
 status: active
 architecture_status: implemented
