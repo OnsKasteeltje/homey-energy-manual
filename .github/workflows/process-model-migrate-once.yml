@@ -17,6 +17,8 @@ jobs:
           ref: docs/process-model-generator
       - name: Migrate legacy Mermaid
         run: python3 scripts/migrate_legacy_mermaid.py
+      - name: Regenerate all managed diagrams
+        run: python3 scripts/generate_process_diagrams.py
       - name: Verify generated diagrams
         run: python3 scripts/generate_process_diagrams.py --check
       - name: Commit migrated flows
