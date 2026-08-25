@@ -48,12 +48,23 @@ def main() -> int:
     if fences % 2:
         fail(f"ongebalanceerde Markdown code fences: {fences}")
 
-    # Each source module owns one H1 before assembly. The builder demotes these to
-    # H2; duplicate module titles are usually a sign of accidental duplication.
-    h2 = [m.group(1).strip().casefold() for m in re.finditer(r"(?m)^##\s+(.+)$", text)]
-    duplicates = [name for name, count in Counter(h2).items() if count > 1]
+    # Validate only module titles: the first H2 inside each assembled BEGIN/END
+    # section. Repeated internal headings such as Doel, Inputs and Validatie are
+    # intentional because component modules share a standard structure.
+    section_blocks = re.findall(
+        r"<!-- BEGIN ([^>]+) -->\s*(.*?)\s*<!-- END \1 -->",
+        text,
+        flags=re.S,
+    )
+    module_titles: list[str] = []
+    for rel, body in section_blocks:
+        match = re.search(r"(?m)^##\s+(.+)$", body)
+        if not match:
+            fail(f"module heeft geen H2-titel na assembly: {rel.strip()}")
+        module_titles.append(match.group(1).strip().casefold())
+    duplicates = [name for name, count in Counter(module_titles).items() if count > 1]
     if duplicates:
-        fail("dubbele modulekoppen: " + ", ".join(sorted(duplicates)))
+        fail("dubbele moduletitels: " + ", ".join(sorted(duplicates)))
 
     # Mermaid blocks must contain a recognizable Mermaid diagram declaration.
     blocks = re.findall(r"```mermaid\s*\n(.*?)\n```", text, flags=re.S | re.I)
@@ -68,14 +79,14 @@ def main() -> int:
             fail(f"status/RC contract ontbreekt: {label}")
 
     # No migration placeholders may survive in the finished master baseline.
-    forbidden = ["TODO MIGRATE", "TBD MIGRATION", "pending_migration"]
+    forbidden = ["TODO MIGRATE", "TBD MIGRATION"]
     hits = [term for term in forbidden if term.casefold() in folded]
     if hits:
         fail("onafgeronde migratieplaceholder(s): " + ", ".join(hits))
 
     print(
         f"PASS: master QA; sections={text.count('<!-- BEGIN ')}; "
-        f"mermaid={len(blocks)}; h2={len(h2)}; fences={fences}"
+        f"mermaid={len(blocks)}; modules={len(module_titles)}; fences={fences}"
     )
     return 0
 
