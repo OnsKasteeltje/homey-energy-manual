@@ -14,4 +14,4 @@ CI voert twee guards uit:
 - `scripts/migrate_legacy_mermaid.py --check` faalt als een handmatig Mermaid-blok buiten generated markers wordt toegevoegd.
 - `scripts/generate_process_diagrams.py --check` faalt als generated Mermaid afwijkt van het process-model.
 
-Bij inhoudelijke aanpassing van een gemigreerde `mermaid-source` flow verdient omzetting naar het semantische `nodes`/`edges` model de voorkeur.
+Bij inhoudelijke aanpassing van een gemigreerde `mermaid-source` flow verdient omzetting naar het semantische `nodes`/`edges` model de voorkeur. Nieuwe beslislogica wordt direct als semantisch model toegevoegd en niet eerst als handmatig Mermaid-diagram.
