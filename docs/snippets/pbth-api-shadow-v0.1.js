@@ -1,6 +1,6 @@
 // PBTH API Adapter v0.1 — SHADOW / READ-ONLY
 // Doel: valideer de lokale PBTH DAP15 API zonder Logic- of devicewrites.
-// Broncontract: GET /api/app/com.gruijter.powerhour/dap-prices
+// Broncontract: PBTH inter-app GET /dap-prices via Homey.apps.getApp().
 
 const SCHEMA = 'EM2_PBTH_API_SHADOW_V0.1';
 const NL_ZONE = '10YNL----------L';
@@ -29,7 +29,8 @@ function fail(code, detail, extra = {}) {
 
 let data;
 try {
-  data = await Homey.api('GET', '/api/app/com.gruijter.powerhour/dap-prices');
+  const pbth = await Homey.apps.getApp({ id: 'com.gruijter.powerhour' });
+  data = await pbth.get({ path: '/dap-prices' });
 } catch (err) {
   const result = fail('PBTH_API_ERROR', String(err?.message || err));
   log(JSON.stringify(result, null, 2));
@@ -134,9 +135,8 @@ if (errors.length > 0) {
   return result;
 }
 
-const firstMs = isoMs(normalized[0].time);
 const lastMs = isoMs(normalized[normalized.length - 1].time);
-const horizonHours = firstMs !== null && lastMs !== null
+const horizonHours = lastMs !== null
   ? ((lastMs + SLOT_MS) - Date.now()) / 3600000
   : null;
 
