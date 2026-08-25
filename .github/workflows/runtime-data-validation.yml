@@ -11,20 +11,47 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: runtime-data-validation
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.13.15"
+
+      - name: Synchronize Energy State contract version
+        run: python scripts/sync_energy_contract.py
+
       - name: Validate repository and Energy State contract
         run: python scripts/validate_repository.py
+
+      - name: Persist synchronized canonical contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- docs/data/energy-state-v2.schema.json; then
+            echo "Canonical Energy State contract already current."
+            exit 0
+          fi
+          VERSION="$(python - <<'PY'
+          import json
+          print(json.load(open('docs/data/energy-state-v2.json'))['meta']['schema_version'])
+          PY
+          )"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data/energy-state-v2.schema.json
+          git commit -m "chore: sync Energy State contract ${VERSION}"
+          git pull --rebase origin main
+          git push origin HEAD:main
