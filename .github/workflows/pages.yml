@@ -8,6 +8,7 @@ on:
       - 'frontend-version.txt'
       - 'mkdocs.yml'
       - 'scripts/build_frontend_bundles.py'
+      - 'scripts/sync_energy_contract.py'
       - 'docs/javascripts/**'
       - 'docs/stylesheets/**'
       - 'docs/service-worker.js'
@@ -54,6 +55,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.lock
           pip check
+
+      - name: Synchronize Energy State contract version
+        run: python scripts/sync_energy_contract.py
 
       - name: Run Python tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v
