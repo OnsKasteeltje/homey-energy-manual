@@ -5,12 +5,14 @@ on:
     paths:
       - 'docs/software-architecture/**'
       - 'scripts/build_software_architecture.py'
+      - 'scripts/qa_software_architecture.py'
       - '.github/workflows/software-architecture-build.yml'
   push:
     branches: [main]
     paths:
       - 'docs/software-architecture/**'
       - 'scripts/build_software_architecture.py'
+      - 'scripts/qa_software_architecture.py'
       - '.github/workflows/software-architecture-build.yml'
   workflow_dispatch:
 
@@ -24,17 +26,52 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install document toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc libreoffice-writer
+
       - name: Build master Markdown
         run: python3 scripts/build_software_architecture.py
 
-      - name: Verify generated artifact
+      - name: QA master Markdown
+        run: python3 scripts/qa_software_architecture.py
+
+      - name: Verify generated Markdown
         run: |
           test -s docs/software-architecture/generated/software-architecture.md
           grep -q '^# Softwarearchitectuur Home Energy Management System$' docs/software-architecture/generated/software-architecture.md
 
-      - name: Upload master Markdown
+      - name: Build DOCX
+        run: |
+          mkdir -p build
+          pandoc \
+            docs/software-architecture/generated/software-architecture.md \
+            --from=gfm \
+            --to=docx \
+            --toc \
+            --number-sections \
+            --metadata title='Softwarearchitectuur Home Energy Management System' \
+            --output=build/Softwarearchitectuur_Home_Energy_Management_System.docx
+          test -s build/Softwarearchitectuur_Home_Energy_Management_System.docx
+
+      - name: Build PDF from DOCX
+        run: |
+          mkdir -p /tmp/lo-profile
+          libreoffice \
+            -env:UserInstallation=file:///tmp/lo-profile \
+            --headless \
+            --convert-to pdf \
+            --outdir build \
+            build/Softwarearchitectuur_Home_Energy_Management_System.docx
+          test -s build/Softwarearchitectuur_Home_Energy_Management_System.pdf
+
+      - name: Upload architecture artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: software-architecture-markdown
-          path: docs/software-architecture/generated/software-architecture.md
+          name: software-architecture
+          path: |
+            docs/software-architecture/generated/software-architecture.md
+            build/Softwarearchitectuur_Home_Energy_Management_System.docx
+            build/Softwarearchitectuur_Home_Energy_Management_System.pdf
           if-no-files-found: error
