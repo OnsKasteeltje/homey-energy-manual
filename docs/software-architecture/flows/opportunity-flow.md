@@ -102,7 +102,8 @@ flowchart LR
   W[EM2_Control_WW]
   P[EM2_Public_State]
   R{Revisions aligned?}
-  Z[REVISION_MISMATCH\nEV target 0 W]
+  Z[REVISION_MISMATCH
+EV target 0 W]
   I{Decision intent}
   X[target_W = flex_export_budget]
   Y[target_W = discretionary_import_budget]

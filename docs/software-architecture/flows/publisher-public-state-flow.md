@@ -11,47 +11,126 @@ source:
 
 ## 1. Publisher runtime
 
+```process-model
+{
+  "id": "publisher-public-state-flow-1",
+  "kind": "mermaid-source",
+  "declaration": "flowchart TD",
+  "lines": [
+    "    A[Every 5 min] --> B[Delay 60 s]",
+    "    X[Manual start] --> C[Read Homey Logic variables]",
+    "    B --> C",
+    "    C --> D{EM2_Public_State.meta present?}",
+    "    D -->|No| E[Publish_Due=true\\nBLOCKED_PUBLIC_STATE_MISSING]",
+    "    D -->|Yes| F[Enrich tesla.deadline_status]",
+    "    F --> G{state_revision numeric?}",
+    "    G -->|No| H[Publish_Due=true\\nBLOCKED_REVISION_MISSING]",
+    "    G -->|Yes| I{GitHub token present?}",
+    "    I -->|No| J[Publish_Due=true\\nBLOCKED_TOKEN_MISSING]",
+    "    I -->|Yes| K{Revision pending OR heartbeat >=6 min OR forced?}",
+    "    K -->|No| L[SKIP_CURRENT]",
+    "    K -->|Yes| M[Set generated_at / heartbeat_at / publish_reason]",
+    "    M --> N[GET current GitHub file SHA]",
+    "    N --> O{GET 200 or 404?}",
+    "    O -->|No| P[Publish_Due=true\\nGITHUB_GET_ERROR]",
+    "    O -->|Yes| Q[PUT energy-state-v2.json]",
+    "    Q --> R{PUT success?}",
+    "    R -->|No| S[Publish_Due=true\\nGITHUB_PUT_ERROR]",
+    "    R -->|Yes| T[Rewrite EM2_Public_State with published payload]",
+    "    T --> U[Update Last Publish + Revision + Version]",
+    "    U --> V[Publish_Due=false\\nPUBLISHED]"
+  ]
+}
+```
+
+<!-- GENERATED_MERMAID:publisher-public-state-flow-1 START -->
 ```mermaid
 flowchart TD
     A[Every 5 min] --> B[Delay 60 s]
     X[Manual start] --> C[Read Homey Logic variables]
     B --> C
     C --> D{EM2_Public_State.meta present?}
-    D -->|No| E[Publish_Due=true\nBLOCKED_PUBLIC_STATE_MISSING]
+    D -->|No| E[Publish_Due=true
+BLOCKED_PUBLIC_STATE_MISSING]
     D -->|Yes| F[Enrich tesla.deadline_status]
     F --> G{state_revision numeric?}
-    G -->|No| H[Publish_Due=true\nBLOCKED_REVISION_MISSING]
+    G -->|No| H[Publish_Due=true
+BLOCKED_REVISION_MISSING]
     G -->|Yes| I{GitHub token present?}
-    I -->|No| J[Publish_Due=true\nBLOCKED_TOKEN_MISSING]
+    I -->|No| J[Publish_Due=true
+BLOCKED_TOKEN_MISSING]
     I -->|Yes| K{Revision pending OR heartbeat >=6 min OR forced?}
     K -->|No| L[SKIP_CURRENT]
     K -->|Yes| M[Set generated_at / heartbeat_at / publish_reason]
     M --> N[GET current GitHub file SHA]
     N --> O{GET 200 or 404?}
-    O -->|No| P[Publish_Due=true\nGITHUB_GET_ERROR]
+    O -->|No| P[Publish_Due=true
+GITHUB_GET_ERROR]
     O -->|Yes| Q[PUT energy-state-v2.json]
     Q --> R{PUT success?}
-    R -->|No| S[Publish_Due=true\nGITHUB_PUT_ERROR]
+    R -->|No| S[Publish_Due=true
+GITHUB_PUT_ERROR]
     R -->|Yes| T[Rewrite EM2_Public_State with published payload]
     T --> U[Update Last Publish + Revision + Version]
-    U --> V[Publish_Due=false\nPUBLISHED]
+    U --> V[Publish_Due=false
+PUBLISHED]
 ```
+<!-- GENERATED_MERMAID:publisher-public-state-flow-1 END -->
 
 ## 2. Downstream revision boundary
 
+```process-model
+{
+  "id": "publisher-public-state-flow-2",
+  "kind": "mermaid-source",
+  "declaration": "flowchart TD",
+  "lines": [
+    "    A[Publisher rewrites EM2_Public_State] --> B[Power Intent variable_changed trigger]",
+    "    B --> C[Read Public State + EM2_State + Decision + WW Control]",
+    "    C --> D{pubRev == stateRev == decisionRev == wwRev?}",
+    "    D -->|No| E[EM2_POWER_INTENT_V0.2\\nvalid=false\\nREVISION_MISMATCH\\nEV target 0 W]",
+    "    D -->|Yes| F[Project Core policy to numeric/binary targets]",
+    "    F --> G[EM2_POWER_INTENT_V0.2\\nvalid=true]",
+    "    G --> H[Actuator adapters in SHADOW]"
+  ]
+}
+```
+
+<!-- GENERATED_MERMAID:publisher-public-state-flow-2 START -->
 ```mermaid
 flowchart TD
     A[Publisher rewrites EM2_Public_State] --> B[Power Intent variable_changed trigger]
     B --> C[Read Public State + EM2_State + Decision + WW Control]
     C --> D{pubRev == stateRev == decisionRev == wwRev?}
-    D -->|No| E[EM2_POWER_INTENT_V0.2\nvalid=false\nREVISION_MISMATCH\nEV target 0 W]
+    D -->|No| E[EM2_POWER_INTENT_V0.2
+valid=false
+REVISION_MISMATCH
+EV target 0 W]
     D -->|Yes| F[Project Core policy to numeric/binary targets]
-    F --> G[EM2_POWER_INTENT_V0.2\nvalid=true]
+    F --> G[EM2_POWER_INTENT_V0.2
+valid=true]
     G --> H[Actuator adapters in SHADOW]
 ```
+<!-- GENERATED_MERMAID:publisher-public-state-flow-2 END -->
 
 ## 3. Public website boundary
 
+```process-model
+{
+  "id": "publisher-public-state-flow-3",
+  "kind": "mermaid-source",
+  "declaration": "flowchart LR",
+  "lines": [
+    "    A[Internal EM2_Public_State] --> B[Publisher enrichment]",
+    "    B --> C[GitHub docs/data/energy-state-v2.json]",
+    "    C --> D[Website / presentation]",
+    "",
+    "    D -. no control feedback .-> A"
+  ]
+}
+```
+
+<!-- GENERATED_MERMAID:publisher-public-state-flow-3 START -->
 ```mermaid
 flowchart LR
     A[Internal EM2_Public_State] --> B[Publisher enrichment]
@@ -60,9 +139,29 @@ flowchart LR
 
     D -. no control feedback .-> A
 ```
+<!-- GENERATED_MERMAID:publisher-public-state-flow-3 END -->
 
 ## 4. Recovery behavior
 
+```process-model
+{
+  "id": "publisher-public-state-flow-4",
+  "kind": "mermaid-source",
+  "declaration": "stateDiagram-v2",
+  "lines": [
+    "    [*] --> CURRENT",
+    "    CURRENT --> PUBLISH_PENDING: revision changed",
+    "    CURRENT --> PUBLISH_PENDING: heartbeat >= 6 min",
+    "    CURRENT --> PUBLISH_PENDING: Publish_Due=true",
+    "    PUBLISH_PENDING --> PUBLISHED: GitHub PUT succeeds",
+    "    PUBLISH_PENDING --> RETRY_DUE: input/token/GitHub error",
+    "    RETRY_DUE --> PUBLISH_PENDING: next scheduled/manual run",
+    "    PUBLISHED --> CURRENT: revision bookkeeping updated"
+  ]
+}
+```
+
+<!-- GENERATED_MERMAID:publisher-public-state-flow-4 START -->
 ```mermaid
 stateDiagram-v2
     [*] --> CURRENT
@@ -74,6 +173,7 @@ stateDiagram-v2
     RETRY_DUE --> PUBLISH_PENDING: next scheduled/manual run
     PUBLISHED --> CURRENT: revision bookkeeping updated
 ```
+<!-- GENERATED_MERMAID:publisher-public-state-flow-4 END -->
 
 ## 5. Gevalideerde bijzonderheid
 
