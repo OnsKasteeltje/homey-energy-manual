@@ -19,6 +19,22 @@ REQUIRED_STATUS_FACTS = {
     "restart recovery RC gate documented": ["restart"],
     "idempotency RC gate documented": ["idempot"],
     "rollback RC gate documented": ["rollback"],
+    "Building Block View present": ["Building Block View", "EV Power Adapter", "WW Power Adapter"],
+    "Runtime View present": ["Runtime View", "deviceWrites=false"],
+    "Deployment View present": ["Deployment View", "Homey", "GitHub"],
+    "ADR baseline present": ["ADR-004", "ADR-005", "ADR-006", "ADR-007"],
+    "Power Intent is sole upstream adapter contract": ["only upstream power-control contract", "EV_target_W"],
+    "Adapters remain policy-free": ["Device adapters contain no EMS policy", "adapter"],
+    "SHADOW before ACTIVE enforced": ["SHADOW before ACTIVE", "deviceWrites=false"],
+}
+
+REQUIRED_SECTIONS = {
+    "architecture/05-building-block-view.md",
+    "architecture/06-runtime-view.md",
+    "architecture/07-deployment-view.md",
+    "decisions/00-architecture-decisions.md",
+    "components/ev-power-adapter.md",
+    "components/ww-power-adapter.md",
 }
 
 
@@ -47,6 +63,11 @@ def main() -> int:
         text,
         flags=re.S,
     )
+    section_names = {rel.strip() for rel, _ in section_blocks}
+    missing_sections = sorted(REQUIRED_SECTIONS - section_names)
+    if missing_sections:
+        fail("verplichte architectuursecties ontbreken: " + ", ".join(missing_sections))
+
     module_titles: list[str] = []
     for rel, body in section_blocks:
         match = re.search(r"(?m)^##\s+(.+)$", body)
@@ -104,7 +125,7 @@ def main() -> int:
     print(
         f"PASS: master QA; sections={text.count('<!-- BEGIN ')}; "
         f"mermaid={len(blocks)}; modules={len(module_titles)}; fences={fences}; "
-        "numbering=HIERARCHICAL"
+        "architectureFramework=ENFORCED; numbering=HIERARCHICAL"
     )
     return 0
 

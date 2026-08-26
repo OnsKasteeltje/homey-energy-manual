@@ -1,5 +1,5 @@
-title: Softwarearchitectuur Home Energy Management System
-version: 0.3
+title: Software Architecture Home Energy Management System
+version: 0.5
 output:
   markdown: docs/software-architecture/generated/software-architecture.md
   docx: build/Softwarearchitectuur_Home_Energy_Management_System.docx
@@ -10,11 +10,19 @@ sections:
   - architecture/02-architecture-principles.md
   - architecture/03-system-context.md
   - architecture/04-data-model.md
+  - architecture/05-building-block-view.md
+  - architecture/06-runtime-view.md
+  - architecture/07-deployment-view.md
+  - decisions/00-architecture-decisions.md
   - components/core.md
   - components/publisher-public-state.md
   - components/price-adapter.md
   - components/opportunity-engine.md
   - components/planner-power-intent.md
+  - components/business-case-evidence-pipeline.md
+  - components/business-case-engine-v2.md
+  - components/ev-power-adapter.md
+  - components/ww-power-adapter.md
   - components/tesla.md
   - components/boiler.md
   - components/quooker.md
@@ -41,3 +49,7 @@ rules:
   require_last_verified: true
   diagrams_must_match_implementation: true
   generated_files_are_read_only: true
+  decisions_use_adr: true
+  adapters_are_policy_free: true
+  single_writer_per_device: true
+  shadow_before_active: true

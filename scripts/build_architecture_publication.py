@@ -20,8 +20,10 @@ GENERATED_MARKER_RE = re.compile(r'<!--\s*GENERATED_MERMAID:[^>]+(?:START|END)\s
 HEADING_RE = re.compile(r'^(#{1,6})\s+(.+?)\s*$', re.M)
 
 FLOW_MAX_WIDTH_CM = 15.5
-FLOW_MAX_HEIGHT_CM = 19.0
+FLOW_MAX_HEIGHT_CM = 16.8
 PAGE_BREAK = '''```{=openxml}\n<w:p><w:r><w:br w:type="page"/></w:r></w:p>\n```'''
+KEEP_WITH_NEXT = '''```{=openxml}\n<w:pPr><w:keepNext/></w:pPr>\n```'''
+TOC_PLACEHOLDER = '[[TOC]]'
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -46,50 +48,39 @@ def fitted_dimensions_cm(path: Path) -> tuple[float, float]:
     return round(width_cm, 2), round(height_cm, 2)
 
 
-def render_mermaid(source: str, index: int) -> str:
+def clean_title(raw_title: str) -> str:
+    title = re.sub(r'\s*\{[^}]*\}\s*$', '', raw_title).strip()
+    title = re.sub(r'^\d+(?:\.\d+)*\.?\s+', '', title).strip()
+    return title
+
+
+def nearest_process_title(prefix: str, index: int) -> str:
+    matches = list(HEADING_RE.finditer(prefix))
+    if not matches:
+        return f'Proces {index}'
+    return clean_title(matches[-1].group(2)) or f'Proces {index}'
+
+
+def render_mermaid(source: str, index: int, process_title: str) -> str:
     DIAGRAM_DIR.mkdir(parents=True, exist_ok=True)
     mmd = DIAGRAM_DIR / f'diagram-{index:02d}.mmd'
     png = DIAGRAM_DIR / f'diagram-{index:02d}.png'
     mmd.write_text(source.strip() + '\n', encoding='utf-8')
     cmd = [
-        'mmdc',
-        '-p', str(PUPPETEER_CONFIG),
-        '-i', str(mmd),
-        '-o', str(png),
-        '-b', 'white',
-        '-w', '1600',
-        '-s', '1',
+        'mmdc', '-p', str(PUPPETEER_CONFIG), '-i', str(mmd), '-o', str(png),
+        '-b', 'white', '-w', '1600', '-s', '1',
     ]
     subprocess.run(cmd, check=True)
     if not png.exists() or png.stat().st_size == 0:
         raise RuntimeError(f'Mermaid render produced no PNG: {png}')
 
     width_cm, height_cm = fitted_dimensions_cm(png)
+    caption = f'Procesdiagram — {process_title}'
     image = (
-        f'![Procesdiagram](diagrams/{png.name})'
+        f'![{caption}](diagrams/{png.name})'
         f'{{ width={width_cm}cm height={height_cm}cm }}'
     )
-    return f'\n{PAGE_BREAK}\n\n{image}\n\n{PAGE_BREAK}\n'
-
-
-def strip_heading_attributes(title: str) -> str:
-    return re.sub(r'\s*\{[^}]*\}\s*$', '', title).strip()
-
-
-def build_static_toc(text: str) -> str:
-    entries: list[str] = []
-    for hashes, raw_title in HEADING_RE.findall(text):
-        level = len(hashes)
-        if level < 2 or level > 4:
-            continue
-        title = strip_heading_attributes(raw_title)
-        if not title or title.casefold() in {'inhoudsopgave', 'table of contents'}:
-            continue
-        indent = '  ' * (level - 2)
-        entries.append(f'{indent}- {title}')
-    if not entries:
-        raise RuntimeError('Geen headings gevonden voor statische inhoudsopgave')
-    return '# Inhoudsopgave {.unnumbered}\n\n' + '\n'.join(entries) + '\n\n' + PAGE_BREAK + '\n\n'
+    return f'\n{KEEP_WITH_NEXT}\n\n{image}\n\n{PAGE_BREAK}\n'
 
 
 def main() -> int:
@@ -109,8 +100,10 @@ def main() -> int:
     pos = 0
     for match in MERMAID_RE.finditer(text):
         count += 1
+        prefix = text[:match.start()]
+        process_title = nearest_process_title(prefix, count)
         parts.append(text[pos:match.start()])
-        parts.append(render_mermaid(match.group(1), count))
+        parts.append(render_mermaid(match.group(1), count, process_title))
         pos = match.end()
     parts.append(text[pos:])
     body = ''.join(parts)
@@ -122,11 +115,16 @@ def main() -> int:
     if 'GENERATED_MERMAID:' in body:
         raise RuntimeError('generated markers zijn niet volledig verwijderd')
 
-    publication = build_static_toc(body) + body
+    # Do not create a Markdown list here. The DOCX pipeline replaces this exact
+    # placeholder with a genuine Word TOC field and LibreOffice refreshes it
+    # after final pagination, yielding real right-aligned page numbers.
+    toc = f'# Inhoudsopgave {{.unnumbered}}\n\n{TOC_PLACEHOLDER}\n\n{PAGE_BREAK}\n\n'
+    publication = toc + body
     OUT.write_text(publication, encoding='utf-8')
     print(
         f'PASS: publication Markdown -> {OUT}; diagrams={count}; '
-        'toc=STATIC; invariant=ONE_FLOW_ONE_PAGE_HARD'
+        'toc=WORD_FIELD_PLACEHOLDER; captions=NAMED; '
+        'invariant=PROCESS_TITLE_AND_FLOW_ONE_PAGE'
     )
     return 0
 
