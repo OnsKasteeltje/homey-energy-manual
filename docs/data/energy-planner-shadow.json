@@ -1,11 +1,11 @@
 {
   "schema": "EM2_PLANNER_SHADOW_PUBLISH_V0.1",
-  "publishedAt": "2026-08-26T10:16:30.598Z",
+  "publishedAt": "2026-08-26T10:31:30.501Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
   "plan": {
     "schema": "EM2_ENERGY_PLAN_24H_V0.2",
-    "generatedAt": "2026-08-26T10:15:45.749Z",
+    "generatedAt": "2026-08-26T10:30:45.430Z",
     "controlMode": "SHADOW",
     "readOnly": true,
     "physicalWritePerformed": false,
@@ -32,16 +32,16 @@
       ]
     },
     "inputs": {
-      "sourceRevision": 2383,
+      "sourceRevision": 2386,
       "contract": "DYNAMIC",
       "priceQuality": "GOOD",
       "priceFresh": true,
       "priceUsable": true,
-      "priceHorizonHours": 12,
+      "priceHorizonHours": 11.75,
       "pvForecast": {
         "quality": "SUMMARY_ONLY",
         "top4h": true,
-        "updatedAt": "2026-08-26T10:15:10.350Z",
+        "updatedAt": "2026-08-26T10:30:10.566Z",
         "note": "No detailed 15-min PV forecast used; no fabricated PV dispatch."
       },
       "tesla": {
@@ -54,26 +54,18 @@
       },
       "warmWater": {
         "goalReachedToday": false,
-        "remainingFallbackMin": 105,
+        "remainingFallbackMin": 90,
         "catchupRequired": false,
         "modeledPowerW": 1900,
-        "derivedEnergyKWh": 3.325,
+        "derivedEnergyKWh": 2.85,
         "deadlineLocal": "19:00"
       }
     },
     "plan": {
       "slotMinutes": 15,
       "horizonQuality": "PARTIAL",
-      "slotsAvailable": 48,
+      "slotsAvailable": 47,
       "actions": [
-        {
-          "start": "2026-08-26T10:15:00.000Z",
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "price": 0.093,
-          "class": "NORMAL"
-        },
         {
           "start": "2026-08-26T10:30:00.000Z",
           "battery": "HOLD",
@@ -118,7 +110,7 @@
           "start": "2026-08-26T11:45:00.000Z",
           "battery": "CHARGE_CANDIDATE",
           "tesla": "HOLD",
-          "warmWater": "PREFERRED_BEFORE_19",
+          "warmWater": "HOLD",
           "price": 0.0593,
           "class": "CHEAP"
         },
@@ -459,7 +451,7 @@
       "warmWater": {
         "allocatedSlots": [
           {
-            "i": 2,
+            "i": 1,
             "start": "2026-08-26T10:45:00.000Z",
             "end": "2026-08-26T11:00:00.000Z",
             "price_eur_kwh": 0.04,
@@ -467,7 +459,7 @@
             "allocatedKWh": 0.475
           },
           {
-            "i": 4,
+            "i": 3,
             "start": "2026-08-26T11:15:00.000Z",
             "end": "2026-08-26T11:30:00.000Z",
             "price_eur_kwh": 0.0519,
@@ -475,7 +467,7 @@
             "allocatedKWh": 0.475
           },
           {
-            "i": 9,
+            "i": 8,
             "start": "2026-08-26T12:30:00.000Z",
             "end": "2026-08-26T12:45:00.000Z",
             "price_eur_kwh": 0.0519,
@@ -483,7 +475,7 @@
             "allocatedKWh": 0.475
           },
           {
-            "i": 7,
+            "i": 6,
             "start": "2026-08-26T12:00:00.000Z",
             "end": "2026-08-26T12:15:00.000Z",
             "price_eur_kwh": 0.0524,
@@ -491,7 +483,7 @@
             "allocatedKWh": 0.475
           },
           {
-            "i": 8,
+            "i": 7,
             "start": "2026-08-26T12:15:00.000Z",
             "end": "2026-08-26T12:30:00.000Z",
             "price_eur_kwh": 0.0555,
@@ -499,18 +491,10 @@
             "allocatedKWh": 0.475
           },
           {
-            "i": 3,
+            "i": 2,
             "start": "2026-08-26T11:00:00.000Z",
             "end": "2026-08-26T11:15:00.000Z",
             "price_eur_kwh": 0.056,
-            "class": "CHEAP",
-            "allocatedKWh": 0.475
-          },
-          {
-            "i": 6,
-            "start": "2026-08-26T11:45:00.000Z",
-            "end": "2026-08-26T12:00:00.000Z",
-            "price_eur_kwh": 0.0593,
             "class": "CHEAP",
             "allocatedKWh": 0.475
           }
@@ -521,56 +505,56 @@
         "mode": "THEORETICAL_ARBITRAGE_CANDIDATES_ONLY",
         "chargeCandidates": [
           {
-            "i": 2,
+            "i": 1,
             "start": "2026-08-26T10:45:00.000Z",
             "end": "2026-08-26T11:00:00.000Z",
             "price_eur_kwh": 0.04,
             "class": "CHEAP"
           },
           {
-            "i": 4,
+            "i": 3,
             "start": "2026-08-26T11:15:00.000Z",
             "end": "2026-08-26T11:30:00.000Z",
             "price_eur_kwh": 0.0519,
             "class": "CHEAP"
           },
           {
-            "i": 9,
+            "i": 8,
             "start": "2026-08-26T12:30:00.000Z",
             "end": "2026-08-26T12:45:00.000Z",
             "price_eur_kwh": 0.0519,
             "class": "CHEAP"
           },
           {
-            "i": 7,
+            "i": 6,
             "start": "2026-08-26T12:00:00.000Z",
             "end": "2026-08-26T12:15:00.000Z",
             "price_eur_kwh": 0.0524,
             "class": "CHEAP"
           },
           {
-            "i": 8,
+            "i": 7,
             "start": "2026-08-26T12:15:00.000Z",
             "end": "2026-08-26T12:30:00.000Z",
             "price_eur_kwh": 0.0555,
             "class": "CHEAP"
           },
           {
-            "i": 3,
+            "i": 2,
             "start": "2026-08-26T11:00:00.000Z",
             "end": "2026-08-26T11:15:00.000Z",
             "price_eur_kwh": 0.056,
             "class": "CHEAP"
           },
           {
-            "i": 6,
+            "i": 5,
             "start": "2026-08-26T11:45:00.000Z",
             "end": "2026-08-26T12:00:00.000Z",
             "price_eur_kwh": 0.0593,
             "class": "CHEAP"
           },
           {
-            "i": 5,
+            "i": 4,
             "start": "2026-08-26T11:30:00.000Z",
             "end": "2026-08-26T11:45:00.000Z",
             "price_eur_kwh": 0.0601,
@@ -579,56 +563,56 @@
         ],
         "dischargeCandidates": [
           {
-            "i": 31,
+            "i": 30,
             "start": "2026-08-26T18:00:00.000Z",
             "end": "2026-08-26T18:15:00.000Z",
             "price_eur_kwh": 0.2264,
             "class": "EXPENSIVE"
           },
           {
-            "i": 30,
+            "i": 29,
             "start": "2026-08-26T17:45:00.000Z",
             "end": "2026-08-26T18:00:00.000Z",
             "price_eur_kwh": 0.2195,
             "class": "EXPENSIVE"
           },
           {
-            "i": 27,
+            "i": 26,
             "start": "2026-08-26T17:00:00.000Z",
             "end": "2026-08-26T17:15:00.000Z",
             "price_eur_kwh": 0.2172,
             "class": "EXPENSIVE"
           },
           {
-            "i": 32,
+            "i": 31,
             "start": "2026-08-26T18:15:00.000Z",
             "end": "2026-08-26T18:30:00.000Z",
             "price_eur_kwh": 0.2165,
             "class": "EXPENSIVE"
           },
           {
-            "i": 29,
+            "i": 28,
             "start": "2026-08-26T17:30:00.000Z",
             "end": "2026-08-26T17:45:00.000Z",
             "price_eur_kwh": 0.2072,
             "class": "EXPENSIVE"
           },
           {
-            "i": 33,
+            "i": 32,
             "start": "2026-08-26T18:30:00.000Z",
             "end": "2026-08-26T18:45:00.000Z",
             "price_eur_kwh": 0.2032,
             "class": "EXPENSIVE"
           },
           {
-            "i": 34,
+            "i": 33,
             "start": "2026-08-26T18:45:00.000Z",
             "end": "2026-08-26T19:00:00.000Z",
             "price_eur_kwh": 0.194,
             "class": "EXPENSIVE"
           },
           {
-            "i": 28,
+            "i": 27,
             "start": "2026-08-26T17:15:00.000Z",
             "end": "2026-08-26T17:30:00.000Z",
             "price_eur_kwh": 0.1938,
@@ -764,13 +748,13 @@
   },
   "status": {
     "status": "READY_SHADOW_SCENARIO",
-    "at": "2026-08-26T10:15:45.749Z",
+    "at": "2026-08-26T10:30:45.430Z",
     "version": "EM2_ENERGY_PLAN_24H_V0.2",
     "scenario": "VICTRON_3X_US5000_SHADOW_V0.1",
     "scenarioConfigured": true,
     "contract": "DYNAMIC",
     "priceUsable": true,
-    "horizonHours": 12,
+    "horizonHours": 11.75,
     "horizonQuality": "PARTIAL",
     "teslaObligation": false,
     "wwObligation": true,
