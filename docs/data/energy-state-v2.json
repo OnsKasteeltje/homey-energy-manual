@@ -1,31 +1,31 @@
 {
   "meta": {
     "schema_version": "2.12",
-    "generated_at": "2026-08-26T15:31:00.406Z",
-    "heartbeat_at": "2026-08-26T15:31:00.406Z",
+    "generated_at": "2026-08-26T15:36:00.476Z",
+    "heartbeat_at": "2026-08-26T15:36:00.476Z",
     "publisher_version": "EM2_PUBLISHER_V1.0.3",
     "control_mode": "SHADOW",
-    "source_sample_at": "2026-08-26T15:30:00.149Z",
-    "state_revision": 2446,
-    "decision_revision": 2446,
-    "shadow_revision": 2446,
-    "state_age_sec": 2,
+    "source_sample_at": "2026-08-26T15:35:00.278Z",
+    "state_revision": 2447,
+    "decision_revision": 2447,
+    "shadow_revision": 2447,
+    "state_age_sec": 1,
     "publish_reason": "REVISION_RETRY",
     "min_publish_interval_sec": 300,
     "freshness_policy": "EM2_FRESHNESS_V0.1",
-    "freshness_evaluated_at": "2026-08-26T15:30:30.314Z"
+    "freshness_evaluated_at": "2026-08-26T15:35:30.208Z"
   },
   "balance": {
     "valid": true,
-    "reason": "OK",
+    "reason": "ASYNC_PV_RECONSTRUCTION_UNCERTAIN",
     "tolerance_w": 75,
     "source_timing": {
       "valid": true,
       "fresh": true,
-      "synchronized": true,
-      "warning": null,
-      "maxAgeSec": 41,
-      "skewSec": 34,
+      "synchronized": false,
+      "warning": "SOURCE_SKEW_WARNING",
+      "maxAgeSec": 341,
+      "skewSec": 334,
       "maxAllowedAgeSec": 1200,
       "maxAllowedSkewSec": 180,
       "p1Fresh": true,
@@ -34,7 +34,7 @@
       "freshness": {
         "solarEdge": {
           "fresh": true,
-          "ageSec": 41,
+          "ageSec": 341,
           "maxAgeSec": 1200
         },
         "goodWe4200": {
@@ -44,43 +44,43 @@
         },
         "goodWe2000": {
           "fresh": true,
-          "ageSec": 16,
+          "ageSec": 316,
           "maxAgeSec": 600
         }
       },
       "sources": {
-        "p1": "2026-08-26T15:29:54.000Z",
+        "p1": "2026-08-26T15:34:54.000Z",
         "solarEdge": "2026-08-26T15:29:20.000Z",
-        "goodWe4200": "2026-08-26T15:29:45.000Z",
+        "goodWe4200": "2026-08-26T15:34:45.000Z",
         "goodWe2000": "2026-08-26T15:29:45.000Z"
       }
     },
     "control_gate": {
       "p1_fresh": true,
       "grid_measurement_valid": true,
-      "derived_house_balance_valid": true,
+      "derived_house_balance_valid": false,
       "flex_budget_source": "P1_NET_EXPORT"
     },
-    "physical_house_candidate_w": 1032.4,
+    "physical_house_candidate_w": 1141.4,
     "known_measured_load_w": 10.3,
-    "residual_w": 1022.1,
+    "residual_w": null,
     "fail_closed_flex_budget": false,
-    "raw_reason": "OK",
+    "raw_reason": "ASYNC_PV_RECONSTRUCTION_UNCERTAIN",
     "freshness_status": "OK",
     "freshness_expected": false
   },
   "grid": {
-    "power_w": -814,
-    "l1_w": 134,
-    "l2_w": -280,
-    "l3_w": -668,
+    "power_w": -1359,
+    "l1_w": 136,
+    "l2_w": -597,
+    "l3_w": -898,
     "import_w": 0,
-    "export_w": 814
+    "export_w": 1359
   },
   "pv": {
-    "total_w": 1846.39,
+    "total_w": 2500.3900000000003,
     "solaredge_w": 1212.39,
-    "goodwe_4200_w": 507,
+    "goodwe_4200_w": 1161,
     "goodwe_2000_w": 127
   },
   "battery": {
@@ -105,22 +105,22 @@
     "ramp_reserve_w": 100
   },
   "energy_budget": {
-    "house_load_w": 1032,
+    "house_load_w": null,
     "known_flexible_load_w": 0,
     "comfort_load_w": 10,
-    "other_house_load_w": 1022,
+    "other_house_load_w": null,
     "grid_safety_reserve_w": 200,
     "quatt_ramp_reserve_w": 100,
-    "flex_export_budget_w": 514,
+    "flex_export_budget_w": 1059,
     "flex_budget_source": "P1_NET_EXPORT",
     "discretionary_import_budget_w": 4000,
     "battery_support_w": 0,
     "battery_integrated": false,
     "grid_measurement_valid": true,
-    "derived_house_balance_valid": true,
+    "derived_house_balance_valid": false,
     "balance_valid": true,
-    "balance_reason": "OK",
-    "raw_balance_reason": "OK"
+    "balance_reason": "ASYNC_PV_RECONSTRUCTION_UNCERTAIN",
+    "raw_balance_reason": "ASYNC_PV_RECONSTRUCTION_UNCERTAIN"
   },
   "tesla": {
     "connected": false,
@@ -143,8 +143,8 @@
   "equalizer": {
     "power_w": -1373,
     "l1_a": 0,
-    "l2_a": -2,
-    "l3_a": -3
+    "l2_a": -3,
+    "l3_a": -4
   },
   "hot_water": {
     "boiler_on": true,
@@ -154,15 +154,15 @@
       "schema": "EM2_WW_STATE_V0.8",
       "date": "2026-08-26",
       "startedAt": "2026-08-25T22:00:00.185Z",
-      "updatedAt": "2026-08-26T15:30:01.577Z",
-      "sourceRevision": 2446,
-      "lastStateSampleAt": "2026-08-26T15:30:00.149Z",
-      "boilerOnMinToday": 450,
+      "updatedAt": "2026-08-26T15:35:01.057Z",
+      "sourceRevision": 2447,
+      "lastStateSampleAt": "2026-08-26T15:35:00.278Z",
+      "boilerOnMinToday": 455,
       "heatingMinToday": 185,
       "heatingAccountingQuality": "FROM_STATE_START",
-      "currentOnRunMin": 450,
+      "currentOnRunMin": 455,
       "heatingConfirmMin": 184.98606666666663,
-      "lowAfterHeatingMin": 265.01019999999994,
+      "lowAfterHeatingMin": 270.0015166666666,
       "heatingConfirmed": true,
       "goalReached": true,
       "goalReachedToday": true,
@@ -175,7 +175,7 @@
       "boilerOn": true,
       "boilerPowerW": 0,
       "remainingFallbackMin": 0,
-      "minuteOfDay": 1050,
+      "minuteOfDay": 1055,
       "catchupRequired": false,
       "stateAgeSec": 0,
       "fallbackAccounting": "CONFIRMED_HEATING_MINUTES",
@@ -196,10 +196,10 @@
     },
     "control": {
       "schema": "EM2_CONTROL_WW_V0.11",
-      "generatedAt": "2026-08-26T15:30:01.625Z",
+      "generatedAt": "2026-08-26T15:35:01.082Z",
       "controlMode": "SHADOW",
       "readOnly": true,
-      "sourceRevision": 2446,
+      "sourceRevision": 2447,
       "action": "BOILER_OFF",
       "priority": "MUST",
       "reason": "Dagdoel bereikt; verplichte/pre-goal run beëindigen",
@@ -212,10 +212,10 @@
         "revisionMatch": true,
         "wwStateFresh": true,
         "contextFresh": true,
-        "priceHorizonOk": true,
+        "priceHorizonOk": false,
         "priceImportGuardOk": true,
         "gridMeasurementValid": true,
-        "derivedHouseBalanceValid": true,
+        "derivedHouseBalanceValid": false,
         "balanceValid": true,
         "postGoalFresh": true,
         "postGoalEligible": true
@@ -224,24 +224,24 @@
         "boilerOn": true,
         "boilerPowerW": 0,
         "mode": true,
-        "gridW": -814,
-        "exportW": 814,
+        "gridW": -1359,
+        "exportW": 1359,
         "importW": 0,
-        "flexExportBudgetW": 514,
+        "flexExportBudgetW": 1059,
         "discretionaryImportBudgetW": 4000,
         "gridMeasurementValid": true,
-        "derivedHouseBalanceValid": true,
+        "derivedHouseBalanceValid": false,
         "balanceValid": true,
-        "balanceReason": "OK",
+        "balanceReason": "ASYNC_PV_RECONSTRUCTION_UNCERTAIN",
         "quattPowerW": 10.3,
         "quattRampReserveW": 100,
         "goalReached": true,
         "goalReachedToday": true,
         "goalLatchDate": "2026-08-26",
-        "boilerOnMinToday": 450,
+        "boilerOnMinToday": 455,
         "heatingMinToday": 185,
         "heatingAccountingQuality": "FROM_STATE_START",
-        "currentOnRunMin": 450,
+        "currentOnRunMin": 455,
         "runStartReason": "EXPORT",
         "runStartedAt": "2026-08-26T08:05:00.233Z",
         "activeRunLockMin": 15,
@@ -251,17 +251,17 @@
         "postGoalFresh": true,
         "postGoalEligible": true,
         "postGoalDecision": "OPPORTUNITY_AVAILABLE",
-        "postGoalReason": "PV_SURPLUS_EVENING_DRAW_LIKELY",
-        "postGoalGeneratedAt": "2026-08-26T15:15:01.396Z",
+        "postGoalReason": "CHEAP_NOW_EVENING_DRAW_LIKELY",
+        "postGoalGeneratedAt": "2026-08-26T15:30:01.126Z",
         "contextFresh": true,
-        "contextUpdatedAt": "2026-08-26T15:15:10.300Z",
+        "contextUpdatedAt": "2026-08-26T15:30:10.382Z",
         "priceNegative": false,
         "priceCheapNext4h": true,
         "priceExpensiveNext4h": false,
-        "priceHorizonMin": 30,
-        "priceHorizonOk": true,
+        "priceHorizonMin": 25,
+        "priceHorizonOk": false,
         "pvTop4h": false,
-        "wwStateUpdatedAt": "2026-08-26T15:30:01.577Z",
+        "wwStateUpdatedAt": "2026-08-26T15:35:01.057Z",
         "wwStateQuality": "PARTIAL_FROM_START_TIME"
       },
       "policy": {
@@ -345,7 +345,7 @@
       "source": "HOMEY_SWITCH_PLUS_P1_L3",
       "inferred": true,
       "fresh": true,
-      "last_sample_at": "2026-08-26T15:29:00.302Z",
+      "last_sample_at": "2026-08-26T15:34:00.334Z",
       "baseline_l3_w": 0.1,
       "threshold_delta_w": [
         1400,
@@ -442,15 +442,17 @@
   "manager": {
     "state": "SURPLUS",
     "decision": "HOLD",
-    "reason": "Geen harde verplichting of sterke opportunity",
+    "reason": "PV/Huis reconstructie onderdrukt: P1/PV niet tijdgelijk; P1-export blijft autoritatief voor flex",
     "priority": "MAY",
     "constraints": [
       "QUATT_OBSERVE_ONLY_10W",
-      "QUATT_RAMP_RESERVE_100W"
+      "QUATT_RAMP_RESERVE_100W",
+      "SOURCE_SKEW_WARNING",
+      "DERIVED_BALANCE_UNCERTAIN_ASYNC_PV"
     ],
     "state_dirty": true,
     "state_age_sec": 0,
-    "flex_export_budget_w": 514,
+    "flex_export_budget_w": 1059,
     "discretionary_import_budget_w": 4000
   },
   "shadow": {
@@ -465,21 +467,21 @@
       "quattPowerW": 10.3,
       "quookerActive": false,
       "quookerPowerW": 0,
-      "flexExportBudgetW": 514,
+      "flexExportBudgetW": 1059,
       "gridMeasurementValid": true,
-      "derivedHouseBalanceValid": true,
+      "derivedHouseBalanceValid": false,
       "balanceValid": true
     },
     "decision": {
       "priority": "MAY",
       "intent": "HOLD",
-      "reason": "Geen harde verplichting of sterke opportunity"
+      "reason": "PV/Huis reconstructie onderdrukt: P1/PV niet tijdgelijk; P1-export blijft autoritatief voor flex"
     }
   },
   "context": {
-    "updated_at": "2026-08-26T15:15:10.300Z",
+    "updated_at": "2026-08-26T15:30:10.382Z",
     "fresh": true,
-    "age_sec": 890,
+    "age_sec": 291,
     "price_negative": false,
     "price_cheap_next4h": true,
     "price_expensive_next4h": false,
