@@ -3,7 +3,7 @@ component: planner-power-intent
 title: 24h Energy Planner and Power Intent
 status: shadow
 architecture_status: implemented-shadow
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 sources:
   - Homey Advanced Flow: EM v2 | 45 Planner | 24h Energy Plan v0.2 SHADOW
   - Homey Advanced Flow: EM v2 | 20 Power Intent | P1 v0.2 SHADOW
@@ -122,24 +122,51 @@ Er wordt nog geen numeriek `WW_target_W` gegenereerd.
 
 ## 7. EV Power Adapter v0.1 SHADOW
 
-De aparte EV Power Adapter accepteert zowel `EM2_POWER_INTENT_V0.1` als `V0.2` en is daarmee compatibel met de actuele producer.
+De live SHADOW-adapter accepteert de actuele producer `EM2_POWER_INTENT_V0.2` en voert uitsluitend een deterministische, apparaat-specifieke vertaling uit. Hij leest geen devices rechtstreeks en voert geen fysieke Easee-write uit.
 
-De adapter:
+De v0.1-elektrische topologie is bewust vastgezet op:
 
-- leest geen devices zelf;
-- gebruikt alleen elektrische context uit `EM2_State`;
-- bepaalt W/A op basis van geobserveerd vermogen per requested A, of theoretisch `voltage x active phases`;
-- gebruikt 6 A minimum en 16 A maximum;
-- past een deadband toe ter grootte van circa `W_per_A x 6A`;
-- schrijft nooit fysiek naar Easee.
+- 3 fasen;
+- 230 V per fase;
+- 6 A minimale uitvoerbare laadstroom;
+- maximaal de geconfigureerde veilige laadstroom, hard begrensd op 16 A;
+- geen automatische 1↔3-faseschakeling.
 
-Voorbeeldstatussen:
+De vertaling is:
 
-- `OK_IDLE`
-- `OK_DEADBAND_IDLE`
-- `OK_TRANSLATED`
-- `WAITING_FOR_ELECTRICAL_CONTEXT`
-- `REVISION_MISMATCH`
+`theoretical_A = EV_target_W / (3 × 230)`
+
+`requested_A = floor(theoretical_A)`
+
+Daarna wordt naar de veilige maximumstroom geclamped. Als `requested_A < 6 A`, wordt `requested_A=0`. Er wordt nooit omhoog afgerond naar het minimale laadvermogen en de adapter kan daardoor het upstream toegewezen vermogensbudget niet overschrijden.
+
+Concrete grensgevallen:
+
+- 4.139 W -> 0 A;
+- 4.140 W -> 6 A;
+- 6.200 W -> 8 A / circa 5.520 W uitvoerbaar;
+- 6.210 W -> 9 A.
+
+De adapter valideert daarnaast:
+
+- revision/schema alignment;
+- freshness van Power Intent en Core/Easee-context;
+- geldige numerieke target en stroomconstraints;
+- charger-beschikbaarheid voor een positieve laadintentie.
+
+Bij stale, ongeldige of niet-vertrouwde control-input valt de adapter fail-closed terug naar 0 A met een expliciete status/reason code.
+
+De output onderscheidt expliciet:
+
+- `requested_A`: door de adapter berekende gewenste runtime-setpoint;
+- `commanded_A`: pas gevuld wanneer een toekomstige writer werkelijk een write start; in SHADOW altijd `null`;
+- `confirmed_A`: read-only terugmelding uit de bestaande Core/Easee-context, momenteel gebaseerd op offered current.
+
+Verder worden `theoretical_A`, `executable_W`, `delta_W`, freshness en source revision gepubliceerd voor runtime-validatie.
+
+Een toekomstige LIVE-cut-over mag uitsluitend Easee's dynamic/volatile current-control gebruiken (`setDynamicChargerCurrent` of aantoonbaar equivalente dynamic route). Persistente chargerinstellingen met flash-wear-risico zijn geen EMS-runtimewriter.
+
+Hysterese, PV-smoothing, minimale stabiele duur en opportunity/MUST-policy horen upstream in Energy Core en worden niet in deze mapper geïntroduceerd.
 
 ## 8. Generieke Actuator Commands v0.2 SHADOW
 
@@ -162,7 +189,8 @@ De beoogde architectuur blijft:
 
 - Core owns policy/arbitration;
 - Power Intent owns neutral numeric/binary intent;
-- adapters own translation, electrical clamping, guards and dedupe;
+- adapters own deterministic translation, physical feasibility, quantization/clamping and freshness/capability guards;
+- writer-lifecycle owns commanded/confirmed tracking, idempotency, dedupe, run-lease, retries en write-throttling;
 - slechts één expliciete fysieke writer per actuator mag actief zijn.
 
 Een fysieke writer mag pas worden geactiveerd via een gecontroleerde atomic cut-over waarbij de bestaande productiewriter wordt uitgefaseerd.
@@ -171,11 +199,15 @@ Een fysieke writer mag pas worden geactiveerd via een gecontroleerde atomic cut-
 
 Deze laag moet altijd voldoen aan:
 
-- geen device writes;
+- geen device writes in SHADOW;
 - geen netwerkcalls vanuit Power Intent/adapters;
 - geen policy-arbitrage in adapters;
 - revision alignment vóór numerieke targets;
-- fail-closed bij ontbrekende of onbekende input;
+- fail-closed bij ontbrekende, ongeldige of stale control-input;
+- een adapter mag een upstream vermogensbudget nooit verhogen;
+- requested, commanded en confirmed actuatorstate blijven afzonderlijke begrippen;
+- frequente Easee-control gebruikt uitsluitend dynamic/volatile runtime-control;
+- automatische phaseswitching is geen onderdeel van EV Adapter v0.1 en vereist later een expliciete state machine;
 - geen verzonnen Tesla throughput;
 - geen claim van gerealiseerde batterijbesparing zonder actuele SOC/load/PV-data;
 - één fysieke writer per actuator bij toekomstige ACTIVE-integratie.
@@ -186,7 +218,7 @@ Deze laag moet altijd voldoen aan:
 |---|---|
 | 24h Planner v0.2 | ACTIVE SHADOW |
 | Power Intent v0.2 | ACTIVE SHADOW |
-| EV Power Adapter v0.1 | ACTIVE SHADOW, v0.2 compatible |
+| EV Power Adapter v0.1 | ACTIVE SHADOW, hardened 3×230V/floor/fail-closed |
 | Actuator Commands v0.2 | ACTIVE SHADOW, Power Intent v0.1/v0.2 compatible |
 | EV fysieke writer via nieuwe adapterketen | NIET ACTIEF |
 | Victron fysieke writer | NIET ACTIEF |
