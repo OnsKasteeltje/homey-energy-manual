@@ -6,6 +6,8 @@ architecture_status: implemented-read-only
 last_verified: 2026-08-26
 sources:
   - docs/javascripts/business-case-engine-v2.js
+  - docs/javascripts/business-case-oracle-v0.1.js
+  - docs/javascripts/business-case-history-adapter-v0.1.js
   - docs/data/business-case-scenarios-v2.json
   - docs/data/energy-day-v2.json
   - docs/data/energy-day-series-7d.json
@@ -15,48 +17,50 @@ sources:
 
 ## 1. Doel
 
-De Business Case Engine maakt de economische onderbouwing van batterij/EMS-keuzes reproduceerbaar en evidence-driven. De engine simuleert counterfactual scenario's op dezelfde historische woningdata en scheidt fysieke aannames, economische aannames, EMS-strategie en gemeten evidence.
+De Business Case Engine maakt de economische onderbouwing van batterij/EMS-keuzes reproduceerbaar en evidence-driven. De component simuleert counterfactual scenario's op dezelfde historische woningdata en scheidt fysieke aannames, economische aannames, EMS-strategie en gemeten evidence.
 
-De component is **read-only** en heeft geen control- of writerroute naar Homey, Easee, boiler of Victron.
+De volledige component is **read-only**: `controlImpact=false`. Er bestaat geen writerroute naar Homey, Easee, boiler, Power Intent of Victron.
 
 ## 2. Architectuur
 
 ```text
-Historical evidence
-P1 + PV + EV + WW + prijzen + validity
+energy-day / day-series history
+P1 + PV + EV + WW + validity
              │
              ▼
-      Normalization / quality gate
+Business Case History Adapter v0.1
++ expliciete fixed/dynamic tariffs
              │
              ▼
-     Counterfactual replay kernel
-      ┌──────────┼───────────┐
-      ▼          ▼           ▼
-  no battery  self-use    EMS replay
-      │          │           │
-      └──────────┼───────────┘
-                 ▼
-   energy/economic decomposition
-                 │
-                 ├── avoided import
-                 ├── lost/avoided export
-                 ├── conversion losses
-                 ├── standby losses
-                 ├── throughput/degradation
-                 └── terminal SOC
-                 │
-                 ▼
-     annualization + NPV/payback
-                 │
-                 ▼
-       evidence/calibration loop
+      normalized time steps
+             │
+      ┌──────┴──────────────────────┐
+      ▼                             ▼
+Business Case Engine v2     Perfect-information Oracle v0.1
+replay kernel               dynamic programming
+      │                             │
+      ├─ no battery                 └─ Oracle targets
+      ├─ self-consumption                    │
+      └─ EMS replay                          ▼
+      │                              canonical replay kernel
+      └──────────────┬───────────────────────┘
+                     ▼
+        energy/economic decomposition
+                     │
+                     ├─ avoided import/export delta
+                     ├─ conversion + standby losses
+                     ├─ throughput/degradation
+                     ├─ terminal SOC
+                     ├─ evidence quality
+                     └─ NPV/payback/capture ratio
+                     │
+                     ▼
+            evidence/calibration loop
 ```
-
-Een aparte perfect-information optimizer mag later een Oracle-resultaat leveren. De replay-engine noemt een eigen heuristic **nooit** Oracle. `compareBusinessCases()` accepteert alleen een onafhankelijk aangeleverd Oracle-resultaat voor de EMS capture ratio.
 
 ## 3. Tijdstap en waarheidsbron
 
-De primaire replay-eenheid is een tijdstap. De actuele historylaag levert 5-minutenmetingen in `energy-day-v2.json` en 7-daagse historie in `energy-day-series-7d.json`.
+De primaire rekeneenheid is een tijdstap, niet een jaartotaal. De bestaande historylaag levert 5-minutenmetingen. `business-case-history-adapter-v0.1.js` vertaalt `p1W`, validity en relevante evidence naar het BC-contract.
 
 Per tijdstap zijn minimaal nodig:
 
@@ -64,49 +68,60 @@ Per tijdstap zijn minimaal nodig:
 - importprijs in euro/kWh;
 - exportvergoeding in euro/kWh;
 - intervalduur;
-- optioneel `emsBatteryTargetW` voor replay van feitelijke/SHADOW EMS-beslissingen.
+- optioneel `emsBatteryTargetW` voor EMS replay.
 
-`NULL_IS_UNKNOWN_NEVER_ZERO` blijft bindend: ontbrekende data wordt uitgesloten en nooit naar 0 geïnterpreteerd. Evidence coverage en quality worden in ieder resultaat gepubliceerd.
+`NULL_IS_UNKNOWN_NEVER_ZERO` is bindend. Ongeldige meet- of tariefdata wordt niet als 0 geïnterpreteerd; replay rapporteert `validSamples`, `invalidSamples`, `coverage` en quality.
 
-## 4. Fysiek batterijmodel
+## 4. Vier modellagen
 
-Iedere scenario-config bevat expliciet:
+De BC houdt vier grenzen expliciet gescheiden:
 
-- nominale capaciteit;
-- min/max SOC;
-- initial SOC;
-- max AC charge/discharge power;
-- afzonderlijke charge/discharge efficiency;
-- standbyvermogen;
-- degradation cost per throughput-kWh.
+1. **Physical model** — capaciteit, SOC-band, charge/discharge power, efficiency, standby en degradation;
+2. **Economic model** — import/exporttarief, CAPEX, onderhoud, discount rate en residual value;
+3. **EMS strategy model** — self-consumption of gereplayde EMS-targets;
+4. **Evidence/calibration model** — werkelijk gemeten P1/PV/EV/WW en later Victron battery telemetry.
 
-Sign-conventie voor de batterij aan de AC-bus:
+Een wijziging in één laag mag niet impliciet aannames in een andere laag veranderen.
+
+## 5. Fysiek batterijmodel
+
+Ieder scenario bevat expliciet nominale capaciteit, min/max/initial SOC, maximaal AC laad-/ontlaadvermogen, afzonderlijke charge/discharge efficiency, standbyvermogen en degradation cost per throughput-kWh.
+
+AC-bus tekenconventie:
 
 ```text
-+W = batterij laden / extra net- of PV-load
++W = batterij laden / extra load
  0 = idle
--W = batterij ontladen / supply naar woning/net
+-W = batterij ontladen / supply
 ```
 
-De engine houdt SOC binnen de ingestelde band en publiceert curtailed charge/discharge wanneer een gewenste actie fysiek niet uitvoerbaar is.
+SOC blijft binnen de ingestelde band. Niet-uitvoerbare energie wordt als `curtailedChargeKWh` / `curtailedDischargeKWh` gepubliceerd.
 
-## 5. Strategieën
+## 6. Strategieën
 
-### 5.1 BASELINE_NO_BATTERY
+### 6.1 BASELINE_NO_BATTERY
 
-Historische netimport/export blijft ongewijzigd. Dit is de economische nulmeting.
+De gemeten netimport/export blijft ongewijzigd en vormt de economische nulmeting.
 
-### 5.2 BATTERY_SELF_CONSUMPTION
+### 6.2 BATTERY_SELF_CONSUMPTION
 
-Bij export wordt de batterij geladen; bij import wordt ontladen, begrensd door SOC, vermogen en efficiency. Deze strategie meet de pure fysieke waarde van opslag zonder prijs-/EMS-arbitrage.
+Export laadt de batterij en import ontlaadt de batterij, begrensd door fysieke constraints. Hiermee wordt de pure fysieke opslagwaarde geïsoleerd van EMS/prijsoptimalisatie.
 
-### 5.3 BATTERY_EMS_REPLAY
+### 6.3 BATTERY_EMS_REPLAY
 
-De engine consumeert `emsBatteryTargetW` per tijdstap en voert de gewenste actie counterfactual uit binnen dezelfde fysieke constraints. Hiermee kan de echte EMS-strategie tegen dezelfde historie worden vergeleken.
+`emsBatteryTargetW` wordt per tijdstap gereplayd binnen exact dezelfde fysieke constraints. Hierdoor kan een actuele of SHADOW EMS-strategie tegen dezelfde historische woningdata worden beoordeeld.
 
-### 5.4 Oracle / perfect information
+### 6.4 Perfect-information Oracle v0.1
 
-Een Oracle is een **separate component/solver** met perfecte kennis van de volledige horizon en dezelfde fysieke/economische constraints. Een greedy heuristic mag niet als Oracle worden gepresenteerd. De BC Engine ondersteunt wel vergelijking van een aangeleverd Oracle-resultaat met EMS via:
+`business-case-oracle-v0.1.js` is een afzonderlijke dynamic-programming optimizer met perfecte kennis van de volledige horizon. Hij gebruikt dezelfde SOC-, vermogen-, efficiency-, standby-, tariff- en degradation-semantiek als de replay-engine.
+
+De Oracle discretiseert batterij-energie (`energyStepKWh`, standaard 0,1 kWh) en rekent terminal energy value mee. Het resultaat wordt vervolgens opnieuw door de canonieke `BATTERY_EMS_REPLAY` kernel gevoerd; economische accounting blijft dus op één plek.
+
+De Oracle is een benchmark/bovengrens voor de gekozen discretisatie, geen voorspelling van gerealiseerde EMS-prestatie.
+
+## 7. EMS capture en onzekerheid
+
+Wanneer baseline, EMS replay en Oracle beschikbaar zijn:
 
 ```text
 EMS capture ratio =
@@ -114,9 +129,19 @@ EMS capture ratio =
 (Oracle value - no-battery value)
 ```
 
-## 6. Economische decompositie
+De doelarchitectuur onderscheidt daarnaast:
 
-Iedere euro moet herleidbaar zijn. De kernoutput onderscheidt minimaal:
+```text
+Oracle / perfect information
+Forecast-realistic EMS
+Realized EMS
+```
+
+Daarmee kunnen later forecast penalty en control/constraint penalty afzonderlijk worden verklaard.
+
+## 8. Economische decompositie
+
+Iedere euro moet herleidbaar zijn:
 
 ```text
 baseline energy cost
@@ -128,97 +153,80 @@ gross operational saving
 net operational saving
 ```
 
-De energiekant publiceert daarnaast:
+De energiekant publiceert baseline/scenario import en export, charge/discharge, throughput, equivalent full cycles, conversion loss, standby, curtailed energy, self-consumption delta, avoided import en terminal SOC.
 
-- baseline/scenario import kWh;
-- baseline/scenario export kWh;
-- AC charge/discharge kWh;
-- batterijthroughput;
-- equivalent full cycles;
-- conversion losses;
-- standby losses;
-- curtailed energy;
-- self-consumption delta;
-- avoided import;
-- terminal SOC.
+`financialCase()` voegt CAPEX, onderhoud, residual value, discount rate, NPV en simple payback toe. CAPEX wordt niet verzonnen wanneer een gevalideerde actuele prijs ontbreekt.
 
-Financiële evaluatie voegt CAPEX, onderhoud, residual value, discount rate, NPV en simple payback toe. Financial metrics worden niet berekend met verzonnen CAPEX.
+## 9. Evidence hardening
 
-## 7. Evidence hardening
+Generieke aannames worden geleidelijk vervangen door gemeten evidence. Iedere calibratiecandidate houdt bron, periode, sample-count en quality/confidence traceerbaar.
 
-Generieke aannames worden geleidelijk vervangen door gemeten waarden. Iedere kalibratie houdt bron, periode, sample-count en confidence/quality bij.
-
-Prioriteit voor evidence:
+Evidence-prioriteit:
 
 1. werkelijk AC charge/discharge en SOC uit Victron zodra beschikbaar;
 2. P1 import/export en PV uit bestaande history;
-3. werkelijk batterijverlies/standby uit gemeten energy balance;
-4. werkelijk throughput/cycling/degradation-proxy;
+3. gemeten battery conversion/standby losses;
+4. werkelijk throughput/cycling;
 5. forecast-versus-realized verschil;
-6. EMS requested versus realized gedrag.
+6. EMS requested versus realized battery behavior.
 
-Een nieuwe gemeten waarde overschrijft een generieke aanname alleen wanneer meetkwaliteit en representativiteit expliciet voldoende zijn.
+Een enkele gebeurtenis promoveert nooit automatisch een structurele BC-aanname.
 
-## 8. Forecast uncertainty
+## 10. Annualisering en sensitiviteit
 
-De BC rapporteert uiteindelijk drie economische niveaus:
+`annualizeReplay()` kan korte windows extrapoleren, maar <90 dagen krijgt verplicht `SHORT_EVIDENCE_WINDOW`. Voor investeringsbesluiten is bij voorkeur een volledig representatief jaar of expliciet seizoensgewogen model nodig.
 
-```text
-Oracle / perfect information
-Forecast-realistic EMS
-Realized EMS
-```
+Definitieve BC-publicatie gebruikt downside/base/upside of equivalente sensitiviteitsbanden voor materiële aannames zoals CAPEX, import/exporttarief, efficiency, standby, degradation/lifetime en forecastkwaliteit.
 
-Daaruit worden afzonderlijk forecast penalty en control/constraint penalty afgeleid. Een Oracle-resultaat mag nooit rechtstreeks als haalbare jaarlijkse besparing worden gepresenteerd.
+## 11. Scenario baseline
 
-## 9. Annualisering
-
-Korte meetvensters mogen technisch worden geannualiseerd, maar krijgen `SHORT_EVIDENCE_WINDOW`. Tot minimaal 90 dagen representatieve historie wordt annualisering als voorlopig beschouwd. Seizoenseffecten worden niet weggepoetst door een simpele vermenigvuldigingsfactor.
-
-Voor een investeringsbesluit is bij voorkeur een volledig jaar historische replay beschikbaar, of een expliciet seizoensgewogen model.
-
-## 10. Scenario baseline
-
-`business-case-scenarios-v2.json` bevat momenteel:
+`business-case-scenarios-v2.json` bevat:
 
 - 2 × Pylontech US5000;
 - 3 × Pylontech US5000;
 - BYD compatible reference.
 
-Technische waarden zijn expliciete SHADOW-aannames. CAPEX blijft `null` tot actuele gevalideerde prijzen zijn vastgelegd. De BYD-reference is geen definitieve productkeuze zolang het exacte model niet is geselecteerd.
+Technische waarden zijn SHADOW-aannames met quality-label. CAPEX blijft `null` tot een actuele gevalideerde prijs is vastgelegd. De BYD-reference is geen definitieve productkeuze zolang exact model/capaciteit niet is gekozen.
 
-## 11. Safety en control boundary
+## 12. Safety- en controlboundary
 
 Harde invarianten:
 
 - `readOnly=true`;
 - `controlImpact=false`;
-- geen Homey/device writes;
-- geen aanpassing van Power Intent;
-- geen economische uitkomst mag realtime safety/control overrulen;
-- incomplete evidence wordt zichtbaar gedegradeerd, niet geïmputeerd als waarheid;
-- scenario's gebruiken dezelfde constraints om eerlijke vergelijking te garanderen;
-- Oracle en realized/forecast resultaten worden nooit semantisch vermengd.
+- geen Homey/device/network writes;
+- geen wijziging van Power Intent;
+- BC/Oracle mag realtime safety of control nooit overrulen;
+- incomplete evidence degradeert zichtbaar;
+- scenariovergelijkingen gebruiken dezelfde inputreeks en rekenregels;
+- Oracle, forecast en realized blijven semantisch gescheiden.
 
-## 12. Tests
+Een toekomstige optimizer die runtime batterijpolicy voedt is **niet** deze component en vereist een aparte SHADOW/control release-gate.
 
-`tests/business-case-engine-v2.test.mjs` valideert minimaal:
+## 13. Tests
 
-- baseline-identiteit;
-- self-consumption charge/discharge;
-- SOC-band;
-- EMS-target power clamp;
-- evidence-quality bij invalid samples;
-- degradation accounting;
-- korte-window annualization warning;
-- discounted NPV/payback;
-- EMS capture ratio tegen onafhankelijk Oracle-resultaat.
+Automatische tests dekken minimaal baseline-identiteit, self-consumption, SOC-band, power-clamps, evidence quality, degradation, annualisering, discounted NPV/payback, EMS capture, Oracle cheap→expensive shifting, read-only boundary en history-adapter null semantics.
 
-## 13. Vervolgstappen
+## 14. Huidige status
 
-1. history normalizer bouwen die `energy-day-series-7d.json` direct naar BC samples omzet inclusief prijscontext;
-2. meerdere weken/maanden persistent history beschikbaar maken;
-3. gevalideerde CAPEX-componenten vastleggen per hardwarevariant;
-4. onafhankelijke perfect-information optimizer toevoegen;
-5. forecast-realistic replay koppelen aan Planner/Power Intent history;
-6. na Victron-installatie measured efficiency/standby/throughput automatisch als calibration evidence opnemen.
+| Onderdeel | Status |
+|---|---|
+| Replay kernel | IMPLEMENTED SHADOW/read-only |
+| History adapter | IMPLEMENTED v0.1 |
+| Perfect-information Oracle | IMPLEMENTED v0.1 |
+| Scenario config 2×/3× Pylontech | IMPLEMENTED assumptions |
+| BYD exact productmodel/CAPEX | OPEN |
+| Fixed-price replay | technisch ondersteund |
+| Dynamic tariff resolver | interface ondersteund; data-koppeling nog te voltooien |
+| Forecast-realistic EMS replay | OPEN: Planner/Power Intent history koppelen |
+| Victron measured calibration | OPEN tot fysieke integratie |
+| >90d / jaar-history | OPEN |
+
+## 15. Eerstvolgende hardening
+
+1. actuele contract/tariefreeks direct aan de history adapter koppelen;
+2. langere persistent history beschikbaar maken;
+3. actuele gevalideerde CAPEX per hardwarevariant vastleggen;
+4. forecast/Power Intent history als aparte replaybron opslaan;
+5. na Victron-installatie efficiency/standby/throughput automatisch als calibration evidence berekenen;
+6. Oracle discretisatie en terminal-value gevoeligheid benchmarken tegen externe optimizerreferenties.
