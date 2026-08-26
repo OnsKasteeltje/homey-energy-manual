@@ -6,7 +6,7 @@ last_verified: 2026-08-26
 
 # Planner and Power Intent Flows
 
-## 1. End-to-end Power Intent and adapter architecture
+## End-to-end Power Intent and adapter architecture
 
 ```process-model
 {
@@ -46,9 +46,9 @@ flowchart TD
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-0 END -->
 
-De gestippelde adapterroutes zijn SHADOW en mogen niet als actieve fysieke writers worden geïnterpreteerd. De bestaande productie-writers blijven eigenaar totdat een atomic single-writer cut-over is gevalideerd.
+De adapterroutes zijn SHADOW. De bestaande productie-writers blijven fysieke eigenaar totdat een atomic single-writer cut-over is gevalideerd.
 
-## 2. 24h Planner
+## 24h Planner v0.3 energy-balance forecast
 
 ```process-model
 {
@@ -56,18 +56,27 @@ De gestippelde adapterroutes zijn SHADOW en mogen niet als actieve fysieke write
   "kind": "mermaid-source",
   "declaration": "flowchart TD",
   "lines": [
-    "    A[Every 15 min + 45 s delay] --> B[Read EM2_State / WW / Price Context]",
-    "    B --> C{Price context usable?}",
-    "    C -->|No| D[Planner status DEGRADED_PRICE_CONTEXT]",
-    "    C -->|Yes| E[Build 15-min price slots]",
-    "    E --> F[Rank Tesla slots before deadline]",
-    "    E --> G[Allocate WW slots before 19:00]",
-    "    E --> H[Calculate theoretical battery charge/discharge candidates]",
-    "    F --> I[Publish EM2_Energy_Plan_24h]",
-    "    G --> I",
-    "    H --> I",
-    "    D --> I",
-    "    I --> J[No physical writes]"
+    "    A[Every 15 min + 45 s delay] --> B[Read State / WW / Price / EM2_Day_History]",
+    "    B --> C[Build fixed 96 x 15-min time axis]",
+    "    C --> D[Derive house W = P1 W + PV W]",
+    "    D --> E[Derive base W = house - Tesla - Boiler]",
+    "    E --> F[Build local-quarter median base profile]",
+    "    B --> G[Build measured same-day PV quarter persistence]",
+    "    F --> H[Populate baseLoadForecastW]",
+    "    G --> I{PV quarter sufficiently observed?}",
+    "    I -->|Yes| J[Populate pvForecastW]",
+    "    I -->|No| K[pvForecastW = null / degraded quality]",
+    "    H --> L[Calculate netBeforeFlex where base + PV known]",
+    "    J --> L",
+    "    K --> L",
+    "    L --> M[Rank hard Tesla + WW obligations first]",
+    "    M --> N{Contract type}",
+    "    N -->|DYNAMIC| O[Rank price then PV surplus]",
+    "    N -->|FIXED| P[Rank PV surplus then time]",
+    "    O --> Q[Add theoretical battery candidates only]",
+    "    P --> Q",
+    "    Q --> R[Publish EM2_Energy_Plan_24h v0.3]",
+    "    R --> S[No physical writes]"
   ]
 }
 ```
@@ -75,22 +84,67 @@ De gestippelde adapterroutes zijn SHADOW en mogen niet als actieve fysieke write
 <!-- GENERATED_MERMAID:planner-power-intent-flow-1 START -->
 ```mermaid
 flowchart TD
-    A[Every 15 min + 45 s delay] --> B[Read EM2_State / WW / Price Context]
-    B --> C{Price context usable?}
-    C -->|No| D[Planner status DEGRADED_PRICE_CONTEXT]
-    C -->|Yes| E[Build 15-min price slots]
-    E --> F[Rank Tesla slots before deadline]
-    E --> G[Allocate WW slots before 19:00]
-    E --> H[Calculate theoretical battery charge/discharge candidates]
-    F --> I[Publish EM2_Energy_Plan_24h]
-    G --> I
-    H --> I
-    D --> I
-    I --> J[No physical writes]
+    A[Every 15 min + 45 s delay] --> B[Read State / WW / Price / EM2_Day_History]
+    B --> C[Build fixed 96 x 15-min time axis]
+    C --> D[Derive house W = P1 W + PV W]
+    D --> E[Derive base W = house - Tesla - Boiler]
+    E --> F[Build local-quarter median base profile]
+    B --> G[Build measured same-day PV quarter persistence]
+    F --> H[Populate baseLoadForecastW]
+    G --> I{PV quarter sufficiently observed?}
+    I -->|Yes| J[Populate pvForecastW]
+    I -->|No| K[pvForecastW = null / degraded quality]
+    H --> L[Calculate netBeforeFlex where base + PV known]
+    J --> L
+    K --> L
+    L --> M[Rank hard Tesla + WW obligations first]
+    M --> N{Contract type}
+    N -->|DYNAMIC| O[Rank price then PV surplus]
+    N -->|FIXED| P[Rank PV surplus then time]
+    O --> Q[Add theoretical battery candidates only]
+    P --> Q
+    Q --> R[Publish EM2_Energy_Plan_24h v0.3]
+    R --> S[No physical writes]
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-1 END -->
 
-## 3. Power Intent revision guard
+De tijdas is altijd 96 kwartieren, ook bij FIXED. Prijs is context en niet langer de bron van de tijdas. Onbekende PV-slots blijven `null`; v0.3 fabriceert geen weather curve. `gridHeadroomW` blijft expliciet ongemodelleerd totdat fasebewuste 3×25 A headroom beschikbaar is.
+
+## Planner publication and BC evidence loop
+
+```process-model
+{
+  "id": "planner-power-intent-flow-evidence",
+  "kind": "mermaid-source",
+  "declaration": "flowchart TD",
+  "lines": [
+    "    A[EM2_Energy_Plan_24h v0.3] --> B[Planner Shadow Publisher v0.1]",
+    "    B --> C[energy-planner-shadow.json]",
+    "    C --> D[BC Planner Intent Recorder v0.2]",
+    "    E[EM2_Power_Intent] --> D",
+    "    D --> F[15-min evidence buffer]",
+    "    F --> G[planned -> intent evidence]",
+    "    G --> H[Future commanded + actual + financial result]"
+  ]
+}
+```
+
+<!-- GENERATED_MERMAID:planner-power-intent-flow-evidence START -->
+```mermaid
+flowchart TD
+    A[EM2_Energy_Plan_24h v0.3] --> B[Planner Shadow Publisher v0.1]
+    B --> C[energy-planner-shadow.json]
+    C --> D[BC Planner Intent Recorder v0.2]
+    E[EM2_Power_Intent] --> D
+    D --> F[15-min evidence buffer]
+    F --> G[planned -> intent evidence]
+    G --> H[Future commanded + actual + financial result]
+```
+<!-- GENERATED_MERMAID:planner-power-intent-flow-evidence END -->
+
+De BC-recorder ondersteunt vanaf v0.2 de publisher-envelope en `plan.plan.actions`. Hij blijft read-only. De flow heeft momenteel `folder=null`; dat is een open governance-afwijking voor de afgesproken `76 Evidence`-locatie.
+
+## Power Intent revision guard
 
 ```process-model
 {
@@ -126,7 +180,7 @@ EV target 0 W]
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-2 END -->
 
-## 4. EV target projection
+## EV target projection
 
 ```process-model
 {
@@ -166,7 +220,7 @@ flowchart TD
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-3 END -->
 
-## 5. EV Power Adapter
+## EV Power Adapter
 
 ```process-model
 {
@@ -208,7 +262,7 @@ flowchart TD
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-4 END -->
 
-## 6. WW Power Adapter
+## WW Power Adapter
 
 ```process-model
 {
@@ -248,9 +302,9 @@ flowchart TD
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-ww-adapter END -->
 
-`WW_target_W` is het toekomstige numerieke contract. De huidige v0.2 producer levert nog `target_on`; de adapter mag daarom niet zelf een fictief watt-target construeren.
+`WW_target_W` is het toekomstige numerieke contract. De huidige producer levert nog `target_on`.
 
-## 7. Generieke Actuator Commands v0.2
+## Generieke Actuator Commands v0.2
 
 ```process-model
 {
@@ -294,9 +348,7 @@ flowchart TD
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-5 END -->
 
-Dedupe gebruikt `sourceRevision + inputSchema`.
-
-## 8. Beoogde cut-overgrens
+## Beoogde cut-overgrens
 
 ```process-model
 {
