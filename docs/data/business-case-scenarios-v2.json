@@ -2,9 +2,10 @@
   "schema": "EMS_BUSINESS_CASE_SCENARIOS_V2",
   "status": "SHADOW_ASSUMPTIONS",
   "readOnly": true,
+  "capexEvidence": "business-case-capex-v1.json",
   "notes": [
     "Scenario values are explicit assumptions, not commissioning values.",
-    "CAPEX values remain nullable until a validated current quotation is supplied.",
+    "CAPEX is maintained separately as versioned market evidence and may remain incomplete.",
     "Runtime evidence must progressively replace generic efficiency/degradation assumptions."
   ],
   "economicDefaults": {
@@ -51,9 +52,9 @@
       "assumptionQuality": "PROVISIONAL"
     },
     {
-      "id": "BYD_COMPATIBLE_REFERENCE",
-      "label": "BYD compatible reference",
-      "capacityKWh": 10.0,
+      "id": "BYD_LVS_12_0",
+      "label": "BYD Battery-Box Premium LVS 12.0",
+      "capacityKWh": 12.0,
       "minSocPct": 10,
       "maxSocPct": 90,
       "initialSocPct": 50,
@@ -66,7 +67,8 @@
       "lifetimeYears": 15,
       "discountRate": 0.04,
       "degradationEuroPerThroughputKWh": 0.02,
-      "assumptionQuality": "PLACEHOLDER_UNTIL_EXACT_BYD_MODEL_SELECTED"
+      "compatibility": "Victron Premium LVS family supported for ESS; GX/BMS-CAN required",
+      "assumptionQuality": "EXACT_PRODUCT_SELECTED_TECHNICAL_VALUES_STILL_PROVISIONAL"
     }
   ]
 }
