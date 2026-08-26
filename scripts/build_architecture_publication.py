@@ -20,12 +20,10 @@ GENERATED_MARKER_RE = re.compile(r'<!--\s*GENERATED_MERMAID:[^>]+(?:START|END)\s
 HEADING_RE = re.compile(r'^(#{1,6})\s+(.+?)\s*$', re.M)
 
 FLOW_MAX_WIDTH_CM = 15.5
-# Reserve vertical room for the process paragraph title and named caption so the
-# complete title + diagram + caption can stay on one page without wasting a
-# separate page for the heading.
 FLOW_MAX_HEIGHT_CM = 16.8
 PAGE_BREAK = '''```{=openxml}\n<w:p><w:r><w:br w:type="page"/></w:r></w:p>\n```'''
 KEEP_WITH_NEXT = '''```{=openxml}\n<w:pPr><w:keepNext/></w:pPr>\n```'''
+TOC_PLACEHOLDER = '[[TOC]]'
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -77,38 +75,12 @@ def render_mermaid(source: str, index: int, process_title: str) -> str:
         raise RuntimeError(f'Mermaid render produced no PNG: {png}')
 
     width_cm, height_cm = fitted_dimensions_cm(png)
-    # Pandoc uses the alt text as the Word figure caption. Include the process
-    # name so captions are meaningful instead of the generic 'Procesdiagram'.
     caption = f'Procesdiagram — {process_title}'
     image = (
         f'![{caption}](diagrams/{png.name})'
         f'{{ width={width_cm}cm height={height_cm}cm }}'
     )
-    # Do not force a page break before every diagram. The heading preceding the
-    # Mermaid remains directly above it; keepNext asks Word to keep that title
-    # with the figure. A hard break after the figure preserves one-flow-per-page
-    # separation for the next process while using the current page efficiently.
     return f'\n{KEEP_WITH_NEXT}\n\n{image}\n\n{PAGE_BREAK}\n'
-
-
-def strip_heading_attributes(title: str) -> str:
-    return re.sub(r'\s*\{[^}]*\}\s*$', '', title).strip()
-
-
-def build_static_toc(text: str) -> str:
-    entries: list[str] = []
-    for hashes, raw_title in HEADING_RE.findall(text):
-        level = len(hashes)
-        if level < 2 or level > 4:
-            continue
-        title = strip_heading_attributes(raw_title)
-        if not title or title.casefold() in {'inhoudsopgave', 'table of contents'}:
-            continue
-        indent = '  ' * (level - 2)
-        entries.append(f'{indent}- {title}')
-    if not entries:
-        raise RuntimeError('Geen headings gevonden voor statische inhoudsopgave')
-    return '# Inhoudsopgave {.unnumbered}\n\n' + '\n'.join(entries) + '\n\n' + PAGE_BREAK + '\n\n'
 
 
 def main() -> int:
@@ -143,11 +115,16 @@ def main() -> int:
     if 'GENERATED_MERMAID:' in body:
         raise RuntimeError('generated markers zijn niet volledig verwijderd')
 
-    publication = build_static_toc(body) + body
+    # Do not create a Markdown list here. The DOCX pipeline replaces this exact
+    # placeholder with a genuine Word TOC field and LibreOffice refreshes it
+    # after final pagination, yielding real right-aligned page numbers.
+    toc = f'# Inhoudsopgave {{.unnumbered}}\n\n{TOC_PLACEHOLDER}\n\n{PAGE_BREAK}\n\n'
+    publication = toc + body
     OUT.write_text(publication, encoding='utf-8')
     print(
         f'PASS: publication Markdown -> {OUT}; diagrams={count}; '
-        'captions=NAMED; invariant=PROCESS_TITLE_AND_FLOW_ONE_PAGE'
+        'toc=WORD_FIELD_PLACEHOLDER; captions=NAMED; '
+        'invariant=PROCESS_TITLE_AND_FLOW_ONE_PAGE'
     )
     return 0
 
