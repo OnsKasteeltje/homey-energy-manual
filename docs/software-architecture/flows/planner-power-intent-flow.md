@@ -1,12 +1,54 @@
 ---
 title: Planner and Power Intent Flows
 status: implemented-shadow
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 ---
 
 # Planner and Power Intent Flows
 
-## 1. 24h Planner
+## 1. End-to-end Power Intent and adapter architecture
+
+```process-model
+{
+  "id": "planner-power-intent-flow-0",
+  "kind": "mermaid-source",
+  "declaration": "flowchart TD",
+  "lines": [
+    "    A[EMS policy / Energy Core] --> B[Power Intent]",
+    "    B --> C[EV_target_W]",
+    "    B --> D[WW target_on / future WW_target_W]",
+    "    C --> E[EV Power Adapter]",
+    "    D --> F[WW Power Adapter]",
+    "    E --> G[EV writer lifecycle]",
+    "    F --> H[WW writer lifecycle]",
+    "    G -. SHADOW: no write yet .-> I[Easee]",
+    "    H -. SHADOW: no write yet .-> J[Boiler]",
+    "    K[Current production writer] --> I",
+    "    L[Current boiler writer] --> J"
+  ]
+}
+```
+
+<!-- GENERATED_MERMAID:planner-power-intent-flow-0 START -->
+```mermaid
+flowchart TD
+    A[EMS policy / Energy Core] --> B[Power Intent]
+    B --> C[EV_target_W]
+    B --> D[WW target_on / future WW_target_W]
+    C --> E[EV Power Adapter]
+    D --> F[WW Power Adapter]
+    E --> G[EV writer lifecycle]
+    F --> H[WW writer lifecycle]
+    G -. SHADOW: no write yet .-> I[Easee]
+    H -. SHADOW: no write yet .-> J[Boiler]
+    K[Current production writer] --> I
+    L[Current boiler writer] --> J
+```
+<!-- GENERATED_MERMAID:planner-power-intent-flow-0 END -->
+
+De gestippelde adapterroutes zijn SHADOW en mogen niet als actieve fysieke writers worden geïnterpreteerd. De bestaande productie-writers blijven eigenaar totdat een atomic single-writer cut-over is gevalideerd.
+
+## 2. 24h Planner
 
 ```process-model
 {
@@ -48,7 +90,7 @@ flowchart TD
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-1 END -->
 
-## 2. Power Intent revision guard
+## 3. Power Intent revision guard
 
 ```process-model
 {
@@ -84,7 +126,7 @@ EV target 0 W]
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-2 END -->
 
-## 3. EV target projection
+## 4. EV target projection
 
 ```process-model
 {
@@ -124,7 +166,7 @@ flowchart TD
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-3 END -->
 
-## 4. EV Power Adapter
+## 5. EV Power Adapter
 
 ```process-model
 {
@@ -132,19 +174,18 @@ flowchart TD
   "kind": "mermaid-source",
   "declaration": "flowchart TD",
   "lines": [
-    "    A[EM2_Power_Intent v0.1/v0.2] --> B{Revision aligned + valid?}",
-    "    B -->|No| C[REVISION_MISMATCH]",
+    "    A[EV_target_W] --> B{Revision/schema/freshness valid?}",
+    "    B -->|No| C[requested_A = 0 / fail closed]",
     "    B -->|Yes| D{target_W <= 0?}",
-    "    D -->|Yes| E[command_A = 0]",
-    "    D -->|No| F{Reliable W/A available?}",
-    "    F -->|No| G[WAITING_FOR_ELECTRICAL_CONTEXT]",
-    "    F -->|Yes| H[deadband = W/A x 6A]",
-    "    H --> I{target_W below deadband?}",
-    "    I -->|Yes| E",
-    "    I -->|No| J[round target_W / W_per_A]",
-    "    J --> K[Clamp 6..16 A]",
-    "    K --> L[Publish shadow command]",
-    "    L --> M[No Easee write]"
+    "    D -->|Yes| C",
+    "    D -->|No| E[theoretical_A = target_W / 3x230]",
+    "    E --> F[floor to whole A]",
+    "    F --> G{requested_A >= 6 A?}",
+    "    G -->|No| C",
+    "    G -->|Yes| H[Clamp to safe maximum <=16 A]",
+    "    H --> I[Publish requested_A + executable_W]",
+    "    I --> J[commanded_A remains null in SHADOW]",
+    "    J --> K[No Easee write]"
   ]
 }
 ```
@@ -152,23 +193,64 @@ flowchart TD
 <!-- GENERATED_MERMAID:planner-power-intent-flow-4 START -->
 ```mermaid
 flowchart TD
-    A[EM2_Power_Intent v0.1/v0.2] --> B{Revision aligned + valid?}
-    B -->|No| C[REVISION_MISMATCH]
+    A[EV_target_W] --> B{Revision/schema/freshness valid?}
+    B -->|No| C[requested_A = 0 / fail closed]
     B -->|Yes| D{target_W <= 0?}
-    D -->|Yes| E[command_A = 0]
-    D -->|No| F{Reliable W/A available?}
-    F -->|No| G[WAITING_FOR_ELECTRICAL_CONTEXT]
-    F -->|Yes| H[deadband = W/A x 6A]
-    H --> I{target_W below deadband?}
-    I -->|Yes| E
-    I -->|No| J[round target_W / W_per_A]
-    J --> K[Clamp 6..16 A]
-    K --> L[Publish shadow command]
-    L --> M[No Easee write]
+    D -->|Yes| C
+    D -->|No| E[theoretical_A = target_W / 3x230]
+    E --> F[floor to whole A]
+    F --> G{requested_A >= 6 A?}
+    G -->|No| C
+    G -->|Yes| H[Clamp to safe maximum <=16 A]
+    H --> I[Publish requested_A + executable_W]
+    I --> J[commanded_A remains null in SHADOW]
+    J --> K[No Easee write]
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-4 END -->
 
-## 5. Generieke Actuator Commands v0.2
+## 6. WW Power Adapter
+
+```process-model
+{
+  "id": "planner-power-intent-flow-ww-adapter",
+  "kind": "mermaid-source",
+  "declaration": "flowchart TD",
+  "lines": [
+    "    A[WW target_on from Power Intent] --> B{Revision/schema/freshness valid?}",
+    "    B -->|No| C[Fail closed / no physical write]",
+    "    B -->|Yes| D{target_on}",
+    "    D -->|true| E[requested = ON]",
+    "    D -->|false| F[requested = OFF]",
+    "    D -->|null| G[requested = HOLD]",
+    "    E --> H[Publish WW shadow command]",
+    "    F --> H",
+    "    G --> H",
+    "    H --> I[deviceWrites=false]",
+    "    I --> J[Existing boiler writer remains physical owner]"
+  ]
+}
+```
+
+<!-- GENERATED_MERMAID:planner-power-intent-flow-ww-adapter START -->
+```mermaid
+flowchart TD
+    A[WW target_on from Power Intent] --> B{Revision/schema/freshness valid?}
+    B -->|No| C[Fail closed / no physical write]
+    B -->|Yes| D{target_on}
+    D -->|true| E[requested = ON]
+    D -->|false| F[requested = OFF]
+    D -->|null| G[requested = HOLD]
+    E --> H[Publish WW shadow command]
+    F --> H
+    G --> H
+    H --> I[deviceWrites=false]
+    I --> J[Existing boiler writer remains physical owner]
+```
+<!-- GENERATED_MERMAID:planner-power-intent-flow-ww-adapter END -->
+
+`WW_target_W` is het toekomstige numerieke contract. De huidige v0.2 producer levert nog `target_on`; de adapter mag daarom niet zelf een fictief watt-target construeren.
+
+## 7. Generieke Actuator Commands v0.2
 
 ```process-model
 {
@@ -184,7 +266,7 @@ flowchart TD
     "    F -->|No| E",
     "    F -->|Yes| G[Publish EM2_ACTUATOR_COMMANDS_V0.2]",
     "    G --> H[EV translation delegated to EV Power Adapter]",
-    "    G --> I[WW binary shadow translation]",
+    "    G --> I[WW translation delegated to WW Power Adapter]",
     "    G --> J[Battery shadow / not integrated]",
     "    H --> K[No physical writes]",
     "    I --> K",
@@ -204,7 +286,7 @@ flowchart TD
     F -->|No| E
     F -->|Yes| G[Publish EM2_ACTUATOR_COMMANDS_V0.2]
     G --> H[EV translation delegated to EV Power Adapter]
-    G --> I[WW binary shadow translation]
+    G --> I[WW translation delegated to WW Power Adapter]
     G --> J[Battery shadow / not integrated]
     H --> K[No physical writes]
     I --> K
@@ -212,9 +294,9 @@ flowchart TD
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-5 END -->
 
-Dedupe gebruikt `sourceRevision + inputSchema`. Daarmee is de eerdere V0.1-only schema-mismatch opgelost zonder de SHADOW-boundary te wijzigen.
+Dedupe gebruikt `sourceRevision + inputSchema`.
 
-## 6. Beoogde cut-overgrens
+## 8. Beoogde cut-overgrens
 
 ```process-model
 {
@@ -222,12 +304,12 @@ Dedupe gebruikt `sourceRevision + inputSchema`. Daarmee is de eerdere V0.1-only 
   "kind": "mermaid-source",
   "declaration": "flowchart LR",
   "lines": [
-    "    A[Core policy] --> B[Power Intent]",
-    "    B --> C[Device adapter]",
-    "    C --> D[Single physical writer]",
-    "    D --> E[Actuator]",
-    "",
-    "    X[Legacy physical writer] -. must be disabled atomically .-> D"
+    "    A[EMS policy] --> B[Power Intent]",
+    "    B --> C[Device Power Adapter]",
+    "    C --> D[Writer lifecycle]",
+    "    D --> E[Single physical writer]",
+    "    E --> F[Actuator]",
+    "    X[Legacy physical writer] -. disabled atomically at cut-over .-> E"
   ]
 }
 ```
@@ -235,12 +317,12 @@ Dedupe gebruikt `sourceRevision + inputSchema`. Daarmee is de eerdere V0.1-only 
 <!-- GENERATED_MERMAID:planner-power-intent-flow-6 START -->
 ```mermaid
 flowchart LR
-    A[Core policy] --> B[Power Intent]
-    B --> C[Device adapter]
-    C --> D[Single physical writer]
-    D --> E[Actuator]
-
-    X[Legacy physical writer] -. must be disabled atomically .-> D
+    A[EMS policy] --> B[Power Intent]
+    B --> C[Device Power Adapter]
+    C --> D[Writer lifecycle]
+    D --> E[Single physical writer]
+    E --> F[Actuator]
+    X[Legacy physical writer] -. disabled atomically at cut-over .-> E
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-6 END -->
 
