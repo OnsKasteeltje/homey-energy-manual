@@ -67,7 +67,8 @@ jobs:
           p = Path('build/software-architecture-publication.md')
           text = p.read_text(encoding='utf-8')
           assert '# Inhoudsopgave {.unnumbered}' in text
-          assert 'Architecture Overview' in text
+          assert 'Softwarearchitectuur Overzicht' in text
+          assert 'Systeemcontext' in text
           assert '24h Energy Planner and Power Intent' in text
           assert 'w:type="page"' in text
           count = text.count('![Procesdiagram](')
@@ -103,8 +104,8 @@ jobs:
             exit 1
           fi
           grep -q 'Inhoudsopgave' /tmp/publication.txt
-          grep -q 'Architecture Overview' /tmp/publication.txt
-          grep -q 'System Context' /tmp/publication.txt
+          grep -q 'Softwarearchitectuur Overzicht' /tmp/publication.txt
+          grep -q 'Systeemcontext' /tmp/publication.txt
           grep -q '24h Energy Planner and Power Intent' /tmp/publication.txt
           echo 'PASS: static TOC and expected headings present in DOCX'
 
