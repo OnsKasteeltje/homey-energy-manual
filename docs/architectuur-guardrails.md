@@ -116,6 +116,39 @@ Wijzigingsverzoek
 
 Een wijziging op de RC is alleen toegestaan wanneer kan worden benoemd welk bestaand RC-gedrag defect is, waarom dit promotie naar stable blokkeert en welke gerichte validatie na de fix wordt uitgevoerd. Ontbreekt één van deze drie elementen, dan hoort de wijziging op `main`.
 
+## G5 — Power Intent en actuator-adapters
+
+**Control-policy en fysieke actuatie worden door een harde architectuurgrens van elkaar gescheiden. De Energy Core publiceert apparaat-onafhankelijke power intent; adapters mogen uitsluitend technische uitvoerbaarheid en device-semantiek toevoegen.**
+
+Voor actuator-adapters gelden bindend de volgende regels:
+
+- het upstream control-contract gebruikt functioneel vermogen in watt waar dat fysiek zinvol is; een device-specifieke waarde zoals ampère is geen vervangende Core-policy-interface;
+- een adapter mag een target wegens fysieke constraints naar beneden kwantiseren, begrenzen of weigeren, maar mag het upstream toegewezen vermogen nooit verhogen;
+- ongeldige, stale of niet-bevestigbare control-input degradeert fail-closed;
+- requested, commanded en confirmed actuatorstate worden afzonderlijk gemodelleerd; API-acceptatie telt niet als fysieke bevestiging;
+- hoogfrequente runtime-control gebruikt uitsluitend device-interfaces die daarvoor technisch bedoeld zijn; persistente configuratie-/flash-settings zijn geen regelinterface;
+- hysterese, PV-smoothing, minimale stabiele duur, prijslogica, opportunity/MUST-keuzes en andere EMS-policy blijven upstream in Energy Core/policy;
+- idempotency, dedup, run-lease en rate limiting omringen de writer en worden niet vermengd met de pure intent→device mapping;
+- stateful hardwaretransities, waaronder toekomstige 1↔3-faseschakeling, worden als expliciete state machine met bevestiging, dead-time en timeout ontworpen;
+- iedere nieuwe LIVE actuator-adapter doorloopt eerst een SHADOW-fase waarin berekende output observeerbaar is terwijl fysieke writes hard uitgeschakeld blijven.
+
+### LIVE release-gate
+
+Een adapter mag niet van SHADOW naar LIVE zolang niet aantoonbaar is bewezen dat:
+
+1. de writer de juiste runtime/dynamic interface gebruikt;
+2. stale/invalid input fail-closed afvalt;
+3. requested/commanded/confirmed lifecycle observeerbaar en eenduidig is;
+4. idempotency, single-writer en restart recovery intact blijven;
+5. boundary- en invarianttests aantonen dat de adapter geen upstream power budget kan overschrijden;
+6. eventuele stateful actuatortransities expliciet zijn gemodelleerd en getest.
+
+Voor de Easee EV Power Adapter v0.1 betekent dit aanvullend: vaste 3-fase mapping, geen automatische phaseswitching en uitsluitend dynamic/volatile current-control bij een latere LIVE-cut-over.
+
+### Acceptatiecriterium
+
+Een actuator-adapter is niet architectuurconform wanneer hij zelfstandig EMS-policy toevoegt, een upstream power intent kan verhogen, stale data als actueel behandelt, configuratie-instellingen als frequente runtime-write gebruikt of fysieke uitvoering afleidt uit alleen een API-acknowledgement.
+
 ## Relatie met RC en toekomstige wijzigingen
 
 Deze guardrails veranderen geen bestaande RC-controlpaden op zichzelf. Zij gelden vanaf opname als verplichte architectuurtoets voor nieuwe wijzigingen en voor toekomstige herbeoordeling van bestaande integraties.
