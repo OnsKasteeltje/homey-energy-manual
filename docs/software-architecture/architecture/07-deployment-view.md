@@ -9,9 +9,9 @@ source:
   - docs/software-architecture/components/
 ---
 
-## Deployment View
+# Deployment View
 
-### Doel
+## Doel
 
 Deze view beschrijft waar de belangrijkste softwareverantwoordelijkheden runtime landen en welke externe systemen aan de HEMS-control plane grenzen.
 
@@ -44,7 +44,7 @@ flowchart TB
     Cloud --> Pages
 ```
 
-### Deploymentregels
+## Deploymentregels
 
 - Homey is de runtime control plane voor de huidige EMS-logica.
 - GitHub is de versioned source-of-truth en CI/publication plane, niet de fysieke device-control plane.
