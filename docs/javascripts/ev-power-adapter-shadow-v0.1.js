@@ -8,6 +8,7 @@
  */
 
 export const EV_POWER_ADAPTER_REVISION = "EV_POWER_ADAPTER_V0.1";
+export const EV_HARD_MAX_CURRENT_A = 16;
 
 const DEFAULTS = Object.freeze({
   phaseCount: 3,
@@ -36,6 +37,7 @@ function failClosed({
     schema: EV_POWER_ADAPTER_REVISION,
     mode: "SHADOW",
     deviceWrites: false,
+    hardMaxCurrentA: EV_HARD_MAX_CURRENT_A,
     targetW: normalizedTargetW,
     theoreticalA,
     requestedA: 0,
@@ -56,6 +58,9 @@ function failClosed({
  *
  * Policy decisions such as PV smoothing, hysteresis, MUST/deadline priority
  * and opportunity charging remain upstream in Energy Core.
+ *
+ * EV_HARD_MAX_CURRENT_A is a system safety invariant. A caller supplied
+ * maxCurrentA may reduce the limit, but can never raise it above 16 A.
  */
 export function mapEvPowerIntent(input) {
   const nowMs = input?.nowMs ?? Date.now();
@@ -109,7 +114,10 @@ export function mapEvPowerIntent(input) {
     });
   }
 
-  const maxExecutableCurrentA = Math.floor(maxCurrentA);
+  const maxExecutableCurrentA = Math.min(
+    EV_HARD_MAX_CURRENT_A,
+    Math.floor(maxCurrentA),
+  );
   if (maxExecutableCurrentA < minCurrentA) {
     return failClosed({
       targetW,
@@ -169,6 +177,7 @@ export function mapEvPowerIntent(input) {
       schema: EV_POWER_ADAPTER_REVISION,
       mode: "SHADOW",
       deviceWrites: false,
+      hardMaxCurrentA: EV_HARD_MAX_CURRENT_A,
       targetW,
       theoreticalA: 0,
       requestedA: 0,
@@ -209,6 +218,7 @@ export function mapEvPowerIntent(input) {
     schema: EV_POWER_ADAPTER_REVISION,
     mode: "SHADOW",
     deviceWrites: false,
+    hardMaxCurrentA: EV_HARD_MAX_CURRENT_A,
     targetW,
     theoreticalA,
     requestedA,
