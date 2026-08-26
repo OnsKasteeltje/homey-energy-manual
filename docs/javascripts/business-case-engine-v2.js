@@ -22,10 +22,10 @@ function validateScenario(s) {
   const required = [
     "capacityKWh", "minSocPct", "maxSocPct", "initialSocPct",
     "maxChargeKW", "maxDischargeKW", "chargeEfficiency", "dischargeEfficiency",
-    "standbyW", "capexEuro", "lifetimeYears", "discountRate",
-    "degradationEuroPerThroughputKWh"
+    "standbyW", "lifetimeYears", "discountRate", "degradationEuroPerThroughputKWh"
   ];
   for (const k of required) if (!finite(s?.[k])) throw new Error(`INVALID_SCENARIO_${k}`);
+  if (s.capexEuro != null && !finite(s.capexEuro)) throw new Error("INVALID_SCENARIO_capexEuro");
   if (s.capacityKWh <= 0 || s.maxChargeKW < 0 || s.maxDischargeKW < 0) throw new Error("INVALID_SCENARIO_POWER_OR_CAPACITY");
   if (!(s.minSocPct >= 0 && s.minSocPct < s.maxSocPct && s.maxSocPct <= 100)) throw new Error("INVALID_SOC_BAND");
   if (!(s.initialSocPct >= s.minSocPct && s.initialSocPct <= s.maxSocPct)) throw new Error("INVALID_INITIAL_SOC");
@@ -67,7 +67,6 @@ function baselineIntervalCost(gridW, h, importPrice, exportPrice) {
 }
 
 function chooseAcBatteryPowerW(strategy, sample, limits) {
-  // Sign convention at AC bus: +W = battery charging (extra load), -W = discharging (supply).
   if (strategy === BC_STRATEGIES.BASELINE) return 0;
   if (strategy === BC_STRATEGIES.SELF_CONSUMPTION) {
     if (sample.gridW < 0) return Math.min(-sample.gridW, limits.maxChargeW);
@@ -96,10 +95,9 @@ export function replayBusinessCase({ samples, scenario, strategy = BC_STRATEGIES
   for (const s of q.normalized) {
     const b = baselineIntervalCost(s.gridW, s.intervalHours, s.importPrice, s.exportPrice);
     baselineCost += b.costEuro; baselineImportKWh += b.importKWh; baselineExportKWh += b.exportKWh;
-
     const standbyAcKWh = scenario.standbyW / 1000 * s.intervalHours;
     standbyKWh += standbyAcKWh;
-    let desiredW = chooseAcBatteryPowerW(strategy, s, limits);
+    const desiredW = chooseAcBatteryPowerW(strategy, s, limits);
     let actualW = 0;
 
     if (desiredW > EPS) {
@@ -125,11 +123,9 @@ export function replayBusinessCase({ samples, scenario, strategy = BC_STRATEGIES
       curtailedDischargeKWh += desiredAcKWh - actualAcKWh;
     }
 
-    // Standby is an AC-side load and therefore remains visible even when idle.
     const scenarioGridW = s.gridW + actualW + scenario.standbyW;
     const e = baselineIntervalCost(scenarioGridW, s.intervalHours, s.importPrice, s.exportPrice);
     scenarioCost += e.costEuro; importKWh += e.importKWh; exportKWh += e.exportKWh;
-
     trace.push({ ts: s.ts, gridW: s.gridW, batteryAcW: r(actualW, 3), scenarioGridW: r(scenarioGridW, 3), socPct: r(energy / scenario.capacityKWh * 100, 3) });
   }
 
@@ -142,11 +138,7 @@ export function replayBusinessCase({ samples, scenario, strategy = BC_STRATEGIES
   const evidenceCoverage = q.total ? q.valid / q.total : 0;
 
   return {
-    schema: BC_ENGINE_SCHEMA,
-    readOnly: true,
-    controlImpact: false,
-    strategy,
-    scenarioId: scenario.id ?? null,
+    schema: BC_ENGINE_SCHEMA, readOnly: true, controlImpact: false, strategy, scenarioId: scenario.id ?? null,
     evidence: { totalSamples: q.total, validSamples: q.valid, invalidSamples: q.invalid, coverage: r(evidenceCoverage, 4), quality: evidenceCoverage >= 0.98 ? "HIGH" : evidenceCoverage >= 0.90 ? "MEDIUM" : "LOW" },
     energy: {
       baselineImportKWh: r(baselineImportKWh), baselineExportKWh: r(baselineExportKWh), importKWh: r(importKWh), exportKWh: r(exportKWh),
@@ -165,14 +157,7 @@ export function replayBusinessCase({ samples, scenario, strategy = BC_STRATEGIES
 export function annualizeReplay(result, observedDays) {
   if (!finite(observedDays) || observedDays <= 0) throw new Error("INVALID_OBSERVED_DAYS");
   const f = 365.2425 / observedDays;
-  return {
-    annualizationFactor: r(f, 6),
-    annualNetOperationalSavingEuro: r(result.economics.netOperationalSavingEuro * f, 2),
-    annualGrossOperationalSavingEuro: r(result.economics.grossOperationalSavingEuro * f, 2),
-    annualThroughputKWh: r(result.energy.throughputKWh * f, 2),
-    annualEquivalentFullCycles: r(result.energy.equivalentFullCycles * f, 3),
-    warning: observedDays < 90 ? "SHORT_EVIDENCE_WINDOW" : null,
-  };
+  return { annualizationFactor: r(f, 6), annualNetOperationalSavingEuro: r(result.economics.netOperationalSavingEuro * f, 2), annualGrossOperationalSavingEuro: r(result.economics.grossOperationalSavingEuro * f, 2), annualThroughputKWh: r(result.energy.throughputKWh * f, 2), annualEquivalentFullCycles: r(result.energy.equivalentFullCycles * f, 3), warning: observedDays < 90 ? "SHORT_EVIDENCE_WINDOW" : null };
 }
 
 export function financialCase({ capexEuro, annualNetSavingEuro, lifetimeYears, discountRate, residualValueEuro = 0, annualMaintenanceEuro = 0 }) {
@@ -191,9 +176,5 @@ export function compareBusinessCases({ baseline, ems, oracle }) {
   const o = oracle?.economics?.netOperationalSavingEuro;
   const denom = finite(o) ? o - base : NaN;
   const capture = finite(e) && finite(denom) && Math.abs(denom) > EPS ? (e - base) / denom : null;
-  return {
-    emsCaptureRatio: capture == null ? null : r(capture, 4),
-    emsGapToOracleEuro: finite(e) && finite(o) ? r(o - e, 4) : null,
-    note: "Oracle input must come from an independently validated perfect-information optimizer; this replay kernel does not label a heuristic as oracle."
-  };
+  return { emsCaptureRatio: capture == null ? null : r(capture, 4), emsGapToOracleEuro: finite(e) && finite(o) ? r(o - e, 4) : null, note: "Oracle input must come from an independently validated perfect-information optimizer; this replay kernel does not label a heuristic as oracle." };
 }
