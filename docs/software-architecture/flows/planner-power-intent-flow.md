@@ -164,8 +164,9 @@ De BC-recorder blijft read-only en legt planner/intentevidence vast voor latere 
     "    C -->|Yes| E[Project Core policy]",
     "    E --> F[Calculate EV target_W]",
     "    E --> G[Project WW target_on]",
-    "    F --> H[Publish EM2_Power_Intent v0.2.1]",
-    "    G --> H"
+    "    F --> H[Publish schema EM2_POWER_INTENT_V0.2]",
+    "    G --> H",
+    "    H --> I[policyRevision P1_V0.2.1_PV_ONLY]"
   ]
 }
 ```
@@ -181,10 +182,13 @@ EV target 0 W]
     C -->|Yes| E[Project Core policy]
     E --> F[Calculate EV target_W]
     E --> G[Project WW target_on]
-    F --> H[Publish EM2_Power_Intent v0.2.1]
+    F --> H[Publish schema EM2_POWER_INTENT_V0.2]
     G --> H
+    H --> I[policyRevision P1_V0.2.1_PV_ONLY]
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-2 END -->
+
+Het Power Intent-contractschema blijft bewust `EM2_POWER_INTENT_V0.2` voor compatibiliteit met downstream Actuator Commands en adapters; de aangescherpte policy staat in `policyRevision`.
 
 ## EV target projection
 
@@ -318,9 +322,9 @@ flowchart TD
   "kind": "mermaid-source",
   "declaration": "flowchart TD",
   "lines": [
-    "    A[Power Intent producer] --> B[EM2_POWER_INTENT_V0.2.x]",
+    "    A[Power Intent producer] --> B[EM2_POWER_INTENT_V0.2]",
     "    B --> C[Actuator Commands v0.2]",
-    "    C --> D{Supported schema?}",
+    "    C --> D{Schema V0.1 or V0.2?}",
     "    D -->|No| E[INVALID_POWER_INTENT]",
     "    D -->|Yes| F{intent valid + deviceWrites false + revision present?}",
     "    F -->|No| E",
@@ -338,9 +342,9 @@ flowchart TD
 <!-- GENERATED_MERMAID:planner-power-intent-flow-5 START -->
 ```mermaid
 flowchart TD
-    A[Power Intent producer] --> B[EM2_POWER_INTENT_V0.2.x]
+    A[Power Intent producer] --> B[EM2_POWER_INTENT_V0.2]
     B --> C[Actuator Commands v0.2]
-    C --> D{Supported schema?}
+    C --> D{Schema V0.1 or V0.2?}
     D -->|No| E[INVALID_POWER_INTENT]
     D -->|Yes| F{intent valid + deviceWrites false + revision present?}
     F -->|No| E
