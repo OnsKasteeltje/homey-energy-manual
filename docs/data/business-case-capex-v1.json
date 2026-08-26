@@ -1,0 +1,57 @@
+{
+  "schema": "EMS_BUSINESS_CASE_CAPEX_V1",
+  "asOf": "2026-08-26",
+  "currency": "EUR",
+  "pricingPolicy": "NL_CONSUMER_PRICE_OBSERVATIONS_MEDIAN_REFERENCE",
+  "status": "PARTIAL_BOS_INSTALLATION_UNQUOTED",
+  "readOnly": true,
+  "notes": [
+    "Reference prices are evidence inputs, not purchase recommendations.",
+    "Incremental investment excludes already-owned Cerbo GX and Victron grid meter.",
+    "NPV/payback remains blocked until balance-of-system and installation/self-install costs are explicitly completed.",
+    "Retail price observations can include VAT regimes; source and observed price remain traceable."
+  ],
+  "components": {
+    "PYLONTECH_US5000": {
+      "referenceEuro": 945.95,
+      "rangeEuro": [885.0, 1237.95],
+      "quality": "MULTI_SOURCE_CURRENT_NL",
+      "observations": [
+        {"priceEuro":885.0,"vatLabel":"incl_btw","source":"LithiumAccus.nl","observed":"2026-08-26","url":"https://lithiumaccus.nl/product-categorie/pylontech/?shop_view=list&stock_status=instock"},
+        {"priceEuro":945.95,"vatLabel":"incl_btw","source":"Elektro4U","observed":"2026-08-26","url":"https://www.elektro4u.nl/webshop/pylontech-us5000-lv-batterij-module-4-8kwh"},
+        {"priceEuro":1237.95,"vatLabel":"incl_btw","source":"ThuisAccuDirect","observed":"2026-08-26","url":"https://thuisaccudirect.nl/nl-nl/products/pylontech-us5000-4-8-kwh-thuisbatterij-5-kwh-energieopslag"}
+      ]
+    },
+    "VICTRON_MULTIPLUS_II_48_5000_70_50": {
+      "referenceEuro": 744.04,
+      "rangeEuro": [669.95, 806.77],
+      "quality": "MULTI_SOURCE_CURRENT_NL",
+      "observations": [
+        {"priceEuro":669.95,"vatLabel":"incl_btw","source":"Acculaders.nl","observed":"2026-08-26","url":"https://www.acculaders.nl/victron-multiplus-ii-48-5000-70-50-230v.html"},
+        {"priceEuro":695.0,"vatLabel":"incl_btw","source":"LithiumAccus.nl","observed":"2026-08-26","url":"https://lithiumaccus.nl/product/victron-multiplus-ii-48-5000-70-50-230v/"},
+        {"priceEuro":744.04,"vatLabel":"incl_btw","source":"Bootmania.nl","observed":"2026-08-26","url":"https://www.bootmania.nl/victron-multiplus-ii-48v-5000w"},
+        {"priceEuro":769.12,"vatLabel":"incl_btw","source":"VicTech.nl","observed":"2026-08-26","url":"https://victech.nl/product/victron-energy-multiplus-ii-48-5000-70-50/"},
+        {"priceEuro":806.77,"vatLabel":"incl_btw","source":"Dynastart Elektro B.V.","observed":"2026-08-26","url":"https://www.dynastart.nl/pmp482505010-multiplus-ii-48-5000-70-50-230v"}
+      ]
+    },
+    "BYD_BATTERY_BOX_PREMIUM_LVS_12_0": {
+      "referenceEuro": 4055.26,
+      "rangeEuro": [3982.0, 4128.52],
+      "quality": "CURRENT_NL_PLUS_OFFICIAL_VICTRON_COMPATIBILITY",
+      "compatibility": "Victron ESS supported for Premium LVS family; GX/BMS-CAN required",
+      "observations": [
+        {"priceEuro":3982.0,"vatLabel":"incl_btw","source":"ThuisAccuDirect","observed":"2026-08-26","url":"https://thuisaccudirect.nl/nl-nl/pages/advies"},
+        {"priceEuro":4128.52,"vatLabel":"incl_21_btw","source":"Rebor B.V.","observed":"2026-08-26","url":"https://www.shop-rebor.com/products/byd-battery-box-lvs-12-0"}
+      ]
+    },
+    "CERBO_GX": {"alreadyOwned":true,"incrementalEuro":0,"quality":"OWNED"},
+    "VICTRON_GRID_METER": {"alreadyOwned":true,"incrementalEuro":0,"quality":"OWNED"},
+    "BALANCE_OF_SYSTEM": {"referenceEuro":null,"quality":"REQUIRES_BOM"},
+    "INSTALLATION_OR_SELF_INSTALL_COST": {"referenceEuro":null,"quality":"REQUIRES_EXPLICIT_INPUT"}
+  },
+  "scenarios": {
+    "PYLONTECH_US5000_X2": {"knownIncrementalHardwareEuro":2635.94,"completeCapexEuro":null,"completeness":"PARTIAL"},
+    "PYLONTECH_US5000_X3": {"knownIncrementalHardwareEuro":3581.89,"completeCapexEuro":null,"completeness":"PARTIAL"},
+    "BYD_LVS_12_0": {"knownIncrementalHardwareEuro":4799.30,"completeCapexEuro":null,"completeness":"PARTIAL"}
+  }
+}
