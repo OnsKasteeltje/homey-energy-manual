@@ -62,12 +62,18 @@ jobs:
 
       - name: Verify static TOC and hard flow pages in publication Markdown
         run: |
-          grep -q '^# Inhoudsopgave {.unnumbered}$' build/software-architecture-publication.md
-          grep -q 'Architecture Overview' build/software-architecture-publication.md
-          grep -q '24h Energy Planner and Power Intent' build/software-architecture-publication.md
-          grep -q 'w:type="page"' build/software-architecture-publication.md
-          test "$(grep -c '^!\[Procesdiagram\]' build/software-architecture-publication.md)" -eq 41
-          echo 'PASS: static TOC present; 41 hard page-bounded process diagrams'
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('build/software-architecture-publication.md')
+          text = p.read_text(encoding='utf-8')
+          assert '# Inhoudsopgave {.unnumbered}' in text
+          assert 'Architecture Overview' in text
+          assert '24h Energy Planner and Power Intent' in text
+          assert 'w:type="page"' in text
+          count = text.count('![Procesdiagram](')
+          assert count == 41, f'expected 41 process diagrams, got {count}'
+          print('PASS: static TOC present; 41 hard page-bounded process diagrams')
+          PY
 
       - name: Build publication DOCX
         run: |
