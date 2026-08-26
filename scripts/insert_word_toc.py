@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from lxml import etree
@@ -66,6 +67,38 @@ def insert_toc_field(paragraph, levels: str) -> None:
     run._r.extend([fld_begin, instr, fld_sep, placeholder, fld_end])
 
 
+def append_page_field(paragraph) -> None:
+    run = paragraph.add_run()
+    fld_begin = OxmlElement('w:fldChar')
+    fld_begin.set(qn('w:fldCharType'), 'begin')
+    fld_begin.set(qn('w:dirty'), 'true')
+
+    instr = OxmlElement('w:instrText')
+    instr.set(qn('xml:space'), 'preserve')
+    instr.text = ' PAGE '
+
+    fld_sep = OxmlElement('w:fldChar')
+    fld_sep.set(qn('w:fldCharType'), 'separate')
+
+    placeholder = OxmlElement('w:t')
+    placeholder.text = '1'
+
+    fld_end = OxmlElement('w:fldChar')
+    fld_end.set(qn('w:fldCharType'), 'end')
+
+    run._r.extend([fld_begin, instr, fld_sep, placeholder, fld_end])
+
+
+def add_page_numbers(doc: Document) -> None:
+    for section in doc.sections:
+        section.footer.is_linked_to_previous = False
+        footer = section.footer
+        paragraph = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+        clear_paragraph(paragraph)
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        append_page_field(paragraph)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('docx', type=Path)
@@ -79,9 +112,10 @@ def main() -> None:
         raise RuntimeError(f'TOC placeholder not found: {args.placeholder}')
     clear_paragraph(target)
     insert_toc_field(target, args.levels)
+    add_page_numbers(doc)
     doc.save(str(args.docx))
     set_update_fields_on_open(args.docx)
-    print(f'PASS: genuine Word TOC field inserted into {args.docx}')
+    print(f'PASS: genuine Word TOC field and centered footer page numbers inserted into {args.docx}')
 
 
 if __name__ == '__main__':
