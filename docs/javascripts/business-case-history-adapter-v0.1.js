@@ -23,6 +23,7 @@ export function adaptEnergyHistory({history,priceResolver=null,fixedImportPriceE
       importPriceEuroPerKWh:finite(importPrice)?importPrice:null,
       exportPriceEuroPerKWh:finite(exportPrice)?exportPrice:null,
       emsBatteryTargetW:finite(x?.batteryTargetW)?x.batteryTargetW:finite(x?.emsBatteryTargetW)?x.emsBatteryTargetW:null,
+      tariffEvidence:{source:tariff.tariffSource??(finite(importPrice)&&finite(exportPrice)?"FIXED_ARGUMENT":"UNAVAILABLE"),quality:tariff.quality??null,contractType:tariff.contractType??null,tariffAt:tariff.tariffAt??null,ageMinutes:tariff.ageMinutes??null},
       evidence:{revision:x?.revision??null,held:x?.held===true,p1Source:x?.p1Source??null,teslaW:finite(x?.teslaW)?x.teslaW:null,boilerW:finite(x?.boilerW)?x.boilerW:null,pvW:[x?.solarEdgeW,x?.goodWe4200W,x?.goodWe2000W].filter(finite).reduce((a,b)=>a+b,0)}
     };
   });
