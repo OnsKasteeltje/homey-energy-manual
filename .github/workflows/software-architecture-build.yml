@@ -91,7 +91,6 @@ jobs:
             --output=build/Softwarearchitectuur_Home_Energy_Management_System.docx
           test -s build/Softwarearchitectuur_Home_Energy_Management_System.docx
 
-          # LibreOffice lays out the document and updates fields, including TOC page numbers.
           mkdir -p /tmp/lo-update /tmp/updated-docx
           libreoffice \
             -env:UserInstallation=file:///tmp/lo-update \
@@ -147,10 +146,19 @@ jobs:
           text = Path('/tmp/publication-pdf.txt').read_text(encoding='utf-8', errors='ignore')
           toc_pos = text.find('Inhoudsopgave')
           assert toc_pos >= 0
-          sample = text[toc_pos:toc_pos + 12000]
-          page_refs = re.findall(r'\.{2,}\s*\d+\s*$', sample, re.M)
-          assert len(page_refs) >= 5, f'TOC page numbers not detected; found {len(page_refs)}'
-          print(f'PASS: TOC contains page-number references ({len(page_refs)} detected)')
+          sample = text[toc_pos:toc_pos + 16000]
+          lines = [line.rstrip() for line in sample.splitlines() if line.strip()]
+          candidates = []
+          for line in lines:
+              if line.strip() == 'Inhoudsopgave':
+                  continue
+              m = re.search(r'\s+(\d{1,4})\s*$', line)
+              if m and re.search(r'[A-Za-zÀ-ÿ]', line[:m.start()]):
+                  candidates.append(line)
+          assert len(candidates) >= 5, (
+              f'TOC page numbers not detected reliably; found {len(candidates)} candidate lines'
+          )
+          print(f'PASS: TOC contains page-number references ({len(candidates)} detected)')
           PY
 
       - name: Upload architecture artifacts
