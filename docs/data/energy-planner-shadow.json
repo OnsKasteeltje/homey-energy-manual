@@ -1,11 +1,11 @@
 {
   "schema": "EM2_PLANNER_SHADOW_PUBLISH_V0.1",
-  "publishedAt": "2026-08-26T21:43:05.474Z",
+  "publishedAt": "2026-08-26T21:43:27.526Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
   "plan": {
-    "schema": "EM2_ENERGY_PLAN_24H_V0.3.1",
-    "generatedAt": "2026-08-26T21:43:00.680Z",
+    "schema": "EM2_ENERGY_PLAN_24H_V0.4",
+    "generatedAt": "2026-08-26T21:43:21.540Z",
     "controlMode": "SHADOW",
     "readOnly": true,
     "physicalWritePerformed": false,
@@ -40,13 +40,21 @@
         "samples": 285,
         "usableSamples": 285,
         "observedBaseQuarterBins": 95,
-        "observedPvQuarterBins": 95,
         "measurementControlIndependent": true
       },
       "forecastQuality": {
         "baseLoad": "CURRENT_DAY_QUARTER_PROFILE",
-        "pv": "MEASURED_DAY_PERSISTENCE_LOW_CONFIDENCE",
-        "pvNote": "PV slot forecast uses only measured same-day quarter persistence where available; missing quarters stay null. No fabricated weather curve.",
+        "pv": "WEATHER_UNAVAILABLE:insufficient 15-min weather slots",
+        "pvNote": "PV forecast uses Hauwert weather shortwave radiation; scale=8 W per W/m2, calibrationPoints=0. No day-persistence PV forecast.",
+        "pvSource": {
+          "provider": "Open-Meteo",
+          "location": "Hauwert",
+          "latitude": 52.70808,
+          "longitude": 5.10003,
+          "variable": "shortwave_radiation",
+          "resolutionMinutes": 15,
+          "retrievedAt": "2026-08-26T21:43:21.791Z"
+        },
         "gridHeadroom": "NOT_MODELED_PHASE_AWARE"
       },
       "tesla": {
@@ -81,14 +89,14 @@
           "price_eur_kwh": 0.1504,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 454,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 454,
-          "importBeforeFlexW": 454,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -123,14 +131,14 @@
           "price_eur_kwh": 0.156,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 367,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 367,
-          "importBeforeFlexW": 367,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -144,14 +152,14 @@
           "price_eur_kwh": 0.1501,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 431,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 431,
-          "importBeforeFlexW": 431,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -165,14 +173,14 @@
           "price_eur_kwh": 0.1477,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 388,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 388,
-          "importBeforeFlexW": 388,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -186,14 +194,14 @@
           "price_eur_kwh": 0.1421,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 263,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 263,
-          "importBeforeFlexW": 263,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -207,14 +215,14 @@
           "price_eur_kwh": 0.1498,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 262,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 262,
-          "importBeforeFlexW": 262,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -228,14 +236,14 @@
           "price_eur_kwh": 0.1433,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 337,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 337,
-          "importBeforeFlexW": 337,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -249,14 +257,14 @@
           "price_eur_kwh": 0.142,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 446,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 446,
-          "importBeforeFlexW": 446,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -270,14 +278,14 @@
           "price_eur_kwh": 0.1347,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 262,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 262,
-          "importBeforeFlexW": 262,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -291,14 +299,14 @@
           "price_eur_kwh": 0.1387,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 328,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 328,
-          "importBeforeFlexW": 328,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -312,14 +320,14 @@
           "price_eur_kwh": 0.1349,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 328,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 328,
-          "importBeforeFlexW": 328,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -333,14 +341,14 @@
           "price_eur_kwh": 0.1342,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 325,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 325,
-          "importBeforeFlexW": 325,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -354,14 +362,14 @@
           "price_eur_kwh": 0.133,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 306,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 306,
-          "importBeforeFlexW": 306,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -375,14 +383,14 @@
           "price_eur_kwh": 0.1357,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 387,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 387,
-          "importBeforeFlexW": 387,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -396,14 +404,14 @@
           "price_eur_kwh": 0.1341,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 383,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 383,
-          "importBeforeFlexW": 383,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -417,14 +425,14 @@
           "price_eur_kwh": 0.1344,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 310,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 310,
-          "importBeforeFlexW": 310,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -438,14 +446,14 @@
           "price_eur_kwh": 0.1339,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 257,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 257,
-          "importBeforeFlexW": 257,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -459,14 +467,14 @@
           "price_eur_kwh": 0.1338,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 370,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 370,
-          "importBeforeFlexW": 370,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -480,14 +488,14 @@
           "price_eur_kwh": 0.1342,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 372,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 372,
-          "importBeforeFlexW": 372,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -501,14 +509,14 @@
           "price_eur_kwh": 0.1366,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 255,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 255,
-          "importBeforeFlexW": 255,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -522,14 +530,14 @@
           "price_eur_kwh": 0.1402,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 256,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 256,
-          "importBeforeFlexW": 256,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -543,14 +551,14 @@
           "price_eur_kwh": 0.1392,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 323,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 323,
-          "importBeforeFlexW": 323,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -564,14 +572,14 @@
           "price_eur_kwh": 0.1394,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 324,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 324,
-          "importBeforeFlexW": 324,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -585,14 +593,14 @@
           "price_eur_kwh": 0.1476,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 300,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 300,
-          "importBeforeFlexW": 300,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -606,14 +614,14 @@
           "price_eur_kwh": 0.1608,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 432,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 432,
-          "importBeforeFlexW": 432,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -627,14 +635,14 @@
           "price_eur_kwh": 0.1609,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 379,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 379,
-          "importBeforeFlexW": 379,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -648,14 +656,14 @@
           "price_eur_kwh": 0.1697,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 377,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 377,
-          "importBeforeFlexW": 377,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -669,14 +677,14 @@
           "price_eur_kwh": 0.1704,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 254,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 254,
-          "importBeforeFlexW": 254,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -690,14 +698,14 @@
           "price_eur_kwh": 0.1709,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 295,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 295,
-          "importBeforeFlexW": 295,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -711,14 +719,14 @@
           "price_eur_kwh": 0.1775,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 350,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 350,
-          "importBeforeFlexW": 350,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -732,14 +740,14 @@
           "price_eur_kwh": 0.1777,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 272,
-          "pvForecastW": 14,
-          "netBeforeFlexW": 258,
-          "importBeforeFlexW": 258,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -753,14 +761,14 @@
           "price_eur_kwh": 0.1748,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 339,
-          "pvForecastW": 290,
-          "netBeforeFlexW": 49,
-          "importBeforeFlexW": 49,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -774,14 +782,14 @@
           "price_eur_kwh": 0.1655,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 340,
-          "pvForecastW": 341,
-          "netBeforeFlexW": -1,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -795,14 +803,14 @@
           "price_eur_kwh": 0.1691,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 400,
-          "pvForecastW": 385,
-          "netBeforeFlexW": 15,
-          "importBeforeFlexW": 15,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -816,14 +824,14 @@
           "price_eur_kwh": 0.1666,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 525,
-          "pvForecastW": 431,
-          "netBeforeFlexW": 94,
-          "importBeforeFlexW": 94,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -837,14 +845,14 @@
           "price_eur_kwh": 0.1464,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 509,
-          "pvForecastW": 472,
-          "netBeforeFlexW": 37,
-          "importBeforeFlexW": 37,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -858,14 +866,14 @@
           "price_eur_kwh": 0.114,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 405,
-          "pvForecastW": 546,
-          "netBeforeFlexW": -141,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 141,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -879,14 +887,14 @@
           "price_eur_kwh": 0.1229,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 184,
-          "pvForecastW": 968,
-          "netBeforeFlexW": -784,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 784,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -900,14 +908,14 @@
           "price_eur_kwh": 0.1207,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 125,
-          "pvForecastW": 1286,
-          "netBeforeFlexW": -1161,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1161,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -921,14 +929,14 @@
           "price_eur_kwh": 0.1069,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 17,
-          "pvForecastW": 1627,
-          "netBeforeFlexW": -1610,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1610,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -942,14 +950,14 @@
           "price_eur_kwh": 0.0827,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 0,
-          "pvForecastW": 2248,
-          "netBeforeFlexW": -2248,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 2248,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -963,14 +971,14 @@
           "price_eur_kwh": 0.1256,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 0,
-          "pvForecastW": 2749,
-          "netBeforeFlexW": -2749,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 2749,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -984,14 +992,14 @@
           "price_eur_kwh": 0.1114,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 117,
-          "pvForecastW": 3226,
-          "netBeforeFlexW": -3109,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3109,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1005,14 +1013,14 @@
           "price_eur_kwh": 0.0915,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 73,
-          "pvForecastW": 3657,
-          "netBeforeFlexW": -3584,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3584,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1026,14 +1034,14 @@
           "price_eur_kwh": 0.0716,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 134,
-          "pvForecastW": 4132,
-          "netBeforeFlexW": -3998,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3998,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1047,14 +1055,14 @@
           "price_eur_kwh": 0.1092,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 240,
-          "pvForecastW": 4575,
-          "netBeforeFlexW": -4335,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 4335,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1068,14 +1076,14 @@
           "price_eur_kwh": 0.0775,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 424,
-          "pvForecastW": 5059,
-          "netBeforeFlexW": -4635,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 4635,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1089,14 +1097,14 @@
           "price_eur_kwh": 0.04,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 422,
-          "pvForecastW": 5294,
-          "netBeforeFlexW": -4872,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 4872,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1110,14 +1118,14 @@
           "price_eur_kwh": 0.02,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 455,
-          "pvForecastW": 5765,
-          "netBeforeFlexW": -5311,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 5311,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1131,14 +1139,14 @@
           "price_eur_kwh": 0.0319,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 700,
-          "pvForecastW": 5912,
-          "netBeforeFlexW": -5212,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 5212,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1152,17 +1160,17 @@
           "price_eur_kwh": 0.01,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 532,
-          "pvForecastW": 6162,
-          "netBeforeFlexW": -5630,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 5630,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1173,14 +1181,14 @@
           "price_eur_kwh": 0,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 1657,
-          "pvForecastW": 6257,
-          "netBeforeFlexW": -4601,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 4601,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1194,17 +1202,17 @@
           "price_eur_kwh": 0,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 273,
-          "pvForecastW": 5900,
-          "netBeforeFlexW": -5627,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 5627,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1215,17 +1223,17 @@
           "price_eur_kwh": 0,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 326,
-          "pvForecastW": 6484,
-          "netBeforeFlexW": -6158,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 6158,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1236,17 +1244,17 @@
           "price_eur_kwh": 0.0011,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 367,
-          "pvForecastW": 6702,
-          "netBeforeFlexW": -6335,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 6335,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1257,14 +1265,14 @@
           "price_eur_kwh": 0.0089,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 2918,
-          "pvForecastW": 6906,
-          "netBeforeFlexW": -3988,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3988,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1278,17 +1286,17 @@
           "price_eur_kwh": 0.01,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 396,
-          "pvForecastW": 7146,
-          "netBeforeFlexW": -6750,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 6750,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1299,14 +1307,14 @@
           "price_eur_kwh": 0,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 3168,
-          "pvForecastW": 7172,
-          "netBeforeFlexW": -4004,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 4004,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1320,17 +1328,17 @@
           "price_eur_kwh": 0.01,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 550,
-          "pvForecastW": 6827,
-          "netBeforeFlexW": -6277,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 6277,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1341,17 +1349,17 @@
           "price_eur_kwh": 0.0173,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 291,
-          "pvForecastW": 7258,
-          "netBeforeFlexW": -6967,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 6967,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1362,17 +1370,17 @@
           "price_eur_kwh": 0.0327,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 631,
-          "pvForecastW": 7504,
-          "netBeforeFlexW": -6873,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 6873,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1383,17 +1391,17 @@
           "price_eur_kwh": 0,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 830,
-          "pvForecastW": 7438,
-          "netBeforeFlexW": -6608,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 6608,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1404,17 +1412,17 @@
           "price_eur_kwh": 0.02,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 679,
-          "pvForecastW": 7229,
-          "netBeforeFlexW": -6550,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 6550,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1425,17 +1433,17 @@
           "price_eur_kwh": 0.0739,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 740,
-          "pvForecastW": 7138,
-          "netBeforeFlexW": -6398,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 6398,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1446,17 +1454,17 @@
           "price_eur_kwh": 0.1058,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 1085,
-          "pvForecastW": 6791,
-          "netBeforeFlexW": -5706,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 5706,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
-          "tesla": "OPPORTUNITY_PV_ONLY",
+          "tesla": "HOLD",
           "warmWater": "HOLD"
         },
         {
@@ -1467,14 +1475,14 @@
           "price_eur_kwh": 0.0647,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 666,
-          "pvForecastW": 5973,
-          "netBeforeFlexW": -5307,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 5307,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1488,14 +1496,14 @@
           "price_eur_kwh": 0.1,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 2587,
-          "pvForecastW": 5788,
-          "netBeforeFlexW": -3201,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3201,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1509,14 +1517,14 @@
           "price_eur_kwh": 0.1293,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 0,
-          "pvForecastW": 4184,
-          "netBeforeFlexW": -4184,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 4184,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1530,14 +1538,14 @@
           "price_eur_kwh": 0.1505,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 1491,
-          "pvForecastW": 5775,
-          "netBeforeFlexW": -4284,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 4284,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1551,14 +1559,14 @@
           "price_eur_kwh": 0.12,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 1797,
-          "pvForecastW": 3357,
-          "netBeforeFlexW": -1560,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1560,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1572,14 +1580,14 @@
           "price_eur_kwh": 0.1424,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 0,
-          "pvForecastW": 2544,
-          "netBeforeFlexW": -2544,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 2544,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1593,14 +1601,14 @@
           "price_eur_kwh": 0.1717,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 1327,
-          "pvForecastW": 2500,
-          "netBeforeFlexW": -1173,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1173,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1614,14 +1622,14 @@
           "price_eur_kwh": 0.1932,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 1336,
-          "pvForecastW": 1719,
-          "netBeforeFlexW": -383,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 383,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1635,14 +1643,14 @@
           "price_eur_kwh": 0.1546,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 694,
-          "pvForecastW": 960,
-          "netBeforeFlexW": -266,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 266,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1656,14 +1664,14 @@
           "price_eur_kwh": 0.1726,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 618,
-          "pvForecastW": 731,
-          "netBeforeFlexW": -113,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 113,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1677,14 +1685,14 @@
           "price_eur_kwh": 0.1847,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 590,
-          "pvForecastW": 656,
-          "netBeforeFlexW": -66,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 66,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1698,14 +1706,14 @@
           "price_eur_kwh": 0.2081,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 520,
-          "pvForecastW": 593,
-          "netBeforeFlexW": -73,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 73,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1719,14 +1727,14 @@
           "price_eur_kwh": 0.1902,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 511,
-          "pvForecastW": 533,
-          "netBeforeFlexW": -22,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 22,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1740,14 +1748,14 @@
           "price_eur_kwh": 0.2025,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 593,
-          "pvForecastW": 462,
-          "netBeforeFlexW": 130,
-          "importBeforeFlexW": 130,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1761,14 +1769,14 @@
           "price_eur_kwh": 0.2164,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 619,
-          "pvForecastW": 404,
-          "netBeforeFlexW": 216,
-          "importBeforeFlexW": 216,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1782,14 +1790,14 @@
           "price_eur_kwh": 0.2223,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 603,
-          "pvForecastW": 339,
-          "netBeforeFlexW": 264,
-          "importBeforeFlexW": 264,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1803,14 +1811,14 @@
           "price_eur_kwh": 0.2142,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 745,
-          "pvForecastW": 285,
-          "netBeforeFlexW": 460,
-          "importBeforeFlexW": 460,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1824,14 +1832,14 @@
           "price_eur_kwh": 0.1997,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 725,
-          "pvForecastW": 213,
-          "netBeforeFlexW": 512,
-          "importBeforeFlexW": 512,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1845,14 +1853,14 @@
           "price_eur_kwh": 0.1941,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 872,
-          "pvForecastW": 158,
-          "netBeforeFlexW": 714,
-          "importBeforeFlexW": 714,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1866,14 +1874,14 @@
           "price_eur_kwh": 0.1851,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 773,
-          "pvForecastW": 151,
-          "netBeforeFlexW": 622,
-          "importBeforeFlexW": 622,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1887,14 +1895,14 @@
           "price_eur_kwh": 0.201,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 745,
-          "pvForecastW": 139,
-          "netBeforeFlexW": 606,
-          "importBeforeFlexW": 606,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1908,14 +1916,14 @@
           "price_eur_kwh": 0.1868,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 713,
-          "pvForecastW": 139,
-          "netBeforeFlexW": 574,
-          "importBeforeFlexW": 574,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1929,14 +1937,14 @@
           "price_eur_kwh": 0.1806,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 632,
-          "pvForecastW": 139,
-          "netBeforeFlexW": 493,
-          "importBeforeFlexW": 493,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1950,14 +1958,14 @@
           "price_eur_kwh": 0.1724,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 668,
-          "pvForecastW": 139,
-          "netBeforeFlexW": 529,
-          "importBeforeFlexW": 529,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1971,14 +1979,14 @@
           "price_eur_kwh": 0.1835,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 735,
-          "pvForecastW": 139,
-          "netBeforeFlexW": 596,
-          "importBeforeFlexW": 596,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -1992,14 +2000,14 @@
           "price_eur_kwh": 0.1771,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 659,
-          "pvForecastW": 60,
-          "netBeforeFlexW": 599,
-          "importBeforeFlexW": 599,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -2013,14 +2021,14 @@
           "price_eur_kwh": 0.165,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 359,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 359,
-          "importBeforeFlexW": 359,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -2034,14 +2042,14 @@
           "price_eur_kwh": 0.144,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 373,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 373,
-          "importBeforeFlexW": 373,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -2055,14 +2063,14 @@
           "price_eur_kwh": 0.1609,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 499,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 499,
-          "importBeforeFlexW": 499,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -2076,14 +2084,14 @@
           "price_eur_kwh": 0.1501,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 523,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 523,
-          "importBeforeFlexW": 523,
-          "pvSurplusBeforeFlexW": 0,
+          "pvForecastW": null,
+          "netBeforeFlexW": null,
+          "importBeforeFlexW": null,
+          "pvSurplusBeforeFlexW": null,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "QUARTER_MEDIAN",
-            "pv": "DAY_PERSISTENCE"
+            "pv": "UNAVAILABLE"
           },
           "battery": "HOLD",
           "tesla": "HOLD",
@@ -2092,449 +2100,15 @@
       ],
       "energyBalance": {
         "baseLoadGlobalMedianW": 415,
-        "balanceReady": true,
-        "slotsWithPvForecast": 95,
-        "slotsWithNetForecast": 95,
-        "note": "netBeforeFlexW = uncontrollable base-load - measured-day PV persistence; positive means import before flexible loads."
+        "balanceReady": false,
+        "slotsWithPvForecast": 0,
+        "slotsWithNetForecast": 0,
+        "note": "netBeforeFlexW = uncontrollable base-load - weather-aware Hauwert PV forecast; positive means import before flexible loads."
       },
       "tesla": {
-        "preferredSlots": [
-          {
-            "i": 60,
-            "start": "2026-08-27T12:30:00.000Z",
-            "end": "2026-08-27T12:45:00.000Z",
-            "localQuarter": 58,
-            "price_eur_kwh": 0.0173,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 291,
-            "pvForecastW": 7258,
-            "netBeforeFlexW": -6967,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6967,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 61,
-            "start": "2026-08-27T12:45:00.000Z",
-            "end": "2026-08-27T13:00:00.000Z",
-            "localQuarter": 59,
-            "price_eur_kwh": 0.0327,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 631,
-            "pvForecastW": 7504,
-            "netBeforeFlexW": -6873,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6873,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 57,
-            "start": "2026-08-27T11:45:00.000Z",
-            "end": "2026-08-27T12:00:00.000Z",
-            "localQuarter": 55,
-            "price_eur_kwh": 0.01,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 396,
-            "pvForecastW": 7146,
-            "netBeforeFlexW": -6750,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6750,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 62,
-            "start": "2026-08-27T13:00:00.000Z",
-            "end": "2026-08-27T13:15:00.000Z",
-            "localQuarter": 60,
-            "price_eur_kwh": 0,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 830,
-            "pvForecastW": 7438,
-            "netBeforeFlexW": -6608,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6608,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 63,
-            "start": "2026-08-27T13:15:00.000Z",
-            "end": "2026-08-27T13:30:00.000Z",
-            "localQuarter": 61,
-            "price_eur_kwh": 0.02,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 679,
-            "pvForecastW": 7229,
-            "netBeforeFlexW": -6550,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6550,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 64,
-            "start": "2026-08-27T13:30:00.000Z",
-            "end": "2026-08-27T13:45:00.000Z",
-            "localQuarter": 62,
-            "price_eur_kwh": 0.0739,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 740,
-            "pvForecastW": 7138,
-            "netBeforeFlexW": -6398,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6398,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 55,
-            "start": "2026-08-27T11:15:00.000Z",
-            "end": "2026-08-27T11:30:00.000Z",
-            "localQuarter": 53,
-            "price_eur_kwh": 0.0011,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 367,
-            "pvForecastW": 6702,
-            "netBeforeFlexW": -6335,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6335,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 59,
-            "start": "2026-08-27T12:15:00.000Z",
-            "end": "2026-08-27T12:30:00.000Z",
-            "localQuarter": 57,
-            "price_eur_kwh": 0.01,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 550,
-            "pvForecastW": 6827,
-            "netBeforeFlexW": -6277,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6277,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 54,
-            "start": "2026-08-27T11:00:00.000Z",
-            "end": "2026-08-27T11:15:00.000Z",
-            "localQuarter": 52,
-            "price_eur_kwh": 0,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 326,
-            "pvForecastW": 6484,
-            "netBeforeFlexW": -6158,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6158,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 65,
-            "start": "2026-08-27T13:45:00.000Z",
-            "end": "2026-08-27T14:00:00.000Z",
-            "localQuarter": 63,
-            "price_eur_kwh": 0.1058,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 1085,
-            "pvForecastW": 6791,
-            "netBeforeFlexW": -5706,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 5706,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 51,
-            "start": "2026-08-27T10:15:00.000Z",
-            "end": "2026-08-27T10:30:00.000Z",
-            "localQuarter": 49,
-            "price_eur_kwh": 0.01,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 532,
-            "pvForecastW": 6162,
-            "netBeforeFlexW": -5630,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 5630,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 53,
-            "start": "2026-08-27T10:45:00.000Z",
-            "end": "2026-08-27T11:00:00.000Z",
-            "localQuarter": 51,
-            "price_eur_kwh": 0,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 273,
-            "pvForecastW": 5900,
-            "netBeforeFlexW": -5627,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 5627,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          }
-        ],
+        "preferredSlots": [],
         "deadlinePreferredSlots": [],
-        "pvOpportunitySlots": [
-          {
-            "i": 60,
-            "start": "2026-08-27T12:30:00.000Z",
-            "end": "2026-08-27T12:45:00.000Z",
-            "localQuarter": 58,
-            "price_eur_kwh": 0.0173,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 291,
-            "pvForecastW": 7258,
-            "netBeforeFlexW": -6967,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6967,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 61,
-            "start": "2026-08-27T12:45:00.000Z",
-            "end": "2026-08-27T13:00:00.000Z",
-            "localQuarter": 59,
-            "price_eur_kwh": 0.0327,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 631,
-            "pvForecastW": 7504,
-            "netBeforeFlexW": -6873,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6873,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 57,
-            "start": "2026-08-27T11:45:00.000Z",
-            "end": "2026-08-27T12:00:00.000Z",
-            "localQuarter": 55,
-            "price_eur_kwh": 0.01,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 396,
-            "pvForecastW": 7146,
-            "netBeforeFlexW": -6750,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6750,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 62,
-            "start": "2026-08-27T13:00:00.000Z",
-            "end": "2026-08-27T13:15:00.000Z",
-            "localQuarter": 60,
-            "price_eur_kwh": 0,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 830,
-            "pvForecastW": 7438,
-            "netBeforeFlexW": -6608,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6608,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 63,
-            "start": "2026-08-27T13:15:00.000Z",
-            "end": "2026-08-27T13:30:00.000Z",
-            "localQuarter": 61,
-            "price_eur_kwh": 0.02,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 679,
-            "pvForecastW": 7229,
-            "netBeforeFlexW": -6550,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6550,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 64,
-            "start": "2026-08-27T13:30:00.000Z",
-            "end": "2026-08-27T13:45:00.000Z",
-            "localQuarter": 62,
-            "price_eur_kwh": 0.0739,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 740,
-            "pvForecastW": 7138,
-            "netBeforeFlexW": -6398,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6398,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 55,
-            "start": "2026-08-27T11:15:00.000Z",
-            "end": "2026-08-27T11:30:00.000Z",
-            "localQuarter": 53,
-            "price_eur_kwh": 0.0011,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 367,
-            "pvForecastW": 6702,
-            "netBeforeFlexW": -6335,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6335,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 59,
-            "start": "2026-08-27T12:15:00.000Z",
-            "end": "2026-08-27T12:30:00.000Z",
-            "localQuarter": 57,
-            "price_eur_kwh": 0.01,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 550,
-            "pvForecastW": 6827,
-            "netBeforeFlexW": -6277,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6277,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 54,
-            "start": "2026-08-27T11:00:00.000Z",
-            "end": "2026-08-27T11:15:00.000Z",
-            "localQuarter": 52,
-            "price_eur_kwh": 0,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 326,
-            "pvForecastW": 6484,
-            "netBeforeFlexW": -6158,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 6158,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 65,
-            "start": "2026-08-27T13:45:00.000Z",
-            "end": "2026-08-27T14:00:00.000Z",
-            "localQuarter": 63,
-            "price_eur_kwh": 0.1058,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 1085,
-            "pvForecastW": 6791,
-            "netBeforeFlexW": -5706,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 5706,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 51,
-            "start": "2026-08-27T10:15:00.000Z",
-            "end": "2026-08-27T10:30:00.000Z",
-            "localQuarter": 49,
-            "price_eur_kwh": 0.01,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 532,
-            "pvForecastW": 6162,
-            "netBeforeFlexW": -5630,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 5630,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          },
-          {
-            "i": 53,
-            "start": "2026-08-27T10:45:00.000Z",
-            "end": "2026-08-27T11:00:00.000Z",
-            "localQuarter": 51,
-            "price_eur_kwh": 0,
-            "priceClass": "CHEAP",
-            "baseLoadForecastW": 273,
-            "pvForecastW": 5900,
-            "netBeforeFlexW": -5627,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 5627,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "QUARTER_MEDIAN",
-              "pv": "DAY_PERSISTENCE"
-            }
-          }
-        ],
+        "pvOpportunitySlots": [],
         "obligationKWh": 0,
         "deadlineAt": "2026-08-23T16:00",
         "allocationPolicy": "PV_SURPLUS_ONLY_NO_PRICE_TRIGGER"
@@ -2548,35 +2122,35 @@
         "mode": "THEORETICAL_ONLY_NO_SOC",
         "economicPairs": [
           {
-            "chargeStart": "2026-08-27T13:00:00.000Z",
+            "chargeStart": "2026-08-27T10:30:00.000Z",
             "dischargeStart": "2026-08-27T17:45:00.000Z",
             "chargePrice": 0,
             "dischargePrice": 0.2223,
             "netValuePerGridKWh": 0.2006
           },
           {
-            "chargeStart": "2026-08-27T11:00:00.000Z",
+            "chargeStart": "2026-08-27T10:45:00.000Z",
             "dischargeStart": "2026-08-27T17:30:00.000Z",
             "chargePrice": 0,
             "dischargePrice": 0.2164,
             "netValuePerGridKWh": 0.1953
           },
           {
-            "chargeStart": "2026-08-27T10:45:00.000Z",
+            "chargeStart": "2026-08-27T11:00:00.000Z",
             "dischargeStart": "2026-08-27T18:00:00.000Z",
             "chargePrice": 0,
             "dischargePrice": 0.2142,
             "netValuePerGridKWh": 0.1933
           },
           {
-            "chargeStart": "2026-08-27T10:30:00.000Z",
+            "chargeStart": "2026-08-27T12:00:00.000Z",
             "dischargeStart": "2026-08-27T16:45:00.000Z",
             "chargePrice": 0,
             "dischargePrice": 0.2081,
             "netValuePerGridKWh": 0.1878
           },
           {
-            "chargeStart": "2026-08-27T12:00:00.000Z",
+            "chargeStart": "2026-08-27T13:00:00.000Z",
             "dischargeStart": "2026-08-27T17:15:00.000Z",
             "chargePrice": 0,
             "dischargePrice": 0.2025,
@@ -2597,7 +2171,7 @@
             "netValuePerGridKWh": 0.1713
           },
           {
-            "chargeStart": "2026-08-27T11:45:00.000Z",
+            "chargeStart": "2026-08-27T10:15:00.000Z",
             "dischargeStart": "2026-08-27T18:30:00.000Z",
             "chargePrice": 0.01,
             "dischargePrice": 0.1941,
@@ -2607,8 +2181,8 @@
         "note": "No physical battery dispatch until actual SOC and commissioning constraints are integrated."
       }
     },
-    "plannerStatus": "READY_SHADOW_V0.3.1",
-    "nextPhase": "COMPARE_96_SLOT_FORECAST_WITH_ACTUAL_OUTCOMES",
+    "plannerStatus": "DEGRADED_PV_WEATHER_FORECAST",
+    "nextPhase": "COMPARE_WEATHER_AWARE_PV_FORECAST_WITH_ACTUAL_OUTCOMES",
     "safety": {
       "noDeviceWrites": true,
       "noVictronWrites": true,
@@ -2620,19 +2194,21 @@
     }
   },
   "status": {
-    "status": "READY_SHADOW_V0.3.1",
-    "at": "2026-08-26T21:43:00.680Z",
-    "version": "EM2_ENERGY_PLAN_24H_V0.3.1",
+    "status": "DEGRADED_PV_WEATHER_FORECAST",
+    "at": "2026-08-26T21:43:21.540Z",
+    "version": "EM2_ENERGY_PLAN_24H_V0.4",
     "contract": "DYNAMIC",
     "slots": 96,
     "baseQuality": "CURRENT_DAY_QUARTER_PROFILE",
-    "pvQuality": "MEASURED_DAY_PERSISTENCE_LOW_CONFIDENCE",
+    "pvQuality": "WEATHER_UNAVAILABLE:insufficient 15-min weather slots",
+    "pvSource": "OPEN_METEO_HAUWERT",
+    "pvCalibrationPoints": 0,
+    "pvScaleWPerWm2": 8,
     "usableHistory": 285,
     "observedBaseBins": 95,
-    "observedPvBins": 95,
-    "slotsWithNetForecast": 95,
+    "slotsWithNetForecast": 0,
     "teslaObligation": false,
-    "teslaOpportunitySlots": 12,
+    "teslaOpportunitySlots": 0,
     "teslaAllocationPolicy": "PV_SURPLUS_ONLY_NO_PRICE_TRIGGER",
     "wwObligation": false,
     "noActuatorWrites": true
