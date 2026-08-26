@@ -20,8 +20,12 @@ GENERATED_MARKER_RE = re.compile(r'<!--\s*GENERATED_MERMAID:[^>]+(?:START|END)\s
 HEADING_RE = re.compile(r'^(#{1,6})\s+(.+?)\s*$', re.M)
 
 FLOW_MAX_WIDTH_CM = 15.5
-FLOW_MAX_HEIGHT_CM = 19.0
+# Reserve vertical room for the process paragraph title and named caption so the
+# complete title + diagram + caption can stay on one page without wasting a
+# separate page for the heading.
+FLOW_MAX_HEIGHT_CM = 16.8
 PAGE_BREAK = '''```{=openxml}\n<w:p><w:r><w:br w:type="page"/></w:r></w:p>\n```'''
+KEEP_WITH_NEXT = '''```{=openxml}\n<w:pPr><w:keepNext/></w:pPr>\n```'''
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -46,30 +50,45 @@ def fitted_dimensions_cm(path: Path) -> tuple[float, float]:
     return round(width_cm, 2), round(height_cm, 2)
 
 
-def render_mermaid(source: str, index: int) -> str:
+def clean_title(raw_title: str) -> str:
+    title = re.sub(r'\s*\{[^}]*\}\s*$', '', raw_title).strip()
+    title = re.sub(r'^\d+(?:\.\d+)*\.?\s+', '', title).strip()
+    return title
+
+
+def nearest_process_title(prefix: str, index: int) -> str:
+    matches = list(HEADING_RE.finditer(prefix))
+    if not matches:
+        return f'Proces {index}'
+    return clean_title(matches[-1].group(2)) or f'Proces {index}'
+
+
+def render_mermaid(source: str, index: int, process_title: str) -> str:
     DIAGRAM_DIR.mkdir(parents=True, exist_ok=True)
     mmd = DIAGRAM_DIR / f'diagram-{index:02d}.mmd'
     png = DIAGRAM_DIR / f'diagram-{index:02d}.png'
     mmd.write_text(source.strip() + '\n', encoding='utf-8')
     cmd = [
-        'mmdc',
-        '-p', str(PUPPETEER_CONFIG),
-        '-i', str(mmd),
-        '-o', str(png),
-        '-b', 'white',
-        '-w', '1600',
-        '-s', '1',
+        'mmdc', '-p', str(PUPPETEER_CONFIG), '-i', str(mmd), '-o', str(png),
+        '-b', 'white', '-w', '1600', '-s', '1',
     ]
     subprocess.run(cmd, check=True)
     if not png.exists() or png.stat().st_size == 0:
         raise RuntimeError(f'Mermaid render produced no PNG: {png}')
 
     width_cm, height_cm = fitted_dimensions_cm(png)
+    # Pandoc uses the alt text as the Word figure caption. Include the process
+    # name so captions are meaningful instead of the generic 'Procesdiagram'.
+    caption = f'Procesdiagram — {process_title}'
     image = (
-        f'![Procesdiagram](diagrams/{png.name})'
+        f'![{caption}](diagrams/{png.name})'
         f'{{ width={width_cm}cm height={height_cm}cm }}'
     )
-    return f'\n{PAGE_BREAK}\n\n{image}\n\n{PAGE_BREAK}\n'
+    # Do not force a page break before every diagram. The heading preceding the
+    # Mermaid remains directly above it; keepNext asks Word to keep that title
+    # with the figure. A hard break after the figure preserves one-flow-per-page
+    # separation for the next process while using the current page efficiently.
+    return f'\n{KEEP_WITH_NEXT}\n\n{image}\n\n{PAGE_BREAK}\n'
 
 
 def strip_heading_attributes(title: str) -> str:
@@ -109,8 +128,10 @@ def main() -> int:
     pos = 0
     for match in MERMAID_RE.finditer(text):
         count += 1
+        prefix = text[:match.start()]
+        process_title = nearest_process_title(prefix, count)
         parts.append(text[pos:match.start()])
-        parts.append(render_mermaid(match.group(1), count))
+        parts.append(render_mermaid(match.group(1), count, process_title))
         pos = match.end()
     parts.append(text[pos:])
     body = ''.join(parts)
@@ -126,7 +147,7 @@ def main() -> int:
     OUT.write_text(publication, encoding='utf-8')
     print(
         f'PASS: publication Markdown -> {OUT}; diagrams={count}; '
-        'toc=STATIC; invariant=ONE_FLOW_ONE_PAGE_HARD'
+        'captions=NAMED; invariant=PROCESS_TITLE_AND_FLOW_ONE_PAGE'
     )
     return 0
 
