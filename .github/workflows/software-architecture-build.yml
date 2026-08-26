@@ -64,16 +64,20 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('build/software-architecture-publication.md')
-          text = p.read_text(encoding='utf-8')
-          assert '# Inhoudsopgave {.unnumbered}' in text
-          assert 'Softwarearchitectuur Overzicht' in text
-          assert 'Systeemcontext' in text
-          assert '24h Energy Planner and Power Intent' in text
-          assert 'w:type="page"' in text
-          count = text.count('![Procesdiagram](')
-          assert count == 41, f'expected 41 process diagrams, got {count}'
-          print('PASS: static TOC present; 41 hard page-bounded process diagrams')
+          master = Path('docs/software-architecture/generated/software-architecture.md').read_text(encoding='utf-8')
+          publication = Path('build/software-architecture-publication.md').read_text(encoding='utf-8')
+          assert '# Inhoudsopgave {.unnumbered}' in publication
+          assert 'Softwarearchitectuur Overzicht' in publication
+          assert 'Systeemcontext' in publication
+          assert '24h Energy Planner and Power Intent' in publication
+          assert 'w:type="page"' in publication
+          expected = master.count('```mermaid')
+          actual = publication.count('![Procesdiagram](')
+          assert expected > 0, 'expected at least one Mermaid process diagram'
+          assert actual == expected, f'process diagram render mismatch: source={expected}, publication={actual}'
+          page_breaks = publication.count('w:type="page"')
+          assert page_breaks >= actual * 2, f'each diagram must have hard page boundaries: diagrams={actual}, page_breaks={page_breaks}'
+          print(f'PASS: static TOC present; {actual} dynamically counted hard page-bounded process diagrams')
           PY
 
       - name: Build publication DOCX
