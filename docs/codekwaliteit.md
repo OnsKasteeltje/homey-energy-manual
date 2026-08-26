@@ -130,6 +130,28 @@ De repository bevat Python- en JavaScript-tests die vóór een Pages-deployment 
 - `EnergyStore` state/error-publicatie;
 - repository- en Energy State-contractvalidatie.
 
+Voor actuator-adapters zijn boundary- en invarianttests verplicht. De EV Power Adapter v0.1 test minimaal het elektrische minimum, quantisatie naar beneden, max-current clamp, stale/invalid input en de invariant dat het uitvoerbare vermogen het upstream toegewezen vermogen nooit overschrijdt.
+
+## Coding practices voor actuator-adapters
+
+Actuator-adapters vormen een safety- en control-grens. Nieuwe adaptercode volgt daarom aanvullend deze coding practices:
+
+- **Houd de mapping deterministisch en zo puur mogelijk.** De functie `intent + expliciete constraints → requested actuator state` bevat geen verborgen timers, prijslogica, PV-smoothing, opportunity/MUST-keuze of comfortpolicy.
+- **Overschrijd nooit het upstream budget.** Discrete device-setpoints worden conservatief naar beneden gekwantiseerd. Bij W→A betekent dit `floor`, gevolgd door fysieke min/max-validatie; een target onder het minimum wordt 0 en nooit automatisch naar het minimum omhoog afgerond.
+- **Fail closed op onbetrouwbare control-input.** Ontbrekende, ongeldige, toekomstige of stale intent/device-state levert een expliciete reason code en een veilige nul-/idle-opdracht.
+- **Freshness is onderdeel van het contract.** Timestamps worden gevalideerd; out-of-order telemetry mag nieuwere bevestigde state niet terugrollen.
+- **Requested, commanded en confirmed zijn verschillende states.** Een berekend setpoint, een gestarte write en een door het apparaat bevestigde toestand worden nooit door één variabele of succesflag vertegenwoordigd. Een HTTP/API-acknowledgement is geen bewijs van fysieke uitvoering.
+- **Gebruik runtime-control voor runtime-control.** Frequent veranderende EMS-setpoints mogen alleen via dynamic/volatile device-interfaces worden geschreven. Persistente configuratie-, flash- of hardware-maxinstellingen worden als configuratiepad behandeld, niet als regelpad.
+- **Writer-state hoort rond de mapper.** Idempotency, dedup, run-lease, write-throttling, retries en confirmation timeouts omringen de writer; zij worden niet verstopt in de pure vermogensconversie.
+- **Stateful hardwaregedrag krijgt een expliciete state machine.** Start/stop/restart, faseschakeling en vergelijkbare transities bevatten benoemde states, bevestigingscriteria, dead-time waar vereist, timeout en failure-state. Losse opeenvolgende writes met impliciete timing zijn niet toegestaan.
+- **Capabilities zijn expliciete constraints, geen policy.** Faseaantal, voltage, min/max stroom en device/vehicle capabilities mogen de output beperken of weigeren, maar bepalen niet zelfstandig wanneer een resource economisch of beleidsmatig gebruikt wordt.
+- **SHADOW is een hard gescheiden execution mode.** SHADOW-code publiceert dezelfde berekende actuatoroutput en reason codes als een latere writer zou consumeren, maar bevat een niet-overschrijfbare `deviceWrites=false`-garantie.
+- **Observability is onderdeel van de DoD.** Publiceer minimaal intent, theoretische conversie, requested state, uitvoerbaar vermogen, quantisatie-/clampdelta, freshness, reason, sourceRevision en — indien beschikbaar — afzonderlijke commanded/confirmed state.
+- **Boundarytests zijn verplicht vóór LIVE.** Test exact onder/op/boven fysieke minima, quantisatiegrenzen, max clamp, invalid/stale inputs en generieke invarianten zoals monotonic safety en `executableW <= targetW` voor positieve load-intents.
+- **Device-specifieke uitzonderingen blijven lokaal.** Easee-, boiler- en Victron-semantiek mogen niet teruglekken als legacy device-units in het Power Intent-contract.
+
+Voor Easee geldt aanvullend als coding/release-regel: hoogfrequente laadregeling gebruikt uitsluitend dynamic/volatile current-control. Automatische 1↔3-faseschakeling is geen stateless uitbreiding van W→A en vereist een afzonderlijk gevalideerde state machine.
+
 ## CI/CD quality gates
 
 De Pages-pipeline voert vóór deployment uit:
@@ -210,6 +232,10 @@ Bij iedere relevante wijziging wordt minimaal gecontroleerd:
 - schemawijziging atomair door alle consumers/validators/tests;
 - regressietest voor kritieke nieuwe logica;
 - geen nieuwe onnodige Homey-polling of dubbele writer;
+- actuator-adapters verhogen nooit een upstream power budget en failen closed op stale/invalid control-input;
+- requested/commanded/confirmed actuatorstate blijft expliciet gescheiden;
+- frequente actuatorwrites gebruiken uitsluitend daarvoor bedoelde runtime/dynamic interfaces;
+- stateful hardwaretransities hebben een expliciete state machine en timeout/failure-semantiek;
 - voor interactieve frontend: expliciet lifecycle-/ownershipcontract en behoud van lokale edit-state;
 - complexe samengestelde views initieel atomair zichtbaar maken en geen zichtbare tussenstates tonen;
 - atomic render niet gebruiken als vervanging voor het structureel consolideren van post-render patches/timers;
