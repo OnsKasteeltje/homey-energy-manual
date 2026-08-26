@@ -10,7 +10,9 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  * same battery constraints as the replay kernel and returns EMS_REPLAY targets
  * that are replayed by the canonical kernel for final accounting.
  *
- * Energy state is discretized; therefore this is an auditable numerical upper
+ * Initial SOC is real starting energy, not free charging opportunity; tests
+ * that specifically validate cheap-to-expensive shifting therefore start empty.
+ * Energy state is discretized; this remains an auditable numerical upper
  * benchmark, not a claim of continuous mathematical exactness.
  */
 export function optimizePerfectInformation({samples,scenario,energyStepKWh=0.1,terminalEnergyValueEuroPerKWh=null}){
