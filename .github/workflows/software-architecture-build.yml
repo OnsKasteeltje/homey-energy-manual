@@ -60,23 +60,23 @@ jobs:
       - name: Build publication Markdown and render diagrams
         run: python3 scripts/build_architecture_publication.py
 
-      - name: Verify static TOC and hard flow pages in publication Markdown
+      - name: Verify named process diagrams and hard flow pages
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('build/software-architecture-publication.md')
           text = p.read_text(encoding='utf-8')
-          assert '# Inhoudsopgave {.unnumbered}' in text
           assert 'Softwarearchitectuur Overzicht' in text
           assert 'Systeemcontext' in text
           assert '24h Energy Planner and Power Intent' in text
           assert 'w:type="page"' in text
-          count = text.count('![Procesdiagram](')
-          assert count == 44, f'expected 44 process diagrams, got {count}'
-          print('PASS: static TOC present; 44 hard page-bounded process diagrams')
+          count = text.count('![Procesdiagram — ')
+          assert count == 44, f'expected 44 named process diagrams, got {count}'
+          assert '![Procesdiagram](' not in text, 'generic process caption remains'
+          print('PASS: 44 named, hard page-bounded process diagrams')
           PY
 
-      - name: Build publication DOCX
+      - name: Build publication DOCX with real TOC
         run: |
           pandoc \
             build/software-architecture-publication.md \
@@ -84,14 +84,29 @@ jobs:
             --to=docx \
             --resource-path=build \
             --number-sections \
+            --toc \
+            --toc-depth=3 \
+            --metadata toc-title='Inhoudsopgave' \
             --metadata title='Softwarearchitectuur Home Energy Management System' \
             --output=build/Softwarearchitectuur_Home_Energy_Management_System.docx
           test -s build/Softwarearchitectuur_Home_Energy_Management_System.docx
 
-      - name: Verify publication source and TOC
+          # LibreOffice lays out the document and updates fields, including TOC page numbers.
+          mkdir -p /tmp/lo-update /tmp/updated-docx
+          libreoffice \
+            -env:UserInstallation=file:///tmp/lo-update \
+            --headless \
+            --convert-to docx \
+            --outdir /tmp/updated-docx \
+            build/Softwarearchitectuur_Home_Energy_Management_System.docx
+          if test -s /tmp/updated-docx/Softwarearchitectuur_Home_Energy_Management_System.docx; then
+            cp /tmp/updated-docx/Softwarearchitectuur_Home_Energy_Management_System.docx build/Softwarearchitectuur_Home_Energy_Management_System.docx
+          fi
+
+      - name: Verify publication source, TOC and captions
         run: |
           pandoc build/Softwarearchitectuur_Home_Energy_Management_System.docx -t plain > /tmp/publication.txt
-          if grep -q '"kind": "mermaid-source"' /tmp/publication.txt; then
+          if grep -q '\"kind\": \"mermaid-source\"' /tmp/publication.txt; then
             echo 'FAIL: process-model source leaked into publication DOCX'
             exit 1
           fi
@@ -107,7 +122,8 @@ jobs:
           grep -q 'Softwarearchitectuur Overzicht' /tmp/publication.txt
           grep -q 'Systeemcontext' /tmp/publication.txt
           grep -q '24h Energy Planner and Power Intent' /tmp/publication.txt
-          echo 'PASS: static TOC and expected headings present in DOCX'
+          grep -q 'Procesdiagram — ' /tmp/publication.txt
+          echo 'PASS: TOC, expected headings and named process captions present in DOCX'
 
       - name: Build PDF from DOCX
         run: |
@@ -120,6 +136,22 @@ jobs:
             build/Softwarearchitectuur_Home_Energy_Management_System.docx
           test -s build/Softwarearchitectuur_Home_Energy_Management_System.pdf
           pdfinfo build/Softwarearchitectuur_Home_Energy_Management_System.pdf | grep -q '^Pages:'
+
+      - name: Verify PDF contains TOC page numbers
+        run: |
+          pdftotext -layout build/Softwarearchitectuur_Home_Energy_Management_System.pdf /tmp/publication-pdf.txt
+          grep -q 'Inhoudsopgave' /tmp/publication-pdf.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('/tmp/publication-pdf.txt').read_text(encoding='utf-8', errors='ignore')
+          toc_pos = text.find('Inhoudsopgave')
+          assert toc_pos >= 0
+          sample = text[toc_pos:toc_pos + 12000]
+          page_refs = re.findall(r'\.{2,}\s*\d+\s*$', sample, re.M)
+          assert len(page_refs) >= 5, f'TOC page numbers not detected; found {len(page_refs)}'
+          print(f'PASS: TOC contains page-number references ({len(page_refs)} detected)')
+          PY
 
       - name: Upload architecture artifacts
         uses: actions/upload-artifact@v4
