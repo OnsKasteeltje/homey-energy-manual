@@ -1,6 +1,6 @@
 # Architectuur-guardrails
 
-Deze guardrails zijn bindend voor nieuwe functionaliteit, apps, plugins, integraties en actuatorroutes binnen het Home Energy Management System (EMS).
+Deze guardrails zijn bindend voor nieuwe functionaliteit, apps, plugins, integraties, actuatorroutes en gegenereerde architectuurdocumentatie binnen het Home Energy Management System (EMS).
 
 ## G1 — Native Homey vóór maatwerk
 
@@ -148,6 +148,35 @@ Voor de Easee EV Power Adapter v0.1 betekent dit aanvullend: vaste 3-fase mappin
 ### Acceptatiecriterium
 
 Een actuator-adapter is niet architectuurconform wanneer hij zelfstandig EMS-policy toevoegt, een upstream power intent kan verhogen, stale data als actueel behandelt, configuratie-instellingen als frequente runtime-write gebruikt of fysieke uitvoering afleidt uit alleen een API-acknowledgement.
+
+## G6 — One-pass architecture document release pipeline
+
+**A request to generate a new software architecture document is treated as one release operation. CI is a verification gate, not the first place where predictable document-generation errors are discovered.**
+
+The standard documentation language is **English**.
+
+Every document release follows this mandatory sequence:
+
+1. **Source refresh** — collect the current architecture, component, Planner, Business Case, adapter, flow and validation sources that belong in the document.
+2. **Preflight before build** — validate the manifest, frontmatter, required `sources`, verification dates, expected sections, English publication language and diagram inputs before starting the publication build.
+3. **Build** — generate the master publication source, process diagrams, DOCX, real Word table of contents, page numbering and PDF.
+4. **Document QA before delivery** — verify the rendered document, not only source text. At minimum confirm:
+   - the table of contents contains visible page numbers;
+   - document pages have visible page numbering;
+   - each process diagram caption uses `Process diagram — <process name>`;
+   - the relevant section heading and its process diagram stay on the same page where technically possible;
+   - no Mermaid source, generation markers or other implementation artefacts leak into the publication;
+   - required current sections such as Planner and Business Case are actually present when applicable.
+5. **Artifact-first publication** — DOCX/PDF artefacts are uploaded as soon as they are successfully built. A later supplemental QA check must not make an otherwise generated document inaccessible.
+6. **Delivery gate** — only report a document as available after the requested DOCX artefact exists and the mandatory document QA has passed. Intermediate builds are not presented as completed releases.
+
+### Self-testing requirement
+
+Adding a component or section to `manifest.yaml` must be preflight-testable. Missing required metadata such as frontmatter, `sources` or `last_verified` must fail locally/pre-build with a precise diagnostic rather than first being discovered deep inside GitHub Actions.
+
+### Acceptance criterion
+
+A documentation release is conformant only when one invocation can progress from refreshed sources through preflight, build, rendered-document QA and downloadable artefact without manual repair of predictable metadata, TOC, page-numbering, caption or artifact-upload issues.
 
 ## Relatie met RC en toekomstige wijzigingen
 
