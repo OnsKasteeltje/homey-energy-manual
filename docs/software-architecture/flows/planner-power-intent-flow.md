@@ -48,7 +48,7 @@ flowchart TD
 
 De adapterroutes zijn SHADOW. De bestaande productie-writers blijven fysieke eigenaar totdat een atomic single-writer cut-over is gevalideerd.
 
-## 24h Planner v0.3 energy-balance forecast
+## 24h Planner v0.3.1 energy-balance forecast
 
 ```process-model
 {
@@ -69,14 +69,19 @@ De adapterroutes zijn SHADOW. De bestaande productie-writers blijven fysieke eig
     "    H --> L[Calculate netBeforeFlex where base + PV known]",
     "    J --> L",
     "    K --> L",
-    "    L --> M[Rank hard Tesla + WW obligations first]",
-    "    M --> N{Contract type}",
-    "    N -->|DYNAMIC| O[Rank price then PV surplus]",
-    "    N -->|FIXED| P[Rank PV surplus then time]",
-    "    O --> Q[Add theoretical battery candidates only]",
-    "    P --> Q",
-    "    Q --> R[Publish EM2_Energy_Plan_24h v0.3]",
-    "    R --> S[No physical writes]"
+    "    L --> M{Tesla deadline active?}",
+    "    M -->|No| N[Select only PV surplus >= 800 W]",
+    "    N --> O[Mark OPPORTUNITY_PV_ONLY]",
+    "    M -->|Yes| P[Rank PV-surplus slots first]",
+    "    P --> Q{Dynamic contract?}",
+    "    Q -->|Yes| R[Rank remaining required grid slots by cheapest price]",
+    "    Q -->|No| S[Rank remaining required slots by time]",
+    "    R --> T[Mark PREFERRED_BEFORE_DEADLINE]",
+    "    S --> T",
+    "    O --> U[Add WW + theoretical battery candidates]",
+    "    T --> U",
+    "    U --> V[Publish EM2_Energy_Plan_24h v0.3.1]",
+    "    V --> W[No physical writes]"
   ]
 }
 ```
@@ -97,18 +102,23 @@ flowchart TD
     H --> L[Calculate netBeforeFlex where base + PV known]
     J --> L
     K --> L
-    L --> M[Rank hard Tesla + WW obligations first]
-    M --> N{Contract type}
-    N -->|DYNAMIC| O[Rank price then PV surplus]
-    N -->|FIXED| P[Rank PV surplus then time]
-    O --> Q[Add theoretical battery candidates only]
-    P --> Q
-    Q --> R[Publish EM2_Energy_Plan_24h v0.3]
-    R --> S[No physical writes]
+    L --> M{Tesla deadline active?}
+    M -->|No| N[Select only PV surplus >= 800 W]
+    N --> O[Mark OPPORTUNITY_PV_ONLY]
+    M -->|Yes| P[Rank PV-surplus slots first]
+    P --> Q{Dynamic contract?}
+    Q -->|Yes| R[Rank remaining required grid slots by cheapest price]
+    Q -->|No| S[Rank remaining required slots by time]
+    R --> T[Mark PREFERRED_BEFORE_DEADLINE]
+    S --> T
+    O --> U[Add WW + theoretical battery candidates]
+    T --> U
+    U --> V[Publish EM2_Energy_Plan_24h v0.3.1]
+    V --> W[No physical writes]
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-1 END -->
 
-De tijdas is altijd 96 kwartieren, ook bij FIXED. Prijs is context en niet langer de bron van de tijdas. Onbekende PV-slots blijven `null`; v0.3 fabriceert geen weather curve. `gridHeadroomW` blijft expliciet ongemodelleerd totdat fasebewuste 3×25 A headroom beschikbaar is.
+De tijdas is altijd 96 kwartieren, ook bij FIXED. Tesla opportunity is strikt PV-only; goedkope of negatieve prijs mag zonder deadline geen laadslot creëren. Bij deadline/MUST krijgt PV voorrang en wordt alleen de resterende noodzakelijke netenergie bij DYNAMIC op prijs geoptimaliseerd. Onbekende PV-slots blijven `null`; `gridHeadroomW` blijft ongemodelleerd totdat fasebewuste 3×25 A headroom beschikbaar is.
 
 ## Planner publication and BC evidence loop
 
@@ -118,9 +128,9 @@ De tijdas is altijd 96 kwartieren, ook bij FIXED. Prijs is context en niet lange
   "kind": "mermaid-source",
   "declaration": "flowchart TD",
   "lines": [
-    "    A[EM2_Energy_Plan_24h v0.3] --> B[Planner Shadow Publisher v0.1]",
+    "    A[EM2_Energy_Plan_24h v0.3.1] --> B[Planner Shadow Publisher v0.1]",
     "    B --> C[energy-planner-shadow.json]",
-    "    C --> D[BC Planner Intent Recorder v0.2]",
+    "    C --> D[BC Planner Intent Recorder v0.3]",
     "    E[EM2_Power_Intent] --> D",
     "    D --> F[15-min evidence buffer]",
     "    F --> G[planned -> intent evidence]",
@@ -132,9 +142,9 @@ De tijdas is altijd 96 kwartieren, ook bij FIXED. Prijs is context en niet lange
 <!-- GENERATED_MERMAID:planner-power-intent-flow-evidence START -->
 ```mermaid
 flowchart TD
-    A[EM2_Energy_Plan_24h v0.3] --> B[Planner Shadow Publisher v0.1]
+    A[EM2_Energy_Plan_24h v0.3.1] --> B[Planner Shadow Publisher v0.1]
     B --> C[energy-planner-shadow.json]
-    C --> D[BC Planner Intent Recorder v0.2]
+    C --> D[BC Planner Intent Recorder v0.3]
     E[EM2_Power_Intent] --> D
     D --> F[15-min evidence buffer]
     F --> G[planned -> intent evidence]
@@ -142,7 +152,7 @@ flowchart TD
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-evidence END -->
 
-De BC-recorder ondersteunt vanaf v0.2 de publisher-envelope en `plan.plan.actions`. Hij blijft read-only. De flow heeft momenteel `folder=null`; dat is een open governance-afwijking voor de afgesproken `76 Evidence`-locatie.
+De BC-recorder blijft read-only en legt planner/intentevidence vast voor latere `planned -> intent -> commanded -> actual -> financial result`-analyse.
 
 ## Power Intent revision guard
 
@@ -158,7 +168,7 @@ De BC-recorder ondersteunt vanaf v0.2 de publisher-envelope en `plan.plan.action
     "    C -->|Yes| E[Project Core policy]",
     "    E --> F[Calculate EV target_W]",
     "    E --> G[Project WW target_on]",
-    "    F --> H[Publish EM2_Power_Intent v0.2]",
+    "    F --> H[Publish EM2_Power_Intent v0.2.1]",
     "    G --> H"
   ]
 }
@@ -175,7 +185,7 @@ EV target 0 W]
     C -->|Yes| E[Project Core policy]
     E --> F[Calculate EV target_W]
     E --> G[Project WW target_on]
-    F --> H[Publish EM2_Power_Intent v0.2]
+    F --> H[Publish EM2_Power_Intent v0.2.1]
     G --> H
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-2 END -->
@@ -192,13 +202,12 @@ EV target 0 W]
     "    B -->|TESLA_CHARGE_DEADLINE| C{remaining kWh + deadline valid?}",
     "    C -->|Yes| D[target_W = remaining/time]",
     "    C -->|No| E[target_W = 0]",
-    "    B -->|TESLA_CHARGE_OPPORTUNITY| F{flex budget >= 800 W?}",
+    "    B -->|TESLA_CHARGE_OPPORTUNITY| F{flex export budget >= 800 W?}",
     "    F -->|Yes| G[target_W = flex export budget]",
-    "    F -->|No| H{negative or cheap price?}",
-    "    H -->|Yes| I[target_W = discretionary import budget]",
-    "    H -->|No| E",
+    "    F -->|No| E",
     "    B -->|TESLA_BUFFER_EXPORT| G",
-    "    B -->|HOLD / WAIT / blocked| E"
+    "    B -->|HOLD / WAIT / blocked| E",
+    "    H[Cheap or negative price] -. no opportunity trigger .-> E"
   ]
 }
 ```
@@ -210,15 +219,16 @@ flowchart TD
     B -->|TESLA_CHARGE_DEADLINE| C{remaining kWh + deadline valid?}
     C -->|Yes| D[target_W = remaining/time]
     C -->|No| E[target_W = 0]
-    B -->|TESLA_CHARGE_OPPORTUNITY| F{flex budget >= 800 W?}
+    B -->|TESLA_CHARGE_OPPORTUNITY| F{flex export budget >= 800 W?}
     F -->|Yes| G[target_W = flex export budget]
-    F -->|No| H{negative or cheap price?}
-    H -->|Yes| I[target_W = discretionary import budget]
-    H -->|No| E
+    F -->|No| E
     B -->|TESLA_BUFFER_EXPORT| G
     B -->|HOLD / WAIT / blocked| E
+    H[Cheap or negative price] -. no opportunity trigger .-> E
 ```
 <!-- GENERATED_MERMAID:planner-power-intent-flow-3 END -->
+
+Power Intent v0.2.1 fail-closedt opportunity zonder PV/exportbudget naar 0 W. Prijscontext kan geen Tesla-opportunity meer creëren; prijsoptimalisatie hoort bij deadline/MUST-planning.
 
 ## EV Power Adapter
 
@@ -312,9 +322,9 @@ flowchart TD
   "kind": "mermaid-source",
   "declaration": "flowchart TD",
   "lines": [
-    "    A[Power Intent producer] --> B[EM2_POWER_INTENT_V0.2]",
+    "    A[Power Intent producer] --> B[EM2_POWER_INTENT_V0.2.x]",
     "    B --> C[Actuator Commands v0.2]",
-    "    C --> D{Schema V0.1 or V0.2?}",
+    "    C --> D{Supported schema?}",
     "    D -->|No| E[INVALID_POWER_INTENT]",
     "    D -->|Yes| F{intent valid + deviceWrites false + revision present?}",
     "    F -->|No| E",
@@ -332,9 +342,9 @@ flowchart TD
 <!-- GENERATED_MERMAID:planner-power-intent-flow-5 START -->
 ```mermaid
 flowchart TD
-    A[Power Intent producer] --> B[EM2_POWER_INTENT_V0.2]
+    A[Power Intent producer] --> B[EM2_POWER_INTENT_V0.2.x]
     B --> C[Actuator Commands v0.2]
-    C --> D{Schema V0.1 or V0.2?}
+    C --> D{Supported schema?}
     D -->|No| E[INVALID_POWER_INTENT]
     D -->|Yes| F{intent valid + deviceWrites false + revision present?}
     F -->|No| E
