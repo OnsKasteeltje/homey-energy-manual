@@ -20,7 +20,7 @@
     const s=section('24-uurs energiebalans');
     const intro=el('div','ps-chart-note','Verwachting vóór flexibele lasten. Positief net = import; negatief net = PV-overschot. Onbekende PV-kwartieren blijven bewust leeg.');s.append(intro);
     const known=actions.filter(a=>finite(a.baseLoadForecastW)||finite(a.pvForecastW)||finite(a.netBeforeFlexW));
-    if(!known.length){s.append(el('div','ps-empty','Energy-balance forecast is nog niet beschikbaar in deze v0.2-publicatie. Zodra v0.3 is gepubliceerd verschijnt hier de 96-slot forecast.'));return s;}
+    if(!known.length){s.append(el('div','ps-empty','Energy-balance forecast is nog niet beschikbaar in deze publicatie. Zodra v0.3+ is gepubliceerd verschijnt hier de 96-slot forecast.'));return s;}
     const values=[];actions.forEach(a=>{if(finite(a.baseLoadForecastW))values.push(Math.abs(Number(a.baseLoadForecastW)));if(finite(a.pvForecastW))values.push(Math.abs(Number(a.pvForecastW)));if(finite(a.netBeforeFlexW))values.push(Math.abs(Number(a.netBeforeFlexW)));});
     const max=Math.max(1000,...values);
     const legend=el('div','ps-balance-legend');[['Base load','base'],['PV','pv'],['Net vóór flex','net']].forEach(([label,c])=>{const x=el('span','');x.append(el('i',`ps-key ${c}`),document.createTextNode(label));legend.append(x);});s.append(legend);
@@ -35,12 +35,12 @@
     root.querySelector('#ps-status')?.remove();
     const p=unwrap(payload),i=p.inputs||{},plan=p.plan||{},actions=Array.isArray(plan.actions)?plan.actions:[],now=Date.now();
     const current=actions.find(a=>{const t=new Date(a.start).getTime();return Number.isFinite(t)&&t<=now&&t+15*60000>now;})||actions.find(a=>new Date(a.start).getTime()>=now)||actions[0];
-    const v03=String(p.schema||'').includes('V0.3');
+    const schema=String(p.schema||''),v03=schema.includes('V0.3'),plannerLabel=schema.replace('EM2_ENERGY_PLAN_24H_','').replaceAll('_','.').toLowerCase()||'onbekend';
     const currentPrice=current?price(current):null;
-    const summary=el('div','ps-summary');summary.append(el('strong','',current?actionText(current):'Geen actueel slot'),el('span','',`${finite(currentPrice)?`€ ${fmt(currentPrice,3)}/kWh · ${String(current?.priceClass||current?.class||'—')}`:'prijs —'} · ${i.contract||'—'} · ${v03?'Planner v0.3':'Planner v0.2'}`));
+    const summary=el('div','ps-summary');summary.append(el('strong','',current?actionText(current):'Geen actueel slot'),el('span','',`${finite(currentPrice)?`€ ${fmt(currentPrice,3)}/kWh · ${String(current?.priceClass||current?.class||'—')}`:'prijs —'} · ${i.contract||'—'} · Planner ${plannerLabel}`));
 
     const kpis=el('div','ps-grid ps-kpi-grid');
-    const eb=plan.energyBalance||{},fq=i.forecastQuality||{};
+    const eb=plan.energyBalance||{},fq=i.forecastQuality||{},teslaPolicy=i.tesla?.opportunityPolicy||'';
     kpis.append(
       card('Base load',finite(current?.baseLoadForecastW)?`${fmt(current.baseLoadForecastW)} W`:finite(eb.baseLoadGlobalMedianW)?`${fmt(eb.baseLoadGlobalMedianW)} W`:'—',fq.baseLoad||i.pvForecast?.quality||'v0.2'),
       card('PV forecast',finite(current?.pvForecastW)?`${fmt(current.pvForecastW)} W`:'—',fq.pv||i.pvForecast?.quality||'SUMMARY_ONLY'),
@@ -52,11 +52,14 @@
 
     const why=section('Waarom dit besluit?'),notes=[];
     if(v03){if(fq.pv==='SUMMARY_ONLY'||fq.pv==='MISSING')notes.push('PV-kwartieren zonder gemeten basis blijven null; de planner verzint geen weather curve.');if(fq.gridHeadroom==='NOT_MODELED_PHASE_AWARE')notes.push('Fasebewuste net-headroom is nog niet gemodelleerd; runtime safety blijft leidend.');if(plan.battery?.mode==='THEORETICAL_ONLY_NO_SOC')notes.push('Batterijplanning blijft theoretisch zolang werkelijk SOC en commissioningconstraints ontbreken.');}
-    else if(i.pvForecast?.quality!=='GOOD')notes.push('Deze v0.2-publicatie bevat nog geen gedetailleerde 15-minuten energy-balance forecast.');
-    if(!i.tesla?.deadlineActive)notes.push('Geen Tesla deadline-MUST: alleen opportunity wanneer de policy dat rechtvaardigt.');if(i.warmWater?.goalReachedToday)notes.push('Warmwaterdagdoel is gehaald: geen verplichte extra opwarming.');if(actions.length&&actions.every(a=>activeActions(a).length===0))notes.push('Er is nu geen laad-, ontlaad- of flexloadactie gepland; alle slots handhaven de huidige toestand.');const ul=el('ul','ps-reasons');(notes.length?notes:['Geen bijzondere blokkades gerapporteerd.']).forEach(n=>ul.append(el('li','',n)));why.append(ul);
+    else if(i.pvForecast?.quality!=='GOOD')notes.push('Deze oudere publicatie bevat nog geen gedetailleerde 15-minuten energy-balance forecast.');
+    if(i.tesla?.deadlineActive){notes.push('Tesla deadline/MUST: PV-overschot krijgt voorrang; alleen resterende noodzakelijke netenergie wordt bij DYNAMIC naar goedkope slots verschoven.');}
+    else if(teslaPolicy==='PV_SURPLUS_ONLY'){notes.push(`Tesla opportunity is PV-only: zonder minimaal ${fmt(i.tesla?.opportunityMinW||800)} W verwacht PV-overschot wordt geen laadslot gepland, ook niet bij goedkope of negatieve prijzen.`);}
+    else notes.push('Geen Tesla deadline-MUST: opportunity hoort uitsluitend uit PV/exportoverschot te komen.');
+    if(i.warmWater?.goalReachedToday)notes.push('Warmwaterdagdoel is gehaald: geen verplichte extra opwarming.');if(actions.length&&actions.every(a=>activeActions(a).length===0))notes.push('Er is nu geen laad-, ontlaad- of flexloadactie gepland; alle slots handhaven de huidige toestand.');const ul=el('ul','ps-reasons');(notes.length?notes:['Geen bijzondere blokkades gerapporteerd.']).forEach(n=>ul.append(el('li','',n)));why.append(ul);
 
     const must=section('Verplichtingen & datakwaliteit'),mg=el('div','ps-grid');
-    const priceInfo=i.price||{};mg.append(card('Tesla',i.tesla?.deadlineActive?'MUST actief':'Geen MUST',i.tesla?.deadlineActive?`${fmt(i.tesla.remainingKWh,1)} kWh · deadline ${local(i.tesla.deadlineAt)}`:'planner mag opportunity kiezen'),card('Warm water',i.warmWater?.catchupRequired?'MUST_CATCHUP':i.warmWater?.goalReachedToday?'Dagdoel gehaald':'Nog open',`deadline ${i.warmWater?.deadlineLocal||'19:00'}`),card('Prijscontext',(priceInfo.usable??i.priceUsable)?'Bruikbaar':'Niet bruikbaar',`${priceInfo.quality||i.priceQuality||'—'} · ${i.contract||'—'}`),card('PV-forecast',fq.pv||i.pvForecast?.quality||'—',fq.pvNote||i.pvForecast?.note||''));must.append(mg);
+    const priceInfo=i.price||{};mg.append(card('Tesla',i.tesla?.deadlineActive?'MUST actief':'PV opportunity',i.tesla?.deadlineActive?`${fmt(i.tesla.remainingKWh,1)} kWh · deadline ${local(i.tesla.deadlineAt)}`:`PV-only · ≥ ${fmt(i.tesla?.opportunityMinW||800)} W`),card('Warm water',i.warmWater?.catchupRequired?'MUST_CATCHUP':i.warmWater?.goalReachedToday?'Dagdoel gehaald':'Nog open',`deadline ${i.warmWater?.deadlineLocal||'19:00'}`),card('Prijscontext',(priceInfo.usable??i.priceUsable)?'Bruikbaar':'Niet bruikbaar',i.tesla?.deadlineActive?`${priceInfo.quality||i.priceQuality||'—'} · deadline-optimalisatie`:`${priceInfo.quality||i.priceQuality||'—'} · geen Tesla opportunity-trigger`),card('PV-forecast',fq.pv||i.pvForecast?.quality||'—',fq.pvNote||i.pvForecast?.note||''));must.append(mg);
     root.append(summary,kpis,balanceChart(actions),horizon,why,must);
   }
   load().then(render).catch(e=>{const s=root.querySelector('#ps-status');if(s){s.className='ps-error';s.textContent=`Plannerdata laden mislukt: ${e.message}`;}});
