@@ -1,11 +1,11 @@
 {
   "schema": "EM2_PLANNER_SHADOW_PUBLISH_V0.1",
-  "publishedAt": "2026-08-26T12:16:30.531Z",
+  "publishedAt": "2026-08-26T12:31:30.538Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
   "plan": {
     "schema": "EM2_ENERGY_PLAN_24H_V0.2",
-    "generatedAt": "2026-08-26T12:15:45.619Z",
+    "generatedAt": "2026-08-26T12:30:45.461Z",
     "controlMode": "SHADOW",
     "readOnly": true,
     "physicalWritePerformed": false,
@@ -32,16 +32,16 @@
       ]
     },
     "inputs": {
-      "sourceRevision": 2407,
+      "sourceRevision": 2410,
       "contract": "DYNAMIC",
       "priceQuality": "GOOD",
       "priceFresh": true,
       "priceUsable": true,
-      "priceHorizonHours": 10,
+      "priceHorizonHours": 9.75,
       "pvForecast": {
         "quality": "SUMMARY_ONLY",
         "top4h": true,
-        "updatedAt": "2026-08-26T12:15:10.326Z",
+        "updatedAt": "2026-08-26T12:30:10.557Z",
         "note": "No detailed 15-min PV forecast used; no fabricated PV dispatch."
       },
       "tesla": {
@@ -64,16 +64,8 @@
     "plan": {
       "slotMinutes": 15,
       "horizonQuality": "PARTIAL",
-      "slotsAvailable": 40,
+      "slotsAvailable": 39,
       "actions": [
-        {
-          "start": "2026-08-26T12:15:00.000Z",
-          "battery": "CHARGE_CANDIDATE",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "price": 0.0555,
-          "class": "CHEAP"
-        },
         {
           "start": "2026-08-26T12:30:00.000Z",
           "battery": "CHARGE_CANDIDATE",
@@ -124,7 +116,7 @@
         },
         {
           "start": "2026-08-26T14:00:00.000Z",
-          "battery": "HOLD",
+          "battery": "CHARGE_CANDIDATE",
           "tesla": "HOLD",
           "warmWater": "HOLD",
           "price": 0.1077,
@@ -152,7 +144,7 @@
           "tesla": "HOLD",
           "warmWater": "HOLD",
           "price": 0.12,
-          "class": "NORMAL"
+          "class": "CHEAP"
         },
         {
           "start": "2026-08-26T15:00:00.000Z",
@@ -400,114 +392,114 @@
         "mode": "THEORETICAL_ARBITRAGE_CANDIDATES_ONLY",
         "chargeCandidates": [
           {
-            "i": 1,
+            "i": 0,
             "start": "2026-08-26T12:30:00.000Z",
             "end": "2026-08-26T12:45:00.000Z",
             "price_eur_kwh": 0.0519,
             "class": "CHEAP"
           },
           {
-            "i": 0,
-            "start": "2026-08-26T12:15:00.000Z",
-            "end": "2026-08-26T12:30:00.000Z",
-            "price_eur_kwh": 0.0555,
-            "class": "CHEAP"
-          },
-          {
-            "i": 4,
+            "i": 3,
             "start": "2026-08-26T13:15:00.000Z",
             "end": "2026-08-26T13:30:00.000Z",
             "price_eur_kwh": 0.0634,
             "class": "CHEAP"
           },
           {
-            "i": 2,
+            "i": 1,
             "start": "2026-08-26T12:45:00.000Z",
             "end": "2026-08-26T13:00:00.000Z",
             "price_eur_kwh": 0.066,
             "class": "CHEAP"
           },
           {
-            "i": 3,
+            "i": 2,
             "start": "2026-08-26T13:00:00.000Z",
             "end": "2026-08-26T13:15:00.000Z",
             "price_eur_kwh": 0.072,
             "class": "CHEAP"
           },
           {
-            "i": 5,
+            "i": 4,
             "start": "2026-08-26T13:30:00.000Z",
             "end": "2026-08-26T13:45:00.000Z",
             "price_eur_kwh": 0.0798,
             "class": "CHEAP"
           },
           {
-            "i": 6,
+            "i": 5,
             "start": "2026-08-26T13:45:00.000Z",
             "end": "2026-08-26T14:00:00.000Z",
             "price_eur_kwh": 0.0983,
             "class": "CHEAP"
           },
           {
-            "i": 8,
+            "i": 7,
             "start": "2026-08-26T14:15:00.000Z",
             "end": "2026-08-26T14:30:00.000Z",
             "price_eur_kwh": 0.104,
+            "class": "CHEAP"
+          },
+          {
+            "i": 6,
+            "start": "2026-08-26T14:00:00.000Z",
+            "end": "2026-08-26T14:15:00.000Z",
+            "price_eur_kwh": 0.1077,
             "class": "CHEAP"
           }
         ],
         "dischargeCandidates": [
           {
-            "i": 23,
+            "i": 22,
             "start": "2026-08-26T18:00:00.000Z",
             "end": "2026-08-26T18:15:00.000Z",
             "price_eur_kwh": 0.2264,
             "class": "EXPENSIVE"
           },
           {
-            "i": 22,
+            "i": 21,
             "start": "2026-08-26T17:45:00.000Z",
             "end": "2026-08-26T18:00:00.000Z",
             "price_eur_kwh": 0.2195,
             "class": "EXPENSIVE"
           },
           {
-            "i": 19,
+            "i": 18,
             "start": "2026-08-26T17:00:00.000Z",
             "end": "2026-08-26T17:15:00.000Z",
             "price_eur_kwh": 0.2172,
             "class": "EXPENSIVE"
           },
           {
-            "i": 24,
+            "i": 23,
             "start": "2026-08-26T18:15:00.000Z",
             "end": "2026-08-26T18:30:00.000Z",
             "price_eur_kwh": 0.2165,
             "class": "EXPENSIVE"
           },
           {
-            "i": 21,
+            "i": 20,
             "start": "2026-08-26T17:30:00.000Z",
             "end": "2026-08-26T17:45:00.000Z",
             "price_eur_kwh": 0.2072,
             "class": "EXPENSIVE"
           },
           {
-            "i": 25,
+            "i": 24,
             "start": "2026-08-26T18:30:00.000Z",
             "end": "2026-08-26T18:45:00.000Z",
             "price_eur_kwh": 0.2032,
             "class": "EXPENSIVE"
           },
           {
-            "i": 26,
+            "i": 25,
             "start": "2026-08-26T18:45:00.000Z",
             "end": "2026-08-26T19:00:00.000Z",
             "price_eur_kwh": 0.194,
             "class": "EXPENSIVE"
           },
           {
-            "i": 20,
+            "i": 19,
             "start": "2026-08-26T17:15:00.000Z",
             "end": "2026-08-26T17:30:00.000Z",
             "price_eur_kwh": 0.1938,
@@ -525,106 +517,106 @@
             "maxDischargeAcKWhPerSlot": 0.825
           },
           {
-            "chargeStart": "2026-08-26T12:15:00.000Z",
-            "dischargeStart": "2026-08-26T17:45:00.000Z",
-            "chargePrice": 0.0555,
-            "dischargePrice": 0.2195,
-            "netValuePerGridKWh": 0.1426,
-            "maxChargeGridKWhPerSlot": 0.825,
-            "maxDischargeAcKWhPerSlot": 0.825
-          },
-          {
             "chargeStart": "2026-08-26T13:15:00.000Z",
-            "dischargeStart": "2026-08-26T17:00:00.000Z",
+            "dischargeStart": "2026-08-26T17:45:00.000Z",
             "chargePrice": 0.0634,
-            "dischargePrice": 0.2172,
-            "netValuePerGridKWh": 0.1326,
+            "dischargePrice": 0.2195,
+            "netValuePerGridKWh": 0.1347,
             "maxChargeGridKWhPerSlot": 0.825,
             "maxDischargeAcKWhPerSlot": 0.825
           },
           {
             "chargeStart": "2026-08-26T12:45:00.000Z",
-            "dischargeStart": "2026-08-26T18:15:00.000Z",
+            "dischargeStart": "2026-08-26T17:00:00.000Z",
             "chargePrice": 0.066,
-            "dischargePrice": 0.2165,
-            "netValuePerGridKWh": 0.1294,
+            "dischargePrice": 0.2172,
+            "netValuePerGridKWh": 0.13,
             "maxChargeGridKWhPerSlot": 0.825,
             "maxDischargeAcKWhPerSlot": 0.825
           },
           {
             "chargeStart": "2026-08-26T13:00:00.000Z",
-            "dischargeStart": "2026-08-26T17:30:00.000Z",
+            "dischargeStart": "2026-08-26T18:15:00.000Z",
             "chargePrice": 0.072,
-            "dischargePrice": 0.2072,
-            "netValuePerGridKWh": 0.115,
+            "dischargePrice": 0.2165,
+            "netValuePerGridKWh": 0.1234,
             "maxChargeGridKWhPerSlot": 0.825,
             "maxDischargeAcKWhPerSlot": 0.825
           },
           {
             "chargeStart": "2026-08-26T13:30:00.000Z",
-            "dischargeStart": "2026-08-26T18:30:00.000Z",
+            "dischargeStart": "2026-08-26T17:30:00.000Z",
             "chargePrice": 0.0798,
-            "dischargePrice": 0.2032,
-            "netValuePerGridKWh": 0.1036,
+            "dischargePrice": 0.2072,
+            "netValuePerGridKWh": 0.1072,
             "maxChargeGridKWhPerSlot": 0.825,
             "maxDischargeAcKWhPerSlot": 0.825
           },
           {
             "chargeStart": "2026-08-26T13:45:00.000Z",
-            "dischargeStart": "2026-08-26T18:45:00.000Z",
+            "dischargeStart": "2026-08-26T18:30:00.000Z",
             "chargePrice": 0.0983,
-            "dischargePrice": 0.194,
-            "netValuePerGridKWh": 0.0768,
+            "dischargePrice": 0.2032,
+            "netValuePerGridKWh": 0.0851,
             "maxChargeGridKWhPerSlot": 0.825,
             "maxDischargeAcKWhPerSlot": 0.825
           },
           {
             "chargeStart": "2026-08-26T14:15:00.000Z",
-            "dischargeStart": "2026-08-26T17:15:00.000Z",
+            "dischargeStart": "2026-08-26T18:45:00.000Z",
             "chargePrice": 0.104,
-            "dischargePrice": 0.1938,
-            "netValuePerGridKWh": 0.0709,
+            "dischargePrice": 0.194,
+            "netValuePerGridKWh": 0.0711,
             "maxChargeGridKWhPerSlot": 0.825,
             "maxDischargeAcKWhPerSlot": 0.825
           },
           {
             "chargeStart": "2026-08-26T14:00:00.000Z",
-            "dischargeStart": "2026-08-26T16:45:00.000Z",
+            "dischargeStart": "2026-08-26T17:15:00.000Z",
             "chargePrice": 0.1077,
-            "dischargePrice": 0.1921,
-            "netValuePerGridKWh": 0.0657,
+            "dischargePrice": 0.1938,
+            "netValuePerGridKWh": 0.0672,
             "maxChargeGridKWhPerSlot": 0.825,
             "maxDischargeAcKWhPerSlot": 0.825
           },
           {
             "chargeStart": "2026-08-26T14:30:00.000Z",
-            "dischargeStart": "2026-08-26T19:15:00.000Z",
+            "dischargeStart": "2026-08-26T16:45:00.000Z",
             "chargePrice": 0.1113,
-            "dischargePrice": 0.1903,
-            "netValuePerGridKWh": 0.0604,
+            "dischargePrice": 0.1921,
+            "netValuePerGridKWh": 0.0621,
             "maxChargeGridKWhPerSlot": 0.825,
             "maxDischargeAcKWhPerSlot": 0.825
           },
           {
             "chargeStart": "2026-08-26T14:45:00.000Z",
-            "dischargeStart": "2026-08-26T19:00:00.000Z",
+            "dischargeStart": "2026-08-26T19:15:00.000Z",
             "chargePrice": 0.12,
-            "dischargePrice": 0.1863,
-            "netValuePerGridKWh": 0.0481,
+            "dischargePrice": 0.1903,
+            "netValuePerGridKWh": 0.0517,
             "maxChargeGridKWhPerSlot": 0.825,
             "maxDischargeAcKWhPerSlot": 0.825
           },
           {
             "chargeStart": "2026-08-26T15:15:00.000Z",
-            "dischargeStart": "2026-08-26T16:00:00.000Z",
+            "dischargeStart": "2026-08-26T19:00:00.000Z",
             "chargePrice": 0.1279,
-            "dischargePrice": 0.1818,
-            "netValuePerGridKWh": 0.0362,
+            "dischargePrice": 0.1863,
+            "netValuePerGridKWh": 0.0402,
+            "maxChargeGridKWhPerSlot": 0.825,
+            "maxDischargeAcKWhPerSlot": 0.825
+          },
+          {
+            "chargeStart": "2026-08-26T15:00:00.000Z",
+            "dischargeStart": "2026-08-26T19:30:00.000Z",
+            "chargePrice": 0.1412,
+            "dischargePrice": 0.1808,
+            "netValuePerGridKWh": 0.022,
             "maxChargeGridKWhPerSlot": 0.825,
             "maxDischargeAcKWhPerSlot": 0.825
           }
         ],
-        "theoreticalUpperBoundEuro": 0.95,
+        "theoreticalUpperBoundEuro": 0.87,
         "note": "Upper bound is not a realized savings forecast; actual SOC, household load and detailed PV forecast are missing."
       }
     },
@@ -643,17 +635,17 @@
   },
   "status": {
     "status": "READY_SHADOW_SCENARIO",
-    "at": "2026-08-26T12:15:45.619Z",
+    "at": "2026-08-26T12:30:45.461Z",
     "version": "EM2_ENERGY_PLAN_24H_V0.2",
     "scenario": "VICTRON_3X_US5000_SHADOW_V0.1",
     "scenarioConfigured": true,
     "contract": "DYNAMIC",
     "priceUsable": true,
-    "horizonHours": 10,
+    "horizonHours": 9.75,
     "horizonQuality": "PARTIAL",
     "teslaObligation": false,
     "wwObligation": false,
-    "theoreticalBatteryUpperBoundEuro": 0.95,
+    "theoreticalBatteryUpperBoundEuro": 0.87,
     "noActuatorWrites": true
   }
 }
