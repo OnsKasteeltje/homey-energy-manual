@@ -3,7 +3,7 @@ component: business-case-evidence-pipeline
 title: Business Case Evidence Pipeline
 status: implemented-read-only
 last_verified: 2026-08-26
-source:
+sources:
   - docs/data/history/
   - docs/javascripts/business-case-history-adapter-v0.1.js
 ---
