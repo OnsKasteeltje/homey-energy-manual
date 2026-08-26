@@ -8,6 +8,7 @@ sources:
   - Homey Advanced Flow: EM v2 | 45 Planner | 24h Energy Plan v0.2 SHADOW
   - Homey Advanced Flow: EM v2 | 20 Power Intent | P1 v0.2 SHADOW
   - Homey Advanced Flow: EM v2 | 60 Adapter | EV Power v0.1 SHADOW
+  - Homey Advanced Flow: EM v2 | 60 Adapter | WW Power v0.1 SHADOW
   - Homey Advanced Flow: EM v2 | 60 Adapter | Actuator Commands v0.2 SHADOW
 ---
 
@@ -15,82 +16,60 @@ sources:
 
 ## 1. Doel
 
-Deze laag vertaalt de actuele EMS-toestand en contractcontext naar twee verschillende soorten output:
+Deze laag vertaalt EMS-policy naar actuator-neutrale intent en vervolgens via apparaatadapters naar een theoretisch fysiek uitvoerbare opdracht. De kernarchitectuur is:
 
-1. een 24-uurs SHADOW-planning voor Tesla, warm water en een toekomstige Victron-accu;
-2. een numerieke, revision-aligned Power Intent die de actuele Core-policy projecteert naar actuator-neutrale doelen zoals `EV_target_W`.
+`EMS policy -> Power Intent -> EV_target_W / WW_target_W-or-intent -> EV/WW Power Adapter -> Easee/Boiler`
 
-De laag is uitsluitend adviserend/translationeel. Geen van de beschreven flows voert fysieke writes uit.
+De huidige adapterketen is SHADOW. Zij publiceert input, mapping en berekende output, maar neemt de fysieke writer-boundary nog niet over.
 
 ## 2. Architectuurgrens
 
-De keten is:
+Verantwoordelijkheden zijn strikt gescheiden:
 
-`Core / Contract Context -> 24h Planner (advies)`
+- **EMS policy / Energy Core** bezit policy, prioriteit, MUST/opportunity-arbitrage, hysterese en economische beslissing;
+- **Power Intent** projecteert die beslissing naar actuator-neutrale doelen;
+- **EV Power Adapter** vertaalt `EV_target_W` naar een veilige, theoretisch uitvoerbare Easee-opdracht;
+- **WW Power Adapter** vertaalt WW-intent naar een veilige, theoretisch uitvoerbare boileropdracht;
+- **writer lifecycle** bezit commanded/confirmed tracking, idempotency, dedupe, run-lease, retries en throttling;
+- **Easee en Boiler** mogen uiteindelijk elk slechts één actieve fysieke writer hebben.
 
-`Core Decision + WW Control + Public State -> Power Intent -> apparaat-specifieke adapters -> toekomstige fysieke writers`
-
-De 24h Planner is dus geen runtime-actuatorcontroller. Power Intent is evenmin policy-owner; het projecteert bestaande Core-beslissingen naar numerieke doelen.
+Adapters mogen geen nieuwe EMS-policy introduceren en mogen een upstream toegewezen vermogensbudget nooit verhogen.
 
 ## 3. 24h Energy Planner v0.2 SHADOW
 
-De planner draait iedere 15 minuten met 45 seconden vertraging en kan handmatig gestart worden.
+De planner draait iedere 15 minuten met 45 seconden vertraging en kan handmatig gestart worden. Hij adviseert over tijdslots, maar bepaalt geen apparaat-specifieke runtime-setpoints.
 
 ### 3.1 Simulatiescenario
 
-Het huidige vaste SHADOW-scenario is:
-
-- Victron MultiPlus-II 48/5000/70-50;
-- 3 x Pylontech US5000;
-- 14.4 kWh nominale capaciteit;
-- aangenomen SOC-band 20-90%;
-- 3.3 kW AC charge/discharge limiet;
-- 95% charge- en 95% discharge-efficiency;
-- round-trip efficiency 90.25%;
-- bruikbaar simulatievenster 10.08 kWh.
-
-Deze waarden zijn uitsluitend simulatie-aannames en zijn geen commissioningwaarden.
+Het huidige vaste SHADOW-scenario is Victron MultiPlus-II 48/5000/70-50 met 3 x Pylontech US5000, 14.4 kWh nominaal, SOC-band 20-90%, 3.3 kW AC charge/discharge, 95% charge- en discharge-efficiency en 90.25% round-trip efficiency. Dit zijn simulatie-aannames, geen commissioningwaarden.
 
 ### 3.2 Tesla
 
-De planner verzint geen laadvermogen of throughput. Bij een actieve Tesla-deadline gebruikt hij de bestaande deadline/latest-start als hard planningsvenster en rangschikt hij prijs-slots binnen dat venster.
-
-Daarmee is de planner economisch adviserend, maar niet bevoegd om laadstroom te bepalen.
+Bij een actieve Tesla-deadline gebruikt de planner de bestaande deadline/latest-start als hard planningsvenster en rangschikt prijs-slots binnen dat venster. Hij verzint geen laadvermogen of throughput.
 
 ### 3.3 Warm water
 
-Voor warm water gebruikt de planner het reeds gemodelleerde boilerniveau van circa 1.9 kW. Het resterende fallback-volume wordt omgerekend naar kWh en verdeeld over goedkope 15-minutenslots vóór 19:00.
+Voor warm water gebruikt de planner het gemodelleerde boilerniveau van circa 1.9 kW. Het resterende fallback-volume wordt omgerekend naar kWh en verdeeld over goedkope 15-minutenslots vóór 19:00.
 
 ### 3.4 Batterij
 
-Batterijplanning is expliciet theoretisch. Charge/discharge-kandidaten en economische pairs worden berekend uit prijsverschillen en het aangenomen rendement.
-
-Omdat actuele SOC, gedetailleerde base-load en een echte 15-min PV-forecast ontbreken, mag `theoreticalUpperBoundEuro` nooit als gerealiseerde besparing worden geïnterpreteerd.
+Batterijplanning is theoretisch. Zonder actuele SOC, gedetailleerde base-load en echte 15-min PV-forecast mag `theoreticalUpperBoundEuro` niet als gerealiseerde besparing worden geïnterpreteerd.
 
 ## 4. Power Intent v0.2 SHADOW
 
-Power Intent wordt getriggerd door wijziging van `EM2_Public_State` en is idempotent per source revision.
-
-Voor een geldige output moeten vier revisions gelijk zijn:
-
-- Public State revision;
-- Core State revision;
-- Decision sourceRevision;
-- WW Control sourceRevision.
+Power Intent wordt getriggerd door wijziging van `EM2_Public_State` en is idempotent per source revision. Voor geldige output moeten Public State revision, Core State revision, Decision sourceRevision en WW Control sourceRevision gelijk zijn.
 
 Bij mismatch is `valid=false`, `status=REVISION_MISMATCH` en het EV-doel fail-closed 0 W.
 
-## 5. Numeriek EV-target
+## 5. EV-target contract
 
-Power Intent v0.2 maakt `targets.ev.target_W` op basis van de bestaande Core Decision.
+Power Intent maakt `targets.ev.target_W` op basis van de bestaande Core Decision.
 
 ### Deadline
 
-Bij `TESLA_CHARGE_DEADLINE`:
+Bij `TESLA_CHARGE_DEADLINE` geldt, indien resterende energie en toekomstige deadline geldig zijn:
 
 `target_W = remaining_kWh / hours_to_deadline * 1000`
-
-Alleen als zowel resterende energie als een geldige toekomstige deadline beschikbaar zijn.
 
 ### Export-opportunity
 
@@ -108,118 +87,124 @@ Als geen exportbudget beschikbaar is maar prijs negatief/goedkoop is:
 
 Dan is `target_W = 0`.
 
-Power Intent converteert bewust niet naar ampère. Elektrische clamping hoort bij de apparaatadapter.
+Power Intent converteert niet naar ampère. Elektrische feasibility en clamping horen bij de EV Power Adapter.
 
-## 6. Warmwater-target
+## 6. WW-target contract
 
-Warmwater wordt nog als binaire intentie geprojecteerd:
+De architectuur gebruikt conceptueel `WW_target_W` als actuator-neutraal vermogensdoel voor numerieke warmwatersturing. De **huidige Power Intent v0.2 produceert dit nog niet numeriek**; de live interface is:
 
 - `BOILER_ON -> target_on=true`
 - `BOILER_OFF -> target_on=false`
 - `HOLD -> target_on=null`
 
-Er wordt nog geen numeriek `WW_target_W` gegenereerd.
+Daarom geldt tijdens deze overgang:
+
+`EMS policy -> Power Intent -> WW target_on -> WW Power Adapter -> shadow boiler command`
+
+Wanneer een toekomstige producer `WW_target_W` invoert, moet dit als expliciete schemawijziging met revision/schema-validatie worden geïntroduceerd. De adapter mag niet zelf uit policy een watt-target verzinnen.
 
 ## 7. EV Power Adapter v0.1 SHADOW
 
-De live SHADOW-adapter accepteert de actuele producer `EM2_POWER_INTENT_V0.2` en voert uitsluitend een deterministische, apparaat-specifieke vertaling uit. Hij leest geen devices rechtstreeks en voert geen fysieke Easee-write uit.
+De EV-adapter accepteert `EM2_POWER_INTENT_V0.2` en voert uitsluitend deterministische apparaatvertaling uit. Hij leest geen policy uit devices en voert geen fysieke Easee-write uit.
 
-De v0.1-elektrische topologie is bewust vastgezet op:
-
-- 3 fasen;
-- 230 V per fase;
-- 6 A minimale uitvoerbare laadstroom;
-- maximaal de geconfigureerde veilige laadstroom, hard begrensd op 16 A;
-- geen automatische 1↔3-faseschakeling.
-
-De vertaling is:
+De elektrische topologie is 3 fasen, 230 V per fase, minimaal 6 A, maximaal de geconfigureerde veilige stroom met harde bovengrens 16 A, zonder automatische 1↔3-faseschakeling.
 
 `theoretical_A = EV_target_W / (3 × 230)`
 
 `requested_A = floor(theoretical_A)`
 
-Daarna wordt naar de veilige maximumstroom geclamped. Als `requested_A < 6 A`, wordt `requested_A=0`. Er wordt nooit omhoog afgerond naar het minimale laadvermogen en de adapter kan daardoor het upstream toegewezen vermogensbudget niet overschrijden.
+Daarna volgt veilige clamping. Als `requested_A < 6 A`, wordt `requested_A=0`. Er wordt nooit omhoog afgerond naar het minimale laadvermogen.
 
-Concrete grensgevallen:
+De adapter valideert revision/schema alignment, freshness, numerieke constraints en charger-beschikbaarheid. Bij stale of ongeldige input valt hij fail-closed terug naar 0 A.
 
-- 4.139 W -> 0 A;
-- 4.140 W -> 6 A;
-- 6.200 W -> 8 A / circa 5.520 W uitvoerbaar;
-- 6.210 W -> 9 A.
+De output scheidt `requested_A`, `commanded_A` en `confirmed_A`. In SHADOW blijft `commanded_A=null`.
 
-De adapter valideert daarnaast:
+Een toekomstige LIVE-cut-over mag uitsluitend Easee dynamic/volatile current-control gebruiken; persistente chargerinstellingen met flash-wear-risico zijn geen EMS-runtimewriter.
 
-- revision/schema alignment;
-- freshness van Power Intent en Core/Easee-context;
-- geldige numerieke target en stroomconstraints;
-- charger-beschikbaarheid voor een positieve laadintentie.
+## 8. WW Power Adapter v0.1 SHADOW
 
-Bij stale, ongeldige of niet-vertrouwde control-input valt de adapter fail-closed terug naar 0 A met een expliciete status/reason code.
+De WW Power Adapter vormt dezelfde architectuurgrens voor de boiler als de EV Power Adapter voor Easee. Hij accepteert uitsluitend de upstream WW-intent van Power Intent en bevat geen eigen EMS-policy, prijsbeslissing, opportunityselectie of deadline-arbitrage.
 
-De output onderscheidt expliciet:
+De adapter moet minimaal:
 
-- `requested_A`: door de adapter berekende gewenste runtime-setpoint;
-- `commanded_A`: pas gevuld wanneer een toekomstige writer werkelijk een write start; in SHADOW altijd `null`;
-- `confirmed_A`: read-only terugmelding uit de bestaande Core/Easee-context, momenteel gebaseerd op offered current.
+- source schema en revision alignment valideren;
+- freshness van de control-input bewaken;
+- `target_on=true/false/null` deterministisch vertalen naar respectievelijk ON/OFF/HOLD shadow command;
+- HOLD onderscheiden van OFF zodat afwezigheid van een nieuwe opdracht niet als uitschakelopdracht wordt geïnterpreteerd;
+- requested, commanded en confirmed state gescheiden houden;
+- dedupe/idempotency toepassen voordat een toekomstige writer wordt aangeroepen;
+- fail-closed reageren op ongeldige/stale control-input;
+- `deviceWrites=false` behouden zolang SHADOW actief is.
 
-Verder worden `theoretical_A`, `executable_W`, `delta_W`, freshness en source revision gepubliceerd voor runtime-validatie.
+Wanneer `WW_target_W` later numeriek wordt ingevoerd, wordt elektrische mapping onderdeel van deze adapter, niet van Energy Core of Power Intent. Tot die tijd blijft de binaire interface de feitelijke runtimewaarheid.
 
-Een toekomstige LIVE-cut-over mag uitsluitend Easee's dynamic/volatile current-control gebruiken (`setDynamicChargerCurrent` of aantoonbaar equivalente dynamic route). Persistente chargerinstellingen met flash-wear-risico zijn geen EMS-runtimewriter.
+De bestaande boilerproductiewriter blijft fysieke eigenaar totdat de WW Adapter-validatiegate en atomic cut-over expliciet zijn geslaagd.
 
-Hysterese, PV-smoothing, minimale stabiele duur en opportunity/MUST-policy horen upstream in Energy Core en worden niet in deze mapper geïntroduceerd.
+## 9. Generieke Actuator Commands v0.2 SHADOW
 
-## 8. Generieke Actuator Commands v0.2 SHADOW
+Actuator Commands accepteert de overgangsschema's `EM2_POWER_INTENT_V0.1` en `EM2_POWER_INTENT_V0.2`, publiceert `EM2_ACTUATOR_COMMANDS_V0.2` en dedupliceert op source revision én input schema.
 
-De eerder aangetroffen schema-mismatch is op 2026-08-25 gecorrigeerd in de live Homey-flow `EM v2 | 60 Adapter | Actuator Commands v0.2 SHADOW`.
+EV-elektrische vertaling wordt gedelegeerd aan de EV Power Adapter. WW-vertaling wordt gedelegeerd aan de WW Power Adapter. Batterij blijft SHADOW/NOT_INTEGRATED.
 
-De adapter accepteert nu expliciet beide overgangsschema's:
+## 10. End-to-end actuatorarchitectuur
 
-- `EM2_POWER_INTENT_V0.1`;
-- `EM2_POWER_INTENT_V0.2`.
+De softwarearchitectuur is voor EV en warm water symmetrisch:
 
-De output is opgehoogd naar `EM2_ACTUATOR_COMMANDS_V0.2` en bevat `inputSchema` voor traceerbaarheid. Dedupe gebeurt op source revision én input schema, zodat een schema-overgang niet door een eerder geldig resultaat met dezelfde revision kan worden onderdrukt.
+`EMS policy -> Power Intent -> actuator target -> Device Power Adapter -> writer lifecycle -> physical actuator`
 
-De generieke adapter blijft bewust geen EV W->A-conversie uitvoeren. Voor EV wordt de elektrische vertaling gedelegeerd aan de gekalibreerde `EV Power Adapter v0.1`; warm water wordt alleen binair vertaald en batterij blijft SHADOW/NOT_INTEGRATED.
+Voor EV:
 
-Een expliciete runtime-start van v0.2 is succesvol uitgevoerd. De beschikbare Homey-connector exposeert geen directe Logic-variable readback, waardoor de resulterende `EM2_Actuator_Commands`-JSON in deze validatiestap niet afzonderlijk kon worden teruggelezen. De flow zelf is enabled, not broken en de handmatige run werd door Homey succesvol geaccepteerd.
+`Energy Core -> Power Intent -> EV_target_W -> EV Power Adapter -> Easee writer -> Easee`
 
-## 9. Single-writer boundary
+Voor WW in de huidige implementatie:
 
-De beoogde architectuur blijft:
+`Energy Core -> Power Intent -> WW target_on -> WW Power Adapter -> Boiler writer -> Boiler`
 
-- Core owns policy/arbitration;
-- Power Intent owns neutral numeric/binary intent;
-- adapters own deterministic translation, physical feasibility, quantization/clamping and freshness/capability guards;
-- writer-lifecycle owns commanded/confirmed tracking, idempotency, dedupe, run-lease, retries en write-throttling;
-- slechts één expliciete fysieke writer per actuator mag actief zijn.
+Voor de toekomstige numerieke WW-interface:
 
-Een fysieke writer mag pas worden geactiveerd via een gecontroleerde atomic cut-over waarbij de bestaande productiewriter wordt uitgefaseerd.
+`Energy Core -> Power Intent -> WW_target_W -> WW Power Adapter -> Boiler writer -> Boiler`
 
-## 10. Safety invariants
+Deze scheiding voorkomt dat apparaatdetails teruglekken naar EMS-policy en maakt adapters afzonderlijk testbaar in SHADOW.
+
+## 11. Single-writer boundary en cut-over
+
+Een fysieke writer mag pas worden geactiveerd via gecontroleerde atomic cut-over waarbij de bestaande productiewriter wordt uitgefaseerd. Vereisten zijn:
+
+- bewezen revision/schema alignment;
+- bewezen freshness/fail-closed gedrag;
+- bewezen mapping en fysieke feasibility;
+- bewezen dedupe/idempotency;
+- geen dubbele notificaties/history/writes;
+- rollback naar de vorige bewezen writer;
+- nooit twee fysieke writers tegelijk voor dezelfde actuator.
+
+## 12. Safety invariants
 
 Deze laag moet altijd voldoen aan:
 
 - geen device writes in SHADOW;
-- geen netwerkcalls vanuit Power Intent/adapters;
 - geen policy-arbitrage in adapters;
-- revision alignment vóór numerieke targets;
+- revision alignment vóór actuatorvertaling;
 - fail-closed bij ontbrekende, ongeldige of stale control-input;
-- een adapter mag een upstream vermogensbudget nooit verhogen;
-- requested, commanded en confirmed actuatorstate blijven afzonderlijke begrippen;
-- frequente Easee-control gebruikt uitsluitend dynamic/volatile runtime-control;
-- automatische phaseswitching is geen onderdeel van EV Adapter v0.1 en vereist later een expliciete state machine;
-- geen verzonnen Tesla throughput;
-- geen claim van gerealiseerde batterijbesparing zonder actuele SOC/load/PV-data;
-- één fysieke writer per actuator bij toekomstige ACTIVE-integratie.
+- adapter verhoogt nooit upstream vermogensbudget;
+- requested, commanded en confirmed blijven afzonderlijke begrippen;
+- Easee-runtimecontrol gebruikt uitsluitend dynamic/volatile control;
+- automatische phaseswitching vereist een aparte state machine;
+- WW HOLD is semantisch verschillend van OFF;
+- één fysieke writer per actuator na cut-over.
 
-## 11. Huidige status
+## 13. Huidige status
 
 | Onderdeel | Status |
 |---|---|
 | 24h Planner v0.2 | ACTIVE SHADOW |
 | Power Intent v0.2 | ACTIVE SHADOW |
-| EV Power Adapter v0.1 | ACTIVE SHADOW, hardened 3×230V/floor/fail-closed |
-| Actuator Commands v0.2 | ACTIVE SHADOW, Power Intent v0.1/v0.2 compatible |
+| EV_target_W | ACTIVE SHADOW, numeriek |
+| WW target_on | ACTIVE SHADOW, binair |
+| WW_target_W | ARCHITECTUURCONTRACT / nog niet numeriek geproduceerd |
+| EV Power Adapter v0.1 | ACTIVE SHADOW |
+| WW Power Adapter v0.1 | ACTIVE SHADOW |
+| Actuator Commands v0.2 | ACTIVE SHADOW |
 | EV fysieke writer via nieuwe adapterketen | NIET ACTIEF |
-| Victron fysieke writer | NIET ACTIEF |
 | WW fysieke writer via nieuwe adapterketen | NIET ACTIEF |
+| Victron fysieke writer | NIET ACTIEF |
