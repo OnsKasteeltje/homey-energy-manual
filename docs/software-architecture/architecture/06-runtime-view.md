@@ -9,9 +9,9 @@ source:
   - docs/software-architecture/components/
 ---
 
-## Runtime View
+# Runtime View
 
-### Doel
+## Doel
 
 Deze view legt de generieke runtime-keten vast. Gedetailleerde componentflows worden uit de afzonderlijke process models gegenereerd en blijven leidend voor operationele logica.
 
@@ -39,7 +39,7 @@ sequenceDiagram
     end
 ```
 
-### Runtime-regels
+## Runtime-regels
 
 - De planner bepaalt intent; adapters herinterpreteren geen opportunity-, prijs-, prioriteits- of deadlinebeleid.
 - SHADOW en ACTIVE gebruiken dezelfde berekeningsroute; alleen de fysieke write-gate verschilt.
