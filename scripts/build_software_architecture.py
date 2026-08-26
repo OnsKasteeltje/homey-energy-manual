@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Build the HEMS software architecture master Markdown from manifest.yaml.
-
-Uses only the Python standard library and intentionally supports the small,
-controlled manifest shape used by this repository.
-"""
+"""Build the HEMS software architecture master Markdown from manifest.yaml."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,6 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 DOC_ROOT = ROOT / "docs" / "software-architecture"
 MANIFEST = DOC_ROOT / "manifest.yaml"
 
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$")
+MANUAL_NUMBER_RE = re.compile(r"^\s*\d+(?:\.\d+)*[.)]?\s+")
+
 
 def parse_manifest(text: str) -> tuple[str, str, list[str], dict[str, bool]]:
     title = "Software Architecture"
@@ -21,7 +20,6 @@ def parse_manifest(text: str) -> tuple[str, str, list[str], dict[str, bool]]:
     sections: list[str] = []
     rules: dict[str, bool] = {}
     mode: str | None = None
-
     for raw in text.splitlines():
         line = raw.rstrip()
         stripped = line.strip()
@@ -43,7 +41,6 @@ def parse_manifest(text: str) -> tuple[str, str, list[str], dict[str, bool]]:
         elif mode == "rules" and ":" in stripped:
             key, value = stripped.split(":", 1)
             rules[key.strip()] = value.strip().lower() == "true"
-
     if not sections:
         raise ValueError("manifest bevat geen sections")
     return title, output, sections, rules
@@ -55,36 +52,51 @@ def split_frontmatter(text: str, path: Path) -> tuple[str, str]:
     end = text.find("\n---\n", 4)
     if end < 0:
         raise ValueError(f"{path}: YAML-frontmatter is niet afgesloten")
-    return text[4:end], text[end + 5 :].lstrip()
+    return text[4:end], text[end + 5:].lstrip()
 
 
 def validate_frontmatter(frontmatter: str, rel: str, rules: dict[str, bool]) -> None:
     def has_value(key: str) -> bool:
         return re.search(rf"(?m)^{re.escape(key)}\s*:\s*.+$", frontmatter) is not None
-
     if rules.get("require_last_verified", False) and not has_value("last_verified"):
         raise ValueError(f"{rel}: last_verified ontbreekt")
-
     if rules.get("require_source_paths", False) and rel.startswith(("components/", "architecture/")):
         has_sources = (
             re.search(r"(?m)^source\s*:\s*$", frontmatter)
             or re.search(r"(?m)^sources\s*:\s*$", frontmatter)
-            or has_value("source")
-            or has_value("sources")
+            or has_value("source") or has_value("sources")
         )
         if not has_sources:
             raise ValueError(f"{rel}: source/sources ontbreekt")
 
 
-def demote_top_heading(body: str) -> str:
-    # The generated file owns H1. Each module H1 becomes H2; lower headings
-    # retain their relative hierarchy.
-    lines = body.splitlines()
-    for idx, line in enumerate(lines):
-        if line.startswith("# "):
-            lines[idx] = "## " + line[2:]
-            break
-    return "\n".join(lines).rstrip() + "\n"
+def normalize_module_headings(body: str) -> str:
+    """Make each module H2 and preserve all internal relative hierarchy.
+
+    Source modules use H1 for their title. The master document owns H1, so every
+    heading in a module is shifted down exactly one level. Manual numeric
+    prefixes (e.g. `## 3. Doel`, `### 3.1 Detail`) are stripped from the
+    generated master so Pandoc is the only numbering authority.
+    """
+    out: list[str] = []
+    in_fence = False
+    for line in body.splitlines():
+        if line.startswith("```"):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        if not in_fence:
+            match = HEADING_RE.match(line)
+            if match:
+                hashes, title = match.groups()
+                level = len(hashes)
+                if level >= 6:
+                    raise ValueError(f"heading te diep om in master te plaatsen: {line}")
+                clean_title = MANUAL_NUMBER_RE.sub("", title).strip()
+                out.append("#" * (level + 1) + " " + clean_title)
+                continue
+        out.append(line)
+    return "\n".join(out).rstrip() + "\n"
 
 
 def main() -> int:
@@ -95,7 +107,6 @@ def main() -> int:
         f"# {title}",
         "",
     ]
-
     for rel in sections:
         path = DOC_ROOT / rel
         if not path.is_file():
@@ -106,14 +117,17 @@ def main() -> int:
             validate_frontmatter(frontmatter, rel, rules)
         else:
             body = text
-        chunks.extend(
-            [f"<!-- BEGIN {rel} -->", demote_top_heading(body), f"<!-- END {rel} -->", ""]
-        )
+        chunks.extend([
+            f"<!-- BEGIN {rel} -->",
+            normalize_module_headings(body),
+            f"<!-- END {rel} -->",
+            "",
+        ])
 
     output = ROOT / output_rel
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(chunks).rstrip() + "\n", encoding="utf-8")
-    print(f"PASS: {len(sections)} sections -> {output.relative_to(ROOT)}")
+    print(f"PASS: {len(sections)} sections -> {output.relative_to(ROOT)}; numbering=HEADING_HIERARCHY_ONLY")
     return 0
 
 
