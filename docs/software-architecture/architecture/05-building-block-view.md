@@ -9,13 +9,13 @@ source:
   - docs/software-architecture/architecture/04-data-model.md
 ---
 
-## Building Block View
+# Building Block View
 
-### Doel
+## Doel
 
 Deze view beschrijft de statische verantwoordelijkheidsverdeling binnen HEMS. Het model volgt C4-principes pragmatisch: alleen componentgrenzen die relevant zijn voor ownership, contracts en write-routes worden expliciet gemaakt.
 
-### Hoofdstructuur
+## Hoofdstructuur
 
 ```mermaid
 flowchart LR
@@ -34,7 +34,7 @@ flowchart LR
     Fingerprint[Fingerprint Engine] --> Core
 ```
 
-### Ownership rules
+## Ownership rules
 
 - Energy Core normaliseert actuele meet- en systeemstate.
 - Planner en Power Intent bezitten EMS-beslislogica en produceren target-W intenties.
@@ -42,6 +42,6 @@ flowchart LR
 - Per fysiek device bestaat maximaal één ACTIVE writer.
 - Publisher/website is observability en bevat geen control policy.
 
-### Grenzen
+## Grenzen
 
 SHADOW componenten mogen berekende output publiceren maar niet fysiek schrijven. Een componentgrens wordt pas als ACTIVE beschouwd nadat de relevante runtime- en RC-validatie is vastgelegd.
