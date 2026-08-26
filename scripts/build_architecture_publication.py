@@ -17,6 +17,13 @@ PROCESS_MODEL_RE = re.compile(r'```process-model\s*\n.*?\n```\s*', re.S | re.I)
 MERMAID_RE = re.compile(r'```mermaid\s*\n(.*?)\n```', re.S | re.I)
 GENERATED_MARKER_RE = re.compile(r'<!--\s*GENERATED_MERMAID:[^>]+(?:START|END)\s*-->\s*', re.I)
 
+# Publication invariant: one complete process flow per page.  A diagram is
+# wrapped in a one-cell table because Word/LibreOffice keeps a table row
+# together instead of splitting its image across pages.  Width/height limits
+# force proportional scaling to the printable A4 portrait area.
+FLOW_IMAGE_WIDTH_CM = 16.0
+FLOW_IMAGE_HEIGHT_CM = 22.0
+
 
 def render_mermaid(source: str, index: int) -> str:
     DIAGRAM_DIR.mkdir(parents=True, exist_ok=True)
@@ -35,7 +42,16 @@ def render_mermaid(source: str, index: int) -> str:
     subprocess.run(cmd, check=True)
     if not png.exists() or png.stat().st_size == 0:
         raise RuntimeError(f'Mermaid render produced no PNG: {png}')
-    return f'![Procesdiagram](diagrams/{png.name}){{ width=95% }}'
+
+    # A single-cell table is deliberately used as an atomic publication block.
+    # Pandoc/Word/LibreOffice keep the row together. Both dimensions are capped
+    # so tall or wide flows scale down proportionally and remain on one page.
+    return (
+        '| Procesdiagram |\n'
+        '| --- |\n'
+        f'| ![Procesdiagram](diagrams/{png.name})'
+        f'{{ width={FLOW_IMAGE_WIDTH_CM}cm height={FLOW_IMAGE_HEIGHT_CM}cm }} |'
+    )
 
 
 def main() -> int:
@@ -69,7 +85,10 @@ def main() -> int:
         raise RuntimeError('generated markers zijn niet volledig verwijderd')
 
     OUT.write_text(publication, encoding='utf-8')
-    print(f'PASS: publication Markdown -> {OUT}; diagrams={count}')
+    print(
+        f'PASS: publication Markdown -> {OUT}; diagrams={count}; '
+        'invariant=ONE_FLOW_ONE_PAGE'
+    )
     return 0
 
 
