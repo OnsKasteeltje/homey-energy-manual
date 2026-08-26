@@ -9,6 +9,7 @@ on:
       - 'scripts/generate_process_diagrams.py'
       - 'scripts/migrate_legacy_mermaid.py'
       - 'scripts/build_architecture_publication.py'
+      - 'scripts/update_docx_indexes.py'
       - 'scripts/mermaid-puppeteer-config.json'
       - '.github/workflows/software-architecture-build.yml'
   push:
@@ -20,6 +21,7 @@ on:
       - 'scripts/generate_process_diagrams.py'
       - 'scripts/migrate_legacy_mermaid.py'
       - 'scripts/build_architecture_publication.py'
+      - 'scripts/update_docx_indexes.py'
       - 'scripts/mermaid-puppeteer-config.json'
       - '.github/workflows/software-architecture-build.yml'
   workflow_dispatch:
@@ -37,7 +39,7 @@ jobs:
       - name: Install document toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y pandoc libreoffice-writer
+          sudo apt-get install -y pandoc libreoffice-writer python3-uno
           npm install --global @mermaid-js/mermaid-cli
 
       - name: Reject legacy hand-maintained Mermaid
@@ -73,7 +75,12 @@ jobs:
             --output=build/Softwarearchitectuur_Home_Energy_Management_System.docx
           test -s build/Softwarearchitectuur_Home_Energy_Management_System.docx
 
-      - name: Verify publication source is hidden
+      - name: Refresh table of contents and document indexes
+        run: |
+          /usr/bin/python3 scripts/update_docx_indexes.py build/Softwarearchitectuur_Home_Energy_Management_System.docx
+          test -s build/Softwarearchitectuur_Home_Energy_Management_System.docx
+
+      - name: Verify publication source and TOC
         run: |
           pandoc build/Softwarearchitectuur_Home_Energy_Management_System.docx -t plain > /tmp/publication.txt
           if grep -q '"kind": "mermaid-source"' /tmp/publication.txt; then
@@ -88,8 +95,12 @@ jobs:
             echo 'FAIL: Mermaid source leaked into publication DOCX'
             exit 1
           fi
+          grep -q 'Architecture Overview' /tmp/publication.txt
+          grep -q 'System Context' /tmp/publication.txt
+          grep -q 'Core' /tmp/publication.txt
+          echo 'PASS: TOC/index content contains expected architecture headings'
 
-      - name: Build PDF from DOCX
+      - name: Build PDF from refreshed DOCX
         run: |
           mkdir -p /tmp/lo-profile
           libreoffice \
