@@ -136,6 +136,18 @@ jobs:
           test -s build/Softwarearchitectuur_Home_Energy_Management_System.pdf
           pdfinfo build/Softwarearchitectuur_Home_Energy_Management_System.pdf | grep -q '^Pages:'
 
+      - name: Upload architecture artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: software-architecture
+          path: |
+            docs/software-architecture/generated/software-architecture.md
+            build/software-architecture-publication.md
+            build/Softwarearchitectuur_Home_Energy_Management_System.docx
+            build/Softwarearchitectuur_Home_Energy_Management_System.pdf
+          if-no-files-found: warn
+
       - name: Verify PDF contains TOC page numbers
         run: |
           pdftotext -layout build/Softwarearchitectuur_Home_Energy_Management_System.pdf /tmp/publication-pdf.txt
@@ -160,14 +172,3 @@ jobs:
           )
           print(f'PASS: TOC contains page-number references ({len(candidates)} detected)')
           PY
-
-      - name: Upload architecture artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: software-architecture
-          path: |
-            docs/software-architecture/generated/software-architecture.md
-            build/software-architecture-publication.md
-            build/Softwarearchitectuur_Home_Energy_Management_System.docx
-            build/Softwarearchitectuur_Home_Energy_Management_System.pdf
-          if-no-files-found: error
