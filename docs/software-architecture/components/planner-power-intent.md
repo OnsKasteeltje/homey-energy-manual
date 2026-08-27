@@ -3,9 +3,9 @@ component: planner-power-intent
 title: 24h Energy Planner and Power Intent
 status: shadow
 architecture_status: implemented-shadow
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 sources:
-  - Homey Advanced Flow: EM v2 | 45 Planner | 24h Energy Plan v0.4 SHADOW
+  - Homey Advanced Flow: EM v2 | 45 Planner | 24h Energy Plan v0.4.3 SHADOW
   - Homey Advanced Flow: EM v2 | 46 Publish | Planner Shadow v0.1
   - Homey Advanced Flow: EM v2 | 20 Power Intent | P1 v0.2.1 SHADOW
   - Homey Advanced Flow: EM v2 | 60 Adapter | EV Power v0.1 SHADOW
@@ -42,15 +42,15 @@ Daarmee geldt:
 
 Een eventuele toekomstige prijsarbitrage zonder deadline moet een afzonderlijke expliciete policy/intent krijgen en mag niet onder `TESLA_CHARGE_OPPORTUNITY` worden verborgen.
 
-## 24h Energy Planner v0.4 SHADOW
+## 24h Energy Planner v0.4.3 SHADOW
 
-Planner v0.4 draait iedere 15 minuten met 45 seconden vertraging en kan handmatig worden gestart. De bestaande flow-ID en Homey-folder zijn behouden.
+Planner v0.4.3 draait iedere 15 minuten met 45 seconden vertraging en kan handmatig worden gestart. De bestaande flow-ID en Homey-folder zijn behouden.
 
 De Planner genereert altijd **96 × 15-minuten-slots**, ook onder FIXED. Prijs is context, niet de eigenaar van de tijdas.
 
 ### Base-loadmodel
 
-Planner v0.4 leest `EM2_Day_History` uit de canonieke History-flow. Voor bruikbare samples geldt:
+Planner leest `EM2_Day_History` uit de canonieke History-flow. Voor bruikbare samples geldt:
 
 `PV_W = SolarEdge_W + GoodWe4200_W + GoodWe2000_W`
 
@@ -62,11 +62,9 @@ Per lokale kwartierindex wordt een mediaanprofiel opgebouwd met globale mediaan 
 
 ### Weather-aware PV forecast
 
-Vanaf v0.4 is de oude same-day persistence vervangen door een echte 15-minuten weersforecast voor Hauwert. De Planner gebruikt Open-Meteo `shortwave_radiation` voor locatie Hauwert en zet irradiance om naar verwacht aggregaat PV-vermogen.
+De Planner gebruikt Open-Meteo `shortwave_radiation` voor locatie Hauwert en zet irradiance om naar verwacht aggregaat PV-vermogen. De schaalfactor wordt waar mogelijk gekalibreerd tegen gemeten totale PV uit `EM2_Day_History`. Bij voldoende bruikbare calibratiepunten geldt `WEATHER_HAUWERT_CALIBRATED`; anders wordt een theoretische fallback-schaal gebruikt en gemarkeerd als `WEATHER_HAUWERT_THEORETICAL_SCALE`.
 
-De schaalfactor wordt waar mogelijk gekalibreerd tegen gemeten totale PV uit `EM2_Day_History`. Bij voldoende bruikbare calibratiepunten geldt `WEATHER_HAUWERT_CALIBRATED`; anders wordt een theoretische fallback-schaal gebruikt en gemarkeerd als `WEATHER_HAUWERT_THEORETICAL_SCALE`.
-
-De forecastmetadata bevat provider, locatie, coördinaten, variabele, 15-minutenresolutie, retrievaltijd en calibratiepunten. V0.4 gebruikt dus geen day-persistence PV-forecast meer.
+De forecastmetadata bevat provider, locatie, coördinaten, variabele, 15-minutenresolutie, retrievaltijd en calibratiepunten. Er wordt geen day-persistence PV-forecast gebruikt.
 
 ### Energy-balancevelden
 
@@ -91,31 +89,53 @@ Als geen deadline/MUST actief is, worden alleen slots geselecteerd waarvoor:
 
 `pvSurplusBeforeFlexW >= 800 W`
 
-Deze krijgen `OPPORTUNITY_PV_ONLY` en worden op verwacht PV-overschot gerangschikt. Prijs beïnvloedt deze opportunityselectie niet.
-
-Geen PV-overschot >= 800 W betekent: geen Tesla opportunity-slot, ook niet bij goedkope of negatieve prijzen.
+Deze krijgen `OPPORTUNITY_PV_ONLY` en worden op verwacht PV-overschot gerangschikt. Prijs beïnvloedt deze opportunityselectie niet. Geen PV-overschot >= 800 W betekent geen Tesla opportunity-slot, ook niet bij goedkope of negatieve prijzen.
 
 ### Tesla met deadline: PV eerst, daarna prijs
 
 Bij actieve deadline met resterende kWh worden eerst slots vóór de deadline met voldoende verwacht PV-overschot gerangschikt. Daarna worden resterende noodzakelijke slots bij DYNAMIC op laagste prijs gerangschikt; bij FIXED op tijd.
 
-De Planner publiceert hiervoor:
+De Planner publiceert hiervoor `PV_SURPLUS_THEN_CHEAPEST_REQUIRED_GRID_SLOTS`. Het echte vermogen blijft runtime EMS -> Power Intent -> EV Adapter.
 
-`PV_SURPLUS_THEN_CHEAPEST_REQUIRED_GRID_SLOTS`
+### Warm water v0.4.3: elke watt PV telt
 
-De Planner verzint nog geen Tesla-throughput per kwartier; `preferredSlots` blijven adviserend. Het echte vermogen blijft runtime EMS -> Power Intent -> EV Adapter.
+WW heeft een harde dagelijkse energiebehoefte vóór 19:00. Planner v0.4.3 corrigeert de eerdere v0.4.2-ranking waarbij alleen een slot met **volledige** 1,9 kW PV-dekking als PV-first gold. Daardoor kon bijvoorbeeld 1,8 kW verwacht PV-overschot ten onrechte in dezelfde restgroep vallen als 0 W PV en vervolgens door een goedkope netprijs worden verdrongen.
 
-### Warm water en batterij
+De v0.4.3-invariant is:
 
-Warm water gebruikt nog de bestaande circa 1.9 kW representatie voor planning vóór 19:00. De batterij blijft `THEORETICAL_ONLY_NO_SOC` totdat werkelijk Victron/Pylontech SOC en commissioningconstraints beschikbaar zijn.
+`PV coverage first -> remaining deadline energy second -> price only after PV preference`
+
+Voor ieder kandidaatkwartier wordt berekend:
+
+`pvCoverageW = min(1900 W, pvSurplusBeforeFlexW)`
+
+`gridRequiredW = max(0, 1900 W - pvCoverageW)`
+
+De Planner maximaliseert eerst `pvCoverageW`, dus **ook gedeeltelijke PV-dekking heeft prioriteit boven goedkope netenergie**. Alleen wanneer de PV-dekking gelijk is, mag bij DYNAMIC prijs als tie-breaker worden gebruikt. Bij FIXED bepaalt daarna tijd de volgorde.
+
+Geselecteerde WW-slots krijgen expliciete semantiek:
+
+- `PV_PREFERRED` — het slot bevat gehele of gedeeltelijke voorspelde PV-dekking;
+- `DEADLINE_REQUIRED` — het slot is zonder PV nodig om het resterende dagdoel vóór 19:00 te halen;
+- `MUST_CATCHUP` — runtime catch-up is vereist.
+
+Daarnaast publiceert elk geselecteerd WW-slot `warmWaterReason`, `warmWaterPvCoverageW` en `warmWaterGridRequiredW`. De allocation policy is bij DYNAMIC `MAXIMIZE_PV_COVERAGE_THEN_PRICE_TIEBREAK_FOR_DEADLINE` en bij FIXED `MAXIMIZE_PV_COVERAGE_THEN_TIME_BEFORE_DEADLINE`.
+
+Deze labels zijn planning/evidence. Ze veroorzaken geen fysieke boilerwrite; de bestaande WW-productiewriter blijft eigenaar.
+
+### Batterij
+
+De batterij blijft `THEORETICAL_ONLY_NO_SOC` totdat werkelijk Victron/Pylontech SOC en commissioningconstraints beschikbaar zijn.
 
 ### Plannerstatus
 
-V0.4 publiceert onder meer `BLOCKED_STATE_MISSING`, `DEGRADED_BASE_LOAD_HISTORY`, `DEGRADED_PRICE_CONTEXT`, `DEGRADED_PV_WEATHER_FORECAST` en `READY_SHADOW_V0.4`.
+V0.4.3 publiceert onder meer `BLOCKED_STATE_MISSING`, `DEGRADED_BASE_LOAD_HISTORY`, `DEGRADED_PRICE_CONTEXT`, `DEGRADED_PV_WEATHER_FORECAST` en `READY_SHADOW_V0.4.3`.
 
 ## Planner publication en BC evidence
 
-`EM v2 | 46 Publish | Planner Shadow v0.1` publiceert het volledige SHADOW-plan als observability-only envelope naar `docs/data/energy-planner-shadow.json`. De publisher accepteert v0.4 zolang `controlMode=SHADOW`, `readOnly=true` en `physicalWritePerformed=false` blijven gelden.
+`EM v2 | 46 Publish | Planner Shadow v0.1` publiceert het volledige SHADOW-plan als observability-only envelope naar `docs/data/energy-planner-shadow.json`. De publisher accepteert v0.4.x zolang `controlMode=SHADOW`, `readOnly=true` en `physicalWritePerformed=false` blijven gelden.
+
+De Planner Shadow UI onderscheidt vanaf frontend v109 WW-slots met `PV_PREFERRED` van `DEADLINE_REQUIRED`. Hoverdetails tonen de reden en de voorspelde PV-dekking versus benodigde netstroom, zodat een verplicht deadlineslot niet langer visueel als een PV-voorkeur wordt gepresenteerd.
 
 `EM v2 | 76 Evidence | BC Planner Intent Recorder v0.3` legt planner- en Power-Intent-evidence vast voor de closed-loop keten:
 
@@ -136,13 +156,13 @@ Bij `TESLA_CHARGE_OPPORTUNITY` geldt uitsluitend:
 - `flexExportBudgetW >= 800 W` -> `target_W = flexExportBudgetW`;
 - anders -> `target_W = 0`.
 
-Negatieve of goedkope prijs kan geen discretionary importtarget meer creëren voor `TESLA_CHARGE_OPPORTUNITY`. De output publiceert `teslaOpportunityPolicy=PV_SURPLUS_ONLY` en `pricePolicy=DEADLINE_OPTIMIZATION_ONLY`.
+Negatieve of goedkope prijs kan geen discretionary importtarget creëren voor `TESLA_CHARGE_OPPORTUNITY`. De output publiceert `teslaOpportunityPolicy=PV_SURPLUS_ONLY` en `pricePolicy=DEADLINE_OPTIMIZATION_ONLY`.
 
 Power Intent converteert niet naar ampère; elektrische feasibility hoort bij de EV Power Adapter.
 
 ## WW-target contract
 
-WW is nog binair: `BOILER_ON -> true`, `BOILER_OFF -> false`, `HOLD -> null`. `WW_target_W` blijft het toekomstige numerieke architectuurcontract.
+WW is nog binair: `BOILER_ON -> true`, `BOILER_OFF -> false`, `HOLD -> null`. `WW_target_W` blijft het toekomstige numerieke architectuurcontract. De nieuwe `PV_PREFERRED`/`DEADLINE_REQUIRED` Plannerlabels veranderen dit runtimecontract niet.
 
 ## EV Power Adapter v0.1 SHADOW
 
@@ -168,6 +188,8 @@ Een fysieke writer mag pas via gecontroleerde atomic cut-over worden geactiveerd
 - Tesla opportunity is uitsluitend PV/exportbudgetgedreven;
 - goedkope of negatieve prijs mag nooit zelfstandig Tesla opportunity charging starten;
 - prijsoptimalisatie voor Tesla hoort alleen binnen deadline/MUST-planning;
+- WW ranking maximaliseert alle voorspelde PV-dekking, inclusief gedeeltelijke dekking, vóór prijsoptimalisatie;
+- WW `PV_PREFERRED`, `DEADLINE_REQUIRED` en `MUST_CATCHUP` zijn expliciet verschillende plannersemantiek;
 - forecastbron en kwaliteit worden expliciet gepubliceerd;
 - fasebewuste grid-headroom wordt pas gebruikt wanneer werkelijk gemodelleerd;
 - adapters verhogen nooit upstream vermogensbudget;
@@ -178,7 +200,10 @@ Een fysieke writer mag pas via gecontroleerde atomic cut-over worden geactiveerd
 
 | Onderdeel | Status |
 |---|---|
-| 24h Planner v0.4 | ACTIVE SHADOW; weather-aware Hauwert PV forecast |
+| 24h Planner v0.4.3 | ACTIVE SHADOW; weather-aware Hauwert PV forecast |
+| WW allocation | ACTIVE SHADOW; maximize partial/full PV coverage first |
+| WW planner semantics | `PV_PREFERRED` / `DEADLINE_REQUIRED` / `MUST_CATCHUP` |
+| Planner Shadow UI | v109; WW PV/deadline visually separated |
 | Base-load forecast | ACTIVE SHADOW; quarter profile/global median fallback |
 | PV forecast | ACTIVE SHADOW; Open-Meteo shortwave radiation + measured PV calibration |
 | Tesla opportunity policy | PV_SURPLUS_ONLY; minimum 800 W |
