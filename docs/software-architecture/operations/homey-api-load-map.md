@@ -1,13 +1,14 @@
 ---
 component: operations
 title: Homey API/Load Map
-version: 1.1.2
+version: 1.1.3
 status: active
 architecture_status: implemented
 last_verified: 2026-08-28
 source:
   - Homey runtime flow inventory inspected 2026-08-28
   - docs/software-architecture/architecture/05-homey-api-load-governance.md
+  - docs/software-architecture/operations/ev-control-observability.md
 ---
 
 # Homey API/Load Map
@@ -25,6 +26,7 @@ This document is the canonical runtime-load inventory for the Homey Energy Manag
 | `EM v2 | 60 Adapter | EV Power v0.1 SHADOW` | `953e9b18-3576-4557-b940-ed4a64eb2516` | ON | `EM2_Power_Intent` changed | `getVariables()` + adapter output Logic write | none | no device read/write; idempotent by revision/schema/target | MEDIUM | SHADOW |
 | `EM v2 | 80 Validation | EV Power Adapter Gate v0.2` | `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` | ON | `EM2_Power_Intent` changed + 2 s | one `getVariables()` + at most one compact `EM2_EV_Adapter_Gate` JSON write per semantic revision | none | safety schema + `finalStatus` preserved; gate publishes source/intent/state/core revisions used by actuator coherency guard | LOW/MEDIUM | VALIDATION / RUNTIME HEALTH |
 | `EM v2 | 60 Actuator | EV Power v0.2 LIVE OWNERSHIP` | `fea23193-a03f-49dd-9780-7e72ee48747d` | ON | **event-driven on `EM2_EV_Adapter_Gate` changed**; manual Start remains | always one `getVariables()`; LIVE=false only status Logic write and **0 device reads/writes**; LIVE=true performs one charger enumeration when a write/no-op check is required | none outside Easee device path | gate-driven since 2026-08-28; LIVE requires Gate PASS and gate source/intent/state/core revisions all equal current intent revision; only `target_charger_current`; invalid LIVE input fails closed to 0 A | LOW in SHADOW / SAFETY-CRITICAL in LIVE | ACTUATOR / CONTROL |
+| `EM v2 | 81 Observability | EV Control Status v0.1` | `f6edba38-ddf1-45e5-890e-c183aa2055d5` | ON | `EM2_EV_Adapter_Gate` changed or `EM2_EV_Actuator_Status` changed + 2 s; manual Start remains | one `getVariables()`; one small publish-cache Logic write after successful publication; **0 device reads/writes** | steady-state 1 GitHub PUT per changed control status; GET only on cache initialization or conflict recovery | publishes `docs/data/ev-control-status.json`; external read-only safety observability; duplicate payload skipped; never a control input | LOW/MEDIUM | OBSERVABILITY |
 | `EM v2 | 30 Context | Contract Price Adapter v0.8` | `b1c495cb-6ccd-4fb8-b4bf-365845dbb6e7` | ON | every 15 min + manual | FIXED: two Logic enumerations across condition/classifier, **0 `getDevices()`**; DYNAMIC: PBTH device enumeration only in dynamic branch | PBTH only for DYNAMIC | FIXED path optimized 2026-08-28; removes 4 full device enumerations/hour versus previous implementation | MEDIUM | PRODUCTION CONTEXT |
 | `EM v2 | 45 Planner | 24h Energy Plan v0.4.3 SHADOW` | `27617767-0a64-43a3-9bcb-e34b0dd6a5c0` | ON | every 15 min + 45 s + manual | `getVariables()`; 96-slot plan generation | Open-Meteo fetch each run | CPU/data-heavy but no device enumeration; about 4 Logic enumerations + 4 weather fetches/hour | MEDIUM/HIGH | SHADOW |
 | `EM v2 | 46 Publish | Planner Shadow v0.3 event-driven` | `5b3b80fe-96d1-406d-91ef-cf75a4e65d45` | ON | `EM2_Energy_Plan_24h` changed + 2 s; manual Start remains | `getVariables()`; one small local publish-cache Logic write after successful publish | steady-state **1 GitHub PUT per new plan**; GET only on cache miss/first run or conflict recovery | 15-min publisher cron removed; duplicate `plan.generatedAt` skipped; approximately **8 -> 4 GitHub HTTP calls/hour** at normal 15-min planner cadence | LOW/MEDIUM | SHADOW / OBSERVABILITY |
@@ -53,11 +55,17 @@ Core Tick (5 min)
               -> EV Adapter Gate (+2 s)
                    -> EM2_EV_Adapter_Gate changes
                        -> EV Power Actuator
+                       -> EV Control Status Observability (+2 s)
+                            -> docs/data/ev-control-status.json
+                   -> EV Power Actuator status changes
+                       -> EV Control Status Observability (+2 s)
 ```
 
 The load impact of this path is the sum of the whole cascade. It must not be assessed as one Core operation. At nominal cadence the upstream path accounts for about 12 full Core device enumerations/hour and about 48 full Logic enumerations/hour across Power Intent + P1 Gate + EV Adapter + EV Gate. The actuator adds one Logic enumeration per Gate change while LIVE=false, but no device enumeration or physical write. A device enumeration is possible only when LIVE=true. Gate write amplification has been reduced from many typed mirrors per revision to at most one compact runtime-health JSON per Gate per semantic revision.
 
 The actuator is deliberately downstream of the Gate rather than the raw adapter. This prevents a stale PASS from the previous revision from being used during the Gate's 2-second settle window. In LIVE, the actuator independently requires the Gate's `sourceRevision`, `intentRevision`, `stateRevision` and `coreRevision` all to match the current intent revision.
+
+EV Control Status is downstream-only observability. It performs one Logic enumeration per event and no device access. Because exact revision coherence is safety evidence for a positive LIVE smoke, a new natural Gate revision is allowed to produce one external status publication. The cached GitHub SHA keeps steady state to one PUT; GET is limited to cache initialization or conflict recovery. This path must be revisited if throttling evidence implicates it.
 
 ### Quarter-hour cluster
 
@@ -82,10 +90,13 @@ The Contract Price Adapter no longer performs a device enumeration in FIXED mode
 - Contract Price Adapter FIXED path was corrected on 2026-08-28 so `getDevices()` is not called in FIXED mode. This removes 4 full device enumerations/hour at its 15-minute cadence.
 - P1 Pre-EV Gate and EV Power Adapter Gate are compact runtime-health Gates. The P1 Gate status vocabulary is aligned with P1 v0.2.1 (`NUMERIC_PV_EXPORT_TARGET` and `OPPORTUNITY_WITHOUT_PV_BUDGET`).
 - The EV Power Actuator was hardened on 2026-08-28 from adapter-driven to Gate-driven execution. It no longer has a stale-PASS race across the Gate settle window, and LIVE requires exact revision coherence across intent, adapter, state and Gate before a positive physical write can occur.
+- EV Control Status v0.1 was added on 2026-08-28 to replace temporary runtime probes with permanent downstream observability. It publishes revision, `EV_target_W`, `requested_A`, Gate status/revisions, actuator status and LIVE state to `docs/data/ev-control-status.json` without device access.
+- During observability commissioning a residual test flag was discovered: `EM2_EV_Actuator_Live_Enabled=true`. It was explicitly reset to `false`; the cleanup flow self-deleted. Follow-up status at revision 2925 showed `targetW=0`, `requestedA=0`, Gate `PASS`, `coherent=true`, `live=false`, and no physical write.
+- Temporary EV/Tesla test debt was removed: the one-shot 10 A flow, read-only probe, EV runtime readbacks, actuator readback, deadline shadow readback, LIVE Gate enforcement test and temporary LIVE ON/OFF flows were deleted rather than left disabled.
 - Control Audit was converted from fixed 5-minute polling to event-driven execution on `EM2_Control_WW`, with a 2-second settle. Fixed load of about 12 audit runs/hour is removed; GitHub publication is limited to semantic changes and at most once per 30 minutes.
 - BC Planner Intent Recorder was changed to local-first consumption of `EM2_Energy_Plan_24h`; the rolling GitHub read-back path was removed, eliminating about 4 GitHub GETs/hour.
 - Planner Shadow Publisher was changed from v0.2 timed publication to v0.3 event-driven publication. Normal external load falls from one GitHub GET + one PUT every 15 minutes (~8 calls/hour) to one PUT per changed planner output (~4 calls/hour), with GET reserved for cache initialization or conflict recovery.
-- The positive Tesla LIVE regulation smoke has **not yet been performed** after this safety hardening; the architecture blocker is removed, but runtime proof still requires a fresh natural positive EV target and controlled smoke.
+- The positive Tesla LIVE regulation smoke has **not yet been performed** after this safety hardening. The observability blocker is now removed; runtime proof still requires a fresh natural positive EV target, expected adapter current, current Gate PASS/coherence and a controlled LIVE smoke.
 
 ## Required redesign candidates
 
@@ -95,7 +106,7 @@ The Contract Price Adapter no longer performs a device enumeration in FIXED mode
 4. Resolve the duplicate enabled `WW Scheduling SHADOW v0.1` flows after caller/dependency analysis.
 5. Stagger or remove remaining independent clocks where event-driven chaining already establishes correct ordering.
 6. Review Core Tick Logic-write fan-out after a clean multi-cycle stability baseline, because Core remains the principal unavoidable 5-minute device reader.
-7. Execute the controlled positive EV LIVE smoke only on a fresh natural positive `EV_target_W`, current Gate PASS and demonstrably correct adapter output; do not weaken safety criteria to make the smoke pass.
+7. Execute the controlled positive EV LIVE smoke only when `docs/data/ev-control-status.json` shows a fresh positive `targetW`, the expected `requestedA`, Gate `PASS` and `coherent=true`; do not weaken safety criteria to make the smoke pass.
 
 ## Load-map maintenance checklist
 
