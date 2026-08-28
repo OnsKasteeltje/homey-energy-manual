@@ -1,14 +1,16 @@
 ---
 component: architecture
 title: Architectuurprincipes
-version: 0.1.0
+version: 0.2.0
 status: active
 architecture_status: implemented
-last_verified: 2026-08-25
+last_verified: 2026-08-28
 source:
   - docs/architectuur-guardrails.md
   - docs/architectuur.md
   - docs/codekwaliteit.md
+  - docs/software-architecture/architecture/05-homey-api-load-governance.md
+  - docs/software-architecture/operations/homey-api-load-map.md
 ---
 
 # Architectuurprincipes
@@ -36,6 +38,16 @@ Herhaalde Core-ticks, dubbele triggers of retries mogen niet leiden tot dubbele 
 ## Fail-safe bij onbetrouwbare input
 
 Stale, ontbrekende of inconsistente input mag niet zonder expliciete guard naar een fysieke write leiden. De documentatie beschrijft per component fallback- en suppressiegedrag.
+
+## Homey API- en runtimeload is een expliciete architectuurconstraint
+
+Een functioneel correcte flow is niet production-ready wanneer de extra Homey-load niet is gekwantificeerd. Iedere nieuwe of materieel gewijzigde flow wordt opgenomen in de versiebeheerbare **Homey API/Load Map** met triggerfrequentie, device-reads, Logic-reads/writes, flow-starts, Insights-calls, externe netwerkcalls, fysieke writes en event-/cascadefan-out.
+
+Geen flow mag naar productie worden gepromoveerd wanneer de incrementele load onbekend is of buiten het afgesproken loadbudget valt. Wijzigingen in polling, triggerfrequentie, Logic-fan-out, netwerkpublicatie of device-access vereisen een gelijktijdige update van de Load Map.
+
+De standaard is **single-reader first**: downstream logica consumeert canonieke runtime-state, zoals `EM2_State`, en voegt geen duplicerende device-poller toe zonder expliciet gedocumenteerde noodzaak. Sampling en externe publicatie hebben afzonderlijke cadansen en budgetten. Validatie-/evidenceflows hebben een expliciete lifecycle en mogen na afronding niet onbeperkt op volle runtimefrequentie actief blijven zonder productie-doel.
+
+Bij throttling wordt één contributor tegelijk geïsoleerd op basis van de Load Map; safety gates en validatiecriteria worden daarbij nooit versoepeld. Zie `05-homey-api-load-governance.md` en `operations/homey-api-load-map.md`.
 
 ## Documentatie is modulair en reproduceerbaar
 
