@@ -1,0 +1,80 @@
+name: Build Core v0.10.15 fan-out candidate
+
+on:
+  push:
+    branches:
+      - core-v0.10.15-fanout
+    paths:
+      - .github/workflows/build-core-v0.10.15.yml
+      - src/homey/core/core-v0.10.14.js
+      - src/homey/core/.regen-v0.10.15
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: core-v0.10.15-fanout
+
+      - name: Generate v0.10.15 from immutable v0.10.14 baseline
+        shell: python
+        run: |
+          from pathlib import Path
+
+          src = Path('src/homey/core/core-v0.10.14.js')
+          dst = Path('src/homey/core/core-v0.10.15.js')
+          text = src.read_text()
+
+          old_header = "// EM v2 | 00 Core Tick | v0.10.14 — EV electrical context + source-skew guard + WW post-goal SHOULD + idempotent writes"
+          new_header = "// EM v2 | 00 Core Tick | v0.10.15 — semantic Logic fan-out suppression"
+          assert text.count(old_header) == 1
+          text = text.replace(old_header, new_header, 1)
+
+          old_version = "PUB_VERSION='EM2_CORE_STATE_V0.10.14'"
+          new_version = "PUB_VERSION='EM2_CORE_STATE_V0.10.15'"
+          assert text.count(old_version) == 1
+          text = text.replace(old_version, new_version, 1)
+
+          old_set = "const set=async(name,type,value)=>{const v=byName[name];if(v){if(v.value===value)return v;await Homey.logic.updateVariable({id:v.id,variable:{value}});v.value=value;return v;}const nv=await Homey.logic.createVariable({variable:{name,type,value}});byName[name]=nv;return nv;};"
+          new_set = """const SEMANTIC_JSON_VARS=new Set(['EM2_State','EM2_Decision','EM2_Shadow','EM2_WW_State','EM2_Control_WW','EM2_Public_State','EM2_Publisher_Status']);
+          const VOLATILE_KEYS=new Set(['sampledAt','changedAt','publishedAt','ts','updatedAt','updated_at','generatedAt','generated_at','heartbeat_at','source_sample_at','state_age_sec','stateAgeSec','lastStateSampleAt','at','p1AgeSec','ageSec','age_sec','maxAgeSec','skewSec','lastSample','last_sample_at','sources']);
+          const semanticValue=value=>{const walk=v=>{if(Array.isArray(v))return v.map(walk);if(v&&typeof v==='object'){const out={};for(const k of Object.keys(v).sort()){if(VOLATILE_KEYS.has(k))continue;out[k]=walk(v[k]);}return out;}return v;};try{return JSON.stringify(walk(JSON.parse(String(value))));}catch{return String(value);}};
+          const set=async(name,type,value)=>{const v=byName[name];if(v){if(v.value===value)return v;if(type==='string'&&SEMANTIC_JSON_VARS.has(name)&&semanticValue(v.value)===semanticValue(value))return v;await Homey.logic.updateVariable({id:v.id,variable:{value}});v.value=value;return v;}const nv=await Homey.logic.createVariable({variable:{name,type,value}});byName[name]=nv;return nv;};"""
+          new_set = '\n'.join(line.strip() for line in new_set.splitlines())
+          assert text.count(old_set) == 1
+          text = text.replace(old_set, new_set, 1)
+
+          assert "EM2_CORE_STATE_V0.10.14" not in text
+          assert text.count("Homey.devices.getDevices()") == 1
+          assert text.count("Homey.logic.getVariables()") == 1
+          assert "await set('EM2_Publish_Due','boolean',revisionPending||heartbeatDue||upgradeDue);" in text
+          assert "await set('EM2_Publish_Due','boolean',true)" not in text
+          assert "deviceWrites:false" in text
+          assert "physicalWritePerformed:false" in text
+          dst.write_text(text)
+
+      - name: Verify diff is limited to version/header and fan-out guard
+        run: |
+          git diff --no-index -- src/homey/core/core-v0.10.14.js src/homey/core/core-v0.10.15.js > /tmp/core.diff || true
+          cat /tmp/core.diff
+          test "$(grep -c '^@@' /tmp/core.diff)" -le 3
+          grep -q "SEMANTIC_JSON_VARS" /tmp/core.diff
+          grep -q "EM2_CORE_STATE_V0.10.15" /tmp/core.diff
+          grep -q "'sources'" /tmp/core.diff
+          grep -q "'last_sample_at'" /tmp/core.diff
+
+      - name: Commit generated candidate
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/homey/core/core-v0.10.15.js
+          if git diff --cached --quiet; then
+            echo "No generated change to commit"
+          else
+            git commit -m "feat(core): generate v0.10.15 semantic fan-out candidate"
+            git push origin HEAD:core-v0.10.15-fanout
+          fi
