@@ -1,7 +1,7 @@
 ---
 component: operations
 title: Homey API/Load Map
-version: 1.1.1
+version: 1.1.2
 status: active
 architecture_status: implemented
 last_verified: 2026-08-28
@@ -21,9 +21,10 @@ This document is the canonical runtime-load inventory for the Homey Energy Manag
 | `EM v2 | 00 Core Tick | v0.10.13 (EV electrical context)` | `227f8d3b-7551-46dd-837d-1b8c69add824` | ON | every 5 min | `getDevices()` + `getVariables()` + multiple Logic writes | none in current Core path | updates `EM2_Public_State`, which starts Power Intent cascade | HIGH | PRODUCTION |
 | `EM v2 | 70 History | Day Series v0.5.4` | `14027232-905e-4b8b-828d-5b44b8f6692e` | **OFF for isolation test** | every 5 min when enabled | `getVariables()` + targeted P1 `getDevice()`; `getDevices()` for PV snapshot in some paths | GitHub GET/PUT every run for `energy-day-v2.json`; more at rollover | primary current throttling suspect; isolated on 2026-08-28 | **CRITICAL** | EVIDENCE / TELEMETRY |
 | `EM v2 | 20 Power Intent | P1 v0.2.1 SHADOW` | `19d9d8a6-ec32-4639-be5e-71e9f034d31b` | ON | `EM2_Public_State` changed | `getVariables()` + one output Logic write when revision changes | none | triggers P1 Gate, EV Adapter and EV Adapter Gate | MEDIUM | SHADOW |
-| `EM v2 | 80 Validation | P1 Pre-EV Gate v0.2` | `557ed7e8-9efe-4173-bc06-8e629214e172` | ON | `EM2_Power_Intent` changed | one `getVariables()` + at most one compact `EM2_P1_PreEV_Gate` JSON write per semantic revision | none | runtime-health mode; typed campaign mirrors/counters removed; identical semantic retrigger is no-write | LOW/MEDIUM | VALIDATION / RUNTIME HEALTH |
+| `EM v2 | 80 Validation | P1 Pre-EV Gate v0.2` | `557ed7e8-9efe-4173-bc06-8e629214e172` | ON | `EM2_Power_Intent` changed | one `getVariables()` + at most one compact `EM2_P1_PreEV_Gate` JSON write per semantic revision | none | runtime-health mode; status vocabulary aligned to P1 v0.2.1 PV-only contract; typed campaign mirrors/counters removed | LOW/MEDIUM | VALIDATION / RUNTIME HEALTH |
 | `EM v2 | 60 Adapter | EV Power v0.1 SHADOW` | `953e9b18-3576-4557-b940-ed4a64eb2516` | ON | `EM2_Power_Intent` changed | `getVariables()` + adapter output Logic write | none | no device read/write; idempotent by revision/schema/target | MEDIUM | SHADOW |
-| `EM v2 | 80 Validation | EV Power Adapter Gate v0.2` | `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` | ON | `EM2_Power_Intent` changed + 2 s | one `getVariables()` + at most one compact `EM2_EV_Adapter_Gate` JSON write per semantic revision | none | safety schema + `finalStatus` preserved for actuator; typed mirror/campaign outputs removed; identical semantic retrigger is no-write | LOW/MEDIUM | VALIDATION / RUNTIME HEALTH |
+| `EM v2 | 80 Validation | EV Power Adapter Gate v0.2` | `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` | ON | `EM2_Power_Intent` changed + 2 s | one `getVariables()` + at most one compact `EM2_EV_Adapter_Gate` JSON write per semantic revision | none | safety schema + `finalStatus` preserved; gate publishes source/intent/state/core revisions used by actuator coherency guard | LOW/MEDIUM | VALIDATION / RUNTIME HEALTH |
+| `EM v2 | 60 Actuator | EV Power v0.2 LIVE OWNERSHIP` | `fea23193-a03f-49dd-9780-7e72ee48747d` | ON | **event-driven on `EM2_EV_Adapter_Gate` changed**; manual Start remains | always one `getVariables()`; LIVE=false only status Logic write and **0 device reads/writes**; LIVE=true performs one charger enumeration when a write/no-op check is required | none outside Easee device path | gate-driven since 2026-08-28; LIVE requires Gate PASS and gate source/intent/state/core revisions all equal current intent revision; only `target_charger_current`; invalid LIVE input fails closed to 0 A | LOW in SHADOW / SAFETY-CRITICAL in LIVE | ACTUATOR / CONTROL |
 | `EM v2 | 30 Context | Contract Price Adapter v0.8` | `b1c495cb-6ccd-4fb8-b4bf-365845dbb6e7` | ON | every 15 min + manual | FIXED: two Logic enumerations across condition/classifier, **0 `getDevices()`**; DYNAMIC: PBTH device enumeration only in dynamic branch | PBTH only for DYNAMIC | FIXED path optimized 2026-08-28; removes 4 full device enumerations/hour versus previous implementation | MEDIUM | PRODUCTION CONTEXT |
 | `EM v2 | 45 Planner | 24h Energy Plan v0.4.3 SHADOW` | `27617767-0a64-43a3-9bcb-e34b0dd6a5c0` | ON | every 15 min + 45 s + manual | `getVariables()`; 96-slot plan generation | Open-Meteo fetch each run | CPU/data-heavy but no device enumeration; about 4 Logic enumerations + 4 weather fetches/hour | MEDIUM/HIGH | SHADOW |
 | `EM v2 | 46 Publish | Planner Shadow v0.3 event-driven` | `5b3b80fe-96d1-406d-91ef-cf75a4e65d45` | ON | `EM2_Energy_Plan_24h` changed + 2 s; manual Start remains | `getVariables()`; one small local publish-cache Logic write after successful publish | steady-state **1 GitHub PUT per new plan**; GET only on cache miss/first run or conflict recovery | 15-min publisher cron removed; duplicate `plan.generatedAt` skipped; approximately **8 -> 4 GitHub HTTP calls/hour** at normal 15-min planner cadence | LOW/MEDIUM | SHADOW / OBSERVABILITY |
@@ -40,7 +41,7 @@ This document is the canonical runtime-load inventory for the Homey Energy Manag
 
 ## Known cascades and burst groups
 
-### Five-minute Power Intent cascade
+### Five-minute Power Intent / EV safety cascade
 
 ```text
 Core Tick (5 min)
@@ -50,9 +51,13 @@ Core Tick (5 min)
               -> P1 Pre-EV Gate
               -> EV Power Adapter
               -> EV Adapter Gate (+2 s)
+                   -> EM2_EV_Adapter_Gate changes
+                       -> EV Power Actuator
 ```
 
-The load impact of this path is the sum of the whole cascade. It must not be assessed as one Core operation. At nominal cadence this path accounts for about 12 full Core device enumerations/hour and, downstream, about 48 full Logic enumerations/hour across Power Intent + P1 Gate + EV Adapter + EV Gate. Gate write amplification has been reduced from many typed mirrors per revision to at most one compact runtime-health JSON per Gate per semantic revision.
+The load impact of this path is the sum of the whole cascade. It must not be assessed as one Core operation. At nominal cadence the upstream path accounts for about 12 full Core device enumerations/hour and about 48 full Logic enumerations/hour across Power Intent + P1 Gate + EV Adapter + EV Gate. The actuator adds one Logic enumeration per Gate change while LIVE=false, but no device enumeration or physical write. A device enumeration is possible only when LIVE=true. Gate write amplification has been reduced from many typed mirrors per revision to at most one compact runtime-health JSON per Gate per semantic revision.
+
+The actuator is deliberately downstream of the Gate rather than the raw adapter. This prevents a stale PASS from the previous revision from being used during the Gate's 2-second settle window. In LIVE, the actuator independently requires the Gate's `sourceRevision`, `intentRevision`, `stateRevision` and `coreRevision` all to match the current intent revision.
 
 ### Quarter-hour cluster
 
@@ -75,10 +80,12 @@ The Contract Price Adapter no longer performs a device enumeration in FIXED mode
 - Day Series remains isolated because it combined a 5-minute cadence, direct device access and GitHub publication in one flow.
 - Publisher, Watchdog, Immutable Day Archive and washer/dryer analysis/logging/publication remain disabled during the clean throttling isolation.
 - Contract Price Adapter FIXED path was corrected on 2026-08-28 so `getDevices()` is not called in FIXED mode. This removes 4 full device enumerations/hour at its 15-minute cadence.
-- P1 Pre-EV Gate and EV Power Adapter Gate were converted from validation-campaign mirror engines to compact runtime-health Gates. Both retain their safety schemas/checks while reducing Logic write amplification from roughly 34 mirror writes per Power Intent revision across both Gates to at most 2 compact JSON writes per semantic revision.
+- P1 Pre-EV Gate and EV Power Adapter Gate are compact runtime-health Gates. The P1 Gate status vocabulary is aligned with P1 v0.2.1 (`NUMERIC_PV_EXPORT_TARGET` and `OPPORTUNITY_WITHOUT_PV_BUDGET`).
+- The EV Power Actuator was hardened on 2026-08-28 from adapter-driven to Gate-driven execution. It no longer has a stale-PASS race across the Gate settle window, and LIVE requires exact revision coherence across intent, adapter, state and Gate before a positive physical write can occur.
 - Control Audit was converted from fixed 5-minute polling to event-driven execution on `EM2_Control_WW`, with a 2-second settle. Fixed load of about 12 audit runs/hour is removed; GitHub publication is limited to semantic changes and at most once per 30 minutes.
 - BC Planner Intent Recorder was changed to local-first consumption of `EM2_Energy_Plan_24h`; the rolling GitHub read-back path was removed, eliminating about 4 GitHub GETs/hour.
 - Planner Shadow Publisher was changed from v0.2 timed publication to v0.3 event-driven publication. Normal external load falls from one GitHub GET + one PUT every 15 minutes (~8 calls/hour) to one PUT per changed planner output (~4 calls/hour), with GET reserved for cache initialization or conflict recovery.
+- The positive Tesla LIVE regulation smoke has **not yet been performed** after this safety hardening; the architecture blocker is removed, but runtime proof still requires a fresh natural positive EV target and controlled smoke.
 
 ## Required redesign candidates
 
@@ -88,7 +95,7 @@ The Contract Price Adapter no longer performs a device enumeration in FIXED mode
 4. Resolve the duplicate enabled `WW Scheduling SHADOW v0.1` flows after caller/dependency analysis.
 5. Stagger or remove remaining independent clocks where event-driven chaining already establishes correct ordering.
 6. Review Core Tick Logic-write fan-out after a clean multi-cycle stability baseline, because Core remains the principal unavoidable 5-minute device reader.
-7. Before a positive EV LIVE smoke, separately inspect the actuator/Gate revision-coherency path so load hardening and safety hardening remain distinct concerns.
+7. Execute the controlled positive EV LIVE smoke only on a fresh natural positive `EV_target_W`, current Gate PASS and demonstrably correct adapter output; do not weaken safety criteria to make the smoke pass.
 
 ## Load-map maintenance checklist
 
