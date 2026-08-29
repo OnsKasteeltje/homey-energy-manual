@@ -1,7 +1,7 @@
 ---
 component: operations
 title: Homey API/Load Map
-version: 1.3.1
+version: 1.3.2
 status: active
 architecture_status: implemented
 last_verified: 2026-08-29
@@ -41,7 +41,7 @@ Consequences for Homey load governance:
 | `EM v2 | 60 Adapter | EV Power v0.1.1 TARGETED-READ SHADOW` | `953e9b18-3576-4557-b940-ed4a64eb2516` | **ON** | `EM2_Power_Intent` change | targeted Logic reads only | no device access | low-load |
 | `EM v2 | 80 Validation | EV Power Adapter Gate v0.2.1 TARGETED-READ` | `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` | **ON** | `EM2_Power_Intent` change +2 s | targeted Logic reads only | none | low-load |
 | `EM v2 | 60 Actuator | EV Power v0.2.2 TARGETED-READ LIVE OWNERSHIP` | `fea23193-a03f-49dd-9780-7e72ee48747d` | **ON** | `EM2_EV_Adapter_Gate` change | targeted Logic reads; LIVE=false has zero device reads/writes | LIVE=true may enumerate Easee path for guarded write/no-op | low in SHADOW; safety-critical in LIVE |
-| `EM v2 | 40 Data | Publisher v1.0.9 HARD-GATE LOW-LOAD` | `fe84bc17-72d4-4fbb-9a69-b3d751b0ffcd` | **ON** | `EM2_Public_State` change +2 s | five targeted Logic reads | hard minimum 15 min between GitHub publishes; zero GitHub I/O inside gate window | bounded active publisher |
+| `EM v2 | 40 Data | Publisher v1.0.10 SCHEDULED LOW-LOAD` | `fe84bc17-72d4-4fbb-9a69-b3d751b0ffcd` | **ON** | every 15 min +2 s; manual start retained | five targeted Logic reads | hard minimum 15 min between GitHub publishes | **low-fanout publication path**; no longer triggered by each `EM2_Public_State` change, reducing starts from up to ~12/hour to ~4/hour without changing control/actuation |
 | `EM v2 | 45 Planner | 24h Energy Plan v0.4.4 SHADOW LOW-LOAD` | `27617767-0a64-43a3-9bcb-e34b0dd6a5c0` | **OFF** | every 15 min +45 s if enabled | one targeted Planner Input read + one targeted snapshot write | Open-Meteo when enabled | no current load |
 | `EM v2 | 46 Publish | Planner Shadow v0.4 event-driven LOW-LOAD` | `5b3b80fe-96d1-406d-91ef-cf75a4e65d45` | **OFF** | planner snapshot change +2 s if enabled | four targeted Logic reads | GitHub PUT per new plan key when enabled | no current load |
 | `EM v2 | 30 Context | Contract Price Adapter v0.8` | `b1c495cb-6ccd-4fb8-b4bf-365845dbb6e7` | **OFF** | every 15 min if enabled | broad Logic reads; dynamic branch can enumerate PBTH device | PBTH in dynamic mode | no current load; refactor before re-enable |
@@ -90,7 +90,7 @@ The verified active EMS control path is now substantially smaller than earlier l
 
 The only currently proven active periodic broad collection reader is Core v0.10.17. Core intentionally acts as the single central snapshot reader. Replacing its single `getDevices()` with many targeted device calls is not assumed to be cheaper; downstream consumers should consume Core/Logic snapshots rather than independently enumerate Homey collections.
 
-The active EV cascade has been migrated to targeted Logic reads. Publisher v1.0.9 remains active but is hard-gated: event triggers can occur more often, while actual GitHub publication is bounded to at most once per 15 minutes.
+The active EV cascade has been migrated to targeted Logic reads. Publisher v1.0.10 is now scheduled every 15 minutes instead of being triggered by every `EM2_Public_State` change. It still performs five targeted Logic reads and retains the 15-minute hard publication gate. This reduces Publisher wake-ups from up to roughly 12 per hour to roughly 4 per hour while leaving the control and actuator chain unchanged.
 
 No hidden active legacy EMS poller has been found in the exact-ID runtime review so far. The remaining investigation target is therefore the truly active flowset plus any TEMP/DONE/ONE-SHOT artifacts that may unexpectedly still be enabled.
 
