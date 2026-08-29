@@ -18,4 +18,5 @@
 
 <script src="../javascripts/planner-axes-v1.1.0.js"></script>
 <script src="../javascripts/planner-ww-multislot-v1.0.0.js"></script>
-<script src="../javascripts/planner-device-tabs-v1.0.2.js"></script>
+<script src="../javascripts/planner-flex-energy-v1.0.0.js"></script>
+<script src="../javascripts/planner-device-tabs-v1.0.3.js"></script>
