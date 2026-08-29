@@ -49,11 +49,13 @@ echo "[6/11] SHADOW environment"
 ENV_FILE="$EMS_ROOT/secrets/ems.env"
 if [[ ! -f "$ENV_FILE" ]]; then
   DBPASS="$(openssl rand -hex 24)"
+  APITOKEN="$(openssl rand -hex 32)"
   cat > "$ENV_FILE" <<EOF
 EMS_MODE=SHADOW
 TZ=$TZ
 POSTGRES_PASSWORD=$DBPASS
 EMS_REPO_DIR=$REPO_DIR
+MANAGEMENT_API_TOKEN=$APITOKEN
 HOMEY_BASE_URL=
 HOMEY_TOKEN=
 VICTRON_HOST=
@@ -61,6 +63,7 @@ EOF
   chmod 0600 "$ENV_FILE"
 fi
 grep -q '^EMS_MODE=SHADOW$' "$ENV_FILE" || { echo "Refusing install: EMS_MODE must be SHADOW"; exit 1; }
+grep -Eq '^MANAGEMENT_API_TOKEN=.{32,}$' "$ENV_FILE" || { echo "Refusing install: management API token missing/too short"; exit 1; }
 
 COMPOSE=(docker compose --env-file "$ENV_FILE" -f "$EMS_ROOT/compose/docker-compose.yml")
 
@@ -76,8 +79,8 @@ done
 "${COMPOSE[@]}" exec -T postgres pg_isready -U ems -d ems >/dev/null
 "${COMPOSE[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U ems -d ems < "$SCRIPT_DIR/migrations/001_bootstrap.sql"
 
-echo "[9/11] Build/start EMS core in SHADOW"
-"${COMPOSE[@]}" up -d --build ems-core
+echo "[9/11] Build/start EMS core + read-only management API in SHADOW"
+"${COMPOSE[@]}" up -d --build ems-core management-api
 
 echo "[10/11] Host hardening + backup timer"
 "$EMS_ROOT/bootstrap/system/security.sh"
