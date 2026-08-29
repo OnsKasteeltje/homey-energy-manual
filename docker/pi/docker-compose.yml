@@ -15,6 +15,33 @@ services:
       mosquitto:
         condition: service_started
 
+  management-api:
+    build:
+      context: ../..
+      dockerfile: docker/pi/Dockerfile
+    command: ["uvicorn", "management_api:app", "--host", "0.0.0.0", "--port", "8080", "--no-server-header"]
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    environment:
+      EMS_MODE: ${EMS_MODE:-SHADOW}
+      EMS_RELEASE: pi-ems-bootstrap-v0.1
+      DATABASE_URL: postgresql://ems:${POSTGRES_PASSWORD:-change-me}@postgres:5432/ems
+      MANAGEMENT_API_TOKEN: ${MANAGEMENT_API_TOKEN:?MANAGEMENT_API_TOKEN is required}
+      HOMEY_BASE_URL: ${HOMEY_BASE_URL:-}
+      HOMEY_TOKEN: ${HOMEY_TOKEN:-}
+      VICTRON_HOST: ${VICTRON_HOST:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8088:8080"
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
