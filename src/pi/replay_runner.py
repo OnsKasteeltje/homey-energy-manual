@@ -9,6 +9,7 @@ from typing import Any
 
 from ems.ev_semantics import EvSemanticInput, build_ev_control
 from ems.replay import replay_projection, state_from_fixture
+from ems.ww_semantics import WwAdapterInput, build_ww_adapter
 from publisher import build_payload, decide_publish
 
 
@@ -36,6 +37,21 @@ def run_replay(payload: dict[str, Any]) -> dict[str, Any]:
         )
     )
 
+    ww_cfg = payload.get("ww_adapter")
+    ww: dict[str, Any] | None = None
+    if ww_cfg is not None:
+        ww = build_ww_adapter(
+            WwAdapterInput(
+                schema=ww_cfg["schema"],
+                valid=ww_cfg["valid"],
+                device_writes=ww_cfg["device_writes"],
+                source_revision=ww_cfg.get("source_revision"),
+                target_present=ww_cfg["target_present"],
+                target_on=ww_cfg.get("target_on"),
+                source_action=ww_cfg.get("source_action"),
+            )
+        )
+
     pub_cfg = payload["publisher"]
     decision = decide_publish(
         pub_cfg["public_state"],
@@ -48,7 +64,7 @@ def run_replay(payload: dict[str, Any]) -> dict[str, Any]:
     if decision.due:
         publisher["payload"] = build_payload(pub_cfg["public_state"], decision, now=now)
 
-    actual = {"core": core, "ev_semantics": ev, "publisher": publisher}
+    actual = {"core": core, "ev_semantics": ev, "ww_adapter": ww, "publisher": publisher}
     expected = payload.get("expected", {})
     checks: list[dict[str, Any]] = []
 
@@ -66,12 +82,18 @@ def run_replay(payload: dict[str, Any]) -> dict[str, Any]:
         check(f"core.{key}", core.get(key), value)
     for key, value in expected.get("ev_semantics", {}).items():
         check(f"ev_semantics.{key}", ev.get(key), value)
+    if ww is not None:
+        for key, value in expected.get("ww_adapter", {}).items():
+            if key == "command_value":
+                check("ww_adapter.command.value", ww["command"].get("value"), value)
+            else:
+                check(f"ww_adapter.{key}", ww.get(key), value)
     for key, value in expected.get("publisher", {}).items():
         check(f"publisher.decision.{key}", publisher["decision"].get(key), value)
 
     passed = all(item["pass"] for item in checks) if checks else False
     return {
-        "schema": "PI_EMS_REPLAY_REPORT_V0.1",
+        "schema": "PI_EMS_REPLAY_REPORT_V0.2",
         "fixture_id": payload.get("fixture_id", "UNKNOWN"),
         "replay_at": now.isoformat(),
         "status": "PASS" if passed else "FAIL",
