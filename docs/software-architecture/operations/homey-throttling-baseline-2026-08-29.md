@@ -1,7 +1,7 @@
 ---
 component: operations
 title: Homey Throttling Recovery Baseline 2026-08-29
-version: 1.0.0
+version: 1.1.0
 status: active
 architecture_status: implemented
 last_verified: 2026-08-29
@@ -63,17 +63,33 @@ During the clean baseline, keep the following classes OFF unless a specific stag
 6. A `Too many requests` response immediately stops diagnostic probing; no retry loop is allowed.
 7. Reintroduction follows one change at a time with a soak period before the next promotion.
 
-## Recovery-plan status at baseline freeze
+## Fan-out verification — step 4
+
+Step 4 was verified from source plus exact-ID read-only Homey inspection, without changing the active runtime.
+
+### Control fan-out
+
+The active `EM v2 | 20 Power Intent | P1 v0.2.3 TARGETED-READ LOW-LOAD` is triggered by semantic `EM2_Control_WW` changes, not by `EM2_Public_State`. It performs targeted Logic reads and suppresses duplicate output for an already-processed source revision. Thus freshness-only public-state changes do not wake the Power Intent control cascade.
+
+### Publication fan-out
+
+The active `EM v2 | 40 Data | Publisher v1.0.10 SCHEDULED LOW-LOAD` is scheduled every 15 minutes, uses targeted Logic reads and enforces a hard 15-minute minimum publication interval. It is no longer started by every `EM2_Public_State` change.
+
+### Boundary
+
+The two known structural fan-out amplifiers in the KEEP baseline are therefore removed. Remaining fan-out candidates are contained in the OFF isolation set and cannot be promoted until step 5 gives them an explicit load budget and step 6 validates them one at a time.
+
+## Recovery-plan status
 
 | Step | Status | Evidence |
 |---|---|---|
 | 1. Stabilize | PASS | Homey recovered from throttling and accepted repeated read-only probes |
 | 2. Isolate RC/control baseline | PASS | current keep-set runs while high-load/post-RC paths remain isolated |
 | 3. API/load map | PASS | canonical Load Map v1.3.2 plus this frozen recovery baseline |
-| 4. Remove fan-out | NEXT | inspect remaining event chains and semantic-change behavior |
-| 5. Introduce load budget | OPEN | define recurring-read, external-I/O and fan-out limits |
-| 6. Staged rebuild + soak | OPEN | re-enable only after steps 4 and 5 establish acceptance criteria |
+| 4. Remove fan-out | PASS | Power Intent uses semantic control trigger; Publisher is bounded to 15-minute schedule |
+| 5. Introduce load budget | NEXT | define quantitative recurring-read, external-I/O and fan-out limits |
+| 6. Staged rebuild + soak | OPEN | re-enable only after step 5 establishes acceptance criteria |
 
 ## Next safe action
 
-Proceed with step 4 using GitHub/source inspection first. Do not increase Homey runtime load merely to diagnose fan-out. Prioritize chains where one Core/state change can wake multiple downstream flows or where timestamps/revisions create publications without meaningful semantic changes.
+Proceed with step 5 entirely from GitHub/source first. Define quantitative limits for broad collection reads, targeted reads, external I/O, recurring cadence and event fan-out. Do not enable any isolated flow merely to measure its cost; estimate from source and admit it only after the budget is explicit.
