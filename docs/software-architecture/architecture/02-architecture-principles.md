@@ -1,7 +1,7 @@
 ---
 component: architecture
 title: Architectuurprincipes
-version: 0.3.0
+version: 0.3.1
 status: active
 architecture_status: implemented
 last_verified: 2026-08-29
@@ -26,6 +26,16 @@ Procesflowdiagrammen beschrijven altijd de actuele gecodeerde situatie. Bij iede
 ## SHADOW en ACTIVE zijn expliciet gescheiden
 
 Logica die alleen rekent, observeert of valideert wordt als `shadow` gemarkeerd. Alleen aantoonbaar geactiveerde logica die fysieke acties kan uitvoeren wordt als `active` beschreven.
+
+## Planner Shadow is forecast-only
+
+De **Planner Shadow**-pagina is uitsluitend een vooruitkijkende weergave van forecastdata en geplande flexacties binnen de plannerhorizon. De tijdlijn toont dus wat de Planner verwacht of voorstelt, niet wat fysiek reeds is uitgevoerd.
+
+Actuele device-status, actuele laadactiviteit en historische uitvoeringssessies worden niet in de Planner Shadow-tijdlijn geprojecteerd en krijgen daar ook geen aparte `actual/live` kleurcodering. Actuals en historie horen in daarvoor bedoelde live-, observability- of historieviews. Hiermee blijft de semantiek van de Planner-pagina eenduidig: **forecast in, forecast out**.
+
+Geplande Tesla-, warmwater- en batterijblokken op de Planner Shadow-pagina zijn daarom altijd planner-forecast/planned actions. Een zichtbaar actieblok mag nooit worden geïnterpreteerd als bewijs dat de fysieke actuator die actie daadwerkelijk heeft uitgevoerd.
+
+Deze scheiding voorkomt bovendien dat de forecastweergave aanvullende Homey-runtime-reads nodig heeft voor actuele of historische device-status.
 
 ## Gelaagde architectuur
 
