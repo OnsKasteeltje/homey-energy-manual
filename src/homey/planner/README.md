@@ -4,8 +4,8 @@ This directory is the versioned source baseline for the Homey Advanced Flow **EM
 
 - Homey Advanced Flow ID: `27617767-0a64-43a3-9bcb-e34b0dd6a5c0`
 - Last captured runtime baseline: `energy-plan-24h-v0.4.4.js`
-- Previous source candidate: `energy-plan-24h-v0.4.5.js`
-- Current source candidate: `energy-plan-24h-v0.4.6.js`
+- Previous source candidates: `energy-plan-24h-v0.4.5.js`, `energy-plan-24h-v0.4.6.js`
+- Current source candidate: `energy-plan-24h-v0.4.7.js`
 - Schedule in Homey: every 15 minutes with a 45-second stagger; manual start path is also present.
 - Safety: SHADOW/read-only; no Victron, Easee, boiler, or other physical device writes.
 
@@ -30,17 +30,26 @@ v0.4.6 separates physical Tesla start requirements from runtime anti-flapping an
 - A forecast opportunity must contain at least 2 consecutive 15-minute slots (30 minutes).
 - The existing runtime 115/120-second confirmation remains a separate actuator-layer anti-flapping safeguard; planner minimum-run logic does not replace it.
 - Opportunity planning remains PV-only and cannot be triggered by a cheap or negative price when no Tesla deadline is active.
-- Planner output now publishes `opportunityStartMinW`, `opportunityContinueMinW`, `opportunityMinRunSlots`, `opportunityMinRunMinutes`, and `pvOpportunityRuns` for traceability.
+- Planner output publishes `opportunityStartMinW`, `opportunityContinueMinW`, `opportunityMinRunSlots`, `opportunityMinRunMinutes`, and `pvOpportunityRuns` for traceability.
 - This remains SHADOW-only and cannot perform physical writes.
+
+## v0.4.7 warm-water day-boundary planning
+
+v0.4.7 makes warm-water planning explicitly aware of the Europe/Amsterdam calendar day.
+
+- `goalReachedToday` and `remainingFallbackMin` apply only to the current local day and no longer suppress warm-water planning after midnight.
+- Every future local day represented in the 24-hour horizon starts with the configured daily fallback of 240 minutes until runtime evidence for that day can replace it.
+- Each local day gets its own 19:00 deadline and its own WW allocation.
+- WW allocation remains PV-first; within equal PV coverage a DYNAMIC contract may use price as a tie-breaker.
+- Current-day catch-up state is never copied into a future day.
+- Planner output publishes `dayBoundaryAware`, `horizonDates`, `dailyPlans`, `currentDay`, and `futureDays` for traceability.
+- The implementation remains SHADOW/read-only and performs no boiler or other actuator writes.
 
 ## Inputs and outputs
 
 The planner reads the current EMS state, warm-water state, contract/price context, day history and PBTH price buffer. It also retrieves a 15-minute shortwave-radiation forecast for Hauwert from Open-Meteo.
 
-It writes only Homey Logic state:
-
-- `EM2_Energy_Plan_24h`
-- `EM2_Energy_Planner_Status`
+It writes only the canonical planner snapshot Logic state consumed by the Planner Shadow publisher.
 
 ## Migration and change rule
 
