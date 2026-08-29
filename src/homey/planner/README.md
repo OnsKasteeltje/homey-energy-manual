@@ -4,7 +4,8 @@ This directory is the versioned source baseline for the Homey Advanced Flow **EM
 
 - Homey Advanced Flow ID: `27617767-0a64-43a3-9bcb-e34b0dd6a5c0`
 - Last captured runtime baseline: `energy-plan-24h-v0.4.4.js`
-- Next source candidate: `energy-plan-24h-v0.4.5.js`
+- Previous source candidate: `energy-plan-24h-v0.4.5.js`
+- Current source candidate: `energy-plan-24h-v0.4.6.js`
 - Schedule in Homey: every 15 minutes with a 45-second stagger; manual start path is also present.
 - Safety: SHADOW/read-only; no Victron, Easee, boiler, or other physical device writes.
 
@@ -18,6 +19,18 @@ v0.4.5 prevents sparse history from turning a high unexplained global median int
 - A quarter-bin forecast requires at least two clean samples for that local quarter.
 - A global clean fallback requires at least three clean samples and must remain below 1500 W.
 - If neither condition is met, `baseLoadForecastW` stays `null` and quality becomes `INSUFFICIENT_CLEAN_BASE_HISTORY`; the planner does not invent a high fallback.
+- This remains SHADOW-only and cannot perform physical writes.
+
+## v0.4.6 Tesla PV opportunity hardening
+
+v0.4.6 separates physical Tesla start requirements from runtime anti-flapping and prevents isolated 15-minute forecast opportunities.
+
+- A new opportunity run may start only when forecast `pvSurplusBeforeFlexW >= 4830 W`, corresponding approximately to the required 3-phase 7 A Tesla/Easee start bump.
+- Once a forecast run has started, it may continue while `pvSurplusBeforeFlexW >= 4140 W`, corresponding approximately to 3-phase 6 A.
+- A forecast opportunity must contain at least 2 consecutive 15-minute slots (30 minutes).
+- The existing runtime 115/120-second confirmation remains a separate actuator-layer anti-flapping safeguard; planner minimum-run logic does not replace it.
+- Opportunity planning remains PV-only and cannot be triggered by a cheap or negative price when no Tesla deadline is active.
+- Planner output now publishes `opportunityStartMinW`, `opportunityContinueMinW`, `opportunityMinRunSlots`, `opportunityMinRunMinutes`, and `pvOpportunityRuns` for traceability.
 - This remains SHADOW-only and cannot perform physical writes.
 
 ## Inputs and outputs
