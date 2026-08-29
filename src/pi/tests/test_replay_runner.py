@@ -19,6 +19,19 @@ def test_integrated_replay_passes() -> None:
     assert all(check["pass"] for check in report["checks"])
 
 
+def test_integrated_replay_with_ww_passes() -> None:
+    payload = json.loads((FIXTURES / "replay_ev_ww_publish.json").read_text())
+    report = run_replay(payload)
+
+    assert report["status"] == "PASS"
+    assert report["schema"] == "PI_EMS_REPLAY_REPORT_V0.2"
+    assert report["actual"]["ev_semantics"]["mode"] == "HOLD"
+    assert report["actual"]["ww_adapter"]["status"] == "OK_ON"
+    assert report["actual"]["ww_adapter"]["command"]["value"] is True
+    assert report["actual"]["ww_adapter"]["command"]["physicalWrite"] is False
+    assert all(check["pass"] for check in report["checks"])
+
+
 def test_integrated_replay_fails_on_expected_mismatch() -> None:
     payload = json.loads((FIXTURES / "replay_ev_deadline_publish.json").read_text())
     payload["expected"]["ev_semantics"]["mode"] = "HOLD"
