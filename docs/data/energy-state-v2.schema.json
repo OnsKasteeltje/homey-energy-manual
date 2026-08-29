@@ -15,7 +15,7 @@
         "schema_version": {"const": "2.12"},
         "generated_at": {"type": "string", "format": "date-time"},
         "heartbeat_at": {"type": "string", "format": "date-time"},
-        "publisher_version": {"const": "EM2_PUBLISHER_V1.0.3"},
+        "publisher_version": {"const": "EM2_PUBLISHER_V1.0.9"},
         "control_mode": {"enum": ["LEGACY", "SHADOW", "HYBRID", "ACTIVE"]}
       },
       "additionalProperties": true
@@ -30,7 +30,7 @@
           "type": "object",
           "required": ["p1_fresh", "grid_measurement_valid", "derived_house_balance_valid", "flex_budget_source"],
           "properties": {
-            "p1_fresh": {"type": "boolean"},
+            "p1_fresh": {"type": "boolean", "description": "Freshness of authoritative P1 measurement."},
             "grid_measurement_valid": {"type": "boolean", "description": "Authoritative gate for P1 net import/export and flex-export budget."},
             "derived_house_balance_valid": {"type": "boolean", "description": "Validity of reconstructed house/PV balance, residual and related diagnostics."},
             "flex_budget_source": {"enum": ["P1_NET_EXPORT", "P1_STALE"]}
@@ -44,119 +44,15 @@
       },
       "additionalProperties": true
     },
-    "grid": {
-      "type": "object",
-      "properties": {
-        "power_w": {"type": ["number", "null"], "description": "Positief = import, negatief = export"},
-        "l1_w": {"type": ["number", "null"]},
-        "l2_w": {"type": ["number", "null"]},
-        "l3_w": {"type": ["number", "null"]},
-        "import_w": {"type": ["number", "null"]},
-        "export_w": {"type": ["number", "null"]}
-      },
-      "additionalProperties": true
-    },
-    "pv": {
-      "type": "object",
-      "properties": {
-        "total_w": {"type": ["number", "null"]},
-        "solaredge_w": {"type": ["number", "null"]},
-        "goodwe_4200_w": {"type": ["number", "null"]},
-        "goodwe_2000_w": {"type": ["number", "null"]}
-      },
-      "additionalProperties": true
-    },
-    "battery": {
-      "type": "object",
-      "properties": {
-        "soc_pct": {"type": ["number", "null"]},
-        "power_w": {"type": ["number", "null"], "description": "Positief = laden, negatief = ontladen"},
-        "state": {"type": ["string", "null"]},
-        "integrated": {"type": "boolean"}
-      },
-      "additionalProperties": true
-    },
-    "energy_budget": {
-      "type": "object",
-      "required": ["flex_export_budget_w", "flex_budget_source", "grid_measurement_valid", "derived_house_balance_valid", "balance_valid"],
-      "properties": {
-        "house_load_w": {"type": ["number", "null"]},
-        "known_flexible_load_w": {"type": ["number", "null"]},
-        "comfort_load_w": {"type": ["number", "null"]},
-        "other_house_load_w": {"type": ["number", "null"]},
-        "grid_safety_reserve_w": {"type": ["number", "null"]},
-        "quatt_ramp_reserve_w": {"type": ["number", "null"]},
-        "flex_export_budget_w": {"type": ["number", "null"]},
-        "flex_budget_source": {"enum": ["P1_NET_EXPORT", "P1_STALE"]},
-        "discretionary_import_budget_w": {"type": ["number", "null"]},
-        "battery_support_w": {"type": ["number", "null"]},
-        "battery_integrated": {"type": "boolean"},
-        "grid_measurement_valid": {"type": "boolean"},
-        "derived_house_balance_valid": {"type": "boolean"},
-        "balance_valid": {"type": "boolean", "description": "Backward-compatible alias for derived_house_balance_valid."},
-        "balance_reason": {"type": "string"}
-      },
-      "additionalProperties": true
-    },
-    "tesla": {
-      "type": "object",
-      "properties": {
-        "connected": {"type": ["boolean", "null"]},
-        "charging": {"type": ["boolean", "null"]},
-        "power_w": {"type": ["number", "null"]},
-        "requested_a": {"type": ["number", "null"]},
-        "deadline_at": {"type": ["string", "null"]},
-        "need": {"type": ["string", "null"]}
-      },
-      "additionalProperties": true
-    },
-    "hot_water": {
-      "type": "object",
-      "properties": {
-        "boiler_on": {"type": ["boolean", "null"]},
-        "boiler_power_w": {"type": ["number", "null"]},
-        "mode": {},
-        "day_state": {"type": ["object", "null"]},
-        "control": {"type": ["object", "null"]}
-      },
-      "additionalProperties": true
-    },
-    "loads": {
-      "type": "object",
-      "properties": {
-        "washer": {"$ref": "#/$defs/load"},
-        "dryer": {"$ref": "#/$defs/load"},
-        "dishwasher": {"$ref": "#/$defs/load"},
-        "quooker": {"$ref": "#/$defs/load"}
-      },
-      "additionalProperties": true
-    },
-    "manager": {
-      "type": "object",
-      "properties": {
-        "state": {"type": ["string", "null"]},
-        "decision": {"type": ["string", "null"]},
-        "reason": {"type": ["string", "null"]},
-        "priority": {"enum": ["MUST", "SHOULD", "MAY", "NONE", null]},
-        "constraints": {"type": "array", "items": {"type": "string"}},
-        "state_dirty": {"type": "boolean"},
-        "flex_export_budget_w": {"type": ["number", "null"]},
-        "discretionary_import_budget_w": {"type": ["number", "null"]}
-      },
-      "additionalProperties": true
-    }
+    "grid": {"type": "object", "properties": {"power_w": {"type": ["number", "null"], "description": "Positief = import, negatief = export"}, "l1_w": {"type": ["number", "null"]}, "l2_w": {"type": ["number", "null"]}, "l3_w": {"type": ["number", "null"]}, "import_w": {"type": ["number", "null"]}, "export_w": {"type": ["number", "null"]}}, "additionalProperties": true},
+    "pv": {"type": "object", "properties": {"total_w": {"type": ["number", "null"]}, "solaredge_w": {"type": ["number", "null"]}, "goodwe_4200_w": {"type": ["number", "null"]}, "goodwe_2000_w": {"type": ["number", "null"]}}, "additionalProperties": true},
+    "battery": {"type": "object", "properties": {"soc_pct": {"type": ["number", "null"]}, "power_w": {"type": ["number", "null"], "description": "Positief = laden, negatief = ontladen"}, "state": {"type": ["string", "null"]}, "integrated": {"type": "boolean"}}, "additionalProperties": true},
+    "energy_budget": {"type": "object", "required": ["flex_export_budget_w", "flex_budget_source", "grid_measurement_valid", "derived_house_balance_valid", "balance_valid"], "properties": {"house_load_w": {"type": ["number", "null"]}, "known_flexible_load_w": {"type": ["number", "null"]}, "comfort_load_w": {"type": ["number", "null"]}, "other_house_load_w": {"type": ["number", "null"]}, "grid_safety_reserve_w": {"type": ["number", "null"]}, "quatt_ramp_reserve_w": {"type": ["number", "null"]}, "flex_export_budget_w": {"type": ["number", "null"]}, "flex_budget_source": {"enum": ["P1_NET_EXPORT", "P1_STALE"]}, "discretionary_import_budget_w": {"type": ["number", "null"]}, "battery_support_w": {"type": ["number", "null"]}, "battery_integrated": {"type": "boolean"}, "grid_measurement_valid": {"type": "boolean"}, "derived_house_balance_valid": {"type": "boolean"}, "balance_valid": {"type": "boolean", "description": "Backward-compatible alias for derived_house_balance_valid."}, "balance_reason": {"type": "string"}}, "additionalProperties": true},
+    "tesla": {"type": "object", "properties": {"connected": {"type": ["boolean", "null"]}, "charging": {"type": ["boolean", "null"]}, "power_w": {"type": ["number", "null"]}, "requested_a": {"type": ["number", "null"]}, "deadline_at": {"type": ["string", "null"]}, "need": {"type": ["string", "null"]}}, "additionalProperties": true},
+    "hot_water": {"type": "object", "properties": {"boiler_on": {"type": ["boolean", "null"]}, "boiler_power_w": {"type": ["number", "null"]}, "mode": {}, "day_state": {"type": ["object", "null"]}, "control": {"type": ["object", "null"]}}, "additionalProperties": true},
+    "loads": {"type": "object", "properties": {"washer": {"$ref": "#/$defs/load"}, "dryer": {"$ref": "#/$defs/load"}, "dishwasher": {"$ref": "#/$defs/load"}, "quooker": {"$ref": "#/$defs/load"}}, "additionalProperties": true},
+    "manager": {"type": "object", "properties": {"state": {"type": ["string", "null"]}, "decision": {"type": ["string", "null"]}, "reason": {"type": ["string", "null"]}, "priority": {"enum": ["MUST", "SHOULD", "MAY", "NONE", null]}, "constraints": {"type": "array", "items": {"type": "string"}}, "state_dirty": {"type": "boolean"}, "flex_export_budget_w": {"type": ["number", "null"]}, "discretionary_import_budget_w": {"type": ["number", "null"]}}, "additionalProperties": true}
   },
-  "$defs": {
-    "load": {
-      "type": ["object", "null"],
-      "properties": {
-        "active": {"type": ["boolean", "null"]},
-        "power_w": {"type": ["number", "null"]},
-        "phase": {"type": ["string", "null"]},
-        "measurement": {"enum": ["DIRECT", "STATUS_ONLY", "UNKNOWN", null]}
-      },
-      "additionalProperties": true
-    }
-  },
+  "$defs": {"load": {"type": ["object", "null"], "properties": {"active": {"type": ["boolean", "null"]}, "power_w": {"type": ["number", "null"]}, "phase": {"type": ["string", "null"]}, "measurement": {"enum": ["DIRECT", "STATUS_ONLY", "UNKNOWN", null]}}, "additionalProperties": true}},
   "additionalProperties": true
 }
