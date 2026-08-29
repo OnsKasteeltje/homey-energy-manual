@@ -1,159 +1,65 @@
-# EV cascade LOW-LOAD migration plan — 2026-08-28
+# EV cascade LOW-LOAD migration — closed 2026-08-29
 
-Status: **PREP ONLY — no Homey runtime promotion performed**
+Status: **ACTIVE RUNTIME MIGRATION COMPLETE**
 
-## Goal
+## Scope
 
-Remove broad `Homey.logic.getVariables()` collection reads from the event-driven EV chain while preserving the existing schemas, revision guards, fail-closed behavior, SHADOW/LIVE ownership boundaries and observability.
-
-Current cascade:
+The active EV control cascade has been verified directly on Homey and no longer uses broad `Homey.logic.getVariables()` collection reads in its enabled control path.
 
 ```text
-Core
-  -> EM2_Control_WW / policy outputs
-      -> Power Intent
-          -> EM2_Power_Intent
-              -> P1 Pre-EV Gate
-              -> EV Power Adapter
-              -> EV Adapter Gate (+2 s)
-                   -> EM2_EV_Adapter_Gate
-                       -> EV Power Actuator
-                       -> EV Control Status
+EM2_Control_WW
+  -> Power Intent
+      -> EM2_Power_Intent
+          -> P1 Pre-EV Gate
+          -> EV Power Adapter
+          -> EV Adapter Gate (+2 s)
+               -> EM2_EV_Adapter_Gate
+                    -> EV Power Actuator
 ```
 
-The canonical load map currently estimates the upstream Power Intent / Gate / Adapter / Gate part at roughly four full Logic collection enumerations per Core revision, or about 48 full Logic enumerations/hour at a five-minute Core cadence. The migration target is **zero full Logic enumerations in this cascade**.
+## Verified runtime
 
-## Target architecture
+| Stage | Flow ID | Runtime | Enabled | Logic access |
+|---|---|---|---:|---|
+| Power Intent | `19d9d8a6-ec32-4639-be5e-71e9f034d31b` | `P1 v0.2.3 TARGETED-READ LOW-LOAD` | yes | 4 targeted `getVariable(id)` reads |
+| P1 Pre-EV Gate | `557ed7e8-9efe-4173-bc06-8e629214e172` | `v0.2.1 TARGETED-READ` | yes | 2 targeted reads |
+| EV Power Adapter | `953e9b18-3576-4557-b940-ed4a64eb2516` | `v0.1.1 TARGETED-READ SHADOW` | yes | 4 targeted reads |
+| EV Adapter Gate | `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` | `v0.2.1 TARGETED-READ` | yes | 4 targeted reads |
+| EV Power Actuator | `fea23193-a03f-49dd-9780-7e72ee48747d` | `v0.2.2 TARGETED-READ LIVE OWNERSHIP` | yes | 6 targeted reads; zero device reads/writes while LIVE=false |
 
-Each stage must:
+All five enabled stages are event-driven and preserve the existing revision guards, schema checks, fail-closed behavior and SHADOW/LIVE ownership boundaries.
 
-1. be event-driven on its existing authoritative upstream variable;
-2. use only `Homey.logic.getVariable({id})` for explicitly required inputs;
-3. update only existing output/status variables by known ID;
-4. retain semantic idempotency by source revision/schema/target;
-5. perform no `getDevices()` unless the existing LIVE actuator safety path explicitly requires a charger read;
-6. perform no Insights calls;
-7. never add an independent polling clock;
-8. fail closed when any required targeted variable cannot be read or revisions do not align.
+## Load result
 
-## Migration units
+The former upstream chain performed approximately four full Logic collection enumerations per normal Core revision. At a five-minute Core cadence that was approximately **48 full Logic enumerations/hour** before actuator/status fan-out.
 
-### A. Power Intent — target v0.2.3 LOW-LOAD
+That collection-enumeration load is now **0/hour in the enabled EV control cascade**. Individual targeted reads remain bounded by declared dependencies.
 
-Source baseline available in GitHub: `src/homey/power-intent/p1-v0.2.1.js`.
-Runtime is known to be ahead at v0.2.2 (`Public decoupled`), so **runtime capture is required before promotion**. Do not overwrite current Homey code from the older GitHub v0.2.1 baseline.
+The LIVE actuator may enumerate Homey devices only when `EM2_EV_Actuator_Live_Enabled=true`; while LIVE=false it performs no charger device read or physical write.
 
-Broad read to remove:
+## Observability flow
 
-```js
-await Homey.logic.getVariables()
-```
+`EM v2 | 81 Observability | EV Control Status v0.1`
 
-Required targeted inputs, based on current policy contract:
+Flow ID: `f6edba38-ddf1-45e5-890e-c183aa2055d5`
 
-- `EM2_State`
-- `EM2_Decision`
-- `EM2_Control_WW`
-- `EM2_Power_Intent` (previous output for idempotency)
-- any v0.2.2-specific input discovered during runtime capture
+Runtime status on verification: **disabled**.
 
-Required targeted output:
+Its legacy code still contains one broad `Homey.logic.getVariables()` per event plus GitHub publication. Because the flow is disabled it contributes **zero current runtime load** and is deliberately excluded from the active control-cascade completion gate. It should be migrated to targeted reads before any future re-enable.
 
-- `EM2_Power_Intent`
+## Safety confirmation
 
-`EM2_Public_State` must **not** be reintroduced if v0.2.2 has already decoupled from it.
+- no Insights calls in the active EV path;
+- no independent polling clock added;
+- no `getVariables()` in the enabled EV control cascade;
+- no device access in Power Intent, Gates or Adapter;
+- actuator LIVE=false path has zero device reads/writes;
+- positive LIVE writes still require exact Gate/intent/adapter/state revision coherence;
+- manual actuator start first normalizes LIVE to false;
+- EV Power Adapter remains SHADOW and cannot physically actuate the charger.
 
-### B. P1 Pre-EV Gate — target v0.3 LOW-LOAD
+## Completion gate
 
-Exact runtime source is not yet captured in GitHub. Runtime capture is required before code generation.
+**PASS — active EV cascade LOW-LOAD migration complete.**
 
-Expected targeted inputs from current contract:
-
-- `EM2_Power_Intent`
-- `EM2_State`
-- any current gate-local cache/status input actually used by runtime code
-
-Expected targeted output:
-
-- `EM2_P1_PreEV_Gate`
-
-Preserve current status vocabulary and compact single-JSON runtime-health output. Do not restore removed typed mirrors/counters.
-
-### C. EV Power Adapter — target v0.2 LOW-LOAD
-
-Exact GitHub runtime baseline is captured at `src/homey/adapters/ev-power/ev-power-v0.1-shadow.runtime.md`.
-
-Broad read to remove:
-
-```js
-await Homey.logic.getVariables()
-```
-
-Required targeted inputs from captured code:
-
-- `EM2_Power_Intent`
-- `EM2_State`
-- `EM2_EV_Power_Adapter` (previous output/idempotency)
-- `EV Max laadstroom A`
-
-Required targeted output:
-
-- `EM2_EV_Power_Adapter`
-
-All electrical semantics must remain unchanged: fixed 3×230 V, floor quantization, 6 A minimum, configured maximum clamped to 16 A, freshness checks, no device/network reads, fail closed.
-
-### D. EV Adapter Gate — target v0.3 LOW-LOAD
-
-Exact runtime source is not yet captured in GitHub. Runtime capture is required before code generation.
-
-Expected targeted inputs from current safety contract:
-
-- `EM2_Power_Intent`
-- `EM2_EV_Power_Adapter`
-- `EM2_State`
-- possibly `EM2_P1_PreEV_Gate` if current runtime uses it directly
-- current gate previous output/cache if used for semantic idempotency
-
-Expected targeted output:
-
-- `EM2_EV_Adapter_Gate`
-
-Preserve exact revision coherence fields consumed by the LIVE actuator: `sourceRevision`, `intentRevision`, `stateRevision`, `coreRevision` and current final PASS/FAIL vocabulary.
-
-### E. EV Actuator / EV Control Status — review only
-
-These are downstream of the four primary collection-read stages. The load map says they still perform one `getVariables()` per event. They are not part of the first promotion unit because the actuator is safety-critical and the current LIVE=false path is already low impact.
-
-After A-D are stable, prepare a second migration unit for targeted reads here. Do not couple actuator refactoring to the first smoke.
-
-## Expected load reduction
-
-At 12 Core revisions/hour, replacing four collection enumerations with targeted reads removes approximately **48 full Logic collection enumerations/hour** from the normal EV cascade. The number of individual targeted variable reads will rise, but they are bounded and proportional to actual dependencies rather than the total Logic-variable inventory.
-
-## Promotion sequence
-
-Use one tightly controlled stage at a time:
-
-1. capture current Homey runtime source and variable IDs for Power Intent;
-2. generate exact v0.2.3 LOW-LOAD source in GitHub;
-3. deploy Power Intent only, one natural event + targeted smoke, PASS/FAIL;
-4. repeat for P1 Pre-EV Gate;
-5. repeat for EV Power Adapter;
-6. repeat for EV Adapter Gate;
-7. observe at least several natural Core cycles with no `Too many requests`;
-8. only then consider actuator/observability targeted-read migration.
-
-If any Homey API call returns `Too many requests`, stop immediately. Do not retry in a loop.
-
-## Runtime data still required
-
-The following cannot be safely inferred from repository contents and must be captured from Homey before deployment:
-
-- exact v0.2.2 Power Intent runtime code;
-- exact P1 Pre-EV Gate runtime code;
-- exact EV Adapter Gate runtime code;
-- Logic variable IDs for every required input/output not already source-managed;
-- confirmation of enabled/broken/trigger topology for each flow;
-- any v0.2.2/v0.2 Gate fields added after the current GitHub baselines.
-
-This is intentionally a GitHub-first preparation branch. No Homey runtime change is part of this commit.
+Remaining follow-up is separate from this migration: convert the disabled EV Control Status observability publisher to targeted reads before re-enabling it, and continue the wider Homey API-load reduction programme on the remaining non-EV flows.
