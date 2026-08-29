@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ems
+      POSTGRES_USER: ems
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ems -d ems"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [ems-net]
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    command: ["mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+    networks: [ems-net]
+
+  ems-core:
+    build:
+      context: ${EMS_REPO_DIR}
+      dockerfile: docker/pi/Dockerfile
+    restart: unless-stopped
+    environment:
+      EMS_MODE: ${EMS_MODE:-SHADOW}
+      TZ: ${TZ:-Europe/Amsterdam}
+      DATABASE_URL: postgresql://ems:${POSTGRES_PASSWORD}@postgres:5432/ems
+      MQTT_HOST: mosquitto
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    networks: [ems-net]
+
+networks:
+  ems-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mosquitto_data:
