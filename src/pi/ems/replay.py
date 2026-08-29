@@ -46,13 +46,34 @@ def state_from_fixture(payload: dict[str, Any]) -> EmsState:
 
 
 def replay_projection(state: EmsState, now: datetime) -> dict[str, Any]:
-    """Return deterministic derived values used for replay comparison."""
+    """Return deterministic derived values used for replay comparison.
+
+    All freshness checks use the caller-supplied clock so replay results never depend on wall time.
+    """
     grid = state.grid.power_W
     grid_quality = Quality.MISSING if grid is None else grid.effective_quality(now)
 
-    pv_total = state.pv.valid_total_W()
+    pv_sources = [state.pv.solaredge_W, state.pv.goodwe4200_W, state.pv.goodwe2000_W]
+    pv_valid = all(
+        source is not None
+        and source.value is not None
+        and source.effective_quality(now) is Quality.GOOD
+        for source in pv_sources
+    )
+    pv_total = (
+        sum(float(source.value) for source in pv_sources if source is not None and source.value is not None)
+        if pv_valid
+        else None
+    )
+
     house_power = None
-    if grid is not None and grid.value is not None and pv_total is not None:
+    if (
+        grid is not None
+        and grid.value is not None
+        and grid_quality is Quality.GOOD
+        and pv_total is not None
+    ):
+        # Homey convention: positive grid power is import, so house = PV + grid import.
         house_power = float(grid.value) + float(pv_total)
 
     reasons: list[str] = []
