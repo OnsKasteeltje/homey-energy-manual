@@ -1,10 +1,18 @@
 # Core v0.11a — Targeted Device Reads
 
-Status: **IMPLEMENTATION-READY / NOT DEPLOYED**
+Status: **DEPLOYED / ACTIVE BASELINE**
 
 Date: 2026-08-29
 
 Baseline: `EM v2 | 00 Core Tick | v0.10.18 (EV semantic producer)`.
+
+## Runtime status
+
+Deployed Homey flow: `EM v2 | 00 Core Tick | v0.11a (Targeted Device Reads)`.
+
+The full Core + Publisher + EV + WW chain has been re-enabled manually and observed under natural runtime load. Compared with the earlier EMS period with repeated 20–40% system-CPU peaks, v0.11a currently keeps the integrated workload materially lower. Recent observations were predominantly low single digits with short peaks around 11–17%; a later window reached roughly 13–14% without returning to the former 20–40% pattern. Read-only Homey probes have also succeeded again after earlier rate limiting.
+
+This is the active comparison baseline for v0.11b. Do not alter v0.11a while the consolidated Logic-input design is being prepared.
 
 ## Purpose
 
@@ -12,11 +20,11 @@ Remove the remaining broad `Homey.devices.getDevices()` collection scan from Cor
 
 This is deliberately a one-variable-at-a-time load experiment. `Homey.logic.getVariables()` remains unchanged in v0.11a. Logic targeting is a separate v0.11b step.
 
-**v0.10.18 preservation gate:** the producer-only `EM2_Control_EV` semantic output introduced in v0.10.18 MUST remain byte-for-byte equivalent in behavior. v0.11a changes only the device read layer.
+**v0.10.18 preservation gate:** the producer-only `EM2_Control_EV` semantic output introduced in v0.10.18 MUST remain equivalent in behavior. v0.11a changes only the device read layer.
 
 ## Current structural cost
 
-The current Core pattern is effectively:
+The pre-v0.11a Core pattern was effectively:
 
 ```js
 const [devices, vars] = await Promise.all([
@@ -25,13 +33,13 @@ const [devices, vars] = await Promise.all([
 ]);
 ```
 
-Core already contains stable IDs for the devices it consumes. Therefore enumerating the complete Homey device collection every Core tick is unnecessary for normal operation.
+Core already contains stable IDs for the devices it consumes. Therefore enumerating the complete Homey device collection every Core tick was unnecessary for normal operation.
 
-At a 5-minute cadence this broad device scan executes up to **12 times/hour**.
+At a 5-minute cadence the broad device scan executed up to **12 times/hour**.
 
 ## Known Core device inventory
 
-The current Core source already identifies these devices by stable ID:
+The current Core source identifies these devices by stable ID:
 
 | Role | Stable ID | Required Core data |
 |---|---|---|
@@ -48,54 +56,17 @@ The current Core source already identifies these devices by stable ID:
 
 No discovery-by-name is required for these devices.
 
-## v0.11a read strategy
+## Deployed v0.11a read strategy
 
-Replace the collection read with targeted reads only for the known IDs Core actually consumes.
-
-Preferred shape:
-
-```js
-const getDevice = async id => Homey.devices.getDevice({ id });
-
-const [
-  p1, ev, eq, boiler, quatt,
-  se, gw42, gw20, washer, dryer,
-  vars
-] = await Promise.all([
-  getDevice(IDS.p1),
-  getDevice(IDS.ev),
-  getDevice(IDS.eq),
-  getDevice(IDS.boiler),
-  getDevice(IDS.quatt),
-  getDevice(IDS.se),
-  getDevice(IDS.gw42),
-  getDevice(IDS.gw20),
-  getDevice(IDS.washer),
-  getDevice(IDS.dryer),
-  Homey.logic.getVariables()
-]);
-
-const devices = {
-  [IDS.p1]: p1,
-  [IDS.ev]: ev,
-  [IDS.eq]: eq,
-  [IDS.boiler]: boiler,
-  [IDS.quatt]: quatt,
-  [IDS.se]: se,
-  [IDS.gw42]: gw42,
-  [IDS.gw20]: gw20,
-  [IDS.washer]: washer,
-  [IDS.dryer]: dryer
-};
-```
+The collection read is replaced by targeted reads only for the known IDs Core actually consumes. The deployed implementation obtains the ten known devices directly and retains `Homey.logic.getVariables()` for Logic data.
 
 The existing `capObj`, `cap`, `capTs` and laundry-state helpers remain unchanged.
 
 ## Important load caveat
 
-v0.11a removes one **broad collection enumeration** per Core tick, but replaces it with targeted requests for the devices Core actually uses. This is expected to reduce response volume, object traversal and pressure on the broad Homey API path, but it does **not** automatically mean fewer HTTP/API request operations.
+v0.11a removes one **broad collection enumeration** per Core tick, but replaces it with targeted requests for the devices Core actually uses. This reduces broad response volume, object traversal and pressure on the collection path, but it does **not** automatically mean fewer API request operations.
 
-Therefore acceptance is based on observed throttling/resource behavior, not on an assumption that targeted reads are always cheaper in every Homey implementation.
+Acceptance is therefore based on observed throttling/resource behavior, not on an assumption that targeted reads are always cheaper in every Homey implementation.
 
 If Homey exposes a supported bulk-ID or cached/event-driven mechanism with lower request count, that is preferable for a later revision.
 
@@ -111,22 +82,6 @@ Rules:
 - if Easee/Equalizer data cannot be read, EV availability/measurement must not be upgraded to a valid state;
 - no physical write is introduced by this change;
 - do not add retries inside the same Core run after `429 Too many requests`.
-
-## Capability parity gate
-
-Before deployment, compare the targeted response for each device against what current `getDevices()` exposes for every capability Core reads. PASS requires parity for both `.value` and `.lastUpdated` where freshness logic depends on the timestamp.
-
-Required checks include at minimum:
-
-- P1 `measure_power`, phase power/current and `lastUpdated`;
-- SolarEdge/GoodWe production capability and `lastUpdated`;
-- Easee current/voltage/power/charging-state/meter capabilities;
-- Equalizer phase currents;
-- boiler power/onoff;
-- Quatt thermal/COP/mode/thermostat/CV capabilities;
-- washer/dryer direct appliance status fields used by `laundryState()`.
-
-If any targeted device response omits capability metadata used today, **do not continue the soak** until the adapter pattern is corrected.
 
 ## No-change contract
 
@@ -144,38 +99,26 @@ v0.11a MUST NOT change:
 - physical device-write behavior;
 - external HTTP/GitHub behavior.
 
-## Expected effect
+## Observed effect
 
 Steady-state broad device collection scans:
 
 - before: **12/hour**;
 - after v0.11a: **0/hour**.
 
-This should reduce broad-read pressure and data volume. CPU improvement may be small because current Insights show low HomeyScript CPU outside short pulses; the primary success criterion is lower Homey API/throttling pressure.
-
-## Deployment / smoke gate
-
-1. exact-ID read the Core flow;
-2. confirm baseline is v0.10.18, disabled for the clean app-only baseline, and `broken=false`;
-3. apply only the device-read delta while retaining all v0.10.18 semantics;
-4. enable only Core; leave all other EMS flows disabled;
-5. run one controlled Core smoke;
-6. verify `enabled=true`, `broken=false`;
-7. compare `EM2_State`, `EM2_Decision`, `EM2_Control_WW`, `EM2_Control_EV` and `EM2_Planner_Input` semantics with the pre-change contract;
-8. verify no physical write was caused;
-9. stop immediately on `429` / `Too many requests`.
+Observed integrated runtime after deployment is materially lighter than the earlier problematic EMS configuration. This does not prove that CPU load alone caused Homey API throttling, but it establishes v0.11a as the preferred active baseline.
 
 ## Soak acceptance
 
-Observe natural Core runs before moving to v0.11b. PASS requires:
+The current v0.11a baseline has passed the initial runtime/load gate:
 
-- no broad `getDevices()` collection call in the deployed Core source;
-- no semantic regression in Core output;
-- v0.10.18 `EM2_Control_EV` producer preserved;
-- no new stale/missing-device false positives caused by targeted response shape;
-- no new downstream fan-out;
-- no 429 attributable to the new targeted-read fan-out;
-- ideally a longer clean interval between Homey throttling events than the pre-change baseline.
+- no broad `getDevices()` collection call remains in Core;
+- v0.10.18 `EM2_Control_EV` producer is preserved;
+- full Core + Publisher + EV + WW chain runs with much lower CPU than the former 20–40% period;
+- read-only probes can succeed without immediate `Too many requests`;
+- no physical-write behavior was intentionally changed by the Core revision.
+
+Continue to treat rate limiting separately from CPU: a future 429 is not automatically a v0.11a failure unless it correlates with the new targeted-read pattern.
 
 ## Rollback
 
@@ -183,4 +126,4 @@ Restore v0.10.18 unchanged. Do not combine rollback with any Planner, Publisher,
 
 ## Next step
 
-Only after v0.11a passes: design **v0.11b** to remove the remaining broad `Homey.logic.getVariables()` scan using stable Logic IDs/canonical inputs. Event-driven Core (`v0.12`) remains a later step after both broad-read eliminations are proven.
+Design and validate **v0.11b** to remove the remaining broad `Homey.logic.getVariables()` scan using a consolidated canonical Logic input rather than dozens of per-variable reads. Event-driven Core (`v0.12`) remains a later step after both broad-read eliminations are proven.
