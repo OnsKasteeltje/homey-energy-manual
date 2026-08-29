@@ -1,7 +1,7 @@
 ---
 component: operations
 title: Homey API/Load Map
-version: 1.2.0
+version: 1.3.0
 status: active
 architecture_status: implemented
 last_verified: 2026-08-29
@@ -19,11 +19,23 @@ This is the canonical runtime-load inventory for the Home Energy Management Syst
 
 During throttling diagnosis, prefer GitHub/source inspection and exact flow-ID reads. Do not repeatedly enumerate Homey flows. If Homey returns `Too many requests`, stop immediately and do not retry.
 
+## Live Energy attribution rule — 2026-08-29
+
+The regular Live Energy View no longer justifies continuous fingerprint-classification load. A device is split out from `Overige` only when direct power is available or a reliable direct status can be shown. Status-only devices keep power `null`; fingerprint-only devices remain inside `Overige`.
+
+Consequences for Homey load governance:
+
+- appliance fingerprinting is diagnostics-only and defaults OFF;
+- washer/dryer P1 transition learning and publication remain OFF for the clean throttling baseline;
+- waterkettle/dishwasher/oven fingerprint work is not promoted into continuous Homey runtime detection for Live View;
+- existing direct AEG status can still be consumed through canonical Core state without the separate P1 learning pipeline;
+- re-enabling a fingerprint flow requires an explicit temporary diagnostic purpose and a Load Map update.
+
 ## Verified runtime baseline — 2026-08-29
 
 | Flow | ID | Runtime | Trigger / cadence | Homey load | External / device load | Assessment |
 |---|---|---:|---|---|---|---|
-| `EM v2 | 00 Core Tick | v0.10.17 (Planner Input low-load)` | `227f8d3b-7551-46dd-837d-1b8c69add824` | **ON** | every 5 min | one `getDevices()` + one `getVariables()` per tick; downstream Logic snapshot writes | no external I/O in Core | **Primary proven structural broad-read baseline**; keep as single-reader until a cheaper device-read pattern is proven |
+| `EM v2 | 00 Core Tick | v0.10.17 (Planner Input low-load)` | `227f8d3b-7551-46dd-9966-faf6ec9fc5f4` | **ON** | every 5 min | one `getDevices()` + one `getVariables()` per tick; downstream Logic snapshot writes | no external I/O in Core | **Primary proven structural broad-read baseline**; keep as single-reader until a cheaper device-read pattern is proven |
 | `EM v2 | 20 Power Intent | P1 v0.2.3 TARGETED-READ LOW-LOAD` | `19d9d8a6-ec32-4639-be5e-71e9f034d31b` | **ON** | `EM2_Control_WW` change | targeted Logic reads only | none | low-load |
 | `EM v2 | 80 Validation | P1 Pre-EV Gate v0.2.1 TARGETED-READ` | `557ed7e8-9efe-4173-bc06-8e629214e172` | **ON** | `EM2_Power_Intent` change | targeted Logic reads only | none | low-load |
 | `EM v2 | 60 Adapter | EV Power v0.1.1 TARGETED-READ SHADOW` | `953e9b18-3576-4557-b940-ed4a64eb2516` | **ON** | `EM2_Power_Intent` change | targeted Logic reads only | no device access | low-load |
@@ -49,7 +61,10 @@ During throttling diagnosis, prefer GitHub/source inspection and exact flow-ID r
 | `EM v2 | 81 Observability | EV Control Status v0.1` | `f6edba38-ddf1-45e5-890e-c183aa2055d5` | **OFF** | Gate / actuator change if enabled | one `getVariables()` | GitHub status publish | no current load; migrate before re-enable |
 | `EM v2 | 60 Control | Warm Water Actuator v0.8 HYBRID` | `40d45aeb-174e-4a83-9a42-71ae46065cb4` | **OFF** | manual only | broad Logic read; device enumeration only after all guards + kill switch | guarded boiler read/write | no current load |
 | `EM v2 | 05 Watchdog | Core + Publish Freshness v0.3.3 staggered` | `8526109f-5c8d-428e-ac24-85a71c95ac36` | **OFF** | every 5 min +120 s if enabled | broad Logic reads | may start flows | keep disabled during investigation |
-| washer/dryer analysis, logging, publication | multiple | **OFF** | event/runtime dependent | legacy appliance analysis/logging | publication path | keep disabled during clean A/B |
+| `Energie | Wasmachine & Droger analyse | v1.4.2` | `7f8217ce-1994-46f8-92fb-455b11b046fe` | **OFF** | AEG state events + 5-min fallback if enabled | event path performs `getDevices()` + `getVariables()`; fallback reads Logic snapshot | Logic evidence/model writes | **retired from regular Live View; diagnostics-only** |
+| `Energie | Wasmachine & Droger publicatie | v1.1.1` | `fa09ad30-e9fc-4e78-a50c-38635a91b294` | **OFF** | every 5 min if enabled | one `getVariables()` | GitHub GET + PUT | **retired from regular Live View; diagnostics-only** |
+| washer/dryer logging | multiple | **OFF** | event/runtime dependent | legacy appliance logging | possible publication/history path | keep disabled; diagnostics-only |
+| Quooker P1 fingerprint heartbeat/heating assist | multiple | evaluate separately | event-driven | fingerprint-specific P1 processing | none/Logic | direct Cooker status is sufficient for basic Live status; keep fingerprint path only if another explicit function requires it |
 
 ## Current active-load conclusion
 
@@ -58,6 +73,8 @@ The current verified active control path is much smaller than the previous v1.1.
 The only currently proven active periodic broad collection reader is Core v0.10.17. Core intentionally acts as the single central snapshot reader. Replacing one `getDevices()` with many targeted device calls is not assumed to be cheaper; downstream consumers should consume Core/Logic snapshots rather than independently enumerate Homey collections.
 
 The active EV cascade has been migrated to targeted Logic reads. Publisher v1.0.9 remains active but is hard-gated: event triggers can occur more often, while actual GitHub publication is bounded to at most once per 15 minutes.
+
+The Live View simplification removes the architectural need to revive the washer/dryer P1 learner or create continuous waterkettle/dishwasher/oven detectors. This reduces future fan-out risk and avoids extra device/Logic reads and publication paths.
 
 ## Re-enable blockers
 
@@ -68,6 +85,7 @@ Before re-enabling these flows, refactor or explicitly accept their load model:
 3. `EMS Settings Sync v0.3`: replace broad Logic snapshot with targeted reads and reduce external polling where possible.
 4. `WW Scheduling SHADOW v0.2`: consume the canonical Planner snapshot with targeted reads when revived.
 5. `EV Control Status v0.1`: use targeted reads before re-enabling observability.
+6. Fingerprint/appliance-analysis flows: only re-enable for a bounded diagnostic experiment; never because the regular Live View requires inferred wattage.
 
 ## Next investigation set
 
