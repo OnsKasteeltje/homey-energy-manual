@@ -1,15 +1,15 @@
 ---
 component: fingerprint-engine
 title: Fingerprint Engine
-version: 0.1
+version: 0.2
 status: active
-architecture_status: implemented_partial
-last_verified: 2026-08-25
+architecture_status: diagnostics_only
+last_verified: 2026-08-29
 source:
   - Homey: EM v2 | 01 Quooker Detector | v0.3 SWITCH-AUTH + P1 HEATING
   - Homey: EM v2 | 01a Quooker | P1 Event Heartbeat v0.2
   - Homey: Energie | Wasmachine & Droger analyse | v1.4.2
-  - Homey: EM v2 | 00 Core Tick | v0.10.13 (EV electrical context)
+  - Homey: EM v2 | 00 Core Tick | v0.10.17 (Planner Input low-load)
 owner: EMS
 ---
 
@@ -17,92 +17,71 @@ owner: EMS
 
 ## 1. Doel
 
-De Fingerprint Engine vormt de herkenningslaag voor huishoudelijke verbruikers die niet allemaal een directe, betrouwbare vermogensmeting beschikbaar stellen. De engine combineert waar mogelijk autoritatieve apparaatstatus, P1-faseveranderingen, bekende lasten en gevalideerde ground-truth gebeurtenissen.
+De Fingerprint Engine is vanaf 2026-08-29 geen reguliere Live Energy-attributielaag meer. Fingerprints worden uitsluitend gebruikt voor diagnostiek, analyse, incidentele validatie en datasetopbouw voor huishoudelijke verbruikers die niet rechtstreeks meetbaar zijn.
 
-De architectuur maakt expliciet onderscheid tussen een echte runtime-detector en een alleen gevalideerde fingerprint-dataset. Een apparaat mag pas als productiedetector worden beschreven wanneer er actieve runtime-logica bestaat die status of vermogen publiceert.
+De reguliere Live Energy View volgt de **direct-first attribution rule**: een apparaat krijgt alleen een eigen live component wanneer direct vermogen of een betrouwbare directe apparaatstatus beschikbaar is. Fingerprint-only loads vallen qua vermogen onder `Overige`.
 
 ## 2. Maturity-model
 
 | Niveau | Betekenis | Gebruik |
 | --- | --- | --- |
 | M0 — Ground truth | Alleen handmatig gemarkeerde gebeurtenissen | datasetopbouw |
-| M1 — Fingerprint candidate | Herhaalbaar patroon gevonden | analyse, niet publiceren als waarheid |
-| M2 — Validated fingerprint | Meerdere ground-truth events ondersteunen dezelfde signatuur | website/SHADOW-herkenning toegestaan |
-| M3 — Runtime detector | Actieve Homey-logica publiceert status/vermogen | productiestatus toegestaan |
+| M1 — Fingerprint candidate | Herhaalbaar patroon gevonden | analyse |
+| M2 — Validated fingerprint | Meerdere ground-truth events ondersteunen dezelfde signatuur | diagnose/SHADOW-validatie |
+| M3 — Runtime detector | Actieve logica kan status/vermogen afleiden | alleen gebruiken wanneer daar buiten Live View expliciet behoefte aan is |
 | M4 — Control-grade | Detector is robuust genoeg voor fysieke regelbeslissingen | alleen na aparte safety-validatie |
 
 Huidige classificatie:
 
-- Quooker: M3 Runtime detector.
-- Wasmachine: M3 voor statusbron; P1-energiemodel aanvullend en confidence-gated.
-- Droger: M3 voor statusbron; P1-energiemodel aanvullend en confidence-gated.
-- Waterkoker: M2 validated fingerprint; geen zelfstandige runtime-detectorflow vastgesteld.
-- Vaatwasser: M2 validated fingerprint; geen zelfstandige runtime-detectorflow vastgesteld.
-- ATAG/Bertazzoni oven: M1/M2 dataset/fingerprint, afhankelijk van herkenningsdoel; geen zelfstandige runtime-detectorflow vastgesteld.
+- Quooker: directe `onoff`-status beschikbaar; status mag daarom direct worden gebruikt. P1-heating fingerprint blijft diagnostisch.
+- Wasmachine: directe AEG-status beschikbaar; deze status mag rechtstreeks worden gebruikt. P1-energiemodel is niet meer nodig voor reguliere live wattage-attributie.
+- Droger: directe AEG-status beschikbaar; deze status mag rechtstreeks worden gebruikt. P1-energiemodel is niet meer nodig voor reguliere live wattage-attributie.
+- Waterkoker: M2 validated fingerprint; geen eigen reguliere Live Energy-attributie.
+- Vaatwasser: M2 validated fingerprint; geen eigen reguliere Live Energy-attributie.
+- ATAG/Bertazzoni oven: M1/M2 dataset/fingerprint; geen eigen reguliere Live Energy-attributie.
 
-## 3. Bronstrategie
+## 3. Bronstrategie voor Live Energy
 
-De engine hanteert bronprioriteit:
+De reguliere live bronprioriteit is:
 
-1. autoritatieve device-state indien beschikbaar;
-2. directe device-meting;
-3. event-assisted P1-fingerprint;
-4. geïsoleerde P1-fasetransitie;
-5. algemene heuristiek/dataset-match.
+1. directe device-vermogensmeting;
+2. betrouwbare directe device-state voor actief/inactief;
+3. anders geen individuele live attributie en vermogen onder `Overige`.
 
-Een zwakkere bron mag een sterkere autoritatieve bron niet overschrijven.
+Een status-only device krijgt geen geschat wattage. P1-fingerprint-, fasetransitie- of heuristische schattingen worden niet gebruikt om de reguliere Live Energy View verder uit te splitsen.
 
 ## 4. Quooker
 
-De Quooker-detector gebruikt de Cooker `onoff`-status als autoritatieve ON/OFF-bron. P1/L3 wordt uitsluitend gebruikt als heating-assist en vermogensschatting. De P1 Event Heartbeat zet slechts `EM_Quooker_P1_Event_Seen=true`; de detector leest P1 alleen wanneer dat event is gezien.
+De Cooker `onoff`-status is de autoritatieve ON/OFF-bron. Deze directe status kan als live status worden gebruikt. De bestaande P1/L3 heating-assist en baseline/fingerprintlogica is diagnostisch en hoeft niet continu actief te zijn voor de Live Energy View.
 
-Statusmodel:
+Historisch statusmodel:
 
 - `OFF`
 - `ON_IDLE`
 - `HEATING`
 
-De huidige heating-signatuur is een L3-delta van 1400–1750 W ten opzichte van een alleen-in-OFF geleerde baseline. Core accepteert detectorstate alleen wanneer de laatste sample vers genoeg is.
+De heating-signatuur en heartbeat blijven bruikbaar voor incidentanalyse of gerichte validatie, maar mogen niet als reden dienen om een continue fingerprint-runtimebelasting te behouden wanneer direct statusgebruik volstaat.
 
 ## 5. Wasmachine en droger
 
-`Energie | Wasmachine & Droger analyse | v1.4.2` gebruikt event-first Homey-status en een gedeeld P1-fasemodel.
-
-Autoritatieve runtime-status komt uit AEG-signalen:
+Autoritatieve runtime-status komt rechtstreeks uit AEG-signalen:
 
 - `measure_applianceState`
 - `measure_cyclePhase`
 - `measure_timeToEnd`
 - `measure_connectionState`
 
-Voor de droger geldt een expliciete normalisatie: `ANTICREASE` met 0 minuten resterend telt als gereed/inactief, ook wanneer `applianceState` nog `RUNNING` meldt.
+Voor de droger blijft de normalisatie gelden dat `ANTICREASE` met 0 minuten resterend als gereed/inactief telt, ook wanneer `applianceState` nog `RUNNING` meldt.
 
-Het P1-model leert alleen uit geïsoleerde ON/OFF-overgangen. Een transition wordt verworpen wanneer:
-
-- wasmachine en droger tegelijk toggelen;
-- tijd tussen samples > 8 minuten is;
-- bekende Tesla/boiler/Quatt/PV-verandering samen > 450 W is;
-- beste fase-delta < 40 W of > 3500 W is;
-- faseselectie onvoldoende onderscheidend is.
-
-Per apparaat worden maximaal 30 evidence-events bewaard. De dominante fase, mediane transition-wattage en faseconsistentie bepalen confidence:
-
-- `NONE`: geen evidence;
-- `LOW`: onvoldoende bewijs;
-- `MEDIUM`: minimaal 2 events en faseconsistentie >= 0,67;
-- `HIGH`: minimaal 4 events en faseconsistentie >= 0,75.
-
-Live geschat wattage mag alleen gebruikt worden vanaf `MEDIUM` of `HIGH` confidence. De output moet herkenbaar blijven als `P1_TRANSITION_MODEL` en mag niet als directe apparaatmeting worden gepresenteerd.
+De historische `Energie | Wasmachine & Droger analyse | v1.4.2` leerde P1-fasemodellen en geschatte transition-wattages. Deze flow staat tijdens de throttling-baseline uit en is voor de reguliere Live Energy View functioneel overbodig geworden. Als het model later opnieuw voor analyse wordt gebruikt, gebeurt dat expliciet en tijdelijk; niet als permanente live-attributielaag.
 
 ## 6. Dataset-only fingerprints
 
-Waterkoker, vaatwasser en ovens hebben gevalideerde ground-truth/fingerprintmomenten, maar zijn niet aangetroffen als zelfstandige actieve Homey-runtime-detectors. Hun huidige rol is daarom analyse/websiteherkenning en niet control-grade statusbron.
+Waterkoker, vaatwasser en ovens blijven bruikbare ground-truth/fingerprintdatasets. Hun rol is diagnose en analyse. Zolang geen directe meet- of betrouwbare statusbron beschikbaar is, wordt hun vermogen niet afzonderlijk uit `Overige` gehaald.
 
-Deze scheiding voorkomt dat documentatie een historische fingerprint verwart met een live detector.
+## 7. Confidence-contract voor diagnostiek
 
-## 7. Confidence-contract
-
-Iedere toekomstige generieke detector hoort minimaal te publiceren:
+Wanneer fingerprintanalyse tijdelijk wordt uitgevoerd, hoort de output minimaal te publiceren:
 
 - `appliance`
 - `status`
@@ -115,36 +94,34 @@ Iedere toekomstige generieke detector hoort minimaal te publiceren:
 - `model_version`
 - `control_eligible`
 
-`control_eligible` staat standaard op `false` voor fingerprint-gebaseerde detectie, tenzij daarvoor afzonderlijk safety-validatie is uitgevoerd.
+`control_eligible` staat standaard op `false`. Diagnostische output wordt niet gebruikt voor reguliere live vermogensallocatie.
 
 ## 8. Isolatie van bekende lasten
 
-P1-fingerprint-learning moet bekende grote lasten uitfilteren. Minimaal worden Tesla, boiler, Quatt en PV als bekende context meegenomen. Quooker-heating wordt door Core eveneens als bekende gemeten last behandeld zodra de detector vers en actief is.
+Bij tijdelijke P1-fingerprint-learning moeten bekende grote lasten nog steeds worden uitgefilterd. Minimaal Tesla, boiler, Quatt en PV worden als bekende context meegenomen. Dit is een analyse-eis en geen reden om de fingerprint-engine permanent te laten draaien.
 
-Doel: een verandering in een bekende last mag niet als nieuwe appliance-fingerprint worden geleerd.
-
-## 9. Idempotency
+## 9. Idempotency en load-governance
 
 Een detector mag dezelfde source-event/revision niet meerdere keren als nieuw evidence-event opslaan. Evidence-lijsten zijn begrensd. Statuspublicatie mag geen fysieke writes veroorzaken.
 
+Fingerprintflows hebben vanaf 2026-08-29 een **opt-in diagnostics lifecycle**: standaard uit wanneer directe meting/status of `Overige` voldoende is. Een tijdelijke heractivatie wordt in de Homey API/Load Map opgenomen en na de validatie weer uitgezet.
+
 ## 10. Safety
 
-Fingerprint-detectie is observatie, geen actuator. Een detector mag nooit rechtstreeks een apparaat schakelen. Een toekomstig control-pad moet via een aparte decision- en actuatorlaag lopen met freshness-, confidence-, revision- en single-writer-guards.
+Fingerprint-detectie is observatie, geen actuator. Een detector mag nooit rechtstreeks een apparaat schakelen. Een toekomstig control-pad vereist een aparte decision- en actuatorlaag met freshness-, confidence-, revision- en single-writer-guards.
 
 ## 11. Validatie
 
-Een fingerprint promoveert pas naar een hoger maturity-niveau wanneer:
+Een fingerprint kan voor diagnose alleen worden vertrouwd wanneer:
 
 1. ground-truth events reproduceerbaar zijn;
 2. false positives over representatieve perioden zijn beoordeeld;
 3. bekende-load interferentie is getest;
 4. freshness en stale gedrag bekend zijn;
-5. confidence-regels expliciet zijn;
-6. websiteweergave onderscheid maakt tussen direct gemeten en geschat vermogen.
+5. confidence-regels expliciet zijn.
 
-## 12. Open punten
+Dit verleent geen recht op reguliere Live Energy-attributie; daarvoor blijft een directe meet- of statusbron vereist.
 
-- Waterkoker naar een echte event-assisted runtime-detector brengen.
-- Vaatwasser runtime-detector formaliseren.
-- Oven-fingerprints per apparaat scheiden en confidence kwantificeren.
-- Een generiek `EM2_Appliance_Detections` contract invoeren zodat website en Core niet per detector eigen variabelen hoeven te interpreteren.
+## 12. Besluit 2026-08-29
+
+De eerdere roadmap om waterkoker, vaatwasser en oven-fingerprints door te promoveren naar permanente runtime-detectors voor de website is vervallen. Nieuwe prioriteit is eenvoud en Homey-loadreductie: direct meetbare/statusbare apparaten afzonderlijk; alle overige energie onder `Overige`; fingerprints alleen op aanvraag voor analyse.
