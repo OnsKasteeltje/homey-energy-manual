@@ -39,22 +39,27 @@ The following entries record earlier migration checkpoints and are retained as h
 - Adapter: `EM v2 | 60 Adapter | WW Power v0.1 SHADOW`
 - Actuator: `EM v2 | 60 Control | Warm Water Actuator v0.8 HYBRID`
 
+## Supporting group source capture — completed 2026-08-30
+
+The following supporting flows were read directly from Homey as one capture batch and transferred to GitHub source control. Runtime enabled/disabled state and trigger contracts are recorded in `src/homey/captures/supporting-flows-2026-08-30.md`; HomeyScript bodies are stored alongside it under `src/homey/captures/`.
+
+- `EM v2 | 05 Config | EMS Settings Sync v0.3 low-load`
+- `EM v2 | 05 Watchdog | Core + Publish Freshness v0.3.3 staggered`
+- `EM v2 | 06 Freshness | Day-Night Normalizer v0.1.1`
+- `EM v2 | 70 Planner | WW Scheduling SHADOW v0.2`
+- `EM v2 | 50 Decision | WW Post-Goal Opportunity v0.4 SHADOW`
+- `EM v2 | 50 Decision | WW Seasonal Source Advisor v0.3 SHADOW idempotent`
+- `EM v2 | 70 History | Control Audit v0.4 low-load`
+- `EM v2 | 70 History | Day Series v0.6.1 TARGETED LOCAL SAMPLER`
+- `EM v2 | 72 History | Immutable Day Archive v0.1`
+- `EM v2 | 76 Evidence | BC Planner Intent Recorder v0.4 local-first`
+
+Capture is documentation/source-management only. No Homey flow was started, enabled, disabled, or changed as part of this batch.
+
 ## Remaining active/relevant capture set
 
-The following non-critical or supporting flows still need an explicit current-runtime capture/reconciliation where relevant:
-
-1. `EM v2 | 05 Config | EMS Settings Sync v0.3 low-load`
-2. `EM v2 | 05 Watchdog | Core + Publish Freshness v0.3.3 staggered`
-3. `EM v2 | 06 Freshness | Day-Night Normalizer v0.1.1`
-4. `EM v2 | 70 Planner | WW Scheduling SHADOW v0.2`
-5. `EM v2 | 50 Decision | WW Post-Goal Opportunity v0.4 SHADOW`
-6. `EM v2 | 50 Decision | WW Seasonal Source Advisor v0.3 SHADOW idempotent`
-7. `EM v2 | 70 History | Control Audit v0.4 low-load`
-8. `EM v2 | 70 History | Day Series v0.5.4`
-9. `EM v2 | 72 History | Immutable Day Archive v0.1`
-10. `EM v2 | 76 Evidence | BC Planner Intent Recorder v0.4 local-first`
-11. Other `80/81 Validation/Observability` flows not already included in the critical WW/EV control baseline.
-12. Standard EMS flows such as Boiler Night OFF / morning fallback only where still part of the active architecture.
+1. Other `80/81 Validation/Observability` flows not already included in the critical WW/EV control baseline.
+2. Standard EMS flows such as Boiler Night OFF / morning fallback only where still part of the active architecture.
 
 ## Explicit exclusions from active source-of-truth
 
