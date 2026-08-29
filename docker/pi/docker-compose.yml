@@ -33,8 +33,9 @@ services:
   mosquitto:
     image: eclipse-mosquitto:2
     restart: unless-stopped
-    command: ["mosquitto", "-c", "/mosquitto-no-auth.conf"]
+    command: ["mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
     volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto_data:/mosquitto/data
 
 volumes:
