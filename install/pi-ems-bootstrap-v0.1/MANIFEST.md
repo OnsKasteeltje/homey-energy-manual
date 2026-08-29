@@ -29,6 +29,9 @@ Mode: `SHADOW`
 - No positive physical write path is introduced by this installer.
 - PostgreSQL has no host/LAN port mapping.
 - Mosquitto has no host/LAN port mapping.
+- Management API is read-only and bound to `127.0.0.1:8088` only.
+- Management API `/v1/*` routes require a generated bearer token.
+- Management API has no shell, Docker socket or actuator endpoint.
 - Installation verification must PASS before commissioning continues.
 
 ## Host hardening
@@ -38,11 +41,11 @@ Mode: `SHADOW`
 - UFW default-deny incoming; the detected SSH port is allowed before the firewall is enabled.
 
 ## Container hardening
-- `ems-core` is read-only, drops all Linux capabilities and runs with `no-new-privileges`.
-- `/tmp` is an explicit tmpfs for `ems-core`.
+- `ems-core` and `management-api` are read-only, drop all Linux capabilities and run with `no-new-privileges`.
+- `/tmp` is an explicit tmpfs for read-only application containers.
 - PostgreSQL and Mosquitto use `no-new-privileges` where compatible with their normal entrypoints.
 - Docker JSON logs are size-rotated.
-- Services share a private Compose bridge but publish no host ports. Outbound network access remains possible for later read-only Homey/Cerbo commissioning.
+- PostgreSQL and Mosquitto publish no host ports. The Management API publishes only on localhost for a future secure connector/tunnel.
 
 ## Reproducibility
 - Runtime stack uses `postgres:16-alpine` and `eclipse-mosquitto:2` during bootstrap.
@@ -59,6 +62,7 @@ Mode: `SHADOW`
 ## Runtime stack
 - Docker Engine + Compose plugin
 - `ems-core` built from the configured Git branch
+- `management-api` using the same immutable application image, separate process and permissions
 - `postgres:16-alpine`
 - `eclipse-mosquitto:2`
 
