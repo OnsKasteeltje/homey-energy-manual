@@ -1,10 +1,10 @@
 ---
 component: architecture
 title: Architectuurprincipes
-version: 0.2.0
+version: 0.3.0
 status: active
 architecture_status: implemented
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 source:
   - docs/architectuur-guardrails.md
   - docs/architectuur.md
@@ -30,6 +30,19 @@ Logica die alleen rekent, observeert of valideert wordt als `shadow` gemarkeerd.
 ## Gelaagde architectuur
 
 Beslislogica, device-adapters, runtime-state, telemetrie en presentatie worden als afzonderlijke verantwoordelijkheden behandeld. Device-specifieke writes worden zo veel mogelijk achter adapters of duidelijk afgebakende controllerlagen geplaatst.
+
+## Live Energy Attribution is direct-first en inference-light
+
+Een individuele verbruiker wordt in de reguliere Live Energy View alleen afzonderlijk weergegeven wanneer ten minste één van de volgende bronnen beschikbaar is:
+
+1. direct gemeten apparaatvermogen; of
+2. betrouwbare directe apparaatstatus waarmee actief/inactief kan worden vastgesteld.
+
+Wanneer alleen een directe status beschikbaar is, mag het apparaat als actief/inactief worden getoond, maar het vermogen blijft `null/onbekend` en wordt niet uit P1-fingerprints ingevuld.
+
+P1-/fingerprint-inference wordt niet gebruikt voor reguliere live device-attributie. Apparaten die alleen via een afgeleid patroon herkenbaar zijn vallen qua vermogen onder `Overige`. Fingerprints blijven uitsluitend diagnostisch/analysegericht en mogen geen continue Homey-runtime-load veroorzaken wanneer zij niet voor control of expliciete validatie nodig zijn.
+
+De residuele live last wordt daarom bepaald als totale huishoudlast minus de som van rechtstreeks gemeten afzonderlijke verbruikers. Een status-only device wordt niet met fictief vermogen van het residu afgetrokken.
 
 ## Idempotency is een architectuureis
 
