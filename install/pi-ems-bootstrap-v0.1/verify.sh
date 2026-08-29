@@ -11,6 +11,10 @@ check "Docker daemon active" "systemctl is-active docker"
 check "PostgreSQL ready" "${COMPOSE[*]} exec -T postgres pg_isready -U ems -d ems"
 check "Mosquitto running" "${COMPOSE[*]} ps --status running mosquitto | grep -q mosquitto"
 check "EMS core running" "${COMPOSE[*]} ps --status running ems-core | grep -q ems-core"
+check "Management API running" "${COMPOSE[*]} ps --status running management-api | grep -q management-api"
+check "Management API token configured" "grep -Eq '^MANAGEMENT_API_TOKEN=.{32,}$' '$ENV_FILE'"
+check "Management API localhost health" "curl -fsS http://127.0.0.1:8088/healthz | grep -q '\"write_capability\":false'"
+check "Management API not exposed on all interfaces" "ss -ltn | grep ':8088 ' | grep -q '127.0.0.1:8088'"
 check "No Homey token configured" "grep -q '^HOMEY_TOKEN=$' '$ENV_FILE'"
 check "No Victron host configured" "grep -q '^VICTRON_HOST=$' '$ENV_FILE'"
 check "DB schema installed" "${COMPOSE[*]} exec -T postgres psql -U ems -d ems -tAc \"SELECT to_regclass('public.shadow_comparisons') IS NOT NULL\" | grep -q t"
@@ -25,7 +29,7 @@ check "PostgreSQL has no published port" "test -z \"$(${COMPOSE[*]} port postgre
 check "Mosquitto has no published port" "test -z \"$(${COMPOSE[*]} port mosquitto 1883 2>/dev/null)\""
 
 if [[ $fail -eq 0 ]]; then
-  echo "INSTALLATION PASS — hardened offline SHADOW baseline ready."
+  echo "INSTALLATION PASS — hardened offline SHADOW baseline + read-only management API ready."
 else
   echo "INSTALLATION FAIL — do not continue to Homey/Victron commissioning."
   exit 1
