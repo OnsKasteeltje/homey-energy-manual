@@ -1,24 +1,36 @@
 from __future__ import annotations
 
 import asyncio
-import os
 
+from config import Settings
 from ems.state import CentralState
+from health import HealthState
 
 
 async def main() -> None:
-    mode = os.getenv("EMS_MODE", "SHADOW").upper()
-    if mode != "SHADOW":
-        raise RuntimeError("Pi EMS v0.1 is SHADOW-only; LIVE mode is not implemented")
+    settings = Settings()
+    settings.assert_safe_mode()
 
     state = CentralState()
-    print(f"Pi EMS bootstrap started mode={mode} schema={state.snapshot().schema_version}")
+    health = HealthState()
+    health.mark_started()
 
-    while True:
-        # Bootstrap heartbeat only. Homey reads are intentionally not started here yet.
-        # The first reader will be added after its exact input contract is captured.
-        await asyncio.sleep(60)
+    print(
+        'Pi EMS bootstrap started '
+        f'mode={settings.ems_mode.upper()} '
+        f'schema={state.snapshot().schema_version} '
+        f'homey={health.homey_status}'
+    )
+
+    try:
+        while True:
+            # Bootstrap heartbeat only. Homey reads remain intentionally disabled.
+            # Use MockHomeyGateway for deterministic development until the exact
+            # production read contracts are complete and Homey is safe to probe.
+            await asyncio.sleep(60)
+    finally:
+        health.mark_stopped()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     asyncio.run(main())
