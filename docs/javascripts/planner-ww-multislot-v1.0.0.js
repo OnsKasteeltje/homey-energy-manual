@@ -27,9 +27,8 @@
       card('Deadline',ww.deadlineLocal||'19:00',ww.catchupRequired?'MUST_CATCHUP actief':'opportunity zolang catch-up niet nodig is')
     );
     sec.append(cards);
-    if(ww.goalReachedToday){sec.append(el('div','ps-ww-state done','Dagdoel is al gehaald. Eventuele resterende forecastblokken horen te vervallen bij de volgende planner-run; post-goal mag nooit MUST worden.'));}
-    else if(!slots.length){sec.append(el('div','ps-ww-state','Er zijn momenteel geen WW-slots toegewezen. De planner houdt het resterende doel open en moet vóór de deadline naar catch-up escaleren als uitstel niet meer veilig is.'));}
-    else {
+    if(!ww.goalReachedToday&&!slots.length){sec.append(el('div','ps-ww-state','Er zijn momenteel geen WW-slots toegewezen. De planner houdt het resterende doel open en moet vóór de deadline naar catch-up escaleren als uitstel niet meer veilig is.'));}
+    else if(!ww.goalReachedToday&&slots.length){
       const list=el('div','ps-ww-slot-list');let remaining=finite(required)?Number(required):allocated;
       slots.forEach((s,idx)=>{
         const row=el('div','ps-ww-slot');
