@@ -4,13 +4,15 @@ Status: **IMPLEMENTATION-READY / NOT DEPLOYED**
 
 Date: 2026-08-29
 
-Baseline: active `EM v2 | 00 Core Tick | v0.10.17 (Planner Input low-load)`.
+Baseline: `EM v2 | 00 Core Tick | v0.10.18 (EV semantic producer)`.
 
 ## Purpose
 
 Remove the remaining broad `Homey.devices.getDevices()` collection scan from Core while preserving the current 5-minute cadence, Core policy, state schema, Logic single-reader behavior, fan-out suppression and all downstream contracts.
 
 This is deliberately a one-variable-at-a-time load experiment. `Homey.logic.getVariables()` remains unchanged in v0.11a. Logic targeting is a separate v0.11b step.
+
+**v0.10.18 preservation gate:** the producer-only `EM2_Control_EV` semantic output introduced in v0.10.18 MUST remain byte-for-byte equivalent in behavior. v0.11a changes only the device read layer.
 
 ## Current structural cost
 
@@ -72,11 +74,7 @@ const [
   getDevice(IDS.dryer),
   Homey.logic.getVariables()
 ]);
-```
 
-Then construct an in-memory map so the rest of the current Core code can remain as close to byte-for-byte equivalent as practical:
-
-```js
 const devices = {
   [IDS.p1]: p1,
   [IDS.ev]: ev,
@@ -91,7 +89,7 @@ const devices = {
 };
 ```
 
-The existing `capObj`, `cap`, `capTs` and laundry-state helpers can then remain unchanged.
+The existing `capObj`, `cap`, `capTs` and laundry-state helpers remain unchanged.
 
 ## Important load caveat
 
@@ -128,7 +126,7 @@ Required checks include at minimum:
 - Quatt thermal/COP/mode/thermostat/CV capabilities;
 - washer/dryer direct appliance status fields used by `laundryState()`.
 
-If any targeted device response omits capability metadata used today, **do not deploy** v0.11a until the adapter pattern is corrected.
+If any targeted device response omits capability metadata used today, **do not continue the soak** until the adapter pattern is corrected.
 
 ## No-change contract
 
@@ -137,6 +135,7 @@ v0.11a MUST NOT change:
 - Core cadence: stays every 5 minutes;
 - `Homey.logic.getVariables()` behavior;
 - state/decision schemas;
+- v0.10.18 `EM2_Control_EV` semantic producer behavior;
 - Power Intent semantics;
 - EV/WW control ownership;
 - Publisher cadence;
@@ -156,15 +155,13 @@ This should reduce broad-read pressure and data volume. CPU improvement may be s
 
 ## Deployment / smoke gate
 
-Do not deploy during an active throttling incident.
-
-1. exact-ID read the active Core flow;
-2. confirm baseline is v0.10.17 and `broken=false`;
-3. validate targeted capability parity without repeated discovery loops;
-4. apply only the device-read delta;
+1. exact-ID read the Core flow;
+2. confirm baseline is v0.10.18, disabled for the clean app-only baseline, and `broken=false`;
+3. apply only the device-read delta while retaining all v0.10.18 semantics;
+4. enable only Core; leave all other EMS flows disabled;
 5. run one controlled Core smoke;
 6. verify `enabled=true`, `broken=false`;
-7. compare `EM2_State`, `EM2_Decision`, `EM2_Control_WW`, `EM2_Planner_Input` semantics with pre-change baseline;
+7. compare `EM2_State`, `EM2_Decision`, `EM2_Control_WW`, `EM2_Control_EV` and `EM2_Planner_Input` semantics with the pre-change contract;
 8. verify no physical write was caused;
 9. stop immediately on `429` / `Too many requests`.
 
@@ -174,6 +171,7 @@ Observe natural Core runs before moving to v0.11b. PASS requires:
 
 - no broad `getDevices()` collection call in the deployed Core source;
 - no semantic regression in Core output;
+- v0.10.18 `EM2_Control_EV` producer preserved;
 - no new stale/missing-device false positives caused by targeted response shape;
 - no new downstream fan-out;
 - no 429 attributable to the new targeted-read fan-out;
@@ -181,7 +179,7 @@ Observe natural Core runs before moving to v0.11b. PASS requires:
 
 ## Rollback
 
-Restore v0.10.17 unchanged. Do not combine rollback with any Planner, Publisher, Power Intent, Gate or actuator change.
+Restore v0.10.18 unchanged. Do not combine rollback with any Planner, Publisher, Power Intent, Gate or actuator change.
 
 ## Next step
 
