@@ -1,4 +1,4 @@
-# Planner Shadow
+<h1>Planner Shadow</h1>
 
 <link rel="stylesheet" href="../stylesheets/planner-axes-v1.1.0.css">
 <link rel="stylesheet" href="../stylesheets/planner-ww-multislot-v1.0.0.css">
@@ -15,8 +15,3 @@
   </div>
   <div id="ps-status">Plannerdata laden…</div>
 </div>
-
-<script src="../javascripts/planner-axes-v1.1.0.js"></script>
-<script src="../javascripts/planner-ww-multislot-v1.0.0.js"></script>
-<script src="../javascripts/planner-flex-energy-v1.0.0.js"></script>
-<script src="../javascripts/planner-device-tabs-v1.0.3.js"></script>
