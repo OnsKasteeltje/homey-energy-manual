@@ -2,6 +2,8 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       POSTGRES_DB: ems
       POSTGRES_USER: ems
@@ -13,15 +15,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks: [ems-net]
 
   mosquitto:
     image: eclipse-mosquitto:2
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     command: ["mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto_data:/mosquitto/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks: [ems-net]
 
   ems-core:
@@ -29,9 +43,18 @@ services:
       context: ${EMS_REPO_DIR}
       dockerfile: docker/pi/Dockerfile
     restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=64m,mode=1777
     environment:
       EMS_MODE: ${EMS_MODE:-SHADOW}
       TZ: ${TZ:-Europe/Amsterdam}
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
       DATABASE_URL: postgresql://ems:${POSTGRES_PASSWORD}@postgres:5432/ems
       MQTT_HOST: mosquitto
     depends_on:
@@ -39,11 +62,17 @@ services:
         condition: service_healthy
       mosquitto:
         condition: service_started
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks: [ems-net]
 
 networks:
   ems-net:
     driver: bridge
+    internal: true
 
 volumes:
   postgres_data:
