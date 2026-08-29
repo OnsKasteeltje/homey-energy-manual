@@ -8,6 +8,7 @@ from typing import Any
 import psycopg
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from prometheus_client import make_asgi_app
+from psycopg.rows import dict_row
 
 API_SCHEMA = "PI_EMS_MANAGEMENT_API_V0.1"
 RELEASE = os.getenv("EMS_RELEASE", "pi-ems-bootstrap-v0.1")
@@ -46,21 +47,20 @@ def require_token(authorization: str | None = Header(default=None)) -> None:
 
 def fetch_one(sql: str, params: tuple[Any, ...] = ()) -> dict[str, Any] | None:
     with psycopg.connect(DATABASE_URL) as conn:
-        with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, params)
             return cur.fetchone()
 
 
 def fetch_all(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
     with psycopg.connect(DATABASE_URL) as conn:
-        with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, params)
             return list(cur.fetchall())
 
 
 @app.get("/healthz")
 def healthz() -> dict[str, Any]:
-    # Minimal unauthenticated liveness endpoint for localhost/container health checks.
     return {"status": "ok", "mode": MODE, "write_capability": False}
 
 
