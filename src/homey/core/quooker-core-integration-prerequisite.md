@@ -1,88 +1,44 @@
-# Quooker — Core integration prerequisite
+# Quooker — Core integration decision
 
-Status: **SEMANTIC COMMIT PRODUCER v0.4 DEPLOYED DISABLED / SHADOW VALIDATION PENDING**
+Status: **REMOVED FROM HOMEY EMS CRITICAL PATH**
 
 Date: 2026-08-30
 
 ## Project decision
 
-The current Quooker signal path must **not** be used directly as an event-driven source for Core v0.11b or the Core Snapshot Aggregator.
+Quooker detection is no longer a prerequisite for Core v0.11b and is removed from the Homey EMS critical input chain.
 
-`EM_Quooker_Last_Sample` is coupled to the former frequent P1/heartbeat path. Using that variable directly as an aggregator trigger would cause unnecessary wake-ups and fan-out.
+The Quooker is not controlled by the EMS. Detection was used primarily to classify approximately 1.5–1.7 kW of household consumption as Quooker heating for diagnostics and website enrichment. That classification benefit does not justify a permanent Homey producer with periodic device reads, freshness keepalives, Logic writes, aggregator wake-ups, parity work and additional rate-limit exposure.
 
-Canonical marker: `EM_Quooker_Commit` (`f1b9000f-9f98-480e-89a5-7518d7b82a6c`).
+For EMS control and safety, the P1 measurement already contains the Quooker load as normal household consumption. EV, warm-water, Power Intent, Gate and future Victron/DESS decisions therefore remain electrically correct without a dedicated Quooker classification signal.
 
-## Low-load semantic commit contract
+## Homey architecture
 
-Schema: `EM_QUOOKER_COMMIT_V0.1`.
+The Homey critical path becomes:
 
-The commit contains `generatedAt`, `semanticRevision`, `lastSample`, `active`, `powerW`, `status`, `switchOn`, `baselineL3W`, `lastTransition`, `lastHeatingAt`, `lastHeatingPowerW`, and `transitionHistory`.
+`P1 / devices -> Core -> Power Intent / controls`
 
-A new commit is written only when the effective semantic payload changes or when the previous commit requires the 120-second freshness keepalive. `generatedAt` and `lastSample` are excluded from the semantic signature. `semanticRevision` increments only for a semantic payload change.
+There is no required Quooker producer, no required `EM_Quooker_Commit` trigger and no Quooker freshness gate in Core v0.11b.
 
-## Homey producer v0.4
+Consequences:
 
-Advanced Flow: `04a713a5-105e-439a-a93a-441fb2ca50b4`
+- Quooker Detector v0.3/v0.4 is not required for normal EMS operation;
+- `EM_Quooker_Commit` is not part of the Core v0.11b input contract;
+- the ten legacy `EM_Quooker_*` variables are not required inputs for v0.11b;
+- the Snapshot Aggregator must not refresh a Quooker source group;
+- Quooker parity is removed from the v0.11b acceptance gate;
+- Quooker can no longer block Core v0.11b cut-over.
 
-Name: `EM v2 | 01 Quooker Detector | v0.4 LOW-LOAD SEMANTIC COMMIT SHADOW`
+Legacy Quooker variables may remain temporarily for compatibility/history, but they must not be maintained merely to satisfy Core. Cleanup is a separate controlled migration after confirming that no remaining consumer depends on them.
 
-Deployment state on 2026-08-30: `enabled=false`, `broken=false` as returned directly by the update operation.
+## Optional future enrichment on Raspberry Pi
 
-Runtime design:
+Quooker classification may later be implemented outside the Homey critical EMS runtime, preferably on the Raspberry Pi used for the future EMS runtime/website enrichment layer.
 
-- two-minute schedule plus manual start;
-- one targeted Logic read: `EM_Quooker_Commit`;
-- two targeted device reads in parallel: Cooker switch and P1;
-- maximum one Logic write per run: `EM_Quooker_Commit`;
-- no `Homey.logic.getVariables()`;
-- no discovery calls;
-- no P1 heartbeat dependency;
-- no physical device writes;
-- Cooker `onoff` remains authoritative for OFF/ON;
-- P1 L3 delta remains the heating/power signature;
-- baseline smoothing remains limited to Cooker OFF state;
-- transition history remains bounded to eight entries;
-- last-heating timestamp is updated on transition into HEATING rather than on every heating sample.
+Possible inputs include native Quooker `onoff` / `energy_power` data or a lightweight fingerprint based on P1/device telemetry. Such enrichment is informational only and must not become a mandatory freshness dependency for Core or a competing real-time control loop.
 
-The previous v0.3 legacy-variable fan-out is intentionally not reproduced in v0.4. The compact commit is the new publication boundary. Existing production consumers are not cut over yet, which is why v0.4 remains disabled during SHADOW validation.
+## Acceptance effect
 
-## Homey API discipline used for deployment
+The previous v0.4 semantic-commit validation, 120-second keepalive validation and aggregator commit-trigger integration are cancelled as Core v0.11b prerequisites.
 
-The deployment followed `docs/architecture/homey-api-access-guidelines.md`:
-
-1. one targeted pre-change read of the existing Quooker Advanced Flow;
-2. one Advanced Flow update;
-3. no separate post-read because the update response itself returned the complete updated Flow and confirmed `enabled=false` and `broken=false`.
-
-No autocomplete/discovery burst, Flow start, physical write, or additional Homey verification call was performed.
-
-## Aggregator integration after producer validation
-
-After a controlled SHADOW producer run validates the commit:
-
-- trigger the Core Snapshot Aggregator on `EM_Quooker_Commit changed`, never `EM_Quooker_Last_Sample`;
-- perform one targeted read of the commit;
-- map it into `EM2_Core_Input.sources.quooker`;
-- retain existing lease/semantic suppression;
-- retain hourly FULL reconciliation temporarily during SHADOW validation.
-
-## Acceptance gate
-
-Completed:
-
-- stable ID resolved;
-- v0.4 producer deployed disabled;
-- broad Logic scan removed;
-- heartbeat dependency removed;
-- commit construction uses canonical previous state and targeted device reads only.
-
-Still required before production v0.11b cut-over:
-
-- controlled SHADOW run of v0.4;
-- validate commit schema and values;
-- validate semantic-change behavior and 120-second keepalive;
-- wire aggregator to `EM_Quooker_Commit changed` with one compact read;
-- parity against legacy Quooker semantics;
-- confirm no material CPU or 429/rate-limit regression.
-
-Until those criteria pass, Quooker remains a blocker for production cut-over of Core v0.11b.
+Core v0.11b may proceed once the remaining genuinely required inputs satisfy parity, freshness and load criteria.
