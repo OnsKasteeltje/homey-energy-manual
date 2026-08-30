@@ -1,0 +1,40 @@
+name: Test Core v0.11e Planner Tesla intent
+
+on:
+  push:
+    branches:
+      - core-v0.11e-planner-tesla-intent
+    paths:
+      - src/homey/core/core-v0.11e-planner-tesla-decision.js
+      - src/homey/core/test-core-v0.11e-planner-tesla-decision.js
+      - .github/workflows/test-core-v0.11e-planner-tesla.yml
+  pull_request:
+    paths:
+      - src/homey/core/core-v0.11e-planner-tesla-decision.js
+      - src/homey/core/test-core-v0.11e-planner-tesla-decision.js
+      - .github/workflows/test-core-v0.11e-planner-tesla.yml
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run pure decision regression
+        run: node src/homey/core/test-core-v0.11e-planner-tesla-decision.js
+      - name: Enforce no physical-write code in helper
+        run: |
+          ! grep -q "setCapabilityValue" src/homey/core/core-v0.11e-planner-tesla-decision.js
+          ! grep -q "Homey.devices" src/homey/core/core-v0.11e-planner-tesla-decision.js
+          ! grep -q "Homey.logic.getVariables" src/homey/core/core-v0.11e-planner-tesla-decision.js
+      - name: Enforce architecture boundary
+        run: |
+          grep -q "TESLA_CHARGE_DEADLINE" src/homey/core/core-v0.11e-planner-tesla-decision.js
+          grep -q "PLANNER_DEADLINE_SLOT" src/homey/core/core-v0.11e-planner-tesla-decision.js
+          grep -q "LATEST_START_MUST" src/homey/core/core-v0.11e-planner-tesla-decision.js
+          grep -q "PLANNER_TESLA_MIN_IMPORT_BUDGET_W = 4140" src/homey/core/core-v0.11e-planner-tesla-decision.js
