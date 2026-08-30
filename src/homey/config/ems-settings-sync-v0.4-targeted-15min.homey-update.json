@@ -1,0 +1,43 @@
+{
+  "name": "EM v2 | 05 Config | EMS Settings Sync v0.4 TARGETED 15-MIN LOW-LOAD",
+  "enabled": false,
+  "cards": {
+    "10000000-0000-4000-8000-000000000001": {
+      "type": "trigger",
+      "id": "homey:manager:cron:every_nth",
+      "x": 0,
+      "y": 0,
+      "args": {"n": 15, "type": "minute"},
+      "outputSuccess": ["10000000-0000-4000-8000-000000000003"]
+    },
+    "10000000-0000-4000-8000-000000000002": {
+      "type": "start",
+      "x": 0,
+      "y": 160,
+      "outputSuccess": ["10000000-0000-4000-8000-000000000003"]
+    },
+    "10000000-0000-4000-8000-000000000003": {
+      "type": "action",
+      "id": "homey:app:com.athom.homeyscript:runCode_v2",
+      "x": 360,
+      "y": 60,
+      "args": {
+        "code": "// EM v2 | 05 Config | EMS Settings Sync v0.4 TARGETED 15-MIN LOW-LOAD\nconst VERSION='EM2_EMS_SETTINGS_SYNC_V0.4';\nconst API='https://api.github.com/repos/OnsKasteeltje/homey-energy-manual/contents/docs/data/ems-settings-command.json?ref=main';\nconst RAW='https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/ems-settings-command.json';\n\nconst IDS={\n  contract:'8d346495-f183-4072-86d0-c4bc9da94e2e',\n  source:'63006c48-7b92-452c-bbf5-6c02893b875c',\n  boilerMode:'f9d885a4-fca2-4aea-a5a9-a5c05da90835',\n  lastId:'e5562ce6-8ca9-4fff-af68-43fa183f0d23',\n  status:'9f643c3c-0db9-4a8e-8b34-d0d0c49de220',\n  token:'235cfe0f-5760-48b9-9349-a33be47d04d1'\n};\n\nconst read=async id=>Homey.logic.getVariable({id});\nconst write=async(id,value)=>Homey.logic.updateVariable({id,variable:{value}});\nconst norm=v=>String(v??'').trim();\nconst upper=v=>norm(v).toUpperCase();\n\nasync function setIfChanged(id,next,current){\n  if(current!==next){await write(id,next);return true;}\n  return false;\n}\n\nasync function readCommand(token){\n  if(token){\n    try{\n      const r=await fetch(API,{headers:{\n        Authorization:`Bearer ${token}`,\n        Accept:'application/vnd.github.raw+json',\n        'X-GitHub-Api-Version':'2022-11-28',\n        'User-Agent':'Homey-EMS-Settings-v0.4',\n        'Cache-Control':'no-cache'\n      }});\n      if(r.ok)return {cmd:await r.json(),source:'GITHUB_API'};\n    }catch(_){ }\n  }\n  try{\n    const r=await fetch(RAW+'?ts='+Date.now(),{headers:{'Cache-Control':'no-cache'}});\n    if(r.ok)return {cmd:await r.json(),source:'RAW_FALLBACK'};\n  }catch(_){ }\n  return null;\n}\n\nconst [contractV,sourceV,boilerV,lastIdV,statusV,tokenV]=await Promise.all([\n  read(IDS.contract),\n  read(IDS.source),\n  read(IDS.boilerMode),\n  read(IDS.lastId),\n  read(IDS.status),\n  read(IDS.token)\n]);\n\nconst fetched=await readCommand(norm(tokenV?.value));\nasync function setStatus(status,extra={}){\n  const next=JSON.stringify({version:VERSION,status,...extra});\n  if(String(statusV?.value||'')!==next)await write(IDS.status,next);\n}\n\nif(!fetched){await setStatus('FETCH_FAILED');return true;}\nconst cmd=fetched.cmd;\nif(cmd?.schema!==1||cmd?.kind!=='ems_settings'){\n  await setStatus('BLOCKED_SCHEMA',{schema:cmd?.schema??null,kind:cmd?.kind??null});\n  return true;\n}\n\nconst contract=upper(cmd.contractType);\nconst source=upper(cmd.hotWaterSource);\nconst requestId=norm(cmd.requestId);\nif(!['FIXED','DYNAMIC'].includes(contract)||!['BOILER','CV'].includes(source)||!requestId){\n  await setStatus('BLOCKED_VALUES',{contract,source,requestId});\n  return true;\n}\n\nconst desiredBoiler=source==='BOILER';\nconst currentContract=upper(contractV?.value);\nconst currentSource=upper(sourceV?.value);\nconst currentBoiler=Boolean(boilerV?.value);\nconst currentLastId=norm(lastIdV?.value);\n\nconst alreadyApplied=\n  currentLastId===requestId&&\n  currentContract===contract&&\n  currentSource===source&&\n  currentBoiler===desiredBoiler;\n\nif(alreadyApplied)return true;\n\nawait setIfChanged(IDS.contract,contract,currentContract);\nawait setIfChanged(IDS.source,source,currentSource);\nawait setIfChanged(IDS.boilerMode,desiredBoiler,currentBoiler);\nawait setIfChanged(IDS.lastId,requestId,currentLastId);\nawait setStatus('SYNC_OK',{\n  requestId,\n  contractType:contract,\n  hotWaterSource:source,\n  boilerMode:desiredBoiler,\n  requestedAt:cmd.requestedAt||null,\n  sourceOfCommand:cmd.source||null,\n  fetchSource:fetched.source\n});\nreturn true;\n"
+      }
+    },
+    "10000000-0000-4000-8000-000000000004": {
+      "type": "note",
+      "x": 0,
+      "y": -160,
+      "value": "v0.4 targeted low-load: 15-minute polling; six targeted Logic reads only; same requestId + already matching Homey state = zero writes. No broad Logic/device discovery.",
+      "color": "green"
+    },
+    "10000000-0000-4000-8000-000000000005": {
+      "type": "note",
+      "x": 610,
+      "y": -160,
+      "value": "Core v0.11f compatible. FIXED/DYNAMIC changes may update EMS_ContractType only; EMS_HotWaterSource and WW_Boilermodus change only when the website command explicitly changes hotWaterSource.",
+      "color": "blue"
+    }
+  }
+}
