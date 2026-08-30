@@ -1,6 +1,17 @@
 # EM v2 | 30 Context | Contract Price Adapter v0.10 FIXED+DYNAMIC LOW-LOAD
 
-_Status: exact runtime payload prepared from live v0.9 flow + resolved Homey Logic IDs. No physical device/actuator writes._
+_Status: deployed to Homey and smoke-started successfully on 2026-08-30. Full two-direction FIXED ↔ DYNAMIC selector validation remains pending._
+
+## Runtime state
+
+- Homey flow ID: `69648157-892b-49d2-bc4d-e61a1a4d78ab`
+- Name: `EM v2 | 30 Context | Contract Price Adapter v0.10 FIXED+DYNAMIC LOW-LOAD`
+- After deployment: `enabled=true`, `broken=false`, `triggerable=true`
+- Manual flow start after deployment: successful
+- Website command at validation time: `contractType=FIXED`, `hotWaterSource=BOILER`
+- No physical device or actuator writes were introduced or executed by this adapter.
+
+The smoke run was deliberately performed without changing the user's contract selector. Because the website command was FIXED, the intended exercised path was the FIXED branch. This does not substitute for a later explicit two-direction FIXED -> DYNAMIC -> FIXED selector test.
 
 ## Purpose
 
@@ -50,4 +61,15 @@ await publish(ctx);return true;
 
 ## Safety / compatibility
 
-The context schema remains `EM2_UNIFORM_PRICE_CONTEXT_V0.4` to avoid an unnecessary downstream schema change. Core v0.11b consumes `EM2_ContractPrice_Context` and the compatibility mirror `EM2_Contract_Type`; no physical-control ownership is introduced here. The existing proposed <12h PBTH event refresh remains a separate DYNAMIC-only follow-up and must never execute for FIXED.
+The context schema remains `EM2_UNIFORM_PRICE_CONTEXT_V0.4` to avoid an unnecessary downstream schema change. Core v0.11b consumes `EM2_ContractPrice_Context` and the compatibility mirror `EM2_Contract_Type`; no physical-control ownership is introduced here.
+
+## Validation status
+
+- Deployment structure: **PASS** (`enabled=true`, `broken=false`, `triggerable=true`).
+- Manual start: **PASS**.
+- FIXED branch topology: **PASS by structure**; PBTH is unreachable from the FALSE/FIXED branch.
+- DYNAMIC branch topology: **PASS by structure**; exactly one PBTH `prices_json(next_hours)` call precedes normalization.
+- Explicit FIXED -> DYNAMIC -> FIXED selector smoke: **PENDING**; the operational selector was not changed for testing.
+- Long-duration low-load/throttling soak: **PENDING**.
+
+The existing proposed <12h PBTH event refresh remains a separate DYNAMIC-only follow-up and must never execute for FIXED.
