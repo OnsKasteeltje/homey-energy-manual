@@ -51,6 +51,14 @@ These rules apply to **all** manual, assistant-driven, diagnostic, development, 
 10. **429 prevention is an acceptance criterion.**
     - A technically correct implementation that materially increases Homey request bursts or rate-limit frequency is not acceptable.
 
+11. **Homey access is globally serialized across ChatGPT sessions/tabs.**
+    - Treat all browser tabs, ChatGPT conversations, scheduled tasks and assistant-driven workflows as sharing one Homey API budget.
+    - If one session is executing a Homey call sequence, **no second Homey call sequence may be started from another session/tab** until the first sequence is complete.
+    - Do not assume separate ChatGPT chats have separate Homey rate-limit capacity.
+    - Before starting a multi-call Homey operation, the active session must be considered to hold the Homey access lock for the duration of that operation.
+    - When there is any uncertainty whether another session is currently using Homey, **fail closed: do not start the new Homey sequence** until the user confirms that no other Homey work is running.
+    - Single diagnostic pings are also Homey calls and must respect this serialization rule.
+
 ## Default interaction budget
 
 For a normal single-Flow modification, the default Homey interaction pattern is:
@@ -61,16 +69,18 @@ For a normal single-Flow modification, the default Homey interaction pattern is:
 
 This is a **guideline ceiling, not a quota to consume**. If fewer calls are sufficient, use fewer. If more calls are genuinely necessary, stop and plan the sequence first rather than issuing exploratory calls interactively.
 
+The interaction budget applies **globally across concurrent ChatGPT sessions**, not independently per tab or conversation.
+
 ## Incident lesson — 2026-08-30
 
 During Quooker v0.4 preparation, approximately 16 Homey calls were made in a short development window, including a burst of individual Logic autocomplete lookups. Most of those IDs were already known. Homey subsequently returned `429 Too many requests`.
 
-Conclusion: even lightweight read-only calls can collectively form an unsafe API burst. Stable-ID reuse and request-count discipline are therefore mandatory for both runtime code and development operations.
+Conclusion: even lightweight read-only calls can collectively form an unsafe API burst. Stable-ID reuse, request-count discipline and cross-session serialization are therefore mandatory for both runtime code and development operations.
 
 ## Relation to EMS architecture
 
-These operational rules extend the existing v0.11b design principle that replacing one broad read with dozens of targeted requests is not an acceptable optimization. Request **count, burst shape, payload and wake-up frequency** must all be considered together.
+These operational rules extend the existing v0.11b design principle that replacing one broad read with dozens of targeted requests is not an acceptable optimization. Request **count, burst shape, payload, wake-up frequency and concurrency across sessions** must all be considered together.
 
 ## Enforcement
 
-These rules may only be deviated from when there is a concrete safety/correctness reason and the additional Homey calls are planned before execution. Convenience, repeated reassurance or rediscovery of already-recorded IDs is not a valid reason.
+These rules may only be deviated from when there is a concrete safety/correctness reason and the additional Homey calls are planned before execution. Convenience, repeated reassurance, parallel work from another browser tab or rediscovery of already-recorded IDs is not a valid reason.
