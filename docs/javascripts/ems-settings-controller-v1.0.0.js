@@ -2,9 +2,9 @@
   'use strict';
   const BASE='/homey-energy-manual/';
   window.HomeEnergyFrontend=window.HomeEnergyFrontend||{};
-  window.HomeEnergyFrontend.emsSettingsController='1.1.0';
+  window.HomeEnergyFrontend.emsSettingsController='1.1.1';
 
-  let command=null,config=null,core=null,loading=false,saving=false;
+  let command=null,config=null,core=null,loading=false,saving=false,commandReady=false;
 
   async function getJson(path){
     try{
@@ -18,6 +18,12 @@
     if(mode===true)return 'BOILER';
     if(mode===false)return 'CV';
     return null;
+  }
+
+  function validCommand(cmd){
+    const contractType=String(cmd?.contractType||'').toUpperCase();
+    const hotWaterSource=String(cmd?.hotWaterSource||'').toUpperCase();
+    return cmd?.schema===1&&cmd?.kind==='ems_settings'&&['FIXED','DYNAMIC'].includes(contractType)&&['BOILER','CV'].includes(hotWaterSource);
   }
 
   function routeReady(){
@@ -36,8 +42,8 @@
   }
 
   function bind(panel){
-    if(!panel||panel.dataset.bound==='1.1.0')return;
-    panel.dataset.bound='1.1.0';
+    if(!panel||panel.dataset.bound==='1.1.1')return;
+    panel.dataset.bound='1.1.1';
     panel.querySelector('[data-ems-contract]')?.addEventListener('change',()=>save(panel));
     panel.querySelector('[data-ems-hot-water]')?.addEventListener('change',()=>save(panel));
   }
@@ -60,11 +66,18 @@
     const contract=panel.querySelector('[data-ems-contract]');
     const hot=panel.querySelector('[data-ems-hot-water]');
     const msg=panel.querySelector('[data-ems-message]');
-    const contractType=String(command?.contractType||'FIXED').toUpperCase();
-    const requestedHot=String(command?.hotWaterSource||actualHotWaterSource()||'BOILER').toUpperCase();
+
+    if(!commandReady||!validCommand(command)){
+      setEnabled(panel,false);
+      if(msg&&!saving){msg.textContent='Canonieke EMS-instellingen niet geladen · wijzigen geblokkeerd';msg.dataset.state='error';}
+      return;
+    }
+
+    const contractType=String(command.contractType).toUpperCase();
+    const requestedHot=String(command.hotWaterSource).toUpperCase();
     if(!saving){
-      if(contract)contract.value=['FIXED','DYNAMIC'].includes(contractType)?contractType:'FIXED';
-      if(hot)hot.value=['BOILER','CV'].includes(requestedHot)?requestedHot:'BOILER';
+      if(contract)contract.value=contractType;
+      if(hot)hot.value=requestedHot;
     }
     const linked=routeReady();setEnabled(panel,linked&&!saving);
     if(msg&&!saving){
@@ -83,16 +96,26 @@
         getJson('data/tesla-control-config.json'),
         getJson('data/energy-state-v2.json')
       ]);
-      command=cmd||command;config=cfg||config;core=state||core;populate();
+      if(validCommand(cmd)){command=cmd;commandReady=true;}
+      config=cfg||config;core=state||core;populate();
     }finally{loading=false;}
   }
 
   async function save(panel){
     if(saving)return;
-    const worker=String(config?.worker_url||'').trim();
-    const contractType=panel.querySelector('[data-ems-contract]')?.value||'FIXED';
-    const hotWaterSource=panel.querySelector('[data-ems-hot-water]')?.value||'BOILER';
     const msg=panel.querySelector('[data-ems-message]');
+    if(!commandReady||!validCommand(command)){
+      if(msg){msg.textContent='Opslaan geblokkeerd: canonieke EMS-instellingen zijn niet geladen';msg.dataset.state='error';}
+      setEnabled(panel,false);
+      return;
+    }
+    const worker=String(config?.worker_url||'').trim();
+    const contractType=String(panel.querySelector('[data-ems-contract]')?.value||'').toUpperCase();
+    const hotWaterSource=String(panel.querySelector('[data-ems-hot-water]')?.value||'').toUpperCase();
+    if(!['FIXED','DYNAMIC'].includes(contractType)||!['BOILER','CV'].includes(hotWaterSource)){
+      if(msg){msg.textContent='Opslaan geblokkeerd: ongeldige selectorstatus';msg.dataset.state='error';}
+      populate();return;
+    }
     if(!routeReady()){if(msg)msg.textContent='Write-route nog niet vrijgegeven';populate();return;}
     const pin=window.prompt('Voer de Tesla-control PIN in:');
     if(pin===null){populate();return;}
@@ -101,13 +124,13 @@
       const r=await fetch(worker,{method:'POST',headers:{'Content-Type':'application/json','X-Tesla-Control-Pin':pin},body:JSON.stringify({kind:'ems_settings',contractType,hotWaterSource})});
       const j=await r.json().catch(()=>({}));
       if(!r.ok||!j.ok)throw new Error(j.error||`HTTP ${r.status}`);
-      command=j.command||command;
+      if(validCommand(j.command)){command=j.command;commandReady=true;}
       if(msg){msg.textContent='Opgeslagen · wacht op Homey bevestiging';msg.dataset.state='pending';}
       setTimeout(load,1000);
     }catch(e){
       if(msg){msg.textContent=`Opslaan mislukt: ${e.message||e}`;msg.dataset.state='error';}
       setTimeout(populate,1200);
-    }finally{saving=false;setEnabled(panel,routeReady());}
+    }finally{saving=false;setEnabled(panel,routeReady()&&commandReady);}
   }
 
   function refresh(){setTimeout(load,0);}
