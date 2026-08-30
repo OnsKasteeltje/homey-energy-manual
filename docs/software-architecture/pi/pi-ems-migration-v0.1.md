@@ -8,17 +8,17 @@ Move EMS compute/orchestration from Homey to Raspberry Pi 5 incrementally while 
 ## Target architecture
 
 ```text
-Homey devices -> Pi Homey Gateway -> Central State -> Core -> Planner -> Power Intent
-                                                         |             |
-                                                         v             v
-                                                     Publisher     EV / WW adapters
-                                                                       |
-                                                                    Gates
-                                                                       |
-                                                              validated commands
-                                                                       |
-                                                                    Homey
-                                                              EV / WW actuators
+Homey devices -> bounded Homey read boundary -> Central State -> Core -> Planner -> Power Intent
+                                                              |             |
+                                                              v             v
+                                                          Publisher     EV / WW adapters
+                                                                            |
+                                                                         Gates
+                                                                            |
+                                                                   validated commands
+                                                                            |
+                                                                         Homey
+                                                                   EV / WW actuators
 
 Pi <-> Modbus TCP <-> Cerbo GX <-> Victron/DESS
 ```
@@ -35,12 +35,46 @@ Victron DESS remains the primary battery optimizer. The Pi EMS orchestrates hous
 6. Preserve SHADOW/LIVE, idempotency, run leases, stale-input checks and fail-closed behavior.
 7. Ownership transfers only after deterministic comparison against the Homey implementation.
 8. After each ownership transfer, disable the superseded Homey flow and update the Homey API/load map.
+9. Homey is a scarce runtime resource: all migration/commissioning reads are targeted, bounded, cached and fail-fast.
+10. No brute-force discovery, broad collection scans, polling loops or repeated retry probes are permitted in the normal Pi/Homey path.
+11. Known stable IDs and captured contracts are used directly; discovery-by-name is diagnostic-only and must never become steady-state behavior.
+12. A Homey 429/rate-limit signal ends the current read attempt; there is no immediate same-run retry storm.
+13. Publication/website work remains strictly downstream and may never wake or influence the control chain.
+
+## 2026-08-30 Homey low-load baseline incorporated into Pi design
+
+The latest Homey work materially sharpens the Pi migration target:
+
+- Core v0.11a Targeted Device Reads is the active reference pattern: broad device collection reads are eliminated from Core.
+- Fan-out reduction is an explicit architecture requirement: read once, normalize once, reuse many times.
+- Publisher v1.0.11 SCHEDULED LOW-LOAD is the active publication baseline; publication is scheduled rather than driven by high-frequency state-change fan-out.
+- Homey Logic has been cleaned up; unused variables were removed. Pi must not recreate legacy/unused Logic state merely for compatibility.
+- Remaining Homey Logic dependencies must be captured as an explicit allow-list and mapped into canonical Pi state rather than fetched through a broad Logic collection scan.
+- `EM v2 | 12 Input | Core Snapshot Aggregator v0.1 SHADOW` is a candidate migration bridge and must be evaluated before enabling Pi device-by-device Homey reads. If its contract is complete, fresh and low-load, the preferred commissioning path is one bounded snapshot read followed by Pi-local fan-out.
+- Quooker is not assumed to be safely reusable as a normal controlled load. Its semantics/interface must be adapted and validated separately before inclusion in Pi control.
+- Homey load/throttling is a first-class non-functional requirement. Every Pi migration step must demonstrate that it does not increase Homey read amplification.
+
+### Homey read-budget rule
+
+Before any Pi commissioning read is added, document:
+
+1. exact source/device/Logic ID;
+2. exact fields/capabilities required;
+3. intended cadence or event trigger;
+4. cache/fan-out consumers;
+5. freshness/stale threshold;
+6. failure behavior;
+7. expected Homey calls per hour;
+8. whether the same observation already exists in the Core Snapshot Aggregator or another canonical snapshot.
+
+A new direct Homey read is rejected when an equivalent sufficiently fresh observation is already available through the central snapshot/cache.
 
 ## Current active-flow disposition
 
 | Homey flow | Pi target | Initial action |
 |---|---|---|
-| EM v2 | 00 Core Tick | v0.11a (Targeted Device Reads) | Core + central state | Keep LIVE on Homey |
+| EM v2 | 00 Core Tick | v0.11a (Targeted Device Reads) | Core + central state | Keep LIVE on Homey; reference low-load contract |
+| EM v2 | 12 Input | Core Snapshot Aggregator v0.1 SHADOW | Migration snapshot boundary | Evaluate as preferred low-load Homey→Pi commissioning feed |
 | EM v2 | 40 Data | Publisher v1.0.11 SCHEDULED LOW-LOAD | Publisher | First production migration candidate |
 | EM v2 | 20 Power Intent | P1 v0.2.4 DUAL-SEMANTIC LOW-LOAD | Power Intent | Shadow after state/core |
 | EM v2 | 10 Input | EV Deadline Goal Adapter v0.1 | Input/API contract | Keep until input path is replaced |
@@ -59,22 +93,31 @@ Victron DESS remains the primary battery optimizer. The Pi EMS orchestrates hous
 ## Planned phases
 
 ### P0 — Contract capture
-Document inputs, outputs, side effects, cadence, state dependencies and fail-closed rules for every active flow.
+Document inputs, outputs, side effects, cadence, state dependencies and fail-closed rules for every active flow. Capture only missing contracts using targeted Homey reads; do not rediscover already-known resources.
+
+Priority captures still required:
+- exact Publisher v1.0.11 runtime contract;
+- exact WW Power v0.2 contract;
+- exact WW Power Adapter Gate v0.2 contract;
+- exact Warm Water Actuator v0.9 contract;
+- current EV gate/actuator details only where the source-managed contract is incomplete;
+- Core Snapshot Aggregator v0.1 SHADOW input/output/freshness contract;
+- remaining Core Logic dependencies as an explicit allow-list.
 
 ### P1 — Pi bootstrap
-Raspberry Pi OS Lite 64-bit on NVMe; SSH keys; NTP; fixed DHCP reservation; security updates; watchdog; Docker/Compose; health checks; backups.
+Raspberry Pi OS Lite 64-bit; NVMe runtime storage; recovery microSD; SSH keys; NTP; fixed DHCP reservation; security updates; watchdog; Docker/Compose; health checks; backups; read-only Management API.
 
 ### P2 — Homey Gateway + Central State
-Implement targeted reads once and cache centrally. Initial metrics: `homey_reads_total`, `homey_reads_per_minute`, `read_latency_ms`, `read_failures`, `state_age_seconds`.
+Prefer the lowest-load validated source boundary. First evaluate Core Snapshot Aggregator as commissioning input. Only add targeted per-device/per-variable reads for fields not safely available in the snapshot. Cache centrally and expose observations to all Pi modules. Initial metrics: `homey_reads_total`, `homey_reads_per_minute`, `read_latency_ms`, `read_failures`, `homey_429_total`, `state_age_seconds`, plus expected-versus-actual Homey calls/hour.
 
 ### P3 — Publisher
-Run Pi Publisher in SHADOW, compare output, then transfer publication ownership. This is the first intended Homey-flow retirement because it has no actuator safety impact.
+Run Pi Publisher in SHADOW, compare output, then transfer publication ownership. This is the first intended Homey-flow retirement because it has no actuator safety impact. Preserve the scheduled low-load model and strict publication/control separation.
 
 ### P4 — WW SHADOW modules
-Port WW Scheduling, Post-Goal Opportunity, Seasonal Source Advisor and WW Power Adapter. Persist timestamp, input snapshot, Homey result, Pi result, delta/reason and revision for each comparison.
+Port WW Scheduling, Post-Goal Opportunity, Seasonal Source Advisor and WW Power Adapter. Persist timestamp, input snapshot, Homey result, Pi result, delta/reason and revision for each comparison. Quooker is excluded from automatic reuse until its low-load semantic interface is separately adapted and validated.
 
 ### P5 — Central State + Core
-Port Core Tick semantics to Pi. Staleness becomes a first-class property of central state rather than repeated per-flow reads/checks.
+Port Core Tick semantics to Pi. Staleness becomes a first-class property of central state rather than repeated per-flow reads/checks. Do not port Homey's broad Logic collection behavior; replace it with explicit state inputs.
 
 ### P6 — Power Intent
 Port P1 and publish numerical EV/WW targets while Homey still owns physical actuation.
@@ -98,6 +141,13 @@ FAIL -> FIX -> repeat SHADOW
 
 No positive physical write may be promoted on stale input, failed comparison, missing gate evidence or ambiguous ownership.
 
+For Homey-dependent modules, promotion additionally requires:
+- measured Homey call rate at or below the documented read budget;
+- zero broad discovery/collection scans in the steady-state path;
+- no retry storm after 429;
+- proof that central cache/fan-out prevents duplicate reads;
+- no publication-to-control dependency.
+
 ## Hardware baseline
 Ordered for the Pi EMS runtime:
 - Raspberry Pi 5, 8 GB
@@ -106,17 +156,24 @@ Ordered for the Pi EMS runtime:
 - Geekworm X1001 NVMe adapter
 - PNY CS1030 500 GB NVMe
 - Geekworm P579 case
+- 32 GB endurance microSD for installation/recovery
 
 ## Immediate preparation backlog
 
-- [ ] Capture exact contracts for the active Homey flows.
-- [ ] Define canonical Central State schema.
-- [ ] Define Homey Gateway read/write API boundary.
-- [ ] Define SHADOW comparison record schema and tolerances.
-- [ ] Define Docker service layout and configuration/secrets strategy.
-- [ ] Define Pi health/backup/recovery requirements.
-- [ ] Define Publisher v1 Pi acceptance test.
-- [ ] Update Homey API load map after each later ownership transfer.
+- [ ] Capture only the missing exact active Homey contracts using the bounded targeted-read procedure.
+- [x] Define canonical Central State schema v0.1.
+- [x] Define initial Homey Gateway boundary.
+- [x] Define deterministic replay/shadow comparison foundation.
+- [x] Define Docker service layout and configuration/secrets strategy.
+- [x] Define Pi health/backup/recovery requirements.
+- [x] Add SHADOW-only read-only Management API baseline.
+- [ ] Capture exact Publisher v1.0.11 and update Publisher acceptance tests from the exact active source.
+- [ ] Capture WW v0.2/Gate v0.2/Actuator v0.9 exact active contracts and update replay coverage.
+- [ ] Evaluate Core Snapshot Aggregator v0.1 SHADOW as the preferred Homey→Pi commissioning feed.
+- [ ] Replace remaining broad Logic assumptions with an explicit minimal Logic allow-list.
+- [ ] Establish and record the Pi commissioning Homey read budget before real Pi polling is enabled.
+- [ ] Add representative runtime fixtures (idle/night, PV production, EV connected-paused, EV charging, WW ON/OFF; Quooker only after adaptation).
+- [ ] Update Homey API/load map after each later ownership transfer.
 
 ## Hard constraint
-This preparation document does not authorize any Homey flow disablement, actuator ownership change, or LIVE Pi device write.
+This preparation document does not authorize any Homey flow disablement, actuator ownership change, or LIVE Pi device write. Homey contract capture and commissioning must follow the targeted, bounded, cached and fail-fast read policy; no brute-force Homey access is permitted.
