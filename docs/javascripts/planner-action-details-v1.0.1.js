@@ -17,7 +17,7 @@
   const apply=data=>{
     style();
     const p=unwrap(data),actions=Array.isArray(p?.plan?.actions)?p.plan.actions:[],tesla=p?.inputs?.tesla||{};
-    const policy=String(tesla?.opportunityPolicy||''),threshold=Number(tesla?.opportunityMinW||800),deadline=tesla?.deadlineActive===true;
+    const policy=String(tesla?.opportunityPolicy||'').toUpperCase(),startThreshold=Number(tesla?.opportunityStartMinW||4830),continueThreshold=Number(tesla?.opportunityContinueMinW||4140),deadline=tesla?.deadlineActive===true;
     const section=[...root.querySelectorAll('.ps-section')].find(s=>s.querySelector('h2')?.textContent?.trim()==='Prijs & planneracties');
     const row=[...(section?.querySelectorAll('.ps-action-row')||[])].find(r=>r.querySelector('.ps-action-name')?.textContent?.trim()==='Tesla');
     if(!row)return;
@@ -26,15 +26,19 @@
       const g=groups[idx]; if(!g)return; const [start,end]=g,slots=actions.slice(start,end),first=actions[start],last=actions[end-1];
       const endIso=last?.end||new Date(new Date(last.start).getTime()+15*60000).toISOString(),mins=(end-start)*15;
       const raw=String(first?.tesla||'—').replaceAll('_',' '),rawUpper=raw.toUpperCase();
-      const why=(deadline||rawUpper.includes('DEADLINE')||rawUpper.includes('MUST'))?'Deadline':policy==='PV_SURPLUS_ONLY'?'PV opportunity':'Tesla forecast';
+      const isDeadline=deadline||rawUpper.includes('DEADLINE')||rawUpper.includes('MUST');
+      const isOpportunity=!isDeadline&&(policy.includes('PV_SURPLUS')||rawUpper.includes('OPPORTUNITY'));
+      const why=isDeadline?'Deadline':isOpportunity?'PV opportunity':'Tesla forecast';
       const surplusVals=slots.map(a=>Math.max(0,Number(a?.pvSurplusBeforeFlexW)||0)),minSurplus=Math.min(...surplusVals),maxSurplus=Math.max(...surplusVals);
-      const pvValid=why!=='PV opportunity'||slots.every(a=>Number(a?.pvSurplusBeforeFlexW||0)>=threshold);
+      const pvValid=!isOpportunity||(surplusVals[0]>=startThreshold&&surplusVals.slice(1).every(v=>v>=continueThreshold));
       const power=targetW(first),kwh=power?power*mins/60000:null;
       seg.classList.toggle('ps-action-invalid',!pvValid);seg.tabIndex=0;
       seg.textContent=(end-start)>=3?`${time(first.start)}–${time(endIso)}`:'';
       const pop=document.createElement('div');pop.className='ps-action-popover';
-      const status=pvValid?'Geldig volgens huidige policy':`LET OP: minstens één slot < ${fmt(threshold)} W PV-overschot`;
-      pop.innerHTML=`<strong>Tesla · ${why}</strong><div>${time(first.start)}–${time(endIso)} · ${mins} min</div><div>PV-overschot: ${fmt(minSurplus)}–${fmt(maxSurplus)} W</div><div>PV-drempel: ${fmt(threshold)} W</div><div>Planvermogen: ${power?`${fmt(power)} W`:'niet gepubliceerd'}</div><div>Planbare energie: ${kwh?`ca. ${fmt(kwh,2)} kWh`:'niet betrouwbaar berekenbaar'}</div><div>Validatie: ${status}</div><div>Planneractie: ${raw}</div>`;
+      const status=isDeadline?'Geldig deadline-slot volgens huidige policy':pvValid?'Geldig volgens huidige opportunity-policy':`LET OP: start vereist ≥ ${fmt(startThreshold)} W en vervolgslots ≥ ${fmt(continueThreshold)} W PV-overschot`;
+      const thresholdLine=isDeadline?'<div>Opportunity-drempel: n.v.t. bij deadline</div>':isOpportunity?`<div>PV-startdrempel: ${fmt(startThreshold)} W</div><div>PV-doorgaan-drempel: ${fmt(continueThreshold)} W</div>`:'<div>Opportunity-drempel: n.v.t.</div>';
+      const reason=isDeadline?(maxSurplus>=startThreshold?'PV-overschot vóór deadline':'Deadline vereist energie; slot geselecteerd via deadline-optimalisatie'):(isOpportunity?'PV-overschot voldoet aan opportunity-hysterese':'Plannerforecast');
+      pop.innerHTML=`<strong>Tesla · ${why}</strong><div>${time(first.start)}–${time(endIso)} · ${mins} min</div><div>PV-overschot: ${fmt(minSurplus)}–${fmt(maxSurplus)} W</div>${thresholdLine}<div>Reden: ${reason}</div><div>Planvermogen: ${power?`${fmt(power)} W`:'niet gepubliceerd'}</div><div>Planbare energie: ${kwh?`ca. ${fmt(kwh,2)} kWh`:'niet betrouwbaar berekenbaar'}</div><div>Validatie: ${status}</div><div>Planneractie: ${raw}</div>`;
       seg.append(pop);
       seg.title='';
       seg.addEventListener('click',e=>{e.stopPropagation();seg.classList.toggle('ps-popover-open');});
