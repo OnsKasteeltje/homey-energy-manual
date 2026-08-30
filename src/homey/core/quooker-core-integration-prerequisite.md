@@ -1,88 +1,88 @@
 # Quooker — Core integration prerequisite
 
-Status: **SEMANTIC COMMIT MARKER DESIGN FROZEN / HOMEY PROVISIONED / PRODUCER UPDATE BLOCKED BY 429**
+Status: **SEMANTIC COMMIT PRODUCER v0.4 DEPLOYED DISABLED / SHADOW VALIDATION PENDING**
 
-Date: 2026-08-29
+Date: 2026-08-30
 
 ## Project decision
 
 The current Quooker signal path must **not** be used directly as an event-driven source for Core v0.11b or the Core Snapshot Aggregator.
 
-`EM_Quooker_Last_Sample` is currently coupled to the frequent P1/heartbeat path. Using that variable directly as an aggregator trigger would cause a high-frequency wake-up and refresh of the Quooker input group. That would add avoidable Logic reads and fan-out, undermining the Homey low-load/throttling objective.
+`EM_Quooker_Last_Sample` is coupled to the former frequent P1/heartbeat path. Using that variable directly as an aggregator trigger would cause unnecessary wake-ups and fan-out.
 
-Therefore Quooker integration remains explicitly blocked until the producer emits the low-load semantic commit described below.
+Canonical marker: `EM_Quooker_Commit` (`f1b9000f-9f98-480e-89a5-7518d7b82a6c`).
 
 ## Low-load semantic commit contract
 
-Canonical marker:
+Schema: `EM_QUOOKER_COMMIT_V0.1`.
 
-`EM_Quooker_Commit`
+The commit contains `generatedAt`, `semanticRevision`, `lastSample`, `active`, `powerW`, `status`, `switchOn`, `baselineL3W`, `lastTransition`, `lastHeatingAt`, `lastHeatingPowerW`, and `transitionHistory`.
 
-Schema:
+A new commit is written only when the effective semantic payload changes or when the previous commit requires the 120-second freshness keepalive. `generatedAt` and `lastSample` are excluded from the semantic signature. `semanticRevision` increments only for a semantic payload change.
 
-```json
-{
-  "schema": "EM_QUOOKER_COMMIT_V0.1",
-  "generatedAt": "2026-08-29T00:00:00.000Z",
-  "semanticRevision": 1,
-  "lastSample": "2026-08-29T00:00:00.000Z",
-  "active": false,
-  "powerW": 0,
-  "status": "UNKNOWN",
-  "switchOn": false,
-  "baselineL3W": null,
-  "lastTransition": null,
-  "lastHeatingAt": null,
-  "lastHeatingPowerW": null,
-  "transitionHistory": []
-}
-```
+## Homey producer v0.4
 
-The Quooker producer must build this object from values it already has in memory. It must not perform a second set of Logic reads merely to construct the commit.
+Advanced Flow: `04a713a5-105e-439a-a93a-441fb2ca50b4`
 
-### Commit rules
+Name: `EM v2 | 01 Quooker Detector | v0.4 LOW-LOAD SEMANTIC COMMIT SHADOW`
 
-A new commit is written only when either:
+Deployment state on 2026-08-30: `enabled=false`, `broken=false` as returned directly by the update operation.
 
-1. the effective semantic Quooker payload changes; or
-2. the previous commit is old enough that a freshness keepalive is required.
+Runtime design:
 
-`generatedAt` and the raw heartbeat/sample timestamp are excluded from the semantic signature. `semanticRevision` increments only for a semantic payload change, not for a keepalive-only refresh.
+- two-minute schedule plus manual start;
+- one targeted Logic read: `EM_Quooker_Commit`;
+- two targeted device reads in parallel: Cooker switch and P1;
+- maximum one Logic write per run: `EM_Quooker_Commit`;
+- no `Homey.logic.getVariables()`;
+- no discovery calls;
+- no P1 heartbeat dependency;
+- no physical device writes;
+- Cooker `onoff` remains authoritative for OFF/ON;
+- P1 L3 delta remains the heating/power signature;
+- baseline smoothing remains limited to Cooker OFF state;
+- transition history remains bounded to eight entries;
+- last-heating timestamp is updated on transition into HEATING rather than on every heating sample.
 
-The keepalive target is **120 seconds**. This is deliberately below Core's existing **150-second Quooker freshness gate**, preserving freshness semantics while preventing a commit on every P1 heartbeat.
+The previous v0.3 legacy-variable fan-out is intentionally not reproduced in v0.4. The compact commit is the new publication boundary. Existing production consumers are not cut over yet, which is why v0.4 remains disabled during SHADOW validation.
 
-The producer remains the business owner of Quooker interpretation. The commit is only a compact publication boundary; it must not introduce new policy or device writes.
+## Homey API discipline used for deployment
+
+The deployment followed `docs/architecture/homey-api-access-guidelines.md`:
+
+1. one targeted pre-change read of the existing Quooker Advanced Flow;
+2. one Advanced Flow update;
+3. no separate post-read because the update response itself returned the complete updated Flow and confirmed `enabled=false` and `broken=false`.
+
+No autocomplete/discovery burst, Flow start, physical write, or additional Homey verification call was performed.
 
 ## Aggregator integration after producer validation
 
-Once the producer emits `EM_Quooker_Commit` correctly:
+After a controlled SHADOW producer run validates the commit:
 
-- the Core Snapshot Aggregator triggers on `EM_Quooker_Commit changed`, never on `EM_Quooker_Last_Sample`;
-- the aggregator performs one targeted read of `EM_Quooker_Commit`, rather than rereading all ten Quooker Logic variables;
-- it maps the commit payload into `EM2_Core_Input.sources.quooker`;
-- existing aggregator lease and semantic-write suppression remain in force;
-- hourly FULL reconciliation remains a temporary safety net during SHADOW validation.
-
-This changes the Quooker event cost from roughly ten source reads per trigger to one compact source read, while also reducing trigger frequency.
-
-## Homey implementation state
-
-The one-shot v0.11b provisioning flow has been updated and executed once to create `EM_Quooker_Commit` if missing. The provisioning flow was disabled immediately afterwards and remains `broken=false`.
-
-No production Core, Quooker detector, heartbeat, aggregator Quooker trigger, device or actuator behavior was changed in that provisioning step.
-
-The next read-only Homey autocomplete lookup, intended to resolve the newly created variable's stable ID before embedding it in producer code, returned `429 Too many requests`. Per the project throttling rule, no retry was attempted. Therefore the producer update is deliberately deferred until Homey is responsive again.
+- trigger the Core Snapshot Aggregator on `EM_Quooker_Commit changed`, never `EM_Quooker_Last_Sample`;
+- perform one targeted read of the commit;
+- map it into `EM2_Core_Input.sources.quooker`;
+- retain existing lease/semantic suppression;
+- retain hourly FULL reconciliation temporarily during SHADOW validation.
 
 ## Acceptance gate
 
-Quooker may be promoted into the event-driven v0.11b path only after all of the following pass:
+Completed:
 
-- `EM_Quooker_Commit` stable Logic ID resolved;
-- producer writes commit from already-computed values, with no extra broad Logic scan;
-- semantic changes produce an immediate commit;
-- unchanged state produces at most the 120-second freshness keepalive;
-- aggregator reads one compact commit value per Quooker event;
-- parity against the existing ten Quooker source values is demonstrated;
-- no material CPU or 429/rate-limit regression is observed.
+- stable ID resolved;
+- v0.4 producer deployed disabled;
+- broad Logic scan removed;
+- heartbeat dependency removed;
+- commit construction uses canonical previous state and targeted device reads only.
 
-Until these criteria pass, Quooker remains a **hard prerequisite / blocker for production cut-over of Core v0.11b**.
+Still required before production v0.11b cut-over:
+
+- controlled SHADOW run of v0.4;
+- validate commit schema and values;
+- validate semantic-change behavior and 120-second keepalive;
+- wire aggregator to `EM_Quooker_Commit changed` with one compact read;
+- parity against legacy Quooker semantics;
+- confirm no material CPU or 429/rate-limit regression.
+
+Until those criteria pass, Quooker remains a blocker for production cut-over of Core v0.11b.
