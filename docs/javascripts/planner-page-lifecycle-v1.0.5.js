@@ -14,6 +14,7 @@
         if(!ok){loaded.delete(root);return;}
       }
       await loadScript('../javascripts/planner-axes-v1.1.0.js?lifecycle=6').catch(()=>{});
+      await loadScript('../javascripts/planner-price-availability-v1.0.0.js?lifecycle=1').catch(()=>{});
       await loadScript('../javascripts/planner-ww-multislot-v1.0.0.js?lifecycle=6').catch(()=>{});
       await loadScript('../javascripts/planner-flex-energy-v1.0.0.js?lifecycle=6').catch(()=>{});
       await loadScript('../javascripts/planner-action-details-v1.0.1.js?lifecycle=7').catch(()=>{});
