@@ -1,0 +1,46 @@
+{
+  "schema": "EM2_PHASE_TOPOLOGY_V0.1",
+  "updatedAt": "2026-08-30T12:00:00+02:00",
+  "source": "HOMEY_INSIGHTS_P1_EDGE_CORRELATION",
+  "status": "PARTIALLY_VALIDATED",
+  "mainConnection": {
+    "phases": 3,
+    "fuseA": 25
+  },
+  "loads": {
+    "boiler": {
+      "phase": "L2",
+      "phases": 1,
+      "nominalPowerW": 1950,
+      "observedPowerRangeW": [1900, 2050],
+      "observedCurrentA": 8.5,
+      "confidence": "HIGH",
+      "validation": {
+        "method": "Correlatie van onafhankelijke boiler ON/OFF-flanken met P1-fasevermogen in Homey Insights",
+        "date": "2026-08-30",
+        "evidence": [
+          {
+            "event": "OFF",
+            "localTime": "12:15",
+            "deltaW": {"L1": -61, "L2": -1742, "L3": 103}
+          },
+          {
+            "event": "ON",
+            "localTime": "10:16",
+            "deltaWApprox": {"L2": 1910}
+          }
+        ]
+      }
+    },
+    "teslaEasee": {
+      "phase": "L1+L2+L3",
+      "phases": 3,
+      "confidence": "CONFIRMED_DEVICE_TOPOLOGY",
+      "note": "Per-phase current capabilities are available in Homey; runtime phase-aware headroom model is not yet implemented in Planner."
+    }
+  },
+  "planner": {
+    "phaseAwareHeadroom": false,
+    "status": "INPUT_TOPOLOGY_READY_FOR_NEXT_PLANNER_ITERATION"
+  }
+}
