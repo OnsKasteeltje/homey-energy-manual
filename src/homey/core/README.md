@@ -7,14 +7,26 @@ This directory is the versioned source baseline and change staging area for the 
 - Current live Homey generation is newer than that historical capture; never deploy from `core-v0.10.14.js` as a full replacement.
 - Safety: Core is SHADOW/read-only and must not perform physical device writes.
 
-## Prepared next change
+## Current live / prepared next change
 
-Core v0.11c thermostat verification is prepared in GitHub but is **not deployed to Homey**:
+Current live Homey Core observed on 2026-08-30:
 
-- `core-v0.11c-thermostat-verification.patch.md` — exact bounded-control design and deployment delta.
-- `smoke-v0.11c-thermostat-verification.md` — natural-cycle smoke/acceptance plan.
+`EM v2 | 00 Core Tick | v0.11c (Thermostat Verification)`
 
-The v0.11c design keeps one authoritative `EM2_Control_WW` decision/write. It must not publish a transient `BOILER_OFF` and correct it afterwards. Thermostat verification is bounded to 20 minutes and cannot override MUST-OFF, 19:00, stale/invalid P1 or unsafe import conditions.
+A natural run on 2026-08-30 exposed a v0.11c re-arm defect: `thermostatVerifyConsumedRunKey` is scoped to the complete physical boiler ON-run. Once one bounded verification episode is consumed, a materially later discretionary OFF during the same physical run can no longer start a new verification, even after the earlier stop condition cleared and the boiler continued confirmed heating.
+
+Core v0.11d is now prepared in GitHub and is **not deployed to Homey**:
+
+- `core-v0.11d-thermostat-verification-rearm.candidate.md` — edge-based verification episode/re-arm design.
+- `smoke-v0.11d-thermostat-verification-rearm.md` — offline regression and later natural-cycle acceptance plan.
+
+The v0.11d design retains the 20-minute hard bound but replaces the physical-run-wide consumed policy gate. Re-arm occurs only after the discretionary stop request has genuinely cleared (`true -> false`) for a normal Core tick while the boiler remains ON with confirmed >1500 W heating. A later new `false -> true` stop edge may then start exactly one fresh bounded verification. Continuously pending OFF conditions cannot renew verification windows.
+
+Historical v0.11c preparation files remain for audit/history:
+
+- `core-v0.11c-thermostat-verification.patch.md`
+- `core-v0.11c-thermostat-verification.candidate.md`
+- `smoke-v0.11c-thermostat-verification.md`
 
 ## Change rule
 
