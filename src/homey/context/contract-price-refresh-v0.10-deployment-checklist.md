@@ -1,17 +1,30 @@
 # Contract Price Adapter v0.10 — deployment gate
 
-Status: **PREPARED OUTSIDE HOMEY / NOT DEPLOYED**
+Status: **IMPLEMENTATION CANDIDATE READY OUTSIDE HOMEY / NOT DEPLOYED**
 
 ## Prepared artifacts
 
 - `contract-price-refresh-v0.10-logic.js` — pure eligibility, cooldown, normalization and semantic-change logic.
 - `contract-price-refresh-v0.10-tests.js` — offline acceptance suite for the agreed A–G scenarios plus degraded-response protection.
-- Existing design baseline: `contract-price-adapter-v0.10-event-refresh-preparation.md`.
+- `contract-price-adapter-v0.10-event-refresh-preparation.md` — design baseline.
+- `contract-price-adapter-v0.10-event-refresh.candidate.md` — concrete Homey deployment candidate with eligibility gate, post-fetch semantic processor, targeted IDs and deployment sequence.
+
+## PBTH trigger resolved
+
+The current PBTH Day-Ahead 15m E Prices device exposes the WHEN card:
+
+**`New prices received for period`**
+
+The existing v0.9 action remains:
+
+**`prices_json(next_hours)`**
+
+The trigger card is treated only as an opportunity signal; the `<12 h` admission gate and cooldown determine whether the action card may actually be called.
 
 ## Required deployment topology
 
 ```text
-PBTH new-prices event
+PBTH New prices received for period
         |
         v
 eligibility gate
@@ -45,14 +58,15 @@ Do not deploy until all are true:
 
 1. No other ChatGPT/Homey call sequence is active.
 2. Homey is not rate-limited.
-3. Exact PBTH native `new prices received` trigger card is discovered once.
-4. Existing v0.9 flow ID and targeted Logic IDs are reused; no broad rediscovery.
-5. Provision exactly one new Logic text variable only if the event-state variable is still required:
+3. Existing v0.9 flow ID and targeted Logic IDs are reused; no broad rediscovery.
+4. Provision exactly one new Logic text variable:
    `EM2_ContractPrice_EventRefresh_State`.
-6. Initial deployment is disabled/SHADOW.
-7. Existing scheduled 15-minute v0.9 path remains unchanged as fallback.
-8. No physical actuator/device writes are introduced.
-9. Stop immediately on HTTP 429; no retry.
+5. Capture that variable's ID once and insert it into both event scripts.
+6. Add `priceSeries: prices` to the scheduled canonical context so value-level semantic comparison is possible.
+7. Initial event branch is disabled/SHADOW.
+8. Existing scheduled 15-minute v0.9 path remains unchanged in cadence and available as fallback.
+9. No physical actuator/device writes are introduced.
+10. Stop immediately on HTTP 429; no retry.
 
 ## Acceptance gate before enablement
 
