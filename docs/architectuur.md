@@ -1,6 +1,8 @@
 # Architectuuroverzicht
 
-Deze pagina beschrijft de **actuele gecodeerde architectuur van Energy Core v2**. Procesflows en statusbeschrijvingen op deze site moeten altijd overeenkomen met de productiecode; een toekomstige doelarchitectuur wordt expliciet als SHADOW of toekomstig gemarkeerd.
+> **Current-state authority:** actuele procesflows en statusclaims op deze pagina moeten worden gelezen tegen `docs/architecture/homey-runtime-baseline-2026-08-30.md` en `docs/architecture/current-runtime-source-policy.md`. Voor Core is `src/homey/core/core-v0.11f.live-homey.js` de exacte actuele bron. Historische candidate/patch/smoke/rollback-bestanden zijn geen huidige architectuur.
+
+Deze pagina beschrijft de **actuele gecodeerde architectuur van Energy Core v2**. Procesflows en statusbeschrijvingen moeten overeenkomen met de productiecode; toekomstige of historische architectuur wordt expliciet gemarkeerd.
 
 ## 1. Hoofdstructuur
 
@@ -10,11 +12,10 @@ FYSIEKE INSTALLATIE / VEILIGHEID
                     │
                     ▼
                METEN / STATE
-P1 · PV · Easee · boiler · Quatt · overige relevante devices
+P1 · PV · Easee · boiler · Quatt · relevante devices
                     │
-           centrale Core-snapshot / 5 min
                     ▼
-             ENERGY CORE v2
+        ENERGY CORE v2 — v0.11f / 5 min
                     │
         ┌───────────┼───────────┐
         ▼           ▼           ▼
@@ -29,44 +30,21 @@ Ondersteunende planningslaag:
 Contract-/prijscontext · Tesla/WW-verplichtingen · PV-context
                     │
                     ▼
-      24h Energy Planner SHADOW / 15 min
+  24h Energy Planner v0.4.9 SHADOW LOW-LOAD
                     │
                     ▼
-  kostenvensters + flexplanning + Victron SHADOW-scenario
-                    │
-                    └──► uitsluitend Logic-state / advies
-
-Bediening/configuratie:
-Website selector / Tesla deadline
-          │
-          ▼
-PIN → Cloudflare Worker → GitHub command
-          │
-          ▼
-Homey Settings Sync → canonieke Logic-state
-          │
-          ▼
-Core / productiecontrol → Publisher → website
+        plan/intents · geen fysieke writes
 ```
 
 De Energy Manager ligt niet in het fysieke stroompad. Installatieveiligheid, lokale apparaatbeveiligingen en Easee Equalizer blijven hoger in de hiërarchie.
 
-## 2. Single-reader meetlaag en Homey-belasting
+## 2. Core en Homey-belasting
 
-De Core draait op vijfminutencadans. Per Core Tick geldt als harde ontwerpgrens maximaal één volledige Homey-device-snapshot en één Logic-snapshot. Downstream-logica pollt dezelfde devices niet opnieuw wanneer de informatie al beschikbaar is.
+De actuele Core is `EM v2 | 00 Core Tick | v0.11f (Planner Tesla Headroom)` en draait iedere vijf minuten plus handmatige start. De exacte runtime staat in `src/homey/core/core-v0.11f.live-homey.js`.
 
-Voor sneller veranderende signalen mag een **gerichte event-assisted detector** worden gebruikt wanneer de vijfminutencadans onvoldoende is. Zo'n detector mag geen nieuwe korte-interval `getDevices()`-scan introduceren.
+De live Core doet gerichte reads van de bekende devices, maar voert **nog steeds één brede `Homey.logic.getVariables()` enumeratie per Core-run** uit. Dit is een bekende resterende Homey-load/throttling-optimalisatie en mag in documentatie niet worden voorgesteld alsof Core al volledig targeted/event-driven is.
 
-Bindende volgorde voor nieuwe functionaliteit:
-
-```text
-1. Signaal al in Core-snapshot? → hergebruik
-2. Gerichte event-trigger mogelijk? → event-driven/event-assisted
-3. Vijfminuten-Core kan het meenemen? → centrale read uitbreiden
-4. Alleen anders → expliciete aanvullende poller
-```
-
-De website veroorzaakt geen Homey-devicepolling. De nieuwe settings-write-route schrijft uitsluitend expliciete gebruikersconfiguratie en is daarmee gescheiden van de meetlaag.
+Core voert geen fysieke device-writes uit. Fysieke aansturing blijft downstream via Power Intent / adapter / gate / actuator ownership.
 
 ## 3. Waarheidsbronnen en meetvaliditeit
 
@@ -77,135 +55,100 @@ P1 < 0 W → netto export
 P1 > 0 W → netto import
 ```
 
-De meetvaliditeit is bewust gesplitst:
+P1 blijft autoritatief voor het realtime flexbudget. PV/huisreconstructie, Quooker-data en overige afgeleide belastingen ondersteunen state/diagnostiek maar mogen een geldige P1-gate niet vervangen.
 
-- `gridMeasurementValid`: verse/geldige P1-netmeting en autoritatieve gate voor import, export en flex-exportbudget;
-- `derivedHouseBalanceValid`: gereconstrueerde P1+PV/huisbalans, uitsluitend voor `house_load`, residual/Overig en diagnostiek.
+Live Core v0.11f bevat Quooker Logic-data opnieuw in state/diagnostiek en `knownMeasuredLoadW`. Dit vervangt oudere ontwerpteksten waarin Quooker volledig uit Core werd verwijderd.
 
-Harde invariant:
+## 4. Rollen en fysieke ownership
 
-```text
-P1 geldig + SOURCE_SKEW in PV/huisreconstructie
-→ flex-exportbudget blijft bruikbaar
-→ afgeleide huis/Overig-diagnostiek degradeert
+| Verbruiker | Architectuurrol | Actuele ownership |
+|---|---|---|
+| Normaal huishouden | basislast | geen EMS-actuator |
+| Quatt | comfort-baseload | observe-only |
+| Boiler | flexload met comfortdoel | `Warm Water Actuator v0.9 TARGETED-READ LIVE` |
+| Tesla | deadline/opportunity flexload | `EV Power v0.2.2 TARGETED-READ LIVE OWNERSHIP` |
+| Quooker | gemeten/afgeleide load | geen actuele Core-actuatorownership |
+| Victron-batterij | toekomstige batterijoptimizer | Victron DESS/ESS na installatie; Planner nu SHADOW |
 
-P1 stale/ongeldig
-→ flex-exportbudget = 0 W (fail-closed)
-```
+Per fysieke actuator bestaat exact één automatische writer. Historische/replaced writers worden niet als huidige ownership gedocumenteerd.
 
-Voor Quooker zijn de waarheidsbronnen gescheiden: Homey switch voor beschikbaar/aan-uit; P1/L3 voor daadwerkelijk verwarmen en vermogen.
+## 5. Tesla en projected-grid headroom
 
-## 4. Rollen van energieverbruikers
-
-| Verbruiker | Architectuurrol | Flexibel? | Fysieke v2-Control |
-|---|---|---:|---|
-| Normaal huishouden | basislast | nee | n.v.t. |
-| Quatt | `COMFORT_BASELOAD` | voorlopig nee | `OBSERVE_ONLY` |
-| Boiler | flexload met comfortdoel | ja | bronkeuze productie-actief; actuatorroute gefaseerd |
-| Tesla | flexload met deadline/opportunity | ja | afzonderlijke productiewriter |
-| Quooker | comfort/gebruikspatroon + gemeten load | beperkt | bestaande Quooker-flows; detector observe-only |
-| Victron-batterij | energie-/netbuffer | ja | later via Victron EMS/ESS; nu SHADOW-simulatie |
-
-## 5. Centraal vermogensbudget en Decision-prioriteit
+Core v0.11f gebruikt voor Planner Tesla-admission:
 
 ```text
-flex_export_budget
- = max(0,
-       P1_export
-       - grid_safety_reserve
-       - quatt_ramp_reserve)
+PLANNER_TESLA_MIN_POWER_W = 4140 W
+projectedGridW = currentGridW + 4140 W
+admission toegestaan wanneer projectedGridW <= 4000 W
 ```
 
-De actuele gridreserve is 200 W. Het budget wordt uitsluitend vrijgegeven bij `gridMeasurementValid=true`.
+Dit vervangt de eerdere onmogelijke vrije-importbudget-guard. MUST/latest-start catch-up behoudt prioriteit boven Planner opportunity/admission. Easee Equalizer blijft autonoom de lokale elektrische grens bewaken.
 
-Beslisprioriteit:
+## 6. Contract- en prijsarchitectuur
+
+Actuele productiebridge:
 
 ```text
-1. Installatieveiligheid en lokale hardwarebeveiliging
-2. Comfort-baseload
-3. Harde doelen/MUST
-4. Economische flex-opportunities
-5. Rest naar net / later Victron-batterijbeleid
+Website FIXED/DYNAMIC
+        │
+        ▼
+EMS Settings Sync v0.4 TARGETED 15-MIN LOW-LOAD
+        │
+        ▼
+EMS_ContractType
+        │
+        ▼
+Contract Price Adapter v0.10 FIXED+DYNAMIC LOW-LOAD
+        │
+        ├── FIXED   → FIXED_CONFIG_TARGETED / STATIC
+        └── DYNAMIC → PBTH prijscontext
+        │
+        ▼
+EM2_Contract_Type + EM2_ContractPrice_Context
+        │
+        ▼
+Core / Planner
 ```
 
-Tesla- en warmwaterverplichtingen gaan vóór economische optimalisatie.
+Bij FIXED wordt PBTH niet aangeroepen. Core consumeert `EM2_ContractPrice_Context`, `EM2_Contract_Type` en `TEMP_PBTH_JSON_BUFFER`; `EMS_ContractType` wordt niet rechtstreeks door Core gelezen. Legacy `M7_Price_*`/M7-contextsignalen bestaan nog als fallback/legacy input en zijn daarom nog een consolidatiepunt.
 
-## 6. Contract-aware prijsarchitectuur
+De geplande PBTH `<12h` event-refresh is een afzonderlijke DYNAMIC-only verbetering en is pas actuele architectuur nadat die is geïmplementeerd en gereconcilieerd.
 
-Prijsoptimalisatie wordt geconsolideerd rond de geïsoleerde `EM2_ContractPrice_*` interface. De beslislaag ondersteunt `FIXED` en `DYNAMIC`.
+## 7. Warm water en bronkeuze
+
+De websitebronselector is productie-actief:
 
 ```text
-EM v2 | 40 Decision | Contract-aware v0.2
-controlMode = SHADOW_CANDIDATE
-noActuatorWrites = true
+Website BOILER/CV
+      │
+PIN → Worker → GitHub command
+      │
+      ▼
+EMS Settings Sync v0.4
+      │
+      ├── EMS_HotWaterSource
+      └── WW_Boilermodus
+             │
+             ▼
+         Core v0.11f
+             │
+             ▼
+Warm Water Actuator v0.9 LIVE
 ```
 
-De website kan het contracttype inmiddels als beveiligde EMS-instelling schrijven. De volledige productie-cut-over is nog niet afgerond: resterende legacy `M7_Price_*`-afhankelijkheden, met name in Tesla-productie, moeten worden verwijderd zodat uitsluitend de contract-aware context leidend is.
+`WW_Boilermodus` is een directe, safety-critical Core-input. Een FIXED↔DYNAMIC contractwijziging mag deze variabele niet wijzigen. De gecontroleerde DYNAMIC→FIXED acceptatie op 30 augustus 2026 bevestigde deze scheiding.
 
-Bij `FIXED` mogen dynamische prijsclassificaties geen productiegedrag veroorzaken. Dit is een expliciet regressiecriterium.
+Core behoudt de WW goal/thermostaatverificatie: verwarming moet eerst bevestigd zijn; een natuurlijke thermostaatstop wordt pas na de bevestigingsperiode als goal/on-temperature verwerkt. De fysieke actuatorroute blijft downstream van die Core-beslissing.
 
-## 7. Warm water — actuele productiebronkeuze
+## 8. EMS Settings Sync
 
-De eerdere architectuurtekst waarin `BOILER ↔ CV` alleen SHADOW/advies was, is **vervallen**. De bronselector is nu productie-actief en E2E gevalideerd.
-
-Actuele keten:
+Actuele configuratieflow:
 
 ```text
-Website: BOILER ↔ CV
-        │
-        ▼
-PIN-beveiliging
-        │
-        ▼
-Cloudflare Worker
-        │
-        ▼
-docs/data/ems-settings-command.json
-        │
-        ▼
-EM v2 | 05 Config | EMS Settings Sync v0.2
-        │
-        ▼
-WW_Boilermodus
-        │
-        ▼
-Energy Core v2
-        │
-        ├── CV     → elektrische boilercontrol BLOCKED_MODE
-        │
-        └── BOILER → normale WW timing/opportunity/deadline-logica
-        │
-        ▼
-Publisher → energy-state-v2.json → website
+EM v2 | 05 Config | EMS Settings Sync v0.4 TARGETED 15-MIN LOW-LOAD
 ```
 
-`WW_Boilermodus` blijft de canonieke Homey-runtimevariabele, maar wordt nu door de beveiligde websiteconfiguratie gevoed. De website schrijft dus geen actuator aan; zij schrijft een expliciete configuratieopdracht die Homey valideert en vertaalt naar canonieke Logic-state.
-
-### E2E-validatie 23 augustus 2026
-
-Beide richtingen zijn live gevalideerd:
-
-```text
-BOILER → CV
-website → PIN → Worker → GitHub → Settings Sync
-→ WW_Boilermodus=false → Core BLOCKED_MODE → Publisher
-
-CV → BOILER
-website → PIN → Worker → GitHub → Settings Sync
-→ WW_Boilermodus=true → Core normale WW-regels → Publisher
-```
-
-Na terugschakelen naar Boiler gaf de runtime terecht `AFTER_DEADLINE`: de bron stond weer op Boiler, maar na 19:00 werd geen nieuwe elektrische warmwater-run gestart.
-
-## 8. EMS Settings Sync en configuratiewaarheid
-
-Actieve configuratieflow:
-
-```text
-EM v2 | 05 Config | EMS Settings Sync v0.2
-```
-
-De sync leest primair via de authenticated GitHub Contents API met de bestaande status-tokenroute. Raw GitHub is alleen fallback. Dit voorkomt dat een nieuwe gebruikersopdracht door raw-content caching vertraagd wordt verwerkt.
+De flow gebruikt stabiele Logic-ID's en targeted reads, geen brede Logic- of device-enumeratie. De normale no-op route schrijft niets wanneer requestId en gewenste toestand al overeenkomen.
 
 Ondersteunde instellingen:
 
@@ -214,89 +157,93 @@ hotWaterSource = BOILER | CV
 contractType   = FIXED | DYNAMIC
 ```
 
-Canonieke vertaling:
+De configuratieroute schrijft geen fysieke actuator.
+
+## 9. 24h Energy Planner
+
+Actuele planner:
 
 ```text
-hotWaterSource → WW_Boilermodus
-contractType   → EMS_ContractType
+EM v2 | 45 Planner | 24h Energy Plan v0.4.9 SHADOW LOW-LOAD
 ```
 
-Een selectorwijziging is zelf de opdracht: er is geen verborgen aparte knop `Instellingen opslaan`. Na selectie wordt direct de PIN-route gestart. Bij annuleren/falen wordt de laatst bevestigde waarde hersteld.
+De Planner is actief als SHADOW-planningslaag. `SHADOW` betekent hier niet obsolete: hij levert actuele plan/intents, maar verricht geen fysieke device-writes. Core blijft realtime safety-arbiter voor WW en Tesla.
 
-## 9. Tesla
-
-Tesla gebruikt deadline/MUST vóór opportunity-control. Easee Equalizer blijft autonoom de feitelijke laadstroom en lokale elektrische veiligheid begrenzen.
-
-De deadline-write-route en de EMS-settingsroute gebruiken hetzelfde beveiligingsprincipe met PIN + Cloudflare Worker. De Tesla-productieflow heeft een FIXED-gate gekregen zodat legacy dynamische prijssignalen bij een vast contract niet bedoeld zijn als productietrigger. Definitieve consolidatie naar uitsluitend de contract-aware prijsinterface blijft een open pre-Victron actie.
-
-Voor Easee geldt: FLASH-belastende persistente configuratieacties worden niet gebruikt voor frequente automatische regeling. Dynamische laadstroomsturing en de autonome Equalizer-functie blijven daarvan gescheiden.
-
-## 10. 24h Energy Planner — pre-Victron SHADOW
-
-Actieve flow:
+Vereenvoudigde actuele keten:
 
 ```text
-EM v2 | 45 Planner | 24h Energy Plan v0.2 SHADOW
-cadans = 15 min + 45 s stagger
-controlMode = SHADOW
-noActuatorWrites = true
+State + contract/prijs + Tesla/WW doelen + PV-context
+                         │
+                         ▼
+              Planner v0.4.9 SHADOW
+                         │
+                  plan / slot intents
+                         │
+                         ▼
+                   Core v0.11f
+                         │
+                realtime safety/gates
+                         │
+                         ▼
+                 downstream writers
 ```
 
-Het actuele simulatiescenario:
+## 10. Actuele EV- en WW-lagen
+
+EV:
 
 ```text
-MultiPlus-II 48/5000/70-50
-Cerbo GX MK2
-VM-3P75CT
-3 × Pylontech US5000
-nominaal                 = 14,4 kWh
-SHADOW SOC-band          = 20–90%
-SHADOW bruikbaar venster = 10,08 kWh
-SHADOW AC charge limit   = 3,3 kW
-SHADOW AC discharge      = 3,3 kW
-SHADOW η charge          = 95%
-SHADOW η discharge       = 95%
-SHADOW roundtrip         = 90,25%
+Core / policy
+   ↓
+P1 Power Intent v0.2.4
+   ↓
+EV adapter/gate-validatie
+   ↓
+EV Power v0.2.2 LIVE OWNERSHIP
+   ↓
+Easee
 ```
 
-Dit zijn simulatieaannames, geen commissioninginstellingen. De planner maakt geen Victron-, Easee- of boilerwrites.
-
-Vereenvoudigde actuele procesflow:
+WW:
 
 ```text
-15-min trigger
-      │
-      ▼
-Lees State + WW + contract/prijs + Tesla deadline + PV-context
-      │
-      ▼
-Contracttype FIXED / DYNAMIC
-      │
-      ▼
-Leg Tesla/WW harde verplichtingen vast
-      │
-      ▼
-Rangschik economische flexkansen
-      │
-      ▼
-Simuleer Tesla / WW / batterij kwartieracties
-      │
-      ▼
-Publiceer EM2_Energy_Plan_24h + status
-      │
-      ▼
-STOP — SHADOW, geen fysieke writes
+Core / WW intent
+   ↓
+WW Power Adapter v0.2 SHADOW
+   ↓
+WW gates/validatie
+   ↓
+Warm Water Actuator v0.9 LIVE
+   ↓
+Boiler
 ```
 
-## 11. Victron-doelarchitectuur
+De oudere WW actuator v0.6 en de vervangen Tesla v2.7.15-flow zijn geen actuele physical-write owners.
 
-De geplande Victron-laag bestaat uit MultiPlus-II 48/5000, Cerbo GX MK2, VM-3P75CT en 3 × Pylontech US5000. De bestaande PV-omvormers blijven AC-gekoppeld.
+## 11. Aggregator en fan-out
 
-Victron/ESS wordt na installatie eigenaar van batterij-SOC, laden/ontladen en batterij-/netveiligheid. Homey blijft huishoudelijke orchestrator voor flexloads zoals Tesla en warm water en mag Victron-safety/ESS-regels niet dupliceren of omzeilen.
+`Core Snapshot Aggregator v0.2 SHADOW NO-QUOOKER` is een actieve shadow-component en heeft eerder parity rev107 met nul mismatches behaald. De naam `NO-QUOOKER` beschrijft het Aggregator-inputcontract; zij betekent niet dat de live Core v0.11f zelf geen Quooker-data bevat.
 
-Zolang Victron niet fysiek geïntegreerd is, geldt batterijsteun in realtime Core/control als 0 W. Alleen de 24h-planner simuleert het afgesproken scenario.
+Fan-out-optimalisatie blijft een architectuurdoel: semantisch ongewijzigde state mag niet uitsluitend door timestamps/heartbeatmetadata downstream change-events veroorzaken.
 
-## 12. Veiligheidshiërarchie
+## 12. Publicatie en observability
+
+Actuele publicatielagen zijn onder andere:
+
+- `Publisher v1.0.12 SCHEDULED LOW-LOAD`;
+- `Planner Shadow v0.4 event-driven LOW-LOAD`;
+- freshness watchdog v0.3.3;
+- aparte historie/evidence/publicatielagen zoals geregistreerd in de runtime-baseline.
+
+Website/publicatie is observability/configuratie en mag geen alternatieve fysieke actuatorroute creëren.
+
+## 13. Victron-doelarchitectuur
+
+Victron Dynamic ESS (DESS) is de beoogde primaire batterijoptimizer. Homey/Planner orkestreert huishoudelijke flexibiliteit en mag geen concurrerende realtime batterijoptimizer worden.
+
+Zolang Victron niet fysiek geïntegreerd is, blijft batterijgedrag in de Planner simulatie/SHADOW. De bestaande PV-omvormers blijven AC-gekoppeld.
+
+## 14. Veiligheidshiërarchie
 
 ```text
 Installatieveiligheid / 3×25 A
@@ -305,81 +252,28 @@ Lokale apparaatbeveiligingen
           ↓
 Easee Equalizer
           ↓
-Victron EMS / ESS (na installatie)
+Victron DESS / ESS (na installatie)
           ↓
 Energy Core v2 + Homey-orchestratie
           ↓
 Gevalideerde huishoudelijke actuator-writers
 ```
 
-## 13. Publicatie, website en CI/CD
+## 15. Documentatie- en synchronisatieregel
 
-State, Decision en Shadow worden revision-consistent gepubliceerd. Live View en historie blijven observability en beïnvloeden geen fysieke regelbesluiten.
+Procesflowdiagrammen beschrijven altijd de **actuele gecodeerde stand**. Voor current-state documentatie geldt de authority order uit `docs/architecture/current-runtime-source-policy.md`.
 
-De website heeft daarnaast twee expliciete **control/configuratie-ingangen** die niet met observability mogen worden verward:
+`start_flow()` bewijst alleen dat een flow is gestart; het bewijst niet dat downstream verwerking is voltooid. E2E-validatie moet daarom eindigen op aantoonbare runtime/readback-evidence.
 
-- Tesla deadline-opdracht;
-- EMS-instellingen (`BOILER/CV`, `FIXED/DYNAMIC`).
+Historische candidate-, patch-, smoke-, rollback-, TEMP-, DONE- en ONE-SHOT-bestanden mogen voor audit/rationale blijven bestaan, maar mogen niet als actuele architectuur worden samengevoegd.
 
-Beide lopen uitsluitend via de beveiligde PIN/Worker-commandroute; frontendcode schrijft nooit rechtstreeks naar Homey of een actuator.
+## 16. Bekende open optimalisaties
 
-Cloudflare Workers Builds is gekoppeld aan GitHub `main` met root `/cloudflare`. Daardoor geldt voor Worker-code:
+De huidige gereconcilieerde baseline heeft nog expliciete verbeterpunten:
 
-```text
-GitHub main → Cloudflare build → Worker deployment
-```
-
-Voor websitepublicatie geldt dat wijzigingen in `ems-settings-command.json` een Pages-publicatie kunnen triggeren zodat bevestigde configuratiestatus niet onnodig achterloopt.
-
-## 14. Control- en writerdiscipline
-
-```text
-Meetdata:
-State → Decision → Shadow/validatie → Control intent → exact één writer → actuator
-
-Configuratie:
-Website → PIN → Worker → command → Settings Sync → canonieke Logic-state
-
-Planning:
-Context + State → 24h Planner SHADOW → plan/advies
-                                      └── geen actuatorwrite
-```
-
-Per fysieke actuator bestaat uiteindelijk exact één automatische writer. Configuratie-, observatie-, historie-, detector- en plannerlagen mogen geen alternatieve actuatorroute creëren.
-
-## 15. Test- en synchronisatieregel
-
-Homey `start_flow()` bevestigt dat een flow gestart is, niet dat downstream verwerking al voltooid is. E2E-validatie mag daarom niet aannemen dat handmatig achter elkaar gestarte flows synchroon zijn. De bevestigde gepubliceerde runtime-state is leidend voor het einde van een E2E-test.
-
-**Documentatie-invariant:** procesflowdiagrammen beschrijven altijd de actuele gecodeerde stand. Bij iedere relevante flowwijziging worden code, tekst en procesdiagram in dezelfde wijzigingscyclus bijgewerkt.
-
-## 16. Pre-Victron open punten
-
-Voor de stable pre-Victron baseline resteren primair:
-
-1. FIXED/DYNAMIC productiepad consolideren en resterende legacy `M7_Price_*`-afhankelijkheden verwijderen;
-2. Tesla laad-efficiëntie/deadline-calibratie afronden;
-3. warmwater-actuatorroute verder valideren en gecontroleerd vrijgeven waar van toepassing;
-4. formele regressietest op FIXED, DYNAMIC, Tesla deadline, PV opportunity, BOILER, CV, stale P1, SOURCE_SKEW, fail-safe en publicatie;
-5. daarna software-/websiteprocesflows als pre-Victron stable baseline bevriezen.
-
-## 17. Architectuur-review / regressiecriteria
-
-Iedere wijziging wordt minimaal getoetst op:
-
-- bijdrage aan laagste energiekosten en toekomstige Victron-integratie;
-- geen onnodige Homey-load/API-calls;
-- correcte waarheidsbron en geen dubbele writers;
-- `gridMeasurementValid` en `derivedHouseBalanceValid` correct gescheiden;
-- FIXED/DYNAMIC via de contract-aware abstractie;
-- bij `FIXED` geen dynamische prijsactie uit legacy M7-signalen;
-- BOILER/CV-configuratie uitsluitend via de beveiligde settingsroute;
-- Tesla/WW MUST boven economische optimalisatie;
-- 24h-planner blijft SHADOW;
-- Victron/ESS eigenaar van batterij/SOC/netveiligheid;
-- geen frequente Easee FLASH-belastende configuratiewrites;
-- fail-safe gedrag bij stale/onbekende data;
-- rollback en testbaarheid;
-- synchroniteit tussen broncode, procesdiagrammen, frontendbundle en productie-artifact.
-
-> Laatste update: **23 augustus 2026** — BOILER↔CV-selector productie-actief en in beide richtingen E2E gevalideerd; EMS Settings Sync v0.2 met authenticated GitHub Contents API; beveiligde PIN/Cloudflare/GitHub/Homey-configuratieketen gedocumenteerd; runtime terug op BOILER. Contract-aware FIXED/DYNAMIC productieconsolidatie blijft open pre-Victron werk.
+1. Core brede `Homey.logic.getVariables()` enumeratie vervangen/verminderen zonder functionele regressie;
+2. PBTH DYNAMIC `<12h` event-driven prijsrefresh afronden;
+3. resterende legacy M7 prijs/context-afhankelijkheden consolideren;
+4. Round 2B legacy/rollback/validation-flow cleanup dependency-by-dependency uitvoeren;
+5. verdere WW/Tesla runtime-validatie uitvoeren waar de acceptatiecriteria dat vereisen;
+6. Victron-integratie pas promoveren van SHADOW wanneer hardware/commissioning gereed en gevalideerd is.
