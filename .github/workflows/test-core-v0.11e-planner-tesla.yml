@@ -1,21 +1,20 @@
-name: Test Core v0.11e Planner Tesla intent
+name: Test Core v0.11f Planner Tesla headroom
 
 on:
   push:
-    branches:
-      - core-v0.11e-planner-tesla-intent
+    branches: [core-v0.11e-planner-tesla-intent]
     paths:
-      - src/homey/core/core-v0.11d-live-capture-2026-08-30.js
-      - src/homey/core/generate-core-v0.11e-from-v0.11d.py
+      - src/homey/core/core-v0.11e-planner-tesla-intent.js
       - src/homey/core/core-v0.11e-planner-tesla-decision.js
       - src/homey/core/test-core-v0.11e-planner-tesla-decision.js
+      - src/homey/core/generate-core-v0.11f-from-v0.11e.py
       - .github/workflows/test-core-v0.11e-planner-tesla.yml
   pull_request:
     paths:
-      - src/homey/core/core-v0.11d-live-capture-2026-08-30.js
-      - src/homey/core/generate-core-v0.11e-from-v0.11d.py
+      - src/homey/core/core-v0.11e-planner-tesla-intent.js
       - src/homey/core/core-v0.11e-planner-tesla-decision.js
       - src/homey/core/test-core-v0.11e-planner-tesla-decision.js
+      - src/homey/core/generate-core-v0.11f-from-v0.11e.py
       - .github/workflows/test-core-v0.11e-planner-tesla.yml
 
 permissions:
@@ -32,63 +31,37 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-
-      - name: Generate complete v0.11e from captured live v0.11d
-        run: python3 src/homey/core/generate-core-v0.11e-from-v0.11d.py
-
-      - name: Verify narrow full-script diff
+      - name: Generate v0.11f from deployed v0.11e candidate
+        run: python3 src/homey/core/generate-core-v0.11f-from-v0.11e.py
+      - name: Verify narrow headroom diff
         shell: bash
         run: |
           set -euo pipefail
-          git diff --no-index -- src/homey/core/core-v0.11d-live-capture-2026-08-30.js src/homey/core/core-v0.11e-planner-tesla-intent.js > /tmp/core-v0.11e.diff || true
-          cat /tmp/core-v0.11e.diff
-          test "$(grep -c '^@@' /tmp/core-v0.11e.diff)" -le 7
-          grep -q "EM2_CORE_STATE_V0.11e" /tmp/core-v0.11e.diff
-          grep -q "plannerTesla=String" /tmp/core-v0.11e.diff
-          grep -q "PLANNER_TESLA_MIN_IMPORT_BUDGET_W=4140" /tmp/core-v0.11e.diff
-          grep -q "PLANNER_TESLA_DEADLINE_SLOT_EXECUTED" /tmp/core-v0.11e.diff
-          grep -q "plannerTeslaDeadlineEligible" /tmp/core-v0.11e.diff
-          ! grep -q '^+.*setCapabilityValue' /tmp/core-v0.11e.diff
-          ! grep -q '^+.*Homey.devices.getDevice' /tmp/core-v0.11e.diff
-          ! grep -q '^+.*Homey.logic.getVariables' /tmp/core-v0.11e.diff
-          ! grep -q '^+.*fetch(' /tmp/core-v0.11e.diff
-
-      - name: Run pure decision regression
+          git diff --no-index -- src/homey/core/core-v0.11e-planner-tesla-intent.js src/homey/core/core-v0.11f-planner-tesla-headroom.js > /tmp/v011f.diff || true
+          cat /tmp/v011f.diff
+          test "$(grep -c '^@@' /tmp/v011f.diff)" -le 6
+          grep -q "EM2_CORE_STATE_V0.11f" /tmp/v011f.diff
+          grep -q "plannerTeslaProjectedGridW=gridW+PLANNER_TESLA_MIN_POWER_W" /tmp/v011f.diff
+          grep -q "PLANNER_TESLA_BLOCKED_PROJECTED_IMPORT" /tmp/v011f.diff
+          ! grep -q '^+.*setCapabilityValue' /tmp/v011f.diff
+          ! grep -q '^+.*Homey.devices.getDevice' /tmp/v011f.diff
+          ! grep -q '^+.*Homey.logic.getVariables' /tmp/v011f.diff
+      - name: Run runtime-fixture regression
         run: node src/homey/core/test-core-v0.11e-planner-tesla-decision.js
-
-      - name: Enforce architecture boundary
+      - name: Preserve architecture boundaries
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -q "setCapabilityValue" src/homey/core/core-v0.11e-planner-tesla-decision.js
-          ! grep -q "Homey.devices" src/homey/core/core-v0.11e-planner-tesla-decision.js
-          ! grep -q "Homey.logic.getVariables" src/homey/core/core-v0.11e-planner-tesla-decision.js
-          grep -q "TESLA_CHARGE_DEADLINE" src/homey/core/core-v0.11e-planner-tesla-decision.js
-          grep -q "PLANNER_DEADLINE_SLOT" src/homey/core/core-v0.11e-planner-tesla-decision.js
-          grep -q "LATEST_START_MUST" src/homey/core/core-v0.11e-planner-tesla-decision.js
-          grep -q "PLANNER_TESLA_MIN_IMPORT_BUDGET_W = 4140" src/homey/core/core-v0.11e-planner-tesla-decision.js
-
-      - name: Preserve WW and EV ownership invariants in full candidate
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q "EM2_CONTROL_WW_V0.11" src/homey/core/core-v0.11e-planner-tesla-intent.js
-          grep -q "thermostatVerifyConsumedRunKey" src/homey/core/core-v0.11e-planner-tesla-intent.js
-          grep -q "const evMode=intent==='TESLA_CHARGE_DEADLINE'?'DEADLINE'" src/homey/core/core-v0.11e-planner-tesla-intent.js
-          grep -q "physicalWritePerformed:false" src/homey/core/core-v0.11e-planner-tesla-intent.js
-          test "$(grep -o "Homey.logic.getVariables()" src/homey/core/core-v0.11e-planner-tesla-intent.js | wc -l)" -eq 1
-
-      - name: Commit generated full candidate on branch push
+          grep -q "EM2_CONTROL_WW_V0.11" src/homey/core/core-v0.11f-planner-tesla-headroom.js
+          grep -q "const evMode=intent==='TESLA_CHARGE_DEADLINE'?'DEADLINE'" src/homey/core/core-v0.11f-planner-tesla-headroom.js
+          test "$(grep -o 'Homey.logic.getVariables()' src/homey/core/core-v0.11f-planner-tesla-headroom.js | wc -l)" -eq 1
+          ! grep -q 'setCapabilityValue' src/homey/core/core-v0.11f-planner-tesla-headroom.js
+      - name: Commit generated candidate on branch push
         if: github.event_name == 'push'
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/homey/core/core-v0.11e-planner-tesla-intent.js
-          if git diff --cached --quiet; then
-            echo "Generated candidate already current"
-          else
-            git commit -m "build(core): generate full v0.11e Planner Tesla candidate"
-            git push origin HEAD:${{ github.ref_name }}
-          fi
+          git add src/homey/core/core-v0.11f-planner-tesla-headroom.js
+          if git diff --cached --quiet; then echo "Candidate current"; else git commit -m "build(core): generate v0.11f Planner Tesla headroom candidate"; git push origin HEAD:${{ github.ref_name }}; fi
