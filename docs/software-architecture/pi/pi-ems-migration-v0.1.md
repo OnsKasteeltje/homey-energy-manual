@@ -156,7 +156,7 @@ Ordered for the Pi EMS runtime:
 - Geekworm X1001 NVMe adapter
 - PNY CS1030 500 GB NVMe
 - Geekworm P579 case
-- 32 GB endurance microSD for installation/recovery
+- SanDisk Extreme 128 GB microSDXC UHS-I A2/U3/V30 (Amazon ASIN B09X7BK27V) for installation/bootstrap/recovery; the 500 GB NVMe remains the primary 24/7 EMS runtime and database/history storage
 
 ## Immediate preparation backlog
 
