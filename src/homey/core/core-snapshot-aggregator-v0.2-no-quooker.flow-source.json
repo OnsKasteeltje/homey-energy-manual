@@ -1,0 +1,42 @@
+{
+  "schema": "HOMEY_ADVANCED_FLOW_SOURCE_V0.1",
+  "flowId": "758f3353-51f5-4e68-a1f4-3acf30ec5a87",
+  "name": "EM v2 | 12 Input | Core Snapshot Aggregator v0.2 SHADOW NO-QUOOKER",
+  "enabled": false,
+  "deployment": {
+    "status": "PREPARED_NOT_DEPLOYED",
+    "expandCodeSourcesBeforeHomeyUpdate": true,
+    "reason": "Keep the repository source compact and machine-valid; Homey update requires action code inline.",
+    "safety": "SHADOW_ONLY_NO_DEVICE_WRITES"
+  },
+  "codeSources": {
+    "FULL": "src/homey/core/core-snapshot-aggregator-v0.2-no-quooker.js",
+    "PARITY": "src/homey/core/core-snapshot-aggregator-parity-v0.2-no-quooker.js"
+  },
+  "cards": {
+    "10000000-0000-4000-8000-000000000001": {"type":"start","x":0,"y":-420,"outputSuccess":["20000000-0000-4000-8000-000000000001"]},
+    "10000000-0000-4000-8000-000000000002": {"type":"trigger","id":"homey:manager:cron:every_x_minutes","x":0,"y":-300,"args":{"minutes":60},"outputSuccess":["20000000-0000-4000-8000-000000000001"]},
+    "10000000-0000-4000-8000-000000000003": {"type":"trigger","id":"homey:manager:logic:variable_changed","x":0,"y":-140,"args":{"variable":{"id":"917704c9-8038-4914-9205-c552b4f1939a","name":"EM2_Context_UpdatedAt"}},"outputSuccess":["20000000-0000-4000-8000-000000000002"]},
+    "10000000-0000-4000-8000-000000000004": {"type":"trigger","id":"homey:manager:logic:variable_changed","x":0,"y":20,"args":{"variable":{"id":"d0254ca9-5e4e-4cd5-8228-b1c25e6b9e3e","name":"EV Deadline status"}},"outputSuccess":["20000000-0000-4000-8000-000000000003"]},
+    "10000000-0000-4000-8000-000000000005": {"type":"trigger","id":"homey:manager:logic:variable_changed","x":0,"y":100,"args":{"variable":{"id":"c35d4237-f173-4913-ae23-9434d6a98b70","name":"EV Deadline actief"}},"outputSuccess":["20000000-0000-4000-8000-000000000003"]},
+    "10000000-0000-4000-8000-000000000006": {"type":"trigger","id":"homey:manager:logic:variable_changed","x":0,"y":260,"args":{"variable":{"id":"f9d885a4-fca2-4aea-a5a9-a5c05da90835","name":"WW_Boilermodus"}},"outputSuccess":["20000000-0000-4000-8000-000000000004"]},
+    "10000000-0000-4000-8000-000000000007": {"type":"trigger","id":"homey:manager:logic:variable_changed","x":0,"y":380,"args":{"variable":{"id":"1685e7b7-af04-4e0d-b4ed-78bef0d6bd42","name":"EM2_WW_PostGoal_Opportunity"}},"outputSuccess":["20000000-0000-4000-8000-000000000005"]},
+    "10000000-0000-4000-8000-000000000008": {"type":"trigger","id":"homey:manager:logic:variable_changed","x":0,"y":540,"args":{"variable":{"id":"93e41221-6b4d-4f5f-83dc-997c9620f758","name":"EM2_ContractPrice_Context"}},"outputSuccess":["20000000-0000-4000-8000-000000000006"]},
+    "10000000-0000-4000-8000-000000000009": {"type":"trigger","id":"homey:manager:logic:variable_changed","x":0,"y":660,"args":{"variable":{"id":"254f15cd-b060-4b42-801d-5e4f58efa069","name":"EM2_Day_History"}},"outputSuccess":["20000000-0000-4000-8000-000000000007"]},
+    "10000000-0000-4000-8000-000000000010": {"type":"trigger","id":"homey:manager:logic:variable_changed","x":0,"y":780,"args":{"variable":{"id":"211e5846-aada-4607-8d52-01b2ef578866","name":"EM2_Contract_Type"}},"outputSuccess":["20000000-0000-4000-8000-000000000008"]},
+    "10000000-0000-4000-8000-000000000011": {"type":"trigger","id":"homey:manager:logic:variable_changed","x":0,"y":900,"args":{"variable":{"id":"29ffd8d7-b0ae-4c02-ab5a-c62452a7b70b","name":"TEMP_PBTH_JSON_BUFFER"}},"outputSuccess":["20000000-0000-4000-8000-000000000009"]},
+    "10000000-0000-4000-8000-000000000012": {"type":"trigger","id":"homey:manager:logic:variable_changed","x":0,"y":1020,"args":{"variable":{"id":"fc95dcad-55d5-4d21-be15-f565f0a9bac3","name":"EM2_Last_Publish"}},"outputSuccess":["20000000-0000-4000-8000-000000000010"]},
+    "20000000-0000-4000-8000-000000000001": {"type":"action","id":"homey:app:com.athom.homeyscript:runCode_v2","x":420,"y":-360,"args":{"codeSource":"FULL"},"outputSuccess":["30000000-0000-4000-8000-000000000001"]},
+    "20000000-0000-4000-8000-000000000002": {"type":"action","id":"homey:app:com.athom.homeyscript:runCode_v2","x":420,"y":-140,"args":{"eventGroup":"CONTEXT","reads":["917704c9-8038-4914-9205-c552b4f1939a","0bb18a3a-0420-4e94-81ff-dc00b9215434","0c94479a-495a-40b4-9de9-dbd63092cecb","010392a1-7d56-4c70-be75-9b38cdec71be","e66c8f24-27fa-4bf9-8f57-f3eeaca80ca0"]}},
+    "20000000-0000-4000-8000-000000000003": {"type":"action","id":"homey:app:com.athom.homeyscript:runCode_v2","x":420,"y":40,"args":{"eventGroup":"TESLA","reads":["c35d4237-f173-4913-ae23-9434d6a98b70","1173209b-2853-4fe2-b21b-507cea606ce6","bf00e544-7ef1-4778-b8cd-4e0812198850","085eb4ed-80e8-4d37-92a0-56437f40b77f","d0254ca9-5e4e-4cd5-8228-b1c25e6b9e3e"]}},
+    "20000000-0000-4000-8000-000000000004": {"type":"action","id":"homey:app:com.athom.homeyscript:runCode_v2","x":420,"y":260,"args":{"eventGroup":"WW_MODE","reads":["f9d885a4-fca2-4aea-a5a9-a5c05da90835"]}},
+    "20000000-0000-4000-8000-000000000005": {"type":"action","id":"homey:app:com.athom.homeyscript:runCode_v2","x":420,"y":380,"args":{"eventGroup":"WW_POSTGOAL","reads":["1685e7b7-af04-4e0d-b4ed-78bef0d6bd42"]}},
+    "20000000-0000-4000-8000-000000000006": {"type":"action","id":"homey:app:com.athom.homeyscript:runCode_v2","x":420,"y":540,"args":{"eventGroup":"PLANNER_PRICE","reads":["93e41221-6b4d-4f5f-83dc-997c9620f758"]}},
+    "20000000-0000-4000-8000-000000000007": {"type":"action","id":"homey:app:com.athom.homeyscript:runCode_v2","x":420,"y":660,"args":{"eventGroup":"DAY_HISTORY","reads":["254f15cd-b060-4b42-801d-5e4f58efa069"]}},
+    "20000000-0000-4000-8000-000000000008": {"type":"action","id":"homey:app:com.athom.homeyscript:runCode_v2","x":420,"y":780,"args":{"eventGroup":"CONTRACT","reads":["211e5846-aada-4607-8d52-01b2ef578866"]}},
+    "20000000-0000-4000-8000-000000000009": {"type":"action","id":"homey:app:com.athom.homeyscript:runCode_v2","x":420,"y":900,"args":{"eventGroup":"PBTH","reads":["29ffd8d7-b0ae-4c02-ab5a-c62452a7b70b"]}},
+    "20000000-0000-4000-8000-000000000010": {"type":"action","id":"homey:app:com.athom.homeyscript:runCode_v2","x":420,"y":1020,"args":{"eventGroup":"PUBLISHER","reads":["fc95dcad-55d5-4d21-be15-f565f0a9bac3","c10ea01b-3dfc-4e04-bb27-2a56dfc636cd","c8422ce3-093b-4781-ae20-67d2154c0a36"]}},
+    "30000000-0000-4000-8000-000000000001": {"type":"action","id":"homey:app:com.athom.homeyscript:runCode_v2","x":840,"y":-360,"args":{"codeSource":"PARITY"}},
+    "40000000-0000-4000-8000-000000000001": {"type":"note","x":850,"y":-100,"width":360,"height":160,"color":"green","text":"v0.2 NO-QUOOKER — SHADOW only. FULL uses 19 stable Logic reads. Event refreshes serialize via 15s lease. Parity remains temporary broad-read diagnostic. No physical device writes."}
+  }
+}
