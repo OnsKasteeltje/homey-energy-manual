@@ -39,5 +39,12 @@ This synchronization is a Planner UI architecture invariant, not a cosmetic pref
     </div>
     <div class="ps-mode"><strong>SHADOW</strong><span>geen fysieke aansturing</span></div>
   </div>
+
+  <div class="admonition info" style="margin-top:1rem">
+    <p class="admonition-title">Fasetopologie voor volgende Planner-optimalisatie</p>
+    <p><strong>Boiler = L2</strong> is op 30 augustus 2026 empirisch gevalideerd met meerdere onafhankelijke ON/OFF-flanken tegenover P1-fasevermogen. De boiler is een éénfasebelasting van circa <strong>1,9–2,0 kW / ~8,5 A op L2</strong>. Tesla/Easee is 3-fase. Deze topologie wordt de basis voor de volgende Planner-iteratie met <strong>phase-aware 3×25 A headroom</strong>; die headroomlogica is nog niet actief.</p>
+    <p><small>Machineleesbare bron: <code>docs/data/ems-phase-topology.json</code>. Planner blijft tot die volgende iteratie expliciet <code>NOT_MODELED_PHASE_AWARE</code>.</small></p>
+  </div>
+
   <div id="ps-status">Plannerdata laden…</div>
 </div>
