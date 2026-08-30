@@ -18,8 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: JavaScript syntax
-        run: node --check src/homey/planner/energy-plan-24h-v0.4.10.js
+      - name: JavaScript syntax as HomeyScript
+        run: |
+          {
+            echo '(async()=>{'
+            cat src/homey/planner/energy-plan-24h-v0.4.10.js
+            echo '})()'
+          } > /tmp/planner-v0410-check.js
+          node --check /tmp/planner-v0410-check.js
       - name: Python replay syntax
         run: python3 -m py_compile scripts/planner_ww_ab_replay.py
       - name: Deterministic DYNAMIC partial-PV ranking regression
