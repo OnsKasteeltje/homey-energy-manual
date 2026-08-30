@@ -1,14 +1,12 @@
 # Core v0.11b — Shadow Build Record
 
-Status: **PROVISIONED / AGGREGATOR BUILT / NOT ACTIVE**
+Status: **PROVISIONED / AGGREGATOR BUILT / QUOOKER REMOVED FROM TARGET CONTRACT**
 
-Date: 2026-08-29
+Date: 2026-08-30
 
 Active baseline remains `EM v2 | 00 Core Tick | v0.11a (Targeted Device Reads)`.
 
 ## Provisioned Logic variables
-
-The two v0.11b snapshot variables were provisioned once from the current live Logic state:
 
 | Variable | Type | Homey Logic ID | Owner |
 |---|---|---|---|
@@ -19,26 +17,21 @@ Provisioning flow:
 
 `TEMP | Core v0.11b Snapshot Provisioning [ONE-SHOT]`
 
-Homey Advanced Flow ID: `32680a15-7397-4705-a2c0-9ffb928d8ed2`
-
-The flow was enabled only long enough to run exactly once and was then disabled again. It is `broken=false`. It performs one Logic inventory read for installation-time provisioning only; this broad read is not part of normal v0.11b runtime.
-
-No physical device writes and no active Core changes are performed by provisioning.
+Homey Advanced Flow ID: `32680a15-7397-4705-a2c0-9ffb928d8ed2`.
 
 ## Shadow aggregator
 
 Flow:
 
-`EM v2 | 12 Input | Core Snapshot Aggregator v0.1 SHADOW [DISABLED]`
+`EM v2 | 12 Input | Core Snapshot Aggregator v0.1 SHADOW`
 
-Homey Advanced Flow ID: `758f3353-51f5-4e68-a1f4-3acf30ec5a87`
+Homey Advanced Flow ID: `758f3353-51f5-4e68-a1f4-3acf30ec5a87`.
 
-Current state: **disabled, broken=false**.
+The implementation originally included a `QUOOKER` source-group token. As of the 2026-08-30 architecture decision, Quooker is removed from the target v0.11b contract and this token must be retired from the next aggregator revision rather than wired or validated further.
 
-The implementation supports the following source-group tokens:
+Target source-group tokens are now:
 
 - `FULL`
-- `QUOOKER`
 - `CONTEXT`
 - `TESLA`
 - `WW_MODE`
@@ -49,31 +42,27 @@ The implementation supports the following source-group tokens:
 - `PBTH`
 - `PUBLISHER`
 
-For a group refresh it reads the existing `EM2_Core_Input`, reads only the stable Logic IDs for the selected group, merges the group into the snapshot, performs semantic comparison, and writes `EM2_Core_Input` only when the effective payload changed.
+For a group refresh the aggregator reads existing `EM2_Core_Input`, reads only the stable Logic IDs for that source group, merges the group, performs semantic comparison and writes only on effective change.
 
-The `FULL` path is intended for low-frequency reconciliation only. It is currently reachable through the manual start path but is not scheduled or enabled.
+The revised FULL target excludes the ten legacy Quooker variables and therefore needs at most 19 live external source reads. `WW_STATE_V13` remains absent/null and must not be recreated.
 
-## Safety state after build
+## Safety state
 
-- active v0.11a Core: unchanged;
-- Core cadence: unchanged;
-- Publisher / EV / WW flows: unchanged;
-- new aggregator: disabled;
-- event triggers: not wired/active yet;
-- hourly reconciliation: not scheduled yet;
-- `EM2_Core_Runtime`: provisioned only; no active writer yet;
+- active v0.11a Core remains unchanged;
+- Core cadence unchanged;
+- Publisher / EV / WW control flows unchanged;
 - no physical device writes introduced;
-- no v0.11b Core cut-over performed.
+- no v0.11b Core cut-over performed;
+- Quooker is no longer a v0.11b prerequisite or acceptance blocker.
 
 ## Remaining activation gates
 
-Before the aggregator may run alongside v0.11a:
+1. revise the deployed SHADOW aggregator so `QUOOKER` and the ten Quooker FULL reads are removed;
+2. retain/prove serialization for overlapping read-modify-write events;
+3. retain hourly reconciliation only as a low-frequency SHADOW safety net;
+4. compare parity for the remaining required input groups;
+5. run controlled SHADOW validation only while Homey is healthy and globally serialized;
+6. keep v0.11a as rollback/reference throughout;
+7. then implement v0.11b Core with targeted reads of `EM2_Core_Input` and `EM2_Core_Runtime`.
 
-1. wire the commit-marker event triggers to the group tokens;
-2. add/prove serialization for overlapping read-modify-write events;
-3. add the one-hour reconciliation trigger;
-4. add a parity diagnostic comparing the snapshot with the existing v0.11a Logic view;
-5. run one controlled SHADOW smoke only if Homey is not rate-limited;
-6. keep v0.11a as rollback/reference throughout.
-
-Only after snapshot parity has been demonstrated over natural cycles may the v0.11b Core read path be implemented and considered for cut-over.
+The Quooker detector/semantic-commit validation track is cancelled as a Core cut-over dependency. Optional Quooker classification may later move to Raspberry Pi enrichment outside the Homey critical EMS runtime.
