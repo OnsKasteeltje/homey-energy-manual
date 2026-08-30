@@ -2,7 +2,7 @@
   'use strict';
   const BASE='/homey-energy-manual/';
   window.HomeEnergyFrontend=window.HomeEnergyFrontend||{};
-  window.HomeEnergyFrontend.emsSettingsController='1.1.1';
+  window.HomeEnergyFrontend.emsSettingsController='1.1.2';
 
   let command=null,config=null,core=null,loading=false,saving=false,commandReady=false;
 
@@ -11,6 +11,19 @@
       const r=await fetch(`${BASE}${path}?ts=${Date.now()}`,{cache:'no-store'});
       return r.ok?await r.json():null;
     }catch(_){return null;}
+  }
+
+  function commandTime(cmd){
+    const t=Date.parse(String(cmd?.requestedAt||''));
+    return Number.isFinite(t)?t:0;
+  }
+
+  function acceptCommand(cmd){
+    if(!validCommand(cmd))return false;
+    if(!command||!validCommand(command))return true;
+    const incoming=commandTime(cmd),current=commandTime(command);
+    if(incoming&&current&&incoming<current)return false;
+    return true;
   }
 
   function actualHotWaterSource(){
@@ -42,8 +55,8 @@
   }
 
   function bind(panel){
-    if(!panel||panel.dataset.bound==='1.1.1')return;
-    panel.dataset.bound='1.1.1';
+    if(!panel||panel.dataset.bound==='1.1.2')return;
+    panel.dataset.bound='1.1.2';
     panel.querySelector('[data-ems-contract]')?.addEventListener('change',()=>save(panel));
     panel.querySelector('[data-ems-hot-water]')?.addEventListener('change',()=>save(panel));
   }
@@ -96,7 +109,9 @@
         getJson('data/tesla-control-config.json'),
         getJson('data/energy-state-v2.json')
       ]);
-      if(validCommand(cmd)){command=cmd;commandReady=true;}
+      // GitHub Pages can briefly serve an older command after a successful Worker write.
+      // Never let an older requestedAt roll an already accepted newer command back in the UI.
+      if(acceptCommand(cmd)){command=cmd;commandReady=true;}
       config=cfg||config;core=state||core;populate();
     }finally{loading=false;}
   }
@@ -124,7 +139,7 @@
       const r=await fetch(worker,{method:'POST',headers:{'Content-Type':'application/json','X-Tesla-Control-Pin':pin},body:JSON.stringify({kind:'ems_settings',contractType,hotWaterSource})});
       const j=await r.json().catch(()=>({}));
       if(!r.ok||!j.ok)throw new Error(j.error||`HTTP ${r.status}`);
-      if(validCommand(j.command)){command=j.command;commandReady=true;}
+      if(acceptCommand(j.command)){command=j.command;commandReady=true;}
       if(msg){msg.textContent='Opgeslagen · wacht op Homey bevestiging';msg.dataset.state='pending';}
       setTimeout(load,1000);
     }catch(e){
