@@ -28,9 +28,11 @@ permissions:
   pages: write
   id-token: write
 
+# Pages is a rolling view. A stale queued build has no value once a newer
+# commit exists, so always cancel the previous run and deploy only the latest.
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
