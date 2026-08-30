@@ -1,13 +1,13 @@
 {
   "schema": "EM2_PLANNER_SHADOW_PUBLISH_V0.4",
-  "publishedAt": "2026-08-30T13:15:47.448Z",
+  "publishedAt": "2026-08-30T13:30:47.530Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
-  "sourceRevision": 3426,
-  "generatedAt": "2026-08-30T13:15:45.147Z",
+  "sourceRevision": 3429,
+  "generatedAt": "2026-08-30T13:30:45.204Z",
   "plan": {
     "schema": "EM2_ENERGY_PLAN_24H_V0.4.9",
-    "generatedAt": "2026-08-30T13:15:45.147Z",
+    "generatedAt": "2026-08-30T13:30:45.204Z",
     "controlMode": "SHADOW",
     "readOnly": true,
     "physicalWritePerformed": false,
@@ -28,13 +28,13 @@
       "usableWindowKWh": 10.08
     },
     "inputs": {
-      "sourceRevision": 3426,
+      "sourceRevision": 3429,
       "contract": "DYNAMIC",
       "price": {
         "quality": "GOOD",
         "fresh": true,
         "usable": true,
-        "dynamicSlots": 37
+        "dynamicSlots": 96
       },
       "history": {
         "schema": "2.6",
@@ -59,7 +59,7 @@
           "longitude": 5.10003,
           "variable": "shortwave_radiation",
           "resolutionMinutes": 15,
-          "retrievedAt": "2026-08-30T13:15:45.267Z"
+          "retrievedAt": "2026-08-30T13:30:45.345Z"
         },
         "gridHeadroom": "NOT_MODELED_PHASE_AWARE"
       },
@@ -78,10 +78,10 @@
       },
       "warmWater": {
         "goalReachedToday": false,
-        "remainingFallbackMin": 60,
+        "remainingFallbackMin": 45,
         "catchupRequired": false,
         "modeledPowerW": 1900,
-        "derivedEnergyKWh": 1.9,
+        "derivedEnergyKWh": 1.425,
         "deadlineLocal": "19:00",
         "dayBoundaryAware": true,
         "timeZone": "Europe/Amsterdam",
@@ -99,40 +99,6 @@
       "actions": [
         {
           "i": 0,
-          "start": "2026-08-30T13:15:00.000Z",
-          "end": "2026-08-30T13:30:00.000Z",
-          "localDate": "2026-08-30",
-          "localQuarter": 61,
-          "price_eur_kwh": -0.001,
-          "priceClass": "NEGATIVE",
-          "baseLoadForecastW": 887,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 45,
-            "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 0
-          },
-          "pvForecastW": 1595,
-          "netBeforeFlexW": -709,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 709,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_CALIBRATED"
-          },
-          "battery": "HOLD",
-          "tesla": "PREFERRED_BEFORE_DEADLINE",
-          "warmWater": "HOLD"
-        },
-        {
-          "i": 1,
           "start": "2026-08-30T13:30:00.000Z",
           "end": "2026-08-30T13:45:00.000Z",
           "localDate": "2026-08-30",
@@ -166,7 +132,7 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 2,
+          "i": 1,
           "start": "2026-08-30T13:45:00.000Z",
           "end": "2026-08-30T14:00:00.000Z",
           "localDate": "2026-08-30",
@@ -204,7 +170,7 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 3,
+          "i": 2,
           "start": "2026-08-30T14:00:00.000Z",
           "end": "2026-08-30T14:15:00.000Z",
           "localDate": "2026-08-30",
@@ -244,12 +210,12 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 4,
+          "i": 3,
           "start": "2026-08-30T14:15:00.000Z",
           "end": "2026-08-30T14:30:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 65,
-          "price_eur_kwh": -0.0001,
+          "price_eur_kwh": -0.0004,
           "priceClass": "NEGATIVE",
           "baseLoadForecastW": 113,
           "baseForecastTrace": {
@@ -283,16 +249,21 @@
           },
           "battery": "HOLD",
           "tesla": "PREFERRED_BEFORE_DEADLINE",
-          "warmWater": "HOLD"
+          "warmWater": "DEADLINE_REQUIRED",
+          "warmWaterReason": "GRID_CHEAPEST_USABLE",
+          "warmWaterPvCoverageW": 1810,
+          "warmWaterGridRequiredW": 90,
+          "warmWaterPlanningDate": "2026-08-30",
+          "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 5,
+          "i": 4,
           "start": "2026-08-30T14:30:00.000Z",
           "end": "2026-08-30T14:45:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 66,
-          "price_eur_kwh": -0.0004,
-          "priceClass": "NEGATIVE",
+          "price_eur_kwh": 0,
+          "priceClass": "CHEAP",
           "baseLoadForecastW": 756,
           "baseForecastTrace": {
             "basis": "CLEAN_QUARTER_MEDIAN",
@@ -325,20 +296,15 @@
           },
           "battery": "HOLD",
           "tesla": "PREFERRED_BEFORE_DEADLINE",
-          "warmWater": "DEADLINE_REQUIRED",
-          "warmWaterReason": "GRID_CHEAPEST_USABLE",
-          "warmWaterPvCoverageW": 1305,
-          "warmWaterGridRequiredW": 595,
-          "warmWaterPlanningDate": "2026-08-30",
-          "warmWaterDayRelation": "CURRENT_DAY"
+          "warmWater": "HOLD"
         },
         {
-          "i": 6,
+          "i": 5,
           "start": "2026-08-30T14:45:00.000Z",
           "end": "2026-08-30T15:00:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 67,
-          "price_eur_kwh": 0,
+          "price_eur_kwh": 0.0007,
           "priceClass": "CHEAP",
           "baseLoadForecastW": 917,
           "baseForecastTrace": {
@@ -375,13 +341,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 7,
+          "i": 6,
           "start": "2026-08-30T15:00:00.000Z",
           "end": "2026-08-30T15:15:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 68,
-          "price_eur_kwh": 0.0007,
-          "priceClass": "CHEAP",
+          "price_eur_kwh": 0.0016,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 520,
           "baseForecastTrace": {
             "basis": "CLEAN_QUARTER_MEDIAN",
@@ -417,13 +383,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 8,
+          "i": 7,
           "start": "2026-08-30T15:15:00.000Z",
           "end": "2026-08-30T15:30:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 69,
-          "price_eur_kwh": 0.0016,
-          "priceClass": "CHEAP",
+          "price_eur_kwh": 0.0044,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 555,
           "baseForecastTrace": {
             "basis": "CLEAN_QUARTER_MEDIAN",
@@ -459,13 +425,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 9,
+          "i": 8,
           "start": "2026-08-30T15:30:00.000Z",
           "end": "2026-08-30T15:45:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 70,
-          "price_eur_kwh": 0.0044,
-          "priceClass": "CHEAP",
+          "price_eur_kwh": 0.0313,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 426,
           "baseForecastTrace": {
             "basis": "CLEAN_QUARTER_MEDIAN",
@@ -501,12 +467,12 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 10,
+          "i": 9,
           "start": "2026-08-30T15:45:00.000Z",
           "end": "2026-08-30T16:00:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 71,
-          "price_eur_kwh": 0.0313,
+          "price_eur_kwh": 0.0701,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 640,
           "baseForecastTrace": {
@@ -543,12 +509,12 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 11,
+          "i": 10,
           "start": "2026-08-30T16:00:00.000Z",
           "end": "2026-08-30T16:15:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 72,
-          "price_eur_kwh": 0.0701,
+          "price_eur_kwh": 0.1211,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
@@ -581,12 +547,12 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 12,
+          "i": 11,
           "start": "2026-08-30T16:15:00.000Z",
           "end": "2026-08-30T16:30:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 73,
-          "price_eur_kwh": 0.1211,
+          "price_eur_kwh": 0.1001,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
@@ -615,23 +581,16 @@
             "pv": "WEATHER_HAUWERT_CALIBRATED"
           },
           "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "DEADLINE_REQUIRED",
-          "warmWaterReason": "GRID_CHEAPEST_USABLE",
-          "warmWaterPvCoverageW": 505,
-          "warmWaterGridRequiredW": 1395,
-          "warmWaterPlanningDate": "2026-08-30",
-          "warmWaterDayRelation": "CURRENT_DAY",
-          "warmWaterRelocatedFrom": "2026-08-30T14:00:00.000Z",
-          "warmWaterRelocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
+          "tesla": "PREFERRED_BEFORE_DEADLINE",
+          "warmWater": "HOLD"
         },
         {
-          "i": 13,
+          "i": 12,
           "start": "2026-08-30T16:30:00.000Z",
           "end": "2026-08-30T16:45:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 74,
-          "price_eur_kwh": 0.1001,
+          "price_eur_kwh": 0.1514,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 895,
           "baseForecastTrace": {
@@ -671,17 +630,17 @@
           "warmWaterGridRequiredW": 1679,
           "warmWaterPlanningDate": "2026-08-30",
           "warmWaterDayRelation": "CURRENT_DAY",
-          "warmWaterRelocatedFrom": "2026-08-30T13:15:00.000Z",
+          "warmWaterRelocatedFrom": "2026-08-30T13:45:00.000Z",
           "warmWaterRelocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
         },
         {
-          "i": 14,
+          "i": 13,
           "start": "2026-08-30T16:45:00.000Z",
           "end": "2026-08-30T17:00:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 75,
-          "price_eur_kwh": 0.1514,
-          "priceClass": "NORMAL",
+          "price_eur_kwh": 0.1762,
+          "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 895,
           "baseForecastTrace": {
             "basis": "CLEAN_QUARTER_MEDIAN",
@@ -720,17 +679,17 @@
           "warmWaterGridRequiredW": 1895,
           "warmWaterPlanningDate": "2026-08-30",
           "warmWaterDayRelation": "CURRENT_DAY",
-          "warmWaterRelocatedFrom": "2026-08-30T14:15:00.000Z",
+          "warmWaterRelocatedFrom": "2026-08-30T14:00:00.000Z",
           "warmWaterRelocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
         },
         {
-          "i": 15,
+          "i": 14,
           "start": "2026-08-30T17:00:00.000Z",
           "end": "2026-08-30T17:15:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 76,
-          "price_eur_kwh": 0.1762,
-          "priceClass": "NORMAL",
+          "price_eur_kwh": 0.2005,
+          "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 895,
           "baseForecastTrace": {
             "basis": "CLEAN_QUARTER_MEDIAN",
@@ -766,12 +725,12 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 16,
+          "i": 15,
           "start": "2026-08-30T17:15:00.000Z",
           "end": "2026-08-30T17:30:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 77,
-          "price_eur_kwh": 0.2005,
+          "price_eur_kwh": 0.1694,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 895,
           "baseForecastTrace": {
@@ -808,13 +767,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 17,
+          "i": 16,
           "start": "2026-08-30T17:30:00.000Z",
           "end": "2026-08-30T17:45:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 78,
-          "price_eur_kwh": 0.1694,
-          "priceClass": "NORMAL",
+          "price_eur_kwh": 0.1805,
+          "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 895,
           "baseForecastTrace": {
             "basis": "CLEAN_QUARTER_MEDIAN",
@@ -850,13 +809,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 18,
+          "i": 17,
           "start": "2026-08-30T17:45:00.000Z",
           "end": "2026-08-30T18:00:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 79,
-          "price_eur_kwh": 0.1805,
-          "priceClass": "NORMAL",
+          "price_eur_kwh": 0.1879,
+          "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 895,
           "baseForecastTrace": {
             "basis": "CLEAN_QUARTER_MEDIAN",
@@ -892,12 +851,12 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 19,
+          "i": 18,
           "start": "2026-08-30T18:00:00.000Z",
           "end": "2026-08-30T18:15:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 80,
-          "price_eur_kwh": 0.1879,
+          "price_eur_kwh": 0.1985,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
@@ -930,12 +889,12 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 20,
+          "i": 19,
           "start": "2026-08-30T18:15:00.000Z",
           "end": "2026-08-30T18:30:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 81,
-          "price_eur_kwh": 0.1985,
+          "price_eur_kwh": 0.1745,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
@@ -964,13 +923,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 21,
+          "i": 20,
           "start": "2026-08-30T18:30:00.000Z",
           "end": "2026-08-30T18:45:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 82,
-          "price_eur_kwh": 0.1745,
-          "priceClass": "NORMAL",
+          "price_eur_kwh": 0.1848,
+          "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -998,45 +957,11 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 22,
+          "i": 21,
           "start": "2026-08-30T18:45:00.000Z",
           "end": "2026-08-30T19:00:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 83,
-          "price_eur_kwh": 0.1848,
-          "priceClass": "EXPENSIVE",
-          "baseLoadForecastW": 887,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 45,
-            "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 0
-          },
-          "pvForecastW": 0,
-          "netBeforeFlexW": 887,
-          "importBeforeFlexW": 887,
-          "pvSurplusBeforeFlexW": 0,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_CALIBRATED"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD"
-        },
-        {
-          "i": 23,
-          "start": "2026-08-30T19:00:00.000Z",
-          "end": "2026-08-30T19:15:00.000Z",
-          "localDate": "2026-08-30",
-          "localQuarter": 84,
           "price_eur_kwh": 0.2016,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
@@ -1066,11 +991,11 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 24,
-          "start": "2026-08-30T19:15:00.000Z",
-          "end": "2026-08-30T19:30:00.000Z",
+          "i": 22,
+          "start": "2026-08-30T19:00:00.000Z",
+          "end": "2026-08-30T19:15:00.000Z",
           "localDate": "2026-08-30",
-          "localQuarter": 85,
+          "localQuarter": 84,
           "price_eur_kwh": 0.2124,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
@@ -1100,11 +1025,11 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 25,
-          "start": "2026-08-30T19:30:00.000Z",
-          "end": "2026-08-30T19:45:00.000Z",
+          "i": 23,
+          "start": "2026-08-30T19:15:00.000Z",
+          "end": "2026-08-30T19:30:00.000Z",
           "localDate": "2026-08-30",
-          "localQuarter": 86,
+          "localQuarter": 85,
           "price_eur_kwh": 0.204,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
@@ -1134,11 +1059,11 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 26,
-          "start": "2026-08-30T19:45:00.000Z",
-          "end": "2026-08-30T20:00:00.000Z",
+          "i": 24,
+          "start": "2026-08-30T19:30:00.000Z",
+          "end": "2026-08-30T19:45:00.000Z",
           "localDate": "2026-08-30",
-          "localQuarter": 87,
+          "localQuarter": 86,
           "price_eur_kwh": 0.2001,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
@@ -1168,11 +1093,11 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 27,
-          "start": "2026-08-30T20:00:00.000Z",
-          "end": "2026-08-30T20:15:00.000Z",
+          "i": 25,
+          "start": "2026-08-30T19:45:00.000Z",
+          "end": "2026-08-30T20:00:00.000Z",
           "localDate": "2026-08-30",
-          "localQuarter": 88,
+          "localQuarter": 87,
           "price_eur_kwh": 0.1882,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
@@ -1202,13 +1127,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 28,
-          "start": "2026-08-30T20:15:00.000Z",
-          "end": "2026-08-30T20:30:00.000Z",
+          "i": 26,
+          "start": "2026-08-30T20:00:00.000Z",
+          "end": "2026-08-30T20:15:00.000Z",
           "localDate": "2026-08-30",
-          "localQuarter": 89,
+          "localQuarter": 88,
           "price_eur_kwh": 0.1799,
-          "priceClass": "NORMAL",
+          "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1236,11 +1161,11 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 29,
-          "start": "2026-08-30T20:30:00.000Z",
-          "end": "2026-08-30T20:45:00.000Z",
+          "i": 27,
+          "start": "2026-08-30T20:15:00.000Z",
+          "end": "2026-08-30T20:30:00.000Z",
           "localDate": "2026-08-30",
-          "localQuarter": 90,
+          "localQuarter": 89,
           "price_eur_kwh": 0.1893,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
@@ -1270,13 +1195,81 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 30,
+          "i": 28,
+          "start": "2026-08-30T20:30:00.000Z",
+          "end": "2026-08-30T20:45:00.000Z",
+          "localDate": "2026-08-30",
+          "localQuarter": 90,
+          "price_eur_kwh": 0.1796,
+          "priceClass": "EXPENSIVE",
+          "baseLoadForecastW": 887,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 45,
+            "rejectedHighLoadSamples": 8,
+            "rejectedKnownApplianceSamples": 0
+          },
+          "pvForecastW": 0,
+          "netBeforeFlexW": 887,
+          "importBeforeFlexW": 887,
+          "pvSurplusBeforeFlexW": 0,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_CALIBRATED"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD"
+        },
+        {
+          "i": 29,
           "start": "2026-08-30T20:45:00.000Z",
           "end": "2026-08-30T21:00:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 91,
-          "price_eur_kwh": 0.1796,
-          "priceClass": "NORMAL",
+          "price_eur_kwh": 0.1815,
+          "priceClass": "EXPENSIVE",
+          "baseLoadForecastW": 887,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 45,
+            "rejectedHighLoadSamples": 8,
+            "rejectedKnownApplianceSamples": 0
+          },
+          "pvForecastW": 0,
+          "netBeforeFlexW": 887,
+          "importBeforeFlexW": 887,
+          "pvSurplusBeforeFlexW": 0,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_CALIBRATED"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD"
+        },
+        {
+          "i": 30,
+          "start": "2026-08-30T21:00:00.000Z",
+          "end": "2026-08-30T21:15:00.000Z",
+          "localDate": "2026-08-30",
+          "localQuarter": 92,
+          "price_eur_kwh": 0.1756,
+          "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1305,12 +1298,12 @@
         },
         {
           "i": 31,
-          "start": "2026-08-30T21:00:00.000Z",
-          "end": "2026-08-30T21:15:00.000Z",
+          "start": "2026-08-30T21:15:00.000Z",
+          "end": "2026-08-30T21:30:00.000Z",
           "localDate": "2026-08-30",
-          "localQuarter": 92,
-          "price_eur_kwh": 0.1815,
-          "priceClass": "NORMAL",
+          "localQuarter": 93,
+          "price_eur_kwh": 0.179,
+          "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1339,78 +1332,10 @@
         },
         {
           "i": 32,
-          "start": "2026-08-30T21:15:00.000Z",
-          "end": "2026-08-30T21:30:00.000Z",
-          "localDate": "2026-08-30",
-          "localQuarter": 93,
-          "price_eur_kwh": 0.1756,
-          "priceClass": "NORMAL",
-          "baseLoadForecastW": 887,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 45,
-            "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 0
-          },
-          "pvForecastW": 0,
-          "netBeforeFlexW": 887,
-          "importBeforeFlexW": 887,
-          "pvSurplusBeforeFlexW": 0,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_CALIBRATED"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD"
-        },
-        {
-          "i": 33,
           "start": "2026-08-30T21:30:00.000Z",
           "end": "2026-08-30T21:45:00.000Z",
           "localDate": "2026-08-30",
           "localQuarter": 94,
-          "price_eur_kwh": 0.179,
-          "priceClass": "NORMAL",
-          "baseLoadForecastW": 887,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 45,
-            "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 0
-          },
-          "pvForecastW": 0,
-          "netBeforeFlexW": 887,
-          "importBeforeFlexW": 887,
-          "pvSurplusBeforeFlexW": 0,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_CALIBRATED"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD"
-        },
-        {
-          "i": 34,
-          "start": "2026-08-30T21:45:00.000Z",
-          "end": "2026-08-30T22:00:00.000Z",
-          "localDate": "2026-08-30",
-          "localQuarter": 95,
           "price_eur_kwh": 0.1672,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
@@ -1440,11 +1365,11 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 35,
-          "start": "2026-08-30T22:00:00.000Z",
-          "end": "2026-08-30T22:15:00.000Z",
-          "localDate": "2026-08-31",
-          "localQuarter": 0,
+          "i": 33,
+          "start": "2026-08-30T21:45:00.000Z",
+          "end": "2026-08-30T22:00:00.000Z",
+          "localDate": "2026-08-30",
+          "localQuarter": 95,
           "price_eur_kwh": 0.1669,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
@@ -1474,11 +1399,11 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 36,
-          "start": "2026-08-30T22:15:00.000Z",
-          "end": "2026-08-30T22:30:00.000Z",
+          "i": 34,
+          "start": "2026-08-30T22:00:00.000Z",
+          "end": "2026-08-30T22:15:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 1,
+          "localQuarter": 0,
           "price_eur_kwh": 0.159,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
@@ -1505,21 +1430,84 @@
           },
           "battery": "HOLD",
           "tesla": "HOLD",
-          "warmWater": "DEADLINE_REQUIRED",
-          "warmWaterReason": "GRID_CHEAPEST_USABLE",
-          "warmWaterPvCoverageW": 0,
-          "warmWaterGridRequiredW": 1900,
-          "warmWaterPlanningDate": "2026-08-31",
-          "warmWaterDayRelation": "FUTURE_DAY"
+          "warmWater": "HOLD"
         },
         {
-          "i": 37,
+          "i": 35,
+          "start": "2026-08-30T22:15:00.000Z",
+          "end": "2026-08-30T22:30:00.000Z",
+          "localDate": "2026-08-31",
+          "localQuarter": 1,
+          "price_eur_kwh": 0.1879,
+          "priceClass": "EXPENSIVE",
+          "baseLoadForecastW": 887,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 45,
+            "rejectedHighLoadSamples": 8,
+            "rejectedKnownApplianceSamples": 0
+          },
+          "pvForecastW": 0,
+          "netBeforeFlexW": 887,
+          "importBeforeFlexW": 887,
+          "pvSurplusBeforeFlexW": 0,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_CALIBRATED"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD"
+        },
+        {
+          "i": 36,
           "start": "2026-08-30T22:30:00.000Z",
           "end": "2026-08-30T22:45:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 2,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.1752,
+          "priceClass": "EXPENSIVE",
+          "baseLoadForecastW": 887,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 45,
+            "rejectedHighLoadSamples": 8,
+            "rejectedKnownApplianceSamples": 0
+          },
+          "pvForecastW": 0,
+          "netBeforeFlexW": 887,
+          "importBeforeFlexW": 887,
+          "pvSurplusBeforeFlexW": 0,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_CALIBRATED"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD"
+        },
+        {
+          "i": 37,
+          "start": "2026-08-30T22:45:00.000Z",
+          "end": "2026-08-30T23:00:00.000Z",
+          "localDate": "2026-08-31",
+          "localQuarter": 3,
+          "price_eur_kwh": 0.1678,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1548,12 +1536,12 @@
         },
         {
           "i": 38,
-          "start": "2026-08-30T22:45:00.000Z",
-          "end": "2026-08-30T23:00:00.000Z",
+          "start": "2026-08-30T23:00:00.000Z",
+          "end": "2026-08-30T23:15:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 3,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 4,
+          "price_eur_kwh": 0.1614,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1582,12 +1570,12 @@
         },
         {
           "i": 39,
-          "start": "2026-08-30T23:00:00.000Z",
-          "end": "2026-08-30T23:15:00.000Z",
+          "start": "2026-08-30T23:15:00.000Z",
+          "end": "2026-08-30T23:30:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 4,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 5,
+          "price_eur_kwh": 0.1685,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1616,12 +1604,12 @@
         },
         {
           "i": 40,
-          "start": "2026-08-30T23:15:00.000Z",
-          "end": "2026-08-30T23:30:00.000Z",
+          "start": "2026-08-30T23:30:00.000Z",
+          "end": "2026-08-30T23:45:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 5,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 6,
+          "price_eur_kwh": 0.1598,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1650,12 +1638,12 @@
         },
         {
           "i": 41,
-          "start": "2026-08-30T23:30:00.000Z",
-          "end": "2026-08-30T23:45:00.000Z",
+          "start": "2026-08-30T23:45:00.000Z",
+          "end": "2026-08-31T00:00:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 6,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 7,
+          "price_eur_kwh": 0.1537,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1684,12 +1672,12 @@
         },
         {
           "i": 42,
-          "start": "2026-08-30T23:45:00.000Z",
-          "end": "2026-08-31T00:00:00.000Z",
+          "start": "2026-08-31T00:00:00.000Z",
+          "end": "2026-08-31T00:15:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 7,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 8,
+          "price_eur_kwh": 0.1484,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1718,12 +1706,12 @@
         },
         {
           "i": 43,
-          "start": "2026-08-31T00:00:00.000Z",
-          "end": "2026-08-31T00:15:00.000Z",
+          "start": "2026-08-31T00:15:00.000Z",
+          "end": "2026-08-31T00:30:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 8,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 9,
+          "price_eur_kwh": 0.1583,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1752,12 +1740,12 @@
         },
         {
           "i": 44,
-          "start": "2026-08-31T00:15:00.000Z",
-          "end": "2026-08-31T00:30:00.000Z",
+          "start": "2026-08-31T00:30:00.000Z",
+          "end": "2026-08-31T00:45:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 9,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 10,
+          "price_eur_kwh": 0.145,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1786,12 +1774,12 @@
         },
         {
           "i": 45,
-          "start": "2026-08-31T00:30:00.000Z",
-          "end": "2026-08-31T00:45:00.000Z",
+          "start": "2026-08-31T00:45:00.000Z",
+          "end": "2026-08-31T01:00:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 10,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 11,
+          "price_eur_kwh": 0.1384,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1820,12 +1808,12 @@
         },
         {
           "i": 46,
-          "start": "2026-08-31T00:45:00.000Z",
-          "end": "2026-08-31T01:00:00.000Z",
+          "start": "2026-08-31T01:00:00.000Z",
+          "end": "2026-08-31T01:15:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 11,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 12,
+          "price_eur_kwh": 0.1292,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1854,12 +1842,12 @@
         },
         {
           "i": 47,
-          "start": "2026-08-31T01:00:00.000Z",
-          "end": "2026-08-31T01:15:00.000Z",
+          "start": "2026-08-31T01:15:00.000Z",
+          "end": "2026-08-31T01:30:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 12,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 13,
+          "price_eur_kwh": 0.1365,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1888,12 +1876,12 @@
         },
         {
           "i": 48,
-          "start": "2026-08-31T01:15:00.000Z",
-          "end": "2026-08-31T01:30:00.000Z",
+          "start": "2026-08-31T01:30:00.000Z",
+          "end": "2026-08-31T01:45:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 13,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 14,
+          "price_eur_kwh": 0.1311,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1922,12 +1910,12 @@
         },
         {
           "i": 49,
-          "start": "2026-08-31T01:30:00.000Z",
-          "end": "2026-08-31T01:45:00.000Z",
+          "start": "2026-08-31T01:45:00.000Z",
+          "end": "2026-08-31T02:00:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 14,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 15,
+          "price_eur_kwh": 0.1284,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1956,12 +1944,12 @@
         },
         {
           "i": 50,
-          "start": "2026-08-31T01:45:00.000Z",
-          "end": "2026-08-31T02:00:00.000Z",
+          "start": "2026-08-31T02:00:00.000Z",
+          "end": "2026-08-31T02:15:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 15,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 16,
+          "price_eur_kwh": 0.1262,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1990,12 +1978,12 @@
         },
         {
           "i": 51,
-          "start": "2026-08-31T02:00:00.000Z",
-          "end": "2026-08-31T02:15:00.000Z",
+          "start": "2026-08-31T02:15:00.000Z",
+          "end": "2026-08-31T02:30:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 16,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 17,
+          "price_eur_kwh": 0.1255,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2024,12 +2012,12 @@
         },
         {
           "i": 52,
-          "start": "2026-08-31T02:15:00.000Z",
-          "end": "2026-08-31T02:30:00.000Z",
+          "start": "2026-08-31T02:30:00.000Z",
+          "end": "2026-08-31T02:45:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 17,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 18,
+          "price_eur_kwh": 0.1241,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2058,12 +2046,12 @@
         },
         {
           "i": 53,
-          "start": "2026-08-31T02:30:00.000Z",
-          "end": "2026-08-31T02:45:00.000Z",
+          "start": "2026-08-31T02:45:00.000Z",
+          "end": "2026-08-31T03:00:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 18,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 19,
+          "price_eur_kwh": 0.1245,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2092,12 +2080,12 @@
         },
         {
           "i": 54,
-          "start": "2026-08-31T02:45:00.000Z",
-          "end": "2026-08-31T03:00:00.000Z",
+          "start": "2026-08-31T03:00:00.000Z",
+          "end": "2026-08-31T03:15:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 19,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 20,
+          "price_eur_kwh": 0.1254,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2126,12 +2114,12 @@
         },
         {
           "i": 55,
-          "start": "2026-08-31T03:00:00.000Z",
-          "end": "2026-08-31T03:15:00.000Z",
+          "start": "2026-08-31T03:15:00.000Z",
+          "end": "2026-08-31T03:30:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 20,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 21,
+          "price_eur_kwh": 0.1249,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2160,12 +2148,12 @@
         },
         {
           "i": 56,
-          "start": "2026-08-31T03:15:00.000Z",
-          "end": "2026-08-31T03:30:00.000Z",
+          "start": "2026-08-31T03:30:00.000Z",
+          "end": "2026-08-31T03:45:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 21,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 22,
+          "price_eur_kwh": 0.1255,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2194,12 +2182,12 @@
         },
         {
           "i": 57,
-          "start": "2026-08-31T03:30:00.000Z",
-          "end": "2026-08-31T03:45:00.000Z",
+          "start": "2026-08-31T03:45:00.000Z",
+          "end": "2026-08-31T04:00:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 22,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 23,
+          "price_eur_kwh": 0.1274,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2228,12 +2216,12 @@
         },
         {
           "i": 58,
-          "start": "2026-08-31T03:45:00.000Z",
-          "end": "2026-08-31T04:00:00.000Z",
+          "start": "2026-08-31T04:00:00.000Z",
+          "end": "2026-08-31T04:15:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 23,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 24,
+          "price_eur_kwh": 0.1352,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2262,12 +2250,12 @@
         },
         {
           "i": 59,
-          "start": "2026-08-31T04:00:00.000Z",
-          "end": "2026-08-31T04:15:00.000Z",
+          "start": "2026-08-31T04:15:00.000Z",
+          "end": "2026-08-31T04:30:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 24,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 25,
+          "price_eur_kwh": 0.1455,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2296,12 +2284,12 @@
         },
         {
           "i": 60,
-          "start": "2026-08-31T04:15:00.000Z",
-          "end": "2026-08-31T04:30:00.000Z",
+          "start": "2026-08-31T04:30:00.000Z",
+          "end": "2026-08-31T04:45:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 25,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 26,
+          "price_eur_kwh": 0.1465,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2330,12 +2318,12 @@
         },
         {
           "i": 61,
-          "start": "2026-08-31T04:30:00.000Z",
-          "end": "2026-08-31T04:45:00.000Z",
+          "start": "2026-08-31T04:45:00.000Z",
+          "end": "2026-08-31T05:00:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 26,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 27,
+          "price_eur_kwh": 0.1522,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2364,12 +2352,12 @@
         },
         {
           "i": 62,
-          "start": "2026-08-31T04:45:00.000Z",
-          "end": "2026-08-31T05:00:00.000Z",
+          "start": "2026-08-31T05:00:00.000Z",
+          "end": "2026-08-31T05:15:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 27,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 28,
+          "price_eur_kwh": 0.156,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2398,46 +2386,12 @@
         },
         {
           "i": 63,
-          "start": "2026-08-31T05:00:00.000Z",
-          "end": "2026-08-31T05:15:00.000Z",
-          "localDate": "2026-08-31",
-          "localQuarter": 28,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
-          "baseLoadForecastW": 887,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 45,
-            "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 0
-          },
-          "pvForecastW": 0,
-          "netBeforeFlexW": 887,
-          "importBeforeFlexW": 887,
-          "pvSurplusBeforeFlexW": 0,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_CALIBRATED"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD"
-        },
-        {
-          "i": 64,
           "start": "2026-08-31T05:15:00.000Z",
           "end": "2026-08-31T05:30:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 29,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.1652,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2465,13 +2419,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 65,
+          "i": 64,
           "start": "2026-08-31T05:30:00.000Z",
           "end": "2026-08-31T05:45:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 30,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.1652,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2499,13 +2453,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 66,
+          "i": 65,
           "start": "2026-08-31T05:45:00.000Z",
           "end": "2026-08-31T06:00:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 31,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.1652,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2533,13 +2487,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 67,
+          "i": 66,
           "start": "2026-08-31T06:00:00.000Z",
           "end": "2026-08-31T06:15:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 32,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.1646,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2567,13 +2521,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 68,
+          "i": 67,
           "start": "2026-08-31T06:15:00.000Z",
           "end": "2026-08-31T06:30:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 33,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.1841,
+          "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2601,13 +2555,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 69,
+          "i": 68,
           "start": "2026-08-31T06:30:00.000Z",
           "end": "2026-08-31T06:45:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 34,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.1746,
+          "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2635,13 +2589,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 70,
+          "i": 69,
           "start": "2026-08-31T06:45:00.000Z",
           "end": "2026-08-31T07:00:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 35,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.1605,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2669,13 +2623,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 71,
+          "i": 70,
           "start": "2026-08-31T07:00:00.000Z",
           "end": "2026-08-31T07:15:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 36,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.13,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2703,13 +2657,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 72,
+          "i": 71,
           "start": "2026-08-31T07:15:00.000Z",
           "end": "2026-08-31T07:30:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 37,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.1739,
+          "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2737,13 +2691,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 73,
+          "i": 72,
           "start": "2026-08-31T07:30:00.000Z",
           "end": "2026-08-31T07:45:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 38,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.1347,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2771,13 +2725,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 74,
+          "i": 73,
           "start": "2026-08-31T07:45:00.000Z",
           "end": "2026-08-31T08:00:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 39,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.1014,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2805,13 +2759,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 75,
+          "i": 74,
           "start": "2026-08-31T08:00:00.000Z",
           "end": "2026-08-31T08:15:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 40,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.0723,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2839,13 +2793,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 76,
+          "i": 75,
           "start": "2026-08-31T08:15:00.000Z",
           "end": "2026-08-31T08:30:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 41,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.0781,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2873,13 +2827,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 77,
+          "i": 76,
           "start": "2026-08-31T08:30:00.000Z",
           "end": "2026-08-31T08:45:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 42,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.0314,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2907,13 +2861,13 @@
           "warmWater": "HOLD"
         },
         {
-          "i": 78,
+          "i": 77,
           "start": "2026-08-31T08:45:00.000Z",
           "end": "2026-08-31T09:00:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 43,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.0006,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2938,16 +2892,21 @@
           },
           "battery": "HOLD",
           "tesla": "HOLD",
-          "warmWater": "HOLD"
+          "warmWater": "DEADLINE_REQUIRED",
+          "warmWaterReason": "GRID_CHEAPEST_USABLE",
+          "warmWaterPvCoverageW": 0,
+          "warmWaterGridRequiredW": 1900,
+          "warmWaterPlanningDate": "2026-08-31",
+          "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 79,
+          "i": 78,
           "start": "2026-08-31T09:00:00.000Z",
           "end": "2026-08-31T09:15:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 44,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.0011,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -2972,16 +2931,21 @@
           },
           "battery": "HOLD",
           "tesla": "HOLD",
-          "warmWater": "HOLD"
+          "warmWater": "DEADLINE_REQUIRED",
+          "warmWaterReason": "GRID_CHEAPEST_USABLE",
+          "warmWaterPvCoverageW": 0,
+          "warmWaterGridRequiredW": 1900,
+          "warmWaterPlanningDate": "2026-08-31",
+          "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 80,
+          "i": 79,
           "start": "2026-08-31T09:15:00.000Z",
           "end": "2026-08-31T09:30:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 45,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.0004,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3006,16 +2970,21 @@
           },
           "battery": "HOLD",
           "tesla": "HOLD",
-          "warmWater": "HOLD"
+          "warmWater": "DEADLINE_REQUIRED",
+          "warmWaterReason": "GRID_CHEAPEST_USABLE",
+          "warmWaterPvCoverageW": 0,
+          "warmWaterGridRequiredW": 1900,
+          "warmWaterPlanningDate": "2026-08-31",
+          "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 81,
+          "i": 80,
           "start": "2026-08-31T09:30:00.000Z",
           "end": "2026-08-31T09:45:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 46,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.002,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3048,13 +3017,13 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 82,
+          "i": 81,
           "start": "2026-08-31T09:45:00.000Z",
           "end": "2026-08-31T10:00:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 47,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.002,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3087,13 +3056,13 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 83,
+          "i": 82,
           "start": "2026-08-31T10:00:00.000Z",
           "end": "2026-08-31T10:15:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 48,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.002,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3126,13 +3095,13 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 84,
+          "i": 83,
           "start": "2026-08-31T10:15:00.000Z",
           "end": "2026-08-31T10:30:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 49,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.003,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3165,13 +3134,13 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 85,
+          "i": 84,
           "start": "2026-08-31T10:30:00.000Z",
           "end": "2026-08-31T10:45:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 50,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.003,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3204,13 +3173,13 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 86,
+          "i": 85,
           "start": "2026-08-31T10:45:00.000Z",
           "end": "2026-08-31T11:00:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 51,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.003,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3243,13 +3212,13 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 87,
+          "i": 86,
           "start": "2026-08-31T11:00:00.000Z",
           "end": "2026-08-31T11:15:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 52,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.003,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3282,13 +3251,13 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 88,
+          "i": 87,
           "start": "2026-08-31T11:15:00.000Z",
           "end": "2026-08-31T11:30:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 53,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.0008,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3321,13 +3290,13 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 89,
+          "i": 88,
           "start": "2026-08-31T11:30:00.000Z",
           "end": "2026-08-31T11:45:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 54,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.001,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3360,13 +3329,13 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 90,
+          "i": 89,
           "start": "2026-08-31T11:45:00.000Z",
           "end": "2026-08-31T12:00:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 55,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.001,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3399,13 +3368,13 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 91,
+          "i": 90,
           "start": "2026-08-31T12:00:00.000Z",
           "end": "2026-08-31T12:15:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 56,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": -0.001,
+          "priceClass": "NEGATIVE",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3438,13 +3407,13 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 92,
+          "i": 91,
           "start": "2026-08-31T12:15:00.000Z",
           "end": "2026-08-31T12:30:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 57,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.001,
+          "priceClass": "CHEAP",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3469,21 +3438,55 @@
           },
           "battery": "HOLD",
           "tesla": "HOLD",
+          "warmWater": "HOLD"
+        },
+        {
+          "i": 92,
+          "start": "2026-08-31T12:30:00.000Z",
+          "end": "2026-08-31T12:45:00.000Z",
+          "localDate": "2026-08-31",
+          "localQuarter": 58,
+          "price_eur_kwh": 0.0007,
+          "priceClass": "CHEAP",
+          "baseLoadForecastW": 887,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 45,
+            "rejectedHighLoadSamples": 8,
+            "rejectedKnownApplianceSamples": 0
+          },
+          "pvForecastW": 1910,
+          "netBeforeFlexW": -1024,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 1024,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_CALIBRATED"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
           "warmWater": "DEADLINE_REQUIRED",
           "warmWaterReason": "GRID_CHEAPEST_USABLE",
-          "warmWaterPvCoverageW": 912,
-          "warmWaterGridRequiredW": 988,
+          "warmWaterPvCoverageW": 1024,
+          "warmWaterGridRequiredW": 876,
           "warmWaterPlanningDate": "2026-08-31",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
           "i": 93,
-          "start": "2026-08-31T12:30:00.000Z",
-          "end": "2026-08-31T12:45:00.000Z",
+          "start": "2026-08-31T12:45:00.000Z",
+          "end": "2026-08-31T13:00:00.000Z",
           "localDate": "2026-08-31",
-          "localQuarter": 58,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "localQuarter": 59,
+          "price_eur_kwh": 0.0003,
+          "priceClass": "CHEAP",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3517,51 +3520,12 @@
         },
         {
           "i": 94,
-          "start": "2026-08-31T12:45:00.000Z",
-          "end": "2026-08-31T13:00:00.000Z",
-          "localDate": "2026-08-31",
-          "localQuarter": 59,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
-          "baseLoadForecastW": 887,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 45,
-            "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 0
-          },
-          "pvForecastW": 1910,
-          "netBeforeFlexW": -1024,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1024,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_CALIBRATED"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "DEADLINE_REQUIRED",
-          "warmWaterReason": "GRID_CHEAPEST_USABLE",
-          "warmWaterPvCoverageW": 1024,
-          "warmWaterGridRequiredW": 876,
-          "warmWaterPlanningDate": "2026-08-31",
-          "warmWaterDayRelation": "FUTURE_DAY"
-        },
-        {
-          "i": 95,
           "start": "2026-08-31T13:00:00.000Z",
           "end": "2026-08-31T13:15:00.000Z",
           "localDate": "2026-08-31",
           "localQuarter": 60,
-          "price_eur_kwh": null,
-          "priceClass": "UNKNOWN",
+          "price_eur_kwh": 0.0009,
+          "priceClass": "CHEAP",
           "baseLoadForecastW": 887,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -3586,12 +3550,41 @@
           },
           "battery": "HOLD",
           "tesla": "HOLD",
-          "warmWater": "DEADLINE_REQUIRED",
-          "warmWaterReason": "GRID_CHEAPEST_USABLE",
-          "warmWaterPvCoverageW": 965,
-          "warmWaterGridRequiredW": 935,
-          "warmWaterPlanningDate": "2026-08-31",
-          "warmWaterDayRelation": "FUTURE_DAY"
+          "warmWater": "HOLD"
+        },
+        {
+          "i": 95,
+          "start": "2026-08-31T13:15:00.000Z",
+          "end": "2026-08-31T13:30:00.000Z",
+          "localDate": "2026-08-31",
+          "localQuarter": 61,
+          "price_eur_kwh": 0.0018,
+          "priceClass": "NORMAL",
+          "baseLoadForecastW": 887,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 45,
+            "rejectedHighLoadSamples": 8,
+            "rejectedKnownApplianceSamples": 0
+          },
+          "pvForecastW": 1766,
+          "netBeforeFlexW": -879,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 879,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_CALIBRATED"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD"
         }
       ],
       "energyBalance": {
@@ -3607,8 +3600,8 @@
         "policy": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD_RELOCATE_BEFORE_19",
         "phaseAware": false,
         "gridHeadroomModel": "NOT_MODELED_PHASE_AWARE",
-        "overlapsBefore": 4,
-        "wwSlotsRelocated": 3,
+        "overlapsBefore": 3,
+        "wwSlotsRelocated": 2,
         "unresolvedShouldOverlaps": 1,
         "wwMustOverlapsPreserved": 0,
         "hardWWDeadlineLocal": "19:00"
@@ -3616,57 +3609,26 @@
       "tesla": {
         "preferredSlots": [
           {
-            "i": 0,
-            "start": "2026-08-30T13:15:00.000Z",
-            "end": "2026-08-30T13:30:00.000Z",
+            "i": 3,
+            "start": "2026-08-30T14:15:00.000Z",
+            "end": "2026-08-30T14:30:00.000Z",
             "localDate": "2026-08-30",
-            "localQuarter": 61,
-            "price_eur_kwh": -0.001,
-            "priceClass": "NEGATIVE",
-            "baseLoadForecastW": 887,
-            "baseForecastTrace": {
-              "basis": "CLEAN_GLOBAL_MEDIAN",
-              "sampleCount": 0,
-              "sampleValuesW": [],
-              "sampleTimestamps": [],
-              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-              "washerActiveSamples": 0,
-              "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 45,
-              "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 0
-            },
-            "pvForecastW": 1595,
-            "netBeforeFlexW": -709,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 709,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-              "pv": "WEATHER_HAUWERT_CALIBRATED"
-            }
-          },
-          {
-            "i": 5,
-            "start": "2026-08-30T14:30:00.000Z",
-            "end": "2026-08-30T14:45:00.000Z",
-            "localDate": "2026-08-30",
-            "localQuarter": 66,
+            "localQuarter": 65,
             "price_eur_kwh": -0.0004,
             "priceClass": "NEGATIVE",
-            "baseLoadForecastW": 756,
+            "baseLoadForecastW": 113,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
               "sampleCount": 3,
               "sampleValuesW": [
-                420,
-                756,
-                756
+                113,
+                113,
+                303
               ],
               "sampleTimestamps": [
-                "2026-08-29T14:30:00.086Z",
-                "2026-08-29T14:35:00.289Z",
-                "2026-08-29T14:40:00.067Z"
+                "2026-08-29T14:15:00.304Z",
+                "2026-08-29T14:20:00.096Z",
+                "2026-08-29T14:25:00.240Z"
               ],
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
@@ -3675,10 +3637,10 @@
               "rejectedHighLoadSamples": 8,
               "rejectedKnownApplianceSamples": 0
             },
-            "pvForecastW": 2061,
-            "netBeforeFlexW": -1305,
+            "pvForecastW": 1923,
+            "netBeforeFlexW": -1810,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 1305,
+            "pvSurplusBeforeFlexW": 1810,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -3686,7 +3648,7 @@
             }
           },
           {
-            "i": 1,
+            "i": 0,
             "start": "2026-08-30T13:30:00.000Z",
             "end": "2026-08-30T13:45:00.000Z",
             "localDate": "2026-08-30",
@@ -3717,7 +3679,7 @@
             }
           },
           {
-            "i": 2,
+            "i": 1,
             "start": "2026-08-30T13:45:00.000Z",
             "end": "2026-08-30T14:00:00.000Z",
             "localDate": "2026-08-30",
@@ -3752,7 +3714,7 @@
             }
           },
           {
-            "i": 3,
+            "i": 2,
             "start": "2026-08-30T14:00:00.000Z",
             "end": "2026-08-30T14:15:00.000Z",
             "localDate": "2026-08-30",
@@ -3790,25 +3752,25 @@
           },
           {
             "i": 4,
-            "start": "2026-08-30T14:15:00.000Z",
-            "end": "2026-08-30T14:30:00.000Z",
+            "start": "2026-08-30T14:30:00.000Z",
+            "end": "2026-08-30T14:45:00.000Z",
             "localDate": "2026-08-30",
-            "localQuarter": 65,
-            "price_eur_kwh": -0.0001,
-            "priceClass": "NEGATIVE",
-            "baseLoadForecastW": 113,
+            "localQuarter": 66,
+            "price_eur_kwh": 0,
+            "priceClass": "CHEAP",
+            "baseLoadForecastW": 756,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
               "sampleCount": 3,
               "sampleValuesW": [
-                113,
-                113,
-                303
+                420,
+                756,
+                756
               ],
               "sampleTimestamps": [
-                "2026-08-29T14:15:00.304Z",
-                "2026-08-29T14:20:00.096Z",
-                "2026-08-29T14:25:00.240Z"
+                "2026-08-29T14:30:00.086Z",
+                "2026-08-29T14:35:00.289Z",
+                "2026-08-29T14:40:00.067Z"
               ],
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
@@ -3817,10 +3779,10 @@
               "rejectedHighLoadSamples": 8,
               "rejectedKnownApplianceSamples": 0
             },
-            "pvForecastW": 1923,
-            "netBeforeFlexW": -1810,
+            "pvForecastW": 2061,
+            "netBeforeFlexW": -1305,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 1810,
+            "pvSurplusBeforeFlexW": 1305,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -3828,12 +3790,12 @@
             }
           },
           {
-            "i": 6,
+            "i": 5,
             "start": "2026-08-30T14:45:00.000Z",
             "end": "2026-08-30T15:00:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 67,
-            "price_eur_kwh": 0,
+            "price_eur_kwh": 0.0007,
             "priceClass": "CHEAP",
             "baseLoadForecastW": 917,
             "baseForecastTrace": {
@@ -3867,13 +3829,13 @@
             }
           },
           {
-            "i": 7,
+            "i": 6,
             "start": "2026-08-30T15:00:00.000Z",
             "end": "2026-08-30T15:15:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 68,
-            "price_eur_kwh": 0.0007,
-            "priceClass": "CHEAP",
+            "price_eur_kwh": 0.0016,
+            "priceClass": "NORMAL",
             "baseLoadForecastW": 520,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
@@ -3906,13 +3868,13 @@
             }
           },
           {
-            "i": 8,
+            "i": 7,
             "start": "2026-08-30T15:15:00.000Z",
             "end": "2026-08-30T15:30:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 69,
-            "price_eur_kwh": 0.0016,
-            "priceClass": "CHEAP",
+            "price_eur_kwh": 0.0044,
+            "priceClass": "NORMAL",
             "baseLoadForecastW": 555,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
@@ -3945,13 +3907,13 @@
             }
           },
           {
-            "i": 9,
+            "i": 8,
             "start": "2026-08-30T15:30:00.000Z",
             "end": "2026-08-30T15:45:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 70,
-            "price_eur_kwh": 0.0044,
-            "priceClass": "CHEAP",
+            "price_eur_kwh": 0.0313,
+            "priceClass": "NORMAL",
             "baseLoadForecastW": 426,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
@@ -3984,12 +3946,12 @@
             }
           },
           {
-            "i": 10,
+            "i": 9,
             "start": "2026-08-30T15:45:00.000Z",
             "end": "2026-08-30T16:00:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 71,
-            "price_eur_kwh": 0.0313,
+            "price_eur_kwh": 0.0701,
             "priceClass": "NORMAL",
             "baseLoadForecastW": 640,
             "baseForecastTrace": {
@@ -4024,11 +3986,46 @@
           },
           {
             "i": 11,
+            "start": "2026-08-30T16:15:00.000Z",
+            "end": "2026-08-30T16:30:00.000Z",
+            "localDate": "2026-08-30",
+            "localQuarter": 73,
+            "price_eur_kwh": 0.1001,
+            "priceClass": "NORMAL",
+            "baseLoadForecastW": 887,
+            "baseForecastTrace": {
+              "basis": "CLEAN_GLOBAL_MEDIAN",
+              "sampleCount": 1,
+              "sampleValuesW": [
+                887
+              ],
+              "sampleTimestamps": [
+                "2026-08-29T16:25:00.252Z"
+              ],
+              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+              "washerActiveSamples": 0,
+              "dryerActiveSamples": 0,
+              "globalCleanSampleCount": 45,
+              "rejectedHighLoadSamples": 8,
+              "rejectedKnownApplianceSamples": 0
+            },
+            "pvForecastW": 1392,
+            "netBeforeFlexW": -505,
+            "importBeforeFlexW": 0,
+            "pvSurplusBeforeFlexW": 505,
+            "gridHeadroomW": null,
+            "forecastQuality": {
+              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+              "pv": "WEATHER_HAUWERT_CALIBRATED"
+            }
+          },
+          {
+            "i": 10,
             "start": "2026-08-30T16:00:00.000Z",
             "end": "2026-08-30T16:15:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 72,
-            "price_eur_kwh": 0.0701,
+            "price_eur_kwh": 0.1211,
             "priceClass": "NORMAL",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
@@ -4060,57 +4057,26 @@
         ],
         "deadlinePreferredSlots": [
           {
-            "i": 0,
-            "start": "2026-08-30T13:15:00.000Z",
-            "end": "2026-08-30T13:30:00.000Z",
+            "i": 3,
+            "start": "2026-08-30T14:15:00.000Z",
+            "end": "2026-08-30T14:30:00.000Z",
             "localDate": "2026-08-30",
-            "localQuarter": 61,
-            "price_eur_kwh": -0.001,
-            "priceClass": "NEGATIVE",
-            "baseLoadForecastW": 887,
-            "baseForecastTrace": {
-              "basis": "CLEAN_GLOBAL_MEDIAN",
-              "sampleCount": 0,
-              "sampleValuesW": [],
-              "sampleTimestamps": [],
-              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-              "washerActiveSamples": 0,
-              "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 45,
-              "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 0
-            },
-            "pvForecastW": 1595,
-            "netBeforeFlexW": -709,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 709,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-              "pv": "WEATHER_HAUWERT_CALIBRATED"
-            }
-          },
-          {
-            "i": 5,
-            "start": "2026-08-30T14:30:00.000Z",
-            "end": "2026-08-30T14:45:00.000Z",
-            "localDate": "2026-08-30",
-            "localQuarter": 66,
+            "localQuarter": 65,
             "price_eur_kwh": -0.0004,
             "priceClass": "NEGATIVE",
-            "baseLoadForecastW": 756,
+            "baseLoadForecastW": 113,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
               "sampleCount": 3,
               "sampleValuesW": [
-                420,
-                756,
-                756
+                113,
+                113,
+                303
               ],
               "sampleTimestamps": [
-                "2026-08-29T14:30:00.086Z",
-                "2026-08-29T14:35:00.289Z",
-                "2026-08-29T14:40:00.067Z"
+                "2026-08-29T14:15:00.304Z",
+                "2026-08-29T14:20:00.096Z",
+                "2026-08-29T14:25:00.240Z"
               ],
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
@@ -4119,10 +4085,10 @@
               "rejectedHighLoadSamples": 8,
               "rejectedKnownApplianceSamples": 0
             },
-            "pvForecastW": 2061,
-            "netBeforeFlexW": -1305,
+            "pvForecastW": 1923,
+            "netBeforeFlexW": -1810,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 1305,
+            "pvSurplusBeforeFlexW": 1810,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4130,7 +4096,7 @@
             }
           },
           {
-            "i": 1,
+            "i": 0,
             "start": "2026-08-30T13:30:00.000Z",
             "end": "2026-08-30T13:45:00.000Z",
             "localDate": "2026-08-30",
@@ -4161,7 +4127,7 @@
             }
           },
           {
-            "i": 2,
+            "i": 1,
             "start": "2026-08-30T13:45:00.000Z",
             "end": "2026-08-30T14:00:00.000Z",
             "localDate": "2026-08-30",
@@ -4196,7 +4162,7 @@
             }
           },
           {
-            "i": 3,
+            "i": 2,
             "start": "2026-08-30T14:00:00.000Z",
             "end": "2026-08-30T14:15:00.000Z",
             "localDate": "2026-08-30",
@@ -4234,25 +4200,25 @@
           },
           {
             "i": 4,
-            "start": "2026-08-30T14:15:00.000Z",
-            "end": "2026-08-30T14:30:00.000Z",
+            "start": "2026-08-30T14:30:00.000Z",
+            "end": "2026-08-30T14:45:00.000Z",
             "localDate": "2026-08-30",
-            "localQuarter": 65,
-            "price_eur_kwh": -0.0001,
-            "priceClass": "NEGATIVE",
-            "baseLoadForecastW": 113,
+            "localQuarter": 66,
+            "price_eur_kwh": 0,
+            "priceClass": "CHEAP",
+            "baseLoadForecastW": 756,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
               "sampleCount": 3,
               "sampleValuesW": [
-                113,
-                113,
-                303
+                420,
+                756,
+                756
               ],
               "sampleTimestamps": [
-                "2026-08-29T14:15:00.304Z",
-                "2026-08-29T14:20:00.096Z",
-                "2026-08-29T14:25:00.240Z"
+                "2026-08-29T14:30:00.086Z",
+                "2026-08-29T14:35:00.289Z",
+                "2026-08-29T14:40:00.067Z"
               ],
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
@@ -4261,10 +4227,10 @@
               "rejectedHighLoadSamples": 8,
               "rejectedKnownApplianceSamples": 0
             },
-            "pvForecastW": 1923,
-            "netBeforeFlexW": -1810,
+            "pvForecastW": 2061,
+            "netBeforeFlexW": -1305,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 1810,
+            "pvSurplusBeforeFlexW": 1305,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4272,12 +4238,12 @@
             }
           },
           {
-            "i": 6,
+            "i": 5,
             "start": "2026-08-30T14:45:00.000Z",
             "end": "2026-08-30T15:00:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 67,
-            "price_eur_kwh": 0,
+            "price_eur_kwh": 0.0007,
             "priceClass": "CHEAP",
             "baseLoadForecastW": 917,
             "baseForecastTrace": {
@@ -4311,13 +4277,13 @@
             }
           },
           {
-            "i": 7,
+            "i": 6,
             "start": "2026-08-30T15:00:00.000Z",
             "end": "2026-08-30T15:15:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 68,
-            "price_eur_kwh": 0.0007,
-            "priceClass": "CHEAP",
+            "price_eur_kwh": 0.0016,
+            "priceClass": "NORMAL",
             "baseLoadForecastW": 520,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
@@ -4350,13 +4316,13 @@
             }
           },
           {
-            "i": 8,
+            "i": 7,
             "start": "2026-08-30T15:15:00.000Z",
             "end": "2026-08-30T15:30:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 69,
-            "price_eur_kwh": 0.0016,
-            "priceClass": "CHEAP",
+            "price_eur_kwh": 0.0044,
+            "priceClass": "NORMAL",
             "baseLoadForecastW": 555,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
@@ -4389,13 +4355,13 @@
             }
           },
           {
-            "i": 9,
+            "i": 8,
             "start": "2026-08-30T15:30:00.000Z",
             "end": "2026-08-30T15:45:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 70,
-            "price_eur_kwh": 0.0044,
-            "priceClass": "CHEAP",
+            "price_eur_kwh": 0.0313,
+            "priceClass": "NORMAL",
             "baseLoadForecastW": 426,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
@@ -4428,12 +4394,12 @@
             }
           },
           {
-            "i": 10,
+            "i": 9,
             "start": "2026-08-30T15:45:00.000Z",
             "end": "2026-08-30T16:00:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 71,
-            "price_eur_kwh": 0.0313,
+            "price_eur_kwh": 0.0701,
             "priceClass": "NORMAL",
             "baseLoadForecastW": 640,
             "baseForecastTrace": {
@@ -4468,11 +4434,46 @@
           },
           {
             "i": 11,
+            "start": "2026-08-30T16:15:00.000Z",
+            "end": "2026-08-30T16:30:00.000Z",
+            "localDate": "2026-08-30",
+            "localQuarter": 73,
+            "price_eur_kwh": 0.1001,
+            "priceClass": "NORMAL",
+            "baseLoadForecastW": 887,
+            "baseForecastTrace": {
+              "basis": "CLEAN_GLOBAL_MEDIAN",
+              "sampleCount": 1,
+              "sampleValuesW": [
+                887
+              ],
+              "sampleTimestamps": [
+                "2026-08-29T16:25:00.252Z"
+              ],
+              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+              "washerActiveSamples": 0,
+              "dryerActiveSamples": 0,
+              "globalCleanSampleCount": 45,
+              "rejectedHighLoadSamples": 8,
+              "rejectedKnownApplianceSamples": 0
+            },
+            "pvForecastW": 1392,
+            "netBeforeFlexW": -505,
+            "importBeforeFlexW": 0,
+            "pvSurplusBeforeFlexW": 505,
+            "gridHeadroomW": null,
+            "forecastQuality": {
+              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+              "pv": "WEATHER_HAUWERT_CALIBRATED"
+            }
+          },
+          {
+            "i": 10,
             "start": "2026-08-30T16:00:00.000Z",
             "end": "2026-08-30T16:15:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 72,
-            "price_eur_kwh": 0.0701,
+            "price_eur_kwh": 0.1211,
             "priceClass": "NORMAL",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
@@ -4511,26 +4512,26 @@
       "warmWater": {
         "allocatedSlots": [
           {
-            "i": 5,
-            "start": "2026-08-30T14:30:00.000Z",
-            "end": "2026-08-30T14:45:00.000Z",
+            "i": 3,
+            "start": "2026-08-30T14:15:00.000Z",
+            "end": "2026-08-30T14:30:00.000Z",
             "localDate": "2026-08-30",
-            "localQuarter": 66,
+            "localQuarter": 65,
             "price_eur_kwh": -0.0004,
             "priceClass": "NEGATIVE",
-            "baseLoadForecastW": 756,
+            "baseLoadForecastW": 113,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
               "sampleCount": 3,
               "sampleValuesW": [
-                420,
-                756,
-                756
+                113,
+                113,
+                303
               ],
               "sampleTimestamps": [
-                "2026-08-29T14:30:00.086Z",
-                "2026-08-29T14:35:00.289Z",
-                "2026-08-29T14:40:00.067Z"
+                "2026-08-29T14:15:00.304Z",
+                "2026-08-29T14:20:00.096Z",
+                "2026-08-29T14:25:00.240Z"
               ],
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
@@ -4539,10 +4540,10 @@
               "rejectedHighLoadSamples": 8,
               "rejectedKnownApplianceSamples": 0
             },
-            "pvForecastW": 2061,
-            "netBeforeFlexW": -1305,
+            "pvForecastW": 1923,
+            "netBeforeFlexW": -1810,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 1305,
+            "pvSurplusBeforeFlexW": 1810,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4552,61 +4553,17 @@
             "dayRelation": "CURRENT_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 1305,
-            "gridRequiredW": 595,
+            "pvCoverageW": 1810,
+            "gridRequiredW": 90,
             "allocationReason": "GRID_CHEAPEST_USABLE"
           },
           {
             "i": 12,
-            "start": "2026-08-30T16:15:00.000Z",
-            "end": "2026-08-30T16:30:00.000Z",
-            "localDate": "2026-08-30",
-            "localQuarter": 73,
-            "price_eur_kwh": 0.1211,
-            "priceClass": "NORMAL",
-            "baseLoadForecastW": 887,
-            "baseForecastTrace": {
-              "basis": "CLEAN_GLOBAL_MEDIAN",
-              "sampleCount": 1,
-              "sampleValuesW": [
-                887
-              ],
-              "sampleTimestamps": [
-                "2026-08-29T16:25:00.252Z"
-              ],
-              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-              "washerActiveSamples": 0,
-              "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 45,
-              "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 0
-            },
-            "pvForecastW": 1392,
-            "netBeforeFlexW": -505,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 505,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-              "pv": "WEATHER_HAUWERT_CALIBRATED"
-            },
-            "planningDate": "2026-08-30",
-            "dayRelation": "CURRENT_DAY",
-            "catchupRequired": false,
-            "allocatedKWh": 0.475,
-            "pvCoverageW": 505,
-            "gridRequiredW": 1395,
-            "allocationReason": "GRID_CHEAPEST_USABLE",
-            "relocatedFrom": "2026-08-30T14:00:00.000Z",
-            "relocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
-          },
-          {
-            "i": 13,
             "start": "2026-08-30T16:30:00.000Z",
             "end": "2026-08-30T16:45:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 74,
-            "price_eur_kwh": 0.1001,
+            "price_eur_kwh": 0.1514,
             "priceClass": "NORMAL",
             "baseLoadForecastW": 895,
             "baseForecastTrace": {
@@ -4645,17 +4602,17 @@
             "pvCoverageW": 221,
             "gridRequiredW": 1679,
             "allocationReason": "GRID_CHEAPEST_USABLE",
-            "relocatedFrom": "2026-08-30T13:15:00.000Z",
+            "relocatedFrom": "2026-08-30T13:45:00.000Z",
             "relocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
           },
           {
-            "i": 14,
+            "i": 13,
             "start": "2026-08-30T16:45:00.000Z",
             "end": "2026-08-30T17:00:00.000Z",
             "localDate": "2026-08-30",
             "localQuarter": 75,
-            "price_eur_kwh": 0.1514,
-            "priceClass": "NORMAL",
+            "price_eur_kwh": 0.1762,
+            "priceClass": "EXPENSIVE",
             "baseLoadForecastW": 895,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
@@ -4693,17 +4650,17 @@
             "pvCoverageW": 5,
             "gridRequiredW": 1895,
             "allocationReason": "GRID_CHEAPEST_USABLE",
-            "relocatedFrom": "2026-08-30T14:15:00.000Z",
+            "relocatedFrom": "2026-08-30T14:00:00.000Z",
             "relocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
           },
           {
-            "i": 36,
-            "start": "2026-08-30T22:15:00.000Z",
-            "end": "2026-08-30T22:30:00.000Z",
+            "i": 77,
+            "start": "2026-08-31T08:45:00.000Z",
+            "end": "2026-08-31T09:00:00.000Z",
             "localDate": "2026-08-31",
-            "localQuarter": 1,
-            "price_eur_kwh": 0.159,
-            "priceClass": "NORMAL",
+            "localQuarter": 43,
+            "price_eur_kwh": -0.0006,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -4717,9 +4674,9 @@
               "rejectedHighLoadSamples": 8,
               "rejectedKnownApplianceSamples": 0
             },
-            "pvForecastW": 0,
-            "netBeforeFlexW": 887,
-            "importBeforeFlexW": 887,
+            "pvForecastW": 696,
+            "netBeforeFlexW": 191,
+            "importBeforeFlexW": 191,
             "pvSurplusBeforeFlexW": 0,
             "gridHeadroomW": null,
             "forecastQuality": {
@@ -4735,13 +4692,89 @@
             "allocationReason": "GRID_CHEAPEST_USABLE"
           },
           {
-            "i": 81,
+            "i": 78,
+            "start": "2026-08-31T09:00:00.000Z",
+            "end": "2026-08-31T09:15:00.000Z",
+            "localDate": "2026-08-31",
+            "localQuarter": 44,
+            "price_eur_kwh": -0.0011,
+            "priceClass": "NEGATIVE",
+            "baseLoadForecastW": 887,
+            "baseForecastTrace": {
+              "basis": "CLEAN_GLOBAL_MEDIAN",
+              "sampleCount": 0,
+              "sampleValuesW": [],
+              "sampleTimestamps": [],
+              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+              "washerActiveSamples": 0,
+              "dryerActiveSamples": 0,
+              "globalCleanSampleCount": 45,
+              "rejectedHighLoadSamples": 8,
+              "rejectedKnownApplianceSamples": 0
+            },
+            "pvForecastW": 735,
+            "netBeforeFlexW": 151,
+            "importBeforeFlexW": 151,
+            "pvSurplusBeforeFlexW": 0,
+            "gridHeadroomW": null,
+            "forecastQuality": {
+              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+              "pv": "WEATHER_HAUWERT_CALIBRATED"
+            },
+            "planningDate": "2026-08-31",
+            "dayRelation": "FUTURE_DAY",
+            "catchupRequired": false,
+            "allocatedKWh": 0.475,
+            "pvCoverageW": 0,
+            "gridRequiredW": 1900,
+            "allocationReason": "GRID_CHEAPEST_USABLE"
+          },
+          {
+            "i": 79,
+            "start": "2026-08-31T09:15:00.000Z",
+            "end": "2026-08-31T09:30:00.000Z",
+            "localDate": "2026-08-31",
+            "localQuarter": 45,
+            "price_eur_kwh": -0.0004,
+            "priceClass": "NEGATIVE",
+            "baseLoadForecastW": 887,
+            "baseForecastTrace": {
+              "basis": "CLEAN_GLOBAL_MEDIAN",
+              "sampleCount": 0,
+              "sampleValuesW": [],
+              "sampleTimestamps": [],
+              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+              "washerActiveSamples": 0,
+              "dryerActiveSamples": 0,
+              "globalCleanSampleCount": 45,
+              "rejectedHighLoadSamples": 8,
+              "rejectedKnownApplianceSamples": 0
+            },
+            "pvForecastW": 807,
+            "netBeforeFlexW": 79,
+            "importBeforeFlexW": 79,
+            "pvSurplusBeforeFlexW": 0,
+            "gridHeadroomW": null,
+            "forecastQuality": {
+              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+              "pv": "WEATHER_HAUWERT_CALIBRATED"
+            },
+            "planningDate": "2026-08-31",
+            "dayRelation": "FUTURE_DAY",
+            "catchupRequired": false,
+            "allocatedKWh": 0.475,
+            "pvCoverageW": 0,
+            "gridRequiredW": 1900,
+            "allocationReason": "GRID_CHEAPEST_USABLE"
+          },
+          {
+            "i": 80,
             "start": "2026-08-31T09:30:00.000Z",
             "end": "2026-08-31T09:45:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 46,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": -0.002,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -4773,13 +4806,13 @@
             "allocationReason": "GRID_CHEAPEST_USABLE"
           },
           {
-            "i": 82,
+            "i": 81,
             "start": "2026-08-31T09:45:00.000Z",
             "end": "2026-08-31T10:00:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 47,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": -0.002,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -4811,13 +4844,13 @@
             "allocationReason": "GRID_CHEAPEST_USABLE"
           },
           {
-            "i": 83,
+            "i": 82,
             "start": "2026-08-31T10:00:00.000Z",
             "end": "2026-08-31T10:15:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 48,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": -0.002,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -4849,13 +4882,13 @@
             "allocationReason": "GRID_CHEAPEST_USABLE"
           },
           {
-            "i": 84,
+            "i": 83,
             "start": "2026-08-31T10:15:00.000Z",
             "end": "2026-08-31T10:30:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 49,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": -0.003,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -4887,13 +4920,13 @@
             "allocationReason": "GRID_CHEAPEST_USABLE"
           },
           {
-            "i": 85,
+            "i": 84,
             "start": "2026-08-31T10:30:00.000Z",
             "end": "2026-08-31T10:45:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 50,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": -0.003,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -4925,13 +4958,13 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 86,
+            "i": 85,
             "start": "2026-08-31T10:45:00.000Z",
             "end": "2026-08-31T11:00:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 51,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": -0.003,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -4963,13 +4996,13 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 87,
+            "i": 86,
             "start": "2026-08-31T11:00:00.000Z",
             "end": "2026-08-31T11:15:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 52,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": -0.003,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5001,13 +5034,13 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 88,
+            "i": 87,
             "start": "2026-08-31T11:15:00.000Z",
             "end": "2026-08-31T11:30:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 53,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": -0.0008,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5039,13 +5072,13 @@
             "allocationReason": "GRID_CHEAPEST_USABLE"
           },
           {
-            "i": 89,
+            "i": 88,
             "start": "2026-08-31T11:30:00.000Z",
             "end": "2026-08-31T11:45:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 54,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": -0.001,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5077,13 +5110,13 @@
             "allocationReason": "GRID_CHEAPEST_USABLE"
           },
           {
-            "i": 90,
+            "i": 89,
             "start": "2026-08-31T11:45:00.000Z",
             "end": "2026-08-31T12:00:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 55,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": -0.001,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5115,13 +5148,13 @@
             "allocationReason": "GRID_CHEAPEST_USABLE"
           },
           {
-            "i": 91,
+            "i": 90,
             "start": "2026-08-31T12:00:00.000Z",
             "end": "2026-08-31T12:15:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 56,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": -0.001,
+            "priceClass": "NEGATIVE",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5154,50 +5187,12 @@
           },
           {
             "i": 92,
-            "start": "2026-08-31T12:15:00.000Z",
-            "end": "2026-08-31T12:30:00.000Z",
-            "localDate": "2026-08-31",
-            "localQuarter": 57,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
-            "baseLoadForecastW": 887,
-            "baseForecastTrace": {
-              "basis": "CLEAN_GLOBAL_MEDIAN",
-              "sampleCount": 0,
-              "sampleValuesW": [],
-              "sampleTimestamps": [],
-              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-              "washerActiveSamples": 0,
-              "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 45,
-              "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 0
-            },
-            "pvForecastW": 1799,
-            "netBeforeFlexW": -912,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 912,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-              "pv": "WEATHER_HAUWERT_CALIBRATED"
-            },
-            "planningDate": "2026-08-31",
-            "dayRelation": "FUTURE_DAY",
-            "catchupRequired": false,
-            "allocatedKWh": 0.475,
-            "pvCoverageW": 912,
-            "gridRequiredW": 988,
-            "allocationReason": "GRID_CHEAPEST_USABLE"
-          },
-          {
-            "i": 93,
             "start": "2026-08-31T12:30:00.000Z",
             "end": "2026-08-31T12:45:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 58,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": 0.0007,
+            "priceClass": "CHEAP",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5229,13 +5224,13 @@
             "allocationReason": "GRID_CHEAPEST_USABLE"
           },
           {
-            "i": 94,
+            "i": 93,
             "start": "2026-08-31T12:45:00.000Z",
             "end": "2026-08-31T13:00:00.000Z",
             "localDate": "2026-08-31",
             "localQuarter": 59,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
+            "price_eur_kwh": 0.0003,
+            "priceClass": "CHEAP",
             "baseLoadForecastW": 887,
             "baseForecastTrace": {
               "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5264,44 +5259,6 @@
             "allocatedKWh": 0.475,
             "pvCoverageW": 1024,
             "gridRequiredW": 876,
-            "allocationReason": "GRID_CHEAPEST_USABLE"
-          },
-          {
-            "i": 95,
-            "start": "2026-08-31T13:00:00.000Z",
-            "end": "2026-08-31T13:15:00.000Z",
-            "localDate": "2026-08-31",
-            "localQuarter": 60,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
-            "baseLoadForecastW": 887,
-            "baseForecastTrace": {
-              "basis": "CLEAN_GLOBAL_MEDIAN",
-              "sampleCount": 0,
-              "sampleValuesW": [],
-              "sampleTimestamps": [],
-              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-              "washerActiveSamples": 0,
-              "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 45,
-              "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 0
-            },
-            "pvForecastW": 1851,
-            "netBeforeFlexW": -965,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 965,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-              "pv": "WEATHER_HAUWERT_CALIBRATED"
-            },
-            "planningDate": "2026-08-31",
-            "dayRelation": "FUTURE_DAY",
-            "catchupRequired": false,
-            "allocatedKWh": 0.475,
-            "pvCoverageW": 965,
-            "gridRequiredW": 935,
             "allocationReason": "GRID_CHEAPEST_USABLE"
           }
         ],
@@ -5311,33 +5268,33 @@
           "date": "2026-08-30",
           "dayRelation": "CURRENT_DAY",
           "goalReached": false,
-          "remainingFallbackMin": 60,
-          "derivedEnergyKWh": 1.9,
+          "remainingFallbackMin": 45,
+          "derivedEnergyKWh": 1.425,
           "catchupRequired": false,
           "deadlineLocal": "19:00",
           "deadlineAt": "2026-08-30T17:00:00.000Z",
           "allocatedSlots": [
             {
-              "i": 5,
-              "start": "2026-08-30T14:30:00.000Z",
-              "end": "2026-08-30T14:45:00.000Z",
+              "i": 3,
+              "start": "2026-08-30T14:15:00.000Z",
+              "end": "2026-08-30T14:30:00.000Z",
               "localDate": "2026-08-30",
-              "localQuarter": 66,
+              "localQuarter": 65,
               "price_eur_kwh": -0.0004,
               "priceClass": "NEGATIVE",
-              "baseLoadForecastW": 756,
+              "baseLoadForecastW": 113,
               "baseForecastTrace": {
                 "basis": "CLEAN_QUARTER_MEDIAN",
                 "sampleCount": 3,
                 "sampleValuesW": [
-                  420,
-                  756,
-                  756
+                  113,
+                  113,
+                  303
                 ],
                 "sampleTimestamps": [
-                  "2026-08-29T14:30:00.086Z",
-                  "2026-08-29T14:35:00.289Z",
-                  "2026-08-29T14:40:00.067Z"
+                  "2026-08-29T14:15:00.304Z",
+                  "2026-08-29T14:20:00.096Z",
+                  "2026-08-29T14:25:00.240Z"
                 ],
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
@@ -5346,10 +5303,10 @@
                 "rejectedHighLoadSamples": 8,
                 "rejectedKnownApplianceSamples": 0
               },
-              "pvForecastW": 2061,
-              "netBeforeFlexW": -1305,
+              "pvForecastW": 1923,
+              "netBeforeFlexW": -1810,
               "importBeforeFlexW": 0,
-              "pvSurplusBeforeFlexW": 1305,
+              "pvSurplusBeforeFlexW": 1810,
               "gridHeadroomW": null,
               "forecastQuality": {
                 "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5359,61 +5316,17 @@
               "dayRelation": "CURRENT_DAY",
               "catchupRequired": false,
               "allocatedKWh": 0.475,
-              "pvCoverageW": 1305,
-              "gridRequiredW": 595,
+              "pvCoverageW": 1810,
+              "gridRequiredW": 90,
               "allocationReason": "GRID_CHEAPEST_USABLE"
             },
             {
               "i": 12,
-              "start": "2026-08-30T16:15:00.000Z",
-              "end": "2026-08-30T16:30:00.000Z",
-              "localDate": "2026-08-30",
-              "localQuarter": 73,
-              "price_eur_kwh": 0.1211,
-              "priceClass": "NORMAL",
-              "baseLoadForecastW": 887,
-              "baseForecastTrace": {
-                "basis": "CLEAN_GLOBAL_MEDIAN",
-                "sampleCount": 1,
-                "sampleValuesW": [
-                  887
-                ],
-                "sampleTimestamps": [
-                  "2026-08-29T16:25:00.252Z"
-                ],
-                "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-                "washerActiveSamples": 0,
-                "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 45,
-                "rejectedHighLoadSamples": 8,
-                "rejectedKnownApplianceSamples": 0
-              },
-              "pvForecastW": 1392,
-              "netBeforeFlexW": -505,
-              "importBeforeFlexW": 0,
-              "pvSurplusBeforeFlexW": 505,
-              "gridHeadroomW": null,
-              "forecastQuality": {
-                "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-                "pv": "WEATHER_HAUWERT_CALIBRATED"
-              },
-              "planningDate": "2026-08-30",
-              "dayRelation": "CURRENT_DAY",
-              "catchupRequired": false,
-              "allocatedKWh": 0.475,
-              "pvCoverageW": 505,
-              "gridRequiredW": 1395,
-              "allocationReason": "GRID_CHEAPEST_USABLE",
-              "relocatedFrom": "2026-08-30T14:00:00.000Z",
-              "relocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
-            },
-            {
-              "i": 13,
               "start": "2026-08-30T16:30:00.000Z",
               "end": "2026-08-30T16:45:00.000Z",
               "localDate": "2026-08-30",
               "localQuarter": 74,
-              "price_eur_kwh": 0.1001,
+              "price_eur_kwh": 0.1514,
               "priceClass": "NORMAL",
               "baseLoadForecastW": 895,
               "baseForecastTrace": {
@@ -5452,17 +5365,17 @@
               "pvCoverageW": 221,
               "gridRequiredW": 1679,
               "allocationReason": "GRID_CHEAPEST_USABLE",
-              "relocatedFrom": "2026-08-30T13:15:00.000Z",
+              "relocatedFrom": "2026-08-30T13:45:00.000Z",
               "relocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
             },
             {
-              "i": 14,
+              "i": 13,
               "start": "2026-08-30T16:45:00.000Z",
               "end": "2026-08-30T17:00:00.000Z",
               "localDate": "2026-08-30",
               "localQuarter": 75,
-              "price_eur_kwh": 0.1514,
-              "priceClass": "NORMAL",
+              "price_eur_kwh": 0.1762,
+              "priceClass": "EXPENSIVE",
               "baseLoadForecastW": 895,
               "baseForecastTrace": {
                 "basis": "CLEAN_QUARTER_MEDIAN",
@@ -5500,7 +5413,7 @@
               "pvCoverageW": 5,
               "gridRequiredW": 1895,
               "allocationReason": "GRID_CHEAPEST_USABLE",
-              "relocatedFrom": "2026-08-30T14:15:00.000Z",
+              "relocatedFrom": "2026-08-30T14:00:00.000Z",
               "relocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
             }
           ],
@@ -5518,13 +5431,13 @@
             "deadlineAt": "2026-08-31T17:00:00.000Z",
             "allocatedSlots": [
               {
-                "i": 36,
-                "start": "2026-08-30T22:15:00.000Z",
-                "end": "2026-08-30T22:30:00.000Z",
+                "i": 77,
+                "start": "2026-08-31T08:45:00.000Z",
+                "end": "2026-08-31T09:00:00.000Z",
                 "localDate": "2026-08-31",
-                "localQuarter": 1,
-                "price_eur_kwh": 0.159,
-                "priceClass": "NORMAL",
+                "localQuarter": 43,
+                "price_eur_kwh": -0.0006,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5538,9 +5451,9 @@
                   "rejectedHighLoadSamples": 8,
                   "rejectedKnownApplianceSamples": 0
                 },
-                "pvForecastW": 0,
-                "netBeforeFlexW": 887,
-                "importBeforeFlexW": 887,
+                "pvForecastW": 696,
+                "netBeforeFlexW": 191,
+                "importBeforeFlexW": 191,
                 "pvSurplusBeforeFlexW": 0,
                 "gridHeadroomW": null,
                 "forecastQuality": {
@@ -5556,13 +5469,89 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 81,
+                "i": 78,
+                "start": "2026-08-31T09:00:00.000Z",
+                "end": "2026-08-31T09:15:00.000Z",
+                "localDate": "2026-08-31",
+                "localQuarter": 44,
+                "price_eur_kwh": -0.0011,
+                "priceClass": "NEGATIVE",
+                "baseLoadForecastW": 887,
+                "baseForecastTrace": {
+                  "basis": "CLEAN_GLOBAL_MEDIAN",
+                  "sampleCount": 0,
+                  "sampleValuesW": [],
+                  "sampleTimestamps": [],
+                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+                  "washerActiveSamples": 0,
+                  "dryerActiveSamples": 0,
+                  "globalCleanSampleCount": 45,
+                  "rejectedHighLoadSamples": 8,
+                  "rejectedKnownApplianceSamples": 0
+                },
+                "pvForecastW": 735,
+                "netBeforeFlexW": 151,
+                "importBeforeFlexW": 151,
+                "pvSurplusBeforeFlexW": 0,
+                "gridHeadroomW": null,
+                "forecastQuality": {
+                  "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+                  "pv": "WEATHER_HAUWERT_CALIBRATED"
+                },
+                "planningDate": "2026-08-31",
+                "dayRelation": "FUTURE_DAY",
+                "catchupRequired": false,
+                "allocatedKWh": 0.475,
+                "pvCoverageW": 0,
+                "gridRequiredW": 1900,
+                "allocationReason": "GRID_CHEAPEST_USABLE"
+              },
+              {
+                "i": 79,
+                "start": "2026-08-31T09:15:00.000Z",
+                "end": "2026-08-31T09:30:00.000Z",
+                "localDate": "2026-08-31",
+                "localQuarter": 45,
+                "price_eur_kwh": -0.0004,
+                "priceClass": "NEGATIVE",
+                "baseLoadForecastW": 887,
+                "baseForecastTrace": {
+                  "basis": "CLEAN_GLOBAL_MEDIAN",
+                  "sampleCount": 0,
+                  "sampleValuesW": [],
+                  "sampleTimestamps": [],
+                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+                  "washerActiveSamples": 0,
+                  "dryerActiveSamples": 0,
+                  "globalCleanSampleCount": 45,
+                  "rejectedHighLoadSamples": 8,
+                  "rejectedKnownApplianceSamples": 0
+                },
+                "pvForecastW": 807,
+                "netBeforeFlexW": 79,
+                "importBeforeFlexW": 79,
+                "pvSurplusBeforeFlexW": 0,
+                "gridHeadroomW": null,
+                "forecastQuality": {
+                  "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+                  "pv": "WEATHER_HAUWERT_CALIBRATED"
+                },
+                "planningDate": "2026-08-31",
+                "dayRelation": "FUTURE_DAY",
+                "catchupRequired": false,
+                "allocatedKWh": 0.475,
+                "pvCoverageW": 0,
+                "gridRequiredW": 1900,
+                "allocationReason": "GRID_CHEAPEST_USABLE"
+              },
+              {
+                "i": 80,
                 "start": "2026-08-31T09:30:00.000Z",
                 "end": "2026-08-31T09:45:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 46,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.002,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5594,13 +5583,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 82,
+                "i": 81,
                 "start": "2026-08-31T09:45:00.000Z",
                 "end": "2026-08-31T10:00:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 47,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.002,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5632,13 +5621,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 83,
+                "i": 82,
                 "start": "2026-08-31T10:00:00.000Z",
                 "end": "2026-08-31T10:15:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 48,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.002,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5670,13 +5659,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 84,
+                "i": 83,
                 "start": "2026-08-31T10:15:00.000Z",
                 "end": "2026-08-31T10:30:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 49,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.003,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5708,13 +5697,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 85,
+                "i": 84,
                 "start": "2026-08-31T10:30:00.000Z",
                 "end": "2026-08-31T10:45:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 50,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.003,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5746,13 +5735,13 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 86,
+                "i": 85,
                 "start": "2026-08-31T10:45:00.000Z",
                 "end": "2026-08-31T11:00:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 51,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.003,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5784,13 +5773,13 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 87,
+                "i": 86,
                 "start": "2026-08-31T11:00:00.000Z",
                 "end": "2026-08-31T11:15:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 52,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.003,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5822,13 +5811,13 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 88,
+                "i": 87,
                 "start": "2026-08-31T11:15:00.000Z",
                 "end": "2026-08-31T11:30:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 53,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.0008,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5860,13 +5849,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 89,
+                "i": 88,
                 "start": "2026-08-31T11:30:00.000Z",
                 "end": "2026-08-31T11:45:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 54,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.001,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5898,13 +5887,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 90,
+                "i": 89,
                 "start": "2026-08-31T11:45:00.000Z",
                 "end": "2026-08-31T12:00:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 55,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.001,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5936,13 +5925,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 91,
+                "i": 90,
                 "start": "2026-08-31T12:00:00.000Z",
                 "end": "2026-08-31T12:15:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 56,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.001,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -5975,50 +5964,12 @@
               },
               {
                 "i": 92,
-                "start": "2026-08-31T12:15:00.000Z",
-                "end": "2026-08-31T12:30:00.000Z",
-                "localDate": "2026-08-31",
-                "localQuarter": 57,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
-                "baseLoadForecastW": 887,
-                "baseForecastTrace": {
-                  "basis": "CLEAN_GLOBAL_MEDIAN",
-                  "sampleCount": 0,
-                  "sampleValuesW": [],
-                  "sampleTimestamps": [],
-                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-                  "washerActiveSamples": 0,
-                  "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 45,
-                  "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 0
-                },
-                "pvForecastW": 1799,
-                "netBeforeFlexW": -912,
-                "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 912,
-                "gridHeadroomW": null,
-                "forecastQuality": {
-                  "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-                  "pv": "WEATHER_HAUWERT_CALIBRATED"
-                },
-                "planningDate": "2026-08-31",
-                "dayRelation": "FUTURE_DAY",
-                "catchupRequired": false,
-                "allocatedKWh": 0.475,
-                "pvCoverageW": 912,
-                "gridRequiredW": 988,
-                "allocationReason": "GRID_CHEAPEST_USABLE"
-              },
-              {
-                "i": 93,
                 "start": "2026-08-31T12:30:00.000Z",
                 "end": "2026-08-31T12:45:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 58,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": 0.0007,
+                "priceClass": "CHEAP",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6050,13 +6001,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 94,
+                "i": 93,
                 "start": "2026-08-31T12:45:00.000Z",
                 "end": "2026-08-31T13:00:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 59,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": 0.0003,
+                "priceClass": "CHEAP",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6085,44 +6036,6 @@
                 "allocatedKWh": 0.475,
                 "pvCoverageW": 1024,
                 "gridRequiredW": 876,
-                "allocationReason": "GRID_CHEAPEST_USABLE"
-              },
-              {
-                "i": 95,
-                "start": "2026-08-31T13:00:00.000Z",
-                "end": "2026-08-31T13:15:00.000Z",
-                "localDate": "2026-08-31",
-                "localQuarter": 60,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
-                "baseLoadForecastW": 887,
-                "baseForecastTrace": {
-                  "basis": "CLEAN_GLOBAL_MEDIAN",
-                  "sampleCount": 0,
-                  "sampleValuesW": [],
-                  "sampleTimestamps": [],
-                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-                  "washerActiveSamples": 0,
-                  "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 45,
-                  "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 0
-                },
-                "pvForecastW": 1851,
-                "netBeforeFlexW": -965,
-                "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 965,
-                "gridHeadroomW": null,
-                "forecastQuality": {
-                  "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-                  "pv": "WEATHER_HAUWERT_CALIBRATED"
-                },
-                "planningDate": "2026-08-31",
-                "dayRelation": "FUTURE_DAY",
-                "catchupRequired": false,
-                "allocatedKWh": 0.475,
-                "pvCoverageW": 965,
-                "gridRequiredW": 935,
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               }
             ],
@@ -6134,33 +6047,33 @@
             "date": "2026-08-30",
             "dayRelation": "CURRENT_DAY",
             "goalReached": false,
-            "remainingFallbackMin": 60,
-            "derivedEnergyKWh": 1.9,
+            "remainingFallbackMin": 45,
+            "derivedEnergyKWh": 1.425,
             "catchupRequired": false,
             "deadlineLocal": "19:00",
             "deadlineAt": "2026-08-30T17:00:00.000Z",
             "allocatedSlots": [
               {
-                "i": 5,
-                "start": "2026-08-30T14:30:00.000Z",
-                "end": "2026-08-30T14:45:00.000Z",
+                "i": 3,
+                "start": "2026-08-30T14:15:00.000Z",
+                "end": "2026-08-30T14:30:00.000Z",
                 "localDate": "2026-08-30",
-                "localQuarter": 66,
+                "localQuarter": 65,
                 "price_eur_kwh": -0.0004,
                 "priceClass": "NEGATIVE",
-                "baseLoadForecastW": 756,
+                "baseLoadForecastW": 113,
                 "baseForecastTrace": {
                   "basis": "CLEAN_QUARTER_MEDIAN",
                   "sampleCount": 3,
                   "sampleValuesW": [
-                    420,
-                    756,
-                    756
+                    113,
+                    113,
+                    303
                   ],
                   "sampleTimestamps": [
-                    "2026-08-29T14:30:00.086Z",
-                    "2026-08-29T14:35:00.289Z",
-                    "2026-08-29T14:40:00.067Z"
+                    "2026-08-29T14:15:00.304Z",
+                    "2026-08-29T14:20:00.096Z",
+                    "2026-08-29T14:25:00.240Z"
                   ],
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
@@ -6169,10 +6082,10 @@
                   "rejectedHighLoadSamples": 8,
                   "rejectedKnownApplianceSamples": 0
                 },
-                "pvForecastW": 2061,
-                "netBeforeFlexW": -1305,
+                "pvForecastW": 1923,
+                "netBeforeFlexW": -1810,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1305,
+                "pvSurplusBeforeFlexW": 1810,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6182,61 +6095,17 @@
                 "dayRelation": "CURRENT_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1305,
-                "gridRequiredW": 595,
+                "pvCoverageW": 1810,
+                "gridRequiredW": 90,
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
                 "i": 12,
-                "start": "2026-08-30T16:15:00.000Z",
-                "end": "2026-08-30T16:30:00.000Z",
-                "localDate": "2026-08-30",
-                "localQuarter": 73,
-                "price_eur_kwh": 0.1211,
-                "priceClass": "NORMAL",
-                "baseLoadForecastW": 887,
-                "baseForecastTrace": {
-                  "basis": "CLEAN_GLOBAL_MEDIAN",
-                  "sampleCount": 1,
-                  "sampleValuesW": [
-                    887
-                  ],
-                  "sampleTimestamps": [
-                    "2026-08-29T16:25:00.252Z"
-                  ],
-                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-                  "washerActiveSamples": 0,
-                  "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 45,
-                  "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 0
-                },
-                "pvForecastW": 1392,
-                "netBeforeFlexW": -505,
-                "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 505,
-                "gridHeadroomW": null,
-                "forecastQuality": {
-                  "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-                  "pv": "WEATHER_HAUWERT_CALIBRATED"
-                },
-                "planningDate": "2026-08-30",
-                "dayRelation": "CURRENT_DAY",
-                "catchupRequired": false,
-                "allocatedKWh": 0.475,
-                "pvCoverageW": 505,
-                "gridRequiredW": 1395,
-                "allocationReason": "GRID_CHEAPEST_USABLE",
-                "relocatedFrom": "2026-08-30T14:00:00.000Z",
-                "relocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
-              },
-              {
-                "i": 13,
                 "start": "2026-08-30T16:30:00.000Z",
                 "end": "2026-08-30T16:45:00.000Z",
                 "localDate": "2026-08-30",
                 "localQuarter": 74,
-                "price_eur_kwh": 0.1001,
+                "price_eur_kwh": 0.1514,
                 "priceClass": "NORMAL",
                 "baseLoadForecastW": 895,
                 "baseForecastTrace": {
@@ -6275,17 +6144,17 @@
                 "pvCoverageW": 221,
                 "gridRequiredW": 1679,
                 "allocationReason": "GRID_CHEAPEST_USABLE",
-                "relocatedFrom": "2026-08-30T13:15:00.000Z",
+                "relocatedFrom": "2026-08-30T13:45:00.000Z",
                 "relocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
               },
               {
-                "i": 14,
+                "i": 13,
                 "start": "2026-08-30T16:45:00.000Z",
                 "end": "2026-08-30T17:00:00.000Z",
                 "localDate": "2026-08-30",
                 "localQuarter": 75,
-                "price_eur_kwh": 0.1514,
-                "priceClass": "NORMAL",
+                "price_eur_kwh": 0.1762,
+                "priceClass": "EXPENSIVE",
                 "baseLoadForecastW": 895,
                 "baseForecastTrace": {
                   "basis": "CLEAN_QUARTER_MEDIAN",
@@ -6323,7 +6192,7 @@
                 "pvCoverageW": 5,
                 "gridRequiredW": 1895,
                 "allocationReason": "GRID_CHEAPEST_USABLE",
-                "relocatedFrom": "2026-08-30T14:15:00.000Z",
+                "relocatedFrom": "2026-08-30T14:00:00.000Z",
                 "relocationReason": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD"
               }
             ],
@@ -6340,13 +6209,13 @@
             "deadlineAt": "2026-08-31T17:00:00.000Z",
             "allocatedSlots": [
               {
-                "i": 36,
-                "start": "2026-08-30T22:15:00.000Z",
-                "end": "2026-08-30T22:30:00.000Z",
+                "i": 77,
+                "start": "2026-08-31T08:45:00.000Z",
+                "end": "2026-08-31T09:00:00.000Z",
                 "localDate": "2026-08-31",
-                "localQuarter": 1,
-                "price_eur_kwh": 0.159,
-                "priceClass": "NORMAL",
+                "localQuarter": 43,
+                "price_eur_kwh": -0.0006,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6360,9 +6229,9 @@
                   "rejectedHighLoadSamples": 8,
                   "rejectedKnownApplianceSamples": 0
                 },
-                "pvForecastW": 0,
-                "netBeforeFlexW": 887,
-                "importBeforeFlexW": 887,
+                "pvForecastW": 696,
+                "netBeforeFlexW": 191,
+                "importBeforeFlexW": 191,
                 "pvSurplusBeforeFlexW": 0,
                 "gridHeadroomW": null,
                 "forecastQuality": {
@@ -6378,13 +6247,89 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 81,
+                "i": 78,
+                "start": "2026-08-31T09:00:00.000Z",
+                "end": "2026-08-31T09:15:00.000Z",
+                "localDate": "2026-08-31",
+                "localQuarter": 44,
+                "price_eur_kwh": -0.0011,
+                "priceClass": "NEGATIVE",
+                "baseLoadForecastW": 887,
+                "baseForecastTrace": {
+                  "basis": "CLEAN_GLOBAL_MEDIAN",
+                  "sampleCount": 0,
+                  "sampleValuesW": [],
+                  "sampleTimestamps": [],
+                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+                  "washerActiveSamples": 0,
+                  "dryerActiveSamples": 0,
+                  "globalCleanSampleCount": 45,
+                  "rejectedHighLoadSamples": 8,
+                  "rejectedKnownApplianceSamples": 0
+                },
+                "pvForecastW": 735,
+                "netBeforeFlexW": 151,
+                "importBeforeFlexW": 151,
+                "pvSurplusBeforeFlexW": 0,
+                "gridHeadroomW": null,
+                "forecastQuality": {
+                  "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+                  "pv": "WEATHER_HAUWERT_CALIBRATED"
+                },
+                "planningDate": "2026-08-31",
+                "dayRelation": "FUTURE_DAY",
+                "catchupRequired": false,
+                "allocatedKWh": 0.475,
+                "pvCoverageW": 0,
+                "gridRequiredW": 1900,
+                "allocationReason": "GRID_CHEAPEST_USABLE"
+              },
+              {
+                "i": 79,
+                "start": "2026-08-31T09:15:00.000Z",
+                "end": "2026-08-31T09:30:00.000Z",
+                "localDate": "2026-08-31",
+                "localQuarter": 45,
+                "price_eur_kwh": -0.0004,
+                "priceClass": "NEGATIVE",
+                "baseLoadForecastW": 887,
+                "baseForecastTrace": {
+                  "basis": "CLEAN_GLOBAL_MEDIAN",
+                  "sampleCount": 0,
+                  "sampleValuesW": [],
+                  "sampleTimestamps": [],
+                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+                  "washerActiveSamples": 0,
+                  "dryerActiveSamples": 0,
+                  "globalCleanSampleCount": 45,
+                  "rejectedHighLoadSamples": 8,
+                  "rejectedKnownApplianceSamples": 0
+                },
+                "pvForecastW": 807,
+                "netBeforeFlexW": 79,
+                "importBeforeFlexW": 79,
+                "pvSurplusBeforeFlexW": 0,
+                "gridHeadroomW": null,
+                "forecastQuality": {
+                  "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+                  "pv": "WEATHER_HAUWERT_CALIBRATED"
+                },
+                "planningDate": "2026-08-31",
+                "dayRelation": "FUTURE_DAY",
+                "catchupRequired": false,
+                "allocatedKWh": 0.475,
+                "pvCoverageW": 0,
+                "gridRequiredW": 1900,
+                "allocationReason": "GRID_CHEAPEST_USABLE"
+              },
+              {
+                "i": 80,
                 "start": "2026-08-31T09:30:00.000Z",
                 "end": "2026-08-31T09:45:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 46,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.002,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6416,13 +6361,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 82,
+                "i": 81,
                 "start": "2026-08-31T09:45:00.000Z",
                 "end": "2026-08-31T10:00:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 47,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.002,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6454,13 +6399,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 83,
+                "i": 82,
                 "start": "2026-08-31T10:00:00.000Z",
                 "end": "2026-08-31T10:15:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 48,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.002,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6492,13 +6437,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 84,
+                "i": 83,
                 "start": "2026-08-31T10:15:00.000Z",
                 "end": "2026-08-31T10:30:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 49,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.003,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6530,13 +6475,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 85,
+                "i": 84,
                 "start": "2026-08-31T10:30:00.000Z",
                 "end": "2026-08-31T10:45:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 50,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.003,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6568,13 +6513,13 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 86,
+                "i": 85,
                 "start": "2026-08-31T10:45:00.000Z",
                 "end": "2026-08-31T11:00:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 51,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.003,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6606,13 +6551,13 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 87,
+                "i": 86,
                 "start": "2026-08-31T11:00:00.000Z",
                 "end": "2026-08-31T11:15:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 52,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.003,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6644,13 +6589,13 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 88,
+                "i": 87,
                 "start": "2026-08-31T11:15:00.000Z",
                 "end": "2026-08-31T11:30:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 53,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.0008,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6682,13 +6627,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 89,
+                "i": 88,
                 "start": "2026-08-31T11:30:00.000Z",
                 "end": "2026-08-31T11:45:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 54,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.001,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6720,13 +6665,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 90,
+                "i": 89,
                 "start": "2026-08-31T11:45:00.000Z",
                 "end": "2026-08-31T12:00:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 55,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.001,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6758,13 +6703,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 91,
+                "i": 90,
                 "start": "2026-08-31T12:00:00.000Z",
                 "end": "2026-08-31T12:15:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 56,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": -0.001,
+                "priceClass": "NEGATIVE",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6797,50 +6742,12 @@
               },
               {
                 "i": 92,
-                "start": "2026-08-31T12:15:00.000Z",
-                "end": "2026-08-31T12:30:00.000Z",
-                "localDate": "2026-08-31",
-                "localQuarter": 57,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
-                "baseLoadForecastW": 887,
-                "baseForecastTrace": {
-                  "basis": "CLEAN_GLOBAL_MEDIAN",
-                  "sampleCount": 0,
-                  "sampleValuesW": [],
-                  "sampleTimestamps": [],
-                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-                  "washerActiveSamples": 0,
-                  "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 45,
-                  "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 0
-                },
-                "pvForecastW": 1799,
-                "netBeforeFlexW": -912,
-                "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 912,
-                "gridHeadroomW": null,
-                "forecastQuality": {
-                  "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-                  "pv": "WEATHER_HAUWERT_CALIBRATED"
-                },
-                "planningDate": "2026-08-31",
-                "dayRelation": "FUTURE_DAY",
-                "catchupRequired": false,
-                "allocatedKWh": 0.475,
-                "pvCoverageW": 912,
-                "gridRequiredW": 988,
-                "allocationReason": "GRID_CHEAPEST_USABLE"
-              },
-              {
-                "i": 93,
                 "start": "2026-08-31T12:30:00.000Z",
                 "end": "2026-08-31T12:45:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 58,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": 0.0007,
+                "priceClass": "CHEAP",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6872,13 +6779,13 @@
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               },
               {
-                "i": 94,
+                "i": 93,
                 "start": "2026-08-31T12:45:00.000Z",
                 "end": "2026-08-31T13:00:00.000Z",
                 "localDate": "2026-08-31",
                 "localQuarter": 59,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
+                "price_eur_kwh": 0.0003,
+                "priceClass": "CHEAP",
                 "baseLoadForecastW": 887,
                 "baseForecastTrace": {
                   "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -6907,44 +6814,6 @@
                 "allocatedKWh": 0.475,
                 "pvCoverageW": 1024,
                 "gridRequiredW": 876,
-                "allocationReason": "GRID_CHEAPEST_USABLE"
-              },
-              {
-                "i": 95,
-                "start": "2026-08-31T13:00:00.000Z",
-                "end": "2026-08-31T13:15:00.000Z",
-                "localDate": "2026-08-31",
-                "localQuarter": 60,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
-                "baseLoadForecastW": 887,
-                "baseForecastTrace": {
-                  "basis": "CLEAN_GLOBAL_MEDIAN",
-                  "sampleCount": 0,
-                  "sampleValuesW": [],
-                  "sampleTimestamps": [],
-                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-                  "washerActiveSamples": 0,
-                  "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 45,
-                  "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 0
-                },
-                "pvForecastW": 1851,
-                "netBeforeFlexW": -965,
-                "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 965,
-                "gridHeadroomW": null,
-                "forecastQuality": {
-                  "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-                  "pv": "WEATHER_HAUWERT_CALIBRATED"
-                },
-                "planningDate": "2026-08-31",
-                "dayRelation": "FUTURE_DAY",
-                "catchupRequired": false,
-                "allocatedKWh": 0.475,
-                "pvCoverageW": 965,
-                "gridRequiredW": 935,
                 "allocationReason": "GRID_CHEAPEST_USABLE"
               }
             ],
@@ -6954,64 +6823,7 @@
       },
       "battery": {
         "mode": "THEORETICAL_ONLY_NO_SOC",
-        "economicPairs": [
-          {
-            "chargeStart": "2026-08-30T13:15:00.000Z",
-            "dischargeStart": "2026-08-30T19:15:00.000Z",
-            "chargePrice": -0.001,
-            "dischargePrice": 0.2124,
-            "netValuePerGridKWh": 0.1927
-          },
-          {
-            "chargeStart": "2026-08-30T14:30:00.000Z",
-            "dischargeStart": "2026-08-30T19:30:00.000Z",
-            "chargePrice": -0.0004,
-            "dischargePrice": 0.204,
-            "netValuePerGridKWh": 0.1845
-          },
-          {
-            "chargeStart": "2026-08-30T14:15:00.000Z",
-            "dischargeStart": "2026-08-30T19:00:00.000Z",
-            "chargePrice": -0.0001,
-            "dischargePrice": 0.2016,
-            "netValuePerGridKWh": 0.182
-          },
-          {
-            "chargeStart": "2026-08-30T14:00:00.000Z",
-            "dischargeStart": "2026-08-30T17:15:00.000Z",
-            "chargePrice": -0.0001,
-            "dischargePrice": 0.2005,
-            "netValuePerGridKWh": 0.1811
-          },
-          {
-            "chargeStart": "2026-08-30T13:45:00.000Z",
-            "dischargeStart": "2026-08-30T19:45:00.000Z",
-            "chargePrice": -0.0001,
-            "dischargePrice": 0.2001,
-            "netValuePerGridKWh": 0.1807
-          },
-          {
-            "chargeStart": "2026-08-30T13:30:00.000Z",
-            "dischargeStart": "2026-08-30T18:15:00.000Z",
-            "chargePrice": -0.0001,
-            "dischargePrice": 0.1985,
-            "netValuePerGridKWh": 0.1792
-          },
-          {
-            "chargeStart": "2026-08-30T14:45:00.000Z",
-            "dischargeStart": "2026-08-30T20:30:00.000Z",
-            "chargePrice": 0,
-            "dischargePrice": 0.1893,
-            "netValuePerGridKWh": 0.1708
-          },
-          {
-            "chargeStart": "2026-08-30T15:00:00.000Z",
-            "dischargeStart": "2026-08-30T20:00:00.000Z",
-            "chargePrice": 0.0007,
-            "dischargePrice": 0.1882,
-            "netValuePerGridKWh": 0.1692
-          }
-        ],
+        "economicPairs": [],
         "note": "No physical battery dispatch until actual SOC and commissioning constraints are integrated."
       }
     },
@@ -7030,7 +6842,7 @@
   },
   "status": {
     "status": "READY_SHADOW_V0.4.9",
-    "at": "2026-08-30T13:15:45.147Z",
+    "at": "2026-08-30T13:30:45.204Z",
     "version": "EM2_ENERGY_PLAN_24H_V0.4.9",
     "contract": "DYNAMIC",
     "slots": 96,
@@ -7056,14 +6868,14 @@
       "2026-08-30",
       "2026-08-31"
     ],
-    "wwAllocatedSlots": 20,
+    "wwAllocatedSlots": 19,
     "wwAllocationPolicy": "DAY_BOUNDARY_AWARE_TRUE_SURPLUS_FIRST_THEN_CHEAPEST_USABLE_GRID_BEFORE_19",
     "flexLoadCoordination": {
       "policy": "TESLA_DEADLINE_PRIORITY_OVER_WW_SHOULD_RELOCATE_BEFORE_19",
       "phaseAware": false,
       "gridHeadroomModel": "NOT_MODELED_PHASE_AWARE",
-      "overlapsBefore": 4,
-      "wwSlotsRelocated": 3,
+      "overlapsBefore": 3,
+      "wwSlotsRelocated": 2,
       "unresolvedShouldOverlaps": 1,
       "wwMustOverlapsPreserved": 0,
       "hardWWDeadlineLocal": "19:00"
