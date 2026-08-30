@@ -4,40 +4,49 @@ _Status: prepared in GitHub only. Homey deliberately not touched._
 
 ## Objective
 
-Replace v0.3's broad 5-minute `Homey.logic.getVariables()` scan with deterministic targeted Logic reads, keep the existing GitHub command contract, and reduce steady-state polling cadence from 5 to 15 minutes while retaining manual triggerability for immediate application when explicitly requested.
+Replace v0.3's broad 5-minute `Homey.logic.getVariables()` scan with deterministic targeted Logic reads, keep the existing GitHub `ems_settings` command contract, and reduce steady-state polling cadence from 5 to 15 minutes while retaining manual triggerability.
 
-## Why v0.4
+## Compatibility with live Core v0.11f
 
-The v0.3 baseline is functionally correct but not truly low-load: every admitted run starts with `Homey.logic.getVariables()` before its idempotency check. That means the no-op path still incurs a broad Logic enumeration every five minutes.
+Validated 2026-08-30 against live `EM v2 | 00 Core Tick | v0.11f (Planner Tesla Headroom)`.
 
-v0.4 must therefore satisfy all of the following:
+The Settings Sync interface is unchanged by v0.11f:
+
+- `EMS_ContractType` remains the canonical website/config contract selector consumed by the Contract Price Adapter;
+- `EMS_HotWaterSource` remains the canonical BOILER/CV selector;
+- `WW_Boilermodus` remains the boolean warm-water mode consumed by Core (`state.hotWater.mode`);
+- FIXED/DYNAMIC contract changes must never alter `EMS_HotWaterSource` or `WW_Boilermodus` unless the website command explicitly changes `hotWaterSource`;
+- Core v0.11f's Planner Tesla projected-grid headroom change does not alter this contract;
+- no Core, Planner, Power Intent, WW Adapter/Gate/Actuator or EV ownership is moved into Settings Sync.
+
+## Low-load requirements
+
+v0.4 must satisfy all of the following:
 
 - no `Homey.logic.getVariables()`;
 - no `Homey.devices.getDevices()`;
 - no variable creation during normal runtime;
-- targeted reads only by stable Logic ID;
+- targeted reads/writes only by stable Logic ID;
 - 15-minute scheduled cadence + manual start;
 - same `ems_settings` GitHub command schema;
 - same canonical outputs: `EMS_ContractType`, `EMS_HotWaterSource`, `WW_Boilermodus`;
-- same `requestId` idempotency semantics;
+- `requestId` idempotency retained;
 - status writes only when state meaningfully changes or an error state changes;
 - no physical device/actuator writes.
 
-## Known stable IDs
-
-Already resolved and safe to hard-code:
+## Stable IDs resolved from GitHub/runtime registries
 
 - `EMS_ContractType`: `8d346495-f183-4072-86d0-c4bc9da94e2e`
 - `EMS_HotWaterSource`: `63006c48-7b92-452c-bbf5-6c02893b875c`
+- `WW_Boilermodus`: `f9d885a4-fca2-4aea-a5a9-a5c05da90835`
+- `GH_Status_Token`: `235cfe0f-5760-48b9-9349-a33be47d04d1`
 
-Still to resolve later with one controlled read-only Homey discovery step, after the current rest/throttling window:
+Only two IDs still need one controlled Homey resolve before deployment:
 
-- `WW_Boilermodus`: `__RESOLVE_WW_Boilermodus__`
 - `EMS_Settings_LastRequestId`: `__RESOLVE_EMS_Settings_LastRequestId__`
 - `EMS_Settings_Sync_Status`: `__RESOLVE_EMS_Settings_Sync_Status__`
-- optional `GH_Status_Token`: `__RESOLVE_GH_Status_Token__`
 
-Do not deploy while any placeholder remains.
+Do not deploy while either placeholder remains.
 
 ## Prepared targeted runtime
 
@@ -50,10 +59,10 @@ const RAW='https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/m
 const IDS={
   contract:'8d346495-f183-4072-86d0-c4bc9da94e2e',
   source:'63006c48-7b92-452c-bbf5-6c02893b875c',
-  boilerMode:'__RESOLVE_WW_Boilermodus__',
+  boilerMode:'f9d885a4-fca2-4aea-a5a9-a5c05da90835',
   lastId:'__RESOLVE_EMS_Settings_LastRequestId__',
   status:'__RESOLVE_EMS_Settings_Sync_Status__',
-  token:'__RESOLVE_GH_Status_Token__'
+  token:'235cfe0f-5760-48b9-9349-a33be47d04d1'
 };
 
 const read=async id=>Homey.logic.getVariable({id});
@@ -90,19 +99,13 @@ const [contractV,sourceV,boilerV,lastIdV,statusV,tokenV]=await Promise.all([
   read(IDS.contract),read(IDS.source),read(IDS.boilerMode),read(IDS.lastId),read(IDS.status),read(IDS.token)
 ]);
 
-const token=norm(tokenV?.value);
-const fetched=await readCommand(token);
-
+const fetched=await readCommand(norm(tokenV?.value));
 async function setStatus(status,extra={}){
   const next=JSON.stringify({version:VERSION,status,...extra});
   if(String(statusV?.value||'')!==next)await write(IDS.status,next);
 }
 
-if(!fetched){
-  await setStatus('FETCH_FAILED');
-  return true;
-}
-
+if(!fetched){await setStatus('FETCH_FAILED');return true;}
 const cmd=fetched.cmd;
 if(cmd?.schema!==1||cmd?.kind!=='ems_settings'){
   await setStatus('BLOCKED_SCHEMA',{schema:cmd?.schema??null,kind:cmd?.kind??null});
@@ -147,20 +150,26 @@ return true;
 - Trigger: every 15 minutes.
 - Manual start retained.
 - One HomeyScript action only.
-- No broad Logic/device discovery.
-- No writes on the common already-applied path.
+- Six targeted Logic reads per admitted run; zero broad Logic/device discovery.
+- Common already-applied path performs zero writes.
 - No physical device writes.
 
-## Acceptance tests after Homey rest window
+## Acceptance test — DYNAMIC -> FIXED with WW isolation
 
-1. Resolve the four remaining required IDs (and token ID if used) in one read-only discovery pass.
-2. Populate this payload; assert zero placeholders remain.
-3. Deploy in-place over flow `9193b3ae-1e3d-4b52-aa95-60aff099e68a` but keep it disabled until validation start.
-4. Enable only for one controlled DYNAMIC -> FIXED test from the website.
-5. Confirm canonical contract/source/boilerMode and requestId all update correctly.
-6. Confirm `Contract Price Adapter v0.10` subsequently publishes `contractType=FIXED`, `source=FIXED_CONFIG_TARGETED`, `horizon=STATIC`, with no PBTH call.
-7. Disable temporary validation artifacts and remove them after PASS.
-8. Leave v0.4 enabled only after the validation proves no unexpected 429/throttling behavior.
+1. Resolve only the two remaining Settings Sync Logic IDs in one controlled read-only step.
+2. Assert zero placeholders remain; generate exact in-place Homey flow payload in GitHub before touching Homey again.
+3. Deploy over flow `9193b3ae-1e3d-4b52-aa95-60aff099e68a`, initially disabled.
+4. Capture pre-test values for `EMS_HotWaterSource` and `WW_Boilermodus` using targeted reads only.
+5. Enable v0.4 and apply one controlled website DYNAMIC -> FIXED command while leaving `hotWaterSource=BOILER` unchanged.
+6. Confirm `EMS_ContractType=FIXED` and requestId applied.
+7. Confirm `EMS_HotWaterSource` and `WW_Boilermodus` are byte/boolean identical to their pre-test values: contract switching must cause no WW-mode transition in Core v0.11f.
+8. Confirm Contract Price Adapter publishes `EM2_Contract_Type=FIXED`, `source=FIXED_CONFIG_TARGETED`, `horizon=STATIC`, with no PBTH call.
+9. No `list_flows`, no broad Logic scan and no improvised probe fan-out during this acceptance run.
+10. Leave v0.4 enabled only after no unexpected 429/throttling behavior is observed.
+
+## Separate load-map item
+
+Live Core v0.11f still contains one 5-minute `Homey.logic.getVariables()` broad read. That is a separate optimization item and must not be mixed into this Settings Sync change. v0.4 removes the second recurring broad scan that v0.3 would otherwise add.
 
 ## Release decision
 
@@ -168,4 +177,6 @@ Prepared outside Homey: **YES**.
 
 Homey changed during this preparation: **NO**.
 
-Safe to deploy before resolving the remaining Logic IDs: **NO**.
+Remaining Homey discovery before exact payload: **2 targeted ID resolves only**.
+
+Safe to deploy before those two IDs are resolved: **NO**.
