@@ -40,14 +40,11 @@ const expected = {
   },
   publication: {
     lastPublish: by.EM2_Last_Publish,
-    lastPublishedRevision: by.EM2_Last_Publisher_Version,
+    lastPublishedRevision: by.EM2_Last_Published_Revision,
     lastPublisherVersion: by.EM2_Last_Publisher_Version
   },
   legacy: { wwStateV13: null }
 };
-
-// Correct publication revision mapping.
-expected.publication.lastPublishedRevision = by.EM2_Last_Published_Revision;
 
 const actual = snapshot.sources || {};
 const mismatches = [];
