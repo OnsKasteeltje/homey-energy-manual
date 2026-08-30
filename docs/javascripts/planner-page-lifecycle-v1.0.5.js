@@ -17,6 +17,7 @@
       await loadScript('../javascripts/planner-ww-multislot-v1.0.0.js?lifecycle=6').catch(()=>{});
       await loadScript('../javascripts/planner-flex-energy-v1.0.0.js?lifecycle=6').catch(()=>{});
       await loadScript('../javascripts/planner-action-details-v1.0.1.js?lifecycle=7').catch(()=>{});
+      await loadScript('../javascripts/planner-forecast-labels-v1.0.0.js?lifecycle=8').catch(()=>{});
       await loadScript('../javascripts/planner-device-tabs-v1.0.3.js?lifecycle=6').catch(()=>{});
     }catch(e){loaded.delete(root);console.warn('Planner lifecycle init failed',e);}
   };
