@@ -55,3 +55,53 @@ await write(IDS.mirror,'DYNAMIC');await write(IDS.context,JSON.stringify(ctx));a
 ## Scope note
 
 This v0.9 runtime is intentionally DYNAMIC-only. If `EMS_ContractType` is not `DYNAMIC`, it does not invoke a broad fallback implementation; it only mirrors `FIXED` and exits. A future FIXED low-load path should be implemented separately with targeted configuration-variable reads rather than reintroducing the broad v0.8 enumerations.
+
+## Proposed v0.10 — short-horizon event refresh
+
+Design decision, not yet deployed.
+
+Goal: refresh tomorrow's dynamic prices promptly when PBTH receives them, without increasing normal polling or creating repeated Homey load when no new prices are available.
+
+### Trigger policy
+
+- Keep the existing 15-minute scheduled refresh as the normal path.
+- Only arm the additional PBTH event-driven refresh while `horizonHours < 12`.
+- Use PBTH's native "new prices received" event as the preferred extra trigger.
+- The event path may request `prices_json(next_hours)` once and run the same targeted normalization as the scheduled path.
+
+### Semantic-change gate
+
+After an event-driven refresh, compare the newly returned price series with the currently published context before propagating downstream.
+
+A refresh is considered useful when at least one of these changes:
+- the number of valid 15-minute slots increases;
+- the effective horizon extends;
+- one or more price values in the overlapping horizon changes materially.
+
+Only a useful semantic change may update the canonical price context in a way that triggers a Planner recalculation. An identical result must not create downstream fan-out.
+
+### Retry ceiling / cooldown
+
+If the PBTH event produces no new price information:
+
+- record the attempt timestamp;
+- suppress further extra event-driven horizon refreshes for 60 minutes;
+- allow at most one unsuccessful extra horizon refresh per hour;
+- do not loop, retry immediately, or switch to broad polling;
+- the regular 15-minute scheduled path remains unchanged.
+
+A successful horizon extension or price-series change clears the no-change cooldown state.
+
+### Load-budget invariant
+
+The v0.10 event path must remain context-only and low-load:
+
+- no `Homey.logic.getVariables()`;
+- no `Homey.devices.getDevices()`;
+- no actuator/device writes;
+- targeted Logic reads/writes only;
+- one PBTH `prices_json(next_hours)` call per admitted event refresh;
+- no downstream Planner wake-up unless the normalized price context changes semantically;
+- no more than one unsuccessful extra refresh per hour while the horizon remains below 12 hours.
+
+This implements an event-driven refresh with an hourly retry ceiling and preserves the existing Homey API/load-budget architecture.
