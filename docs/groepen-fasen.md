@@ -31,7 +31,7 @@ Deze pagina is een **levend overzicht van de elektrische indeling van de woning*
 | Wasmachine | **L2** | **Groep 1** | **Aardlek 1** | **Bevestigd.** Fase uit testwas; groep fysiek vastgesteld. |
 | Droger | **L3** | **Groep 2** | **Aardlek 1** | **Bevestigd.** Fase uit droogtest; groep fysiek vastgesteld. |
 | Tesla / Easee-lader | **L1 + L2 + L3** | Laadgroep nog te documenteren | Nog te bepalen | 3-fase verbruiker; afzonderlijke fasewaarden zichtbaar in Homey. |
-| Elektrische boiler | **L2** | Nog te bepalen | Volgt uit groep | Verwarmingsbelasting circa 1,93–2,13 kW verschijnt op L2. |
+| Elektrische boiler | **L2** | Nog te bepalen | Volgt uit groep | **Bevestigd / HIGH.** Meerdere onafhankelijke ON/OFF-flanken op 30-08-2026 correleren met circa ±1,9 kW op uitsluitend L2; o.a. 12:15 OFF: ΔL1 −61 W, ΔL2 −1742 W, ΔL3 +103 W. |
 | Vaatwasser | Nog te bepalen | **Groep 5 óf groep 12** | **Aardlek 2 óf 4** | **Nog te bevestigen.** Bij groep 5 hoort aardlek 2; bij groep 12 aardlek 4. |
 | **ATAG oven** | **L3 (kandidaat)** | Nog te bepalen | Nog te bepalen | **Waarschijnlijk.** Rond de ATAG-melding *Snel voorverwarmen klaar* op 18-08 om 18:21 is vlak ervoor een duidelijke extra belasting op L3 zichtbaar (circa 1,3–1,5 kW gemiddeld per 5 min), die na het meldmoment afneemt. Nog valideren met extra start/stopmomenten. |
 | Elektrische kookplaat / fornuis | Nog te bepalen | Nog te bepalen | Nog te bepalen | Afzonderlijke validatie nodig; niet gelijkgesteld aan de ATAG-oven. |
@@ -54,7 +54,8 @@ Deze pagina is een **levend overzicht van de elektrische indeling van de woning*
 - **aardlek 4 → groepen 11–13**;
 - **groep 14 → 3-polige B16-schuurvoeding**;
 - Tesla/Easee is een 3-fase verbruiker;
-- boiler en waterkoker zijn aan L2 gekoppeld;
+- **elektrische boiler → L2, empirisch bevestigd met P1-flankcorrelatie op 30-08-2026**;
+- waterkoker is aan L2 gekoppeld;
 - **GoodWe GW4200D-NS → L2**;
 - **SolarEdge SE3680H → L3**;
 - **GoodWe GW2000-XS → L3**;
@@ -73,6 +74,14 @@ Op **22 augustus 2026** zijn de drie PV-omvormers afzonderlijk fysiek aan/uit ge
 | GoodWe GW2000-XS | **L3** | **VALIDATED / HIGH** |
 
 Daarmee geldt fysiek: **L1 geen PV-omvormer, L2 de grote GoodWe, L3 SolarEdge + kleine GoodWe**. De daardoor zichtbare fase-onbalans bij PV-productie is verklaarbaar en is op zichzelf geen storing.
+
+## Boilerfase gevalideerd met P1-flanken
+
+Op **30 augustus 2026** zijn meerdere duidelijke schakelflanken uit de boilervermogensgrafiek vergeleken met de 1-minuut Homey Insights van P1 `measure_power.l1/l2/l3`. De boiler is een vrijwel constante éénfasebelasting van circa **1,9–2,0 kW**.
+
+De duidelijkste OFF-flank om **12:15 lokale tijd** liet zien: **L1 −61 W, L2 −1742 W, L3 +103 W**. Bij een onafhankelijke ON-flank rond **10:16 lokale tijd** nam L2 met ongeveer **+1,91 kW** toe. L1 en L3 vertoonden geen vergelijkbare boilerstap. Daarmee is **boiler = L2** als **VALIDATED / HIGH** vastgelegd.
+
+De machineleesbare topologie staat in `docs/data/ems-phase-topology.json` en is bedoeld als input voor de volgende Planner-iteratie met phase-aware 3×25 A headroom.
 
 ## Automatische PV-fasemonitor
 
@@ -104,6 +113,8 @@ Dit is voldoende om **L3 als kandidaatfase / waarschijnlijk** te registreren, ma
 
 Wasmachine, boiler en waterkoker zijn aan L2 gekoppeld. Vooral boiler en waterkoker kunnen samen ongeveer 4,1 kW toevoegen. De **GoodWe GW4200D-NS produceert eveneens op L2**. De droger is aan L3 gekoppeld; daarnaast produceren **SolarEdge SE3680H en GoodWe GW2000-XS beide op L3**. De ATAG-oven is voorlopig eveneens een **L3-kandidaat**. Dit fasebeeld is relevant voor de voorbereiding van de Victron-opstelling; de single-phase MultiPlus is daarom in de hardwarebaseline op **L1** voorzien.
 
+Voor de toekomstige Planner-headroom betekent dit concreet dat de boiler circa **8,5 A extra op L2** legt. Bij 3-fase Tesla-laden wordt daardoor L2 eerder de beperkende fase dan L1/L3 wanneer boiler en EV gelijktijdig actief zijn.
+
 ## Beheerregel
 
 Nieuwe betrouwbare inzichten over **fase-, groep- of aardlekindeling** worden direct op deze pagina verwerkt. Onzekere koppelingen blijven expliciet als onzeker gemarkeerd; er wordt niet tussen alternatieven gegokt.
@@ -112,4 +123,4 @@ Nieuwe betrouwbare inzichten over **fase-, groep- of aardlekindeling** worden di
 
 De vaatwasser moet nog definitief tussen **groep 5 en groep 12** worden onderscheiden. De **ATAG-oven moet met aanvullende app-gemarkeerde start/stop- of voorverwarmmomenten worden gevalideerd voordat L3 naar Bevestigd kan**. Daarnaast blijven onder meer kookplaat/fornuis, koffiezetapparaat, Quooker en Quatt qua exacte groep/fase nog open. De exacte groepen van boiler, waterkoker en de drie PV-omvormers moeten eveneens nog fysiek aan groep/automaat worden gekoppeld.
 
-> Laatste inhoudelijke update: 23 augustus 2026. De fysiek gevalideerde PV-fasemapping van 22 augustus is verwerkt: **GoodWe GW4200D-NS = L2; SolarEdge SE3680H = L3; GoodWe GW2000-XS = L3; L1 heeft geen PV-omvormer**.
+> Laatste inhoudelijke update: 30 augustus 2026. **Elektrische boiler = L2 is nu empirisch gevalideerd / HIGH** op basis van meerdere onafhankelijke boilerflanken versus P1-fasevermogen. De fysiek gevalideerde PV-fasemapping blijft: GoodWe GW4200D-NS = L2; SolarEdge SE3680H = L3; GoodWe GW2000-XS = L3; L1 heeft geen PV-omvormer.
