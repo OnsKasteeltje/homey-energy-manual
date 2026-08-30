@@ -1,5 +1,5 @@
-// EM v2 | 05 Config | EMS Settings Sync v0.4 TARGETED 15-MIN LOW-LOAD
-const VERSION='EM2_EMS_SETTINGS_SYNC_V0.4';
+// EM v2 | 05 Config | EMS Settings Sync v0.4.1 TARGETED 15-MIN LOW-LOAD
+const VERSION='EM2_EMS_SETTINGS_SYNC_V0.4.1';
 const API='https://api.github.com/repos/OnsKasteeltje/homey-energy-manual/contents/docs/data/ems-settings-command.json?ref=main';
 const RAW='https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/ems-settings-command.json';
 
@@ -22,36 +22,53 @@ async function setIfChanged(id,next,current){
   return false;
 }
 
-async function readCommand(token){
-  if(token){
-    try{
-      const r=await fetch(API,{headers:{
-        Authorization:`Bearer ${token}`,
-        Accept:'application/vnd.github.raw+json',
-        'X-GitHub-Api-Version':'2022-11-28',
-        'User-Agent':'Homey-EMS-Settings-v0.4',
-        'Cache-Control':'no-cache'
-      }});
-      if(r.ok)return {cmd:await r.json(),source:'GITHUB_API'};
-    }catch(_){ }
-  }
+function validCommand(cmd){
+  return cmd?.schema===1&&cmd?.kind==='ems_settings';
+}
+
+async function readCommand(){
+  // Canonical public RAW is first owner read. Cache-bust avoids stale selector reuse.
   try{
     const r=await fetch(RAW+'?ts='+Date.now(),{headers:{'Cache-Control':'no-cache'}});
-    if(r.ok)return {cmd:await r.json(),source:'RAW_FALLBACK'};
+    if(r.ok){
+      const cmd=await r.json();
+      if(validCommand(cmd))return {cmd,source:'RAW_CANONICAL'};
+    }
+  }catch(_){ }
+
+  // API is fallback only. Accept either raw command JSON or a Contents API wrapper.
+  try{
+    const tokenV=await read(IDS.token),token=norm(tokenV?.value);
+    const headers={
+      Accept:'application/vnd.github+json',
+      'X-GitHub-Api-Version':'2022-11-28',
+      'User-Agent':'Homey-EMS-Settings-v0.4.1',
+      'Cache-Control':'no-cache'
+    };
+    if(token)headers.Authorization=`Bearer ${token}`;
+    const r=await fetch(API,{headers});
+    if(r.ok){
+      const body=await r.json();
+      if(validCommand(body))return {cmd:body,source:'GITHUB_API_RAW'};
+      if(typeof body?.content==='string'){
+        const text=Buffer.from(body.content.replace(/\s/g,''),'base64').toString('utf8');
+        const cmd=JSON.parse(text);
+        if(validCommand(cmd))return {cmd,source:'GITHUB_API_CONTENT'};
+      }
+    }
   }catch(_){ }
   return null;
 }
 
-const [contractV,sourceV,boilerV,lastIdV,statusV,tokenV]=await Promise.all([
+const [contractV,sourceV,boilerV,lastIdV,statusV]=await Promise.all([
   read(IDS.contract),
   read(IDS.source),
   read(IDS.boilerMode),
   read(IDS.lastId),
-  read(IDS.status),
-  read(IDS.token)
+  read(IDS.status)
 ]);
 
-const fetched=await readCommand(norm(tokenV?.value));
+const fetched=await readCommand();
 async function setStatus(status,extra={}){
   const next=JSON.stringify({version:VERSION,status,...extra});
   if(String(statusV?.value||'')!==next)await write(IDS.status,next);
@@ -59,16 +76,11 @@ async function setStatus(status,extra={}){
 
 if(!fetched){await setStatus('FETCH_FAILED');return true;}
 const cmd=fetched.cmd;
-if(cmd?.schema!==1||cmd?.kind!=='ems_settings'){
-  await setStatus('BLOCKED_SCHEMA',{schema:cmd?.schema??null,kind:cmd?.kind??null});
-  return true;
-}
-
 const contract=upper(cmd.contractType);
 const source=upper(cmd.hotWaterSource);
 const requestId=norm(cmd.requestId);
 if(!['FIXED','DYNAMIC'].includes(contract)||!['BOILER','CV'].includes(source)||!requestId){
-  await setStatus('BLOCKED_VALUES',{contract,source,requestId});
+  await setStatus('BLOCKED_VALUES',{contract,source,requestId,fetchSource:fetched.source});
   return true;
 }
 
@@ -84,7 +96,10 @@ const alreadyApplied=
   currentSource===source&&
   currentBoiler===desiredBoiler;
 
-if(alreadyApplied)return true;
+if(alreadyApplied){
+  await setStatus('SYNC_OK',{requestId,contractType:contract,hotWaterSource:source,boilerMode:desiredBoiler,requestedAt:cmd.requestedAt||null,sourceOfCommand:cmd.source||null,fetchSource:fetched.source,alreadyApplied:true});
+  return true;
+}
 
 await setIfChanged(IDS.contract,contract,currentContract);
 await setIfChanged(IDS.source,source,currentSource);
@@ -97,6 +112,7 @@ await setStatus('SYNC_OK',{
   boilerMode:desiredBoiler,
   requestedAt:cmd.requestedAt||null,
   sourceOfCommand:cmd.source||null,
-  fetchSource:fetched.source
+  fetchSource:fetched.source,
+  previousContractType:currentContract||null
 });
 return true;
