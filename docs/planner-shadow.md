@@ -22,12 +22,14 @@ Required invariant:
    multi-slot action against both charts; their slot boundaries MUST align visually.
 6. There MUST be only one active owner for Planner axis wrapping/decorating. Legacy
    decorators must not wrap the same chart a second time.
+7. Boiler planning has one visual owner only: the primary Boiler action row. Explanatory
+   decorators may enrich that row but MUST NOT create a second Boiler timeline.
 
 This synchronization is a Planner UI architecture invariant, not a cosmetic preference.
 -->
 
 <link rel="stylesheet" href="../stylesheets/planner-axes-v1.1.0.css">
-<link rel="stylesheet" href="../stylesheets/planner-ww-multislot-v1.1.0.css">
+<link rel="stylesheet" href="../stylesheets/planner-ww-multislot-v1.1.0.css?owner=10">
 <link rel="stylesheet" href="../stylesheets/planner-device-tabs-v1.0.0.css">
 
 <div id="planner-shadow" class="planner-shadow" data-source="https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/energy-planner-shadow.json?source=planner-shadow" data-history="../data/energy-day-series-7d.json">
