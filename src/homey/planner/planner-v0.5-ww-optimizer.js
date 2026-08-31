@@ -61,24 +61,20 @@ function compareWwSlots(a, b, contract) {
   const bKnown = finiteNumber(b.score.marginalImportW);
   if (aKnown !== bKnown) return aKnown ? -1 : 1;
 
-  // Primary objective: minimize marginal grid import caused by WW.
   if (aKnown && bKnown && a.score.marginalImportW !== b.score.marginalImportW) {
     return a.score.marginalImportW - b.score.marginalImportW;
   }
 
-  // Equivalent import: prefer greatest direct PV coverage.
   if (aKnown && bKnown && a.score.pvCoverageW !== b.score.pvCoverageW) {
     return b.score.pvCoverageW - a.score.pvCoverageW;
   }
 
-  // Price only breaks ties on imported energy; cheap grid never outranks better PV cover.
   if (String(contract || '').toUpperCase() === 'DYNAMIC') {
     const ap = finiteNumber(a.price_eur_kwh) ? Number(a.price_eur_kwh) : Number.POSITIVE_INFINITY;
     const bp = finiteNumber(b.price_eur_kwh) ? Number(b.price_eur_kwh) : Number.POSITIVE_INFINITY;
     if (ap !== bp) return ap - bp;
   }
 
-  // Deterministic final tie-breaker. This intentionally does not impose contiguity.
   const at = Date.parse(String(a.start || ''));
   const bt = Date.parse(String(b.start || ''));
   if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return at - bt;
@@ -102,9 +98,10 @@ function optimizeWarmWater({
   const requestedEnergyKWh = goalReachedToday ? 0 : Math.max(0, Number(wwRemainingEnergyKWh) || 0);
   const slotEnergyKWh = Number(boilerW) * Number(slotMinutes) / 60000;
   const requiredSlots = requestedEnergyKWh > 0 ? Math.ceil(requestedEnergyKWh / slotEnergyKWh) : 0;
+  const hasDeadline = finiteNumber(deadlineMs);
 
   const candidates = normalized.filter((slot) => {
-    if (!Number.isFinite(Number(deadlineMs))) return true;
+    if (!hasDeadline) return true;
     const startMs = Date.parse(String(slot.start || ''));
     return Number.isFinite(startMs) && startMs < Number(deadlineMs);
   });
