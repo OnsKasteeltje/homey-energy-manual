@@ -1,0 +1,39 @@
+name: WW GitHub history replay
+
+on:
+  push:
+    branches:
+      - 'prep/planner-v0.5-power-intent-efficiency'
+    paths:
+      - 'scripts/replay_ww_from_github_history.py'
+      - '.github/workflows/ww-github-history-replay.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  replay-2026-08-31:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay WW from GitHub history only
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out
+          python scripts/replay_ww_from_github_history.py \
+            --date 2026-08-31 \
+            --utc-offset-hours 2 \
+            --csv out/ww-realized-vs-optimal-2026-08-31.csv \
+            --summary out/ww-summary-2026-08-31.json
+      - name: Show summary
+        run: cat out/ww-summary-2026-08-31.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ww-history-replay-2026-08-31
+          path: out/
+          retention-days: 14
