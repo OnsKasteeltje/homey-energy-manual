@@ -1,0 +1,74 @@
+{
+  "fixture_id": "EV_WW_PUBLISH_GOOD_V0.1",
+  "replay_at": "2026-08-29T12:20:00Z",
+  "state": {
+    "grid_power_W": 1250.0,
+    "grid_observed_at": "2026-08-29T12:19:50+00:00",
+    "pv": {
+      "solaredge_W": 2100.0,
+      "goodwe4200_W": 1600.0,
+      "goodwe2000_W": 700.0
+    },
+    "ev": {
+      "charger_available": true,
+      "power_W": 0.0,
+      "deadline_active": false
+    },
+    "ww": {
+      "boiler_on": false,
+      "boiler_power_W": 0.0,
+      "goal_reached_today": false
+    }
+  },
+  "ev_semantics": {
+    "decision_mode": "HOLD",
+    "flex_W": 0.0,
+    "charger_available": true,
+    "deadline_active": false,
+    "core_revision": 43
+  },
+  "ww_adapter": {
+    "schema": "EM2_POWER_INTENT_V0.2",
+    "valid": true,
+    "device_writes": false,
+    "source_revision": 43,
+    "target_present": true,
+    "target_on": true,
+    "source_action": "WW_SCHEDULE"
+  },
+  "publisher": {
+    "public_state": {
+      "meta": {"state_revision": 43},
+      "grid_W": 1250.0
+    },
+    "authoritative_state": {
+      "revision": 43
+    },
+    "last_published_revision": 42,
+    "last_publish_at": "2026-08-29T12:00:00Z"
+  },
+  "expected": {
+    "core": {
+      "grid_quality": "GOOD",
+      "pv_total_W": 4400.0,
+      "house_power_W": 5650.0,
+      "positive_writes_allowed": true
+    },
+    "ev_semantics": {
+      "mode": "HOLD",
+      "requestedPowerClass": 0,
+      "safetyState": "OK"
+    },
+    "ww_adapter": {
+      "valid": true,
+      "status": "OK_ON",
+      "deviceWrites": false,
+      "command_value": true
+    },
+    "publisher": {
+      "due": true,
+      "reason": "REVISION_EVENT",
+      "revision": 43
+    }
+  }
+}

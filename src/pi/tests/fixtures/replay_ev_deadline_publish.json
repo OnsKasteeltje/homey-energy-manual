@@ -1,0 +1,61 @@
+{
+  "fixture_id": "EV_DEADLINE_PUBLISH_GOOD_V0.1",
+  "replay_at": "2026-08-29T12:20:00Z",
+  "state": {
+    "grid_power_W": 1250.0,
+    "grid_observed_at": "2026-08-29T12:19:50+00:00",
+    "pv": {
+      "solaredge_W": 2100.0,
+      "goodwe4200_W": 1600.0,
+      "goodwe2000_W": 700.0
+    },
+    "ev": {
+      "charger_available": true,
+      "power_W": 0.0,
+      "deadline_active": true
+    },
+    "ww": {
+      "boiler_on": false,
+      "boiler_power_W": 0.0,
+      "goal_reached_today": false
+    }
+  },
+  "ev_semantics": {
+    "decision_mode": "TESLA_CHARGE_DEADLINE",
+    "flex_W": 6200.0,
+    "charger_available": true,
+    "deadline_active": true,
+    "core_revision": 42
+  },
+  "publisher": {
+    "public_state": {
+      "meta": {"state_revision": 42},
+      "grid_W": 1250.0
+    },
+    "authoritative_state": {
+      "revision": 42
+    },
+    "last_published_revision": 41,
+    "last_publish_at": "2026-08-29T12:00:00Z"
+  },
+  "expected": {
+    "core": {
+      "grid_quality": "GOOD",
+      "pv_total_W": 4400.0,
+      "house_power_W": 5650.0,
+      "positive_writes_allowed": true
+    },
+    "ev_semantics": {
+      "mode": "DEADLINE",
+      "requestedPowerClass": 8,
+      "chargerAvailable": true,
+      "deadlineActive": true,
+      "safetyState": "OK"
+    },
+    "publisher": {
+      "due": true,
+      "reason": "REVISION_EVENT",
+      "revision": 42
+    }
+  }
+}
