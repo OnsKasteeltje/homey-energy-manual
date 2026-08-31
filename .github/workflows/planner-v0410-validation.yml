@@ -1,0 +1,51 @@
+name: Planner v0.4.10 validation
+
+on:
+  push:
+    branches:
+      - planner-v0.4.10-true-surplus-ranking
+  pull_request:
+    paths:
+      - 'src/homey/planner/energy-plan-24h-v0.4.10.js'
+      - 'scripts/planner_ww_ab_replay.py'
+      - '.github/workflows/planner-v0410-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: JavaScript syntax as HomeyScript
+        run: |
+          {
+            echo '(async()=>{'
+            cat src/homey/planner/energy-plan-24h-v0.4.10.js
+            echo '})()'
+          } > /tmp/planner-v0410-check.js
+          node --check /tmp/planner-v0410-check.js
+      - name: Python replay syntax
+        run: python3 -m py_compile scripts/planner_ww_ab_replay.py
+      - name: Deterministic DYNAMIC partial-PV ranking regression
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          spec = importlib.util.spec_from_file_location('ab', 'scripts/planner_ww_ab_replay.py')
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          slots = [
+              {'i': 1, 'start':'2026-08-31T10:00:00Z','price_eur_kwh':-0.02,'pvSurplusBeforeFlexW':200},
+              {'i': 2, 'start':'2026-08-31T10:15:00Z','price_eur_kwh':-0.01,'pvSurplusBeforeFlexW':300},
+              {'i': 3, 'start':'2026-08-31T13:00:00Z','price_eur_kwh':0.01,'pvSurplusBeforeFlexW':1400},
+              {'i': 4, 'start':'2026-08-31T13:15:00Z','price_eur_kwh':0.02,'pvSurplusBeforeFlexW':1500},
+          ]
+          old = [s['i'] for s in m.rank_grid_v049(slots, 'DYNAMIC', True)]
+          new = [s['i'] for s in m.rank_grid_candidate(slots, 'DYNAMIC', True)]
+          assert old[:2] == [1,2], old
+          assert new[:2] == [4,3], new
+          print({'v0.4.9_first': old[:2], 'v0.4.10_first': new[:2]})
+          PY
+      - name: Current snapshot replay safety check
+        run: python3 scripts/planner_ww_ab_replay.py docs/data/energy-planner-shadow.json
