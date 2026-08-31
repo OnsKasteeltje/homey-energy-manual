@@ -1,26 +1,39 @@
 # Contract Price Adapter v0.10 — Event Refresh Deployment Pack
 
-Status: **READY OUTSIDE HOMEY / MINIMAL HOMEY DISCOVERY REMAINS**
+Status: **READY OUTSIDE HOMEY / ONLY EVENT STATE ID REMAINS TO PROVISION**
 
-Purpose: minimize the eventual Homey mutation/discovery round. Prepare and validate everything possible in GitHub first; Homey is used only for the runtime-specific identifiers and the final controlled mutation that cannot be resolved outside Homey.
+Purpose: prepare and validate everything possible outside Homey first. Homey is used only for runtime-specific state provisioning and the final controlled flow mutation.
 
 ## Live baseline
 
-Existing live flow:
+- Flow: `EM v2 | 30 Context | Contract Price Adapter v0.10 FIXED+DYNAMIC LOW-LOAD`
+- ID: `69648157-892b-49d2-bc4d-e61a1a4d78ab`
+- Existing schedule: every 15 minutes + manual start
+- DYNAMIC action: `homey:device:d28cdd44-ab8c-4f4c-8ea7-279f444ecd81:prices_json`, `period=next_hours`
+- Canonical DYNAMIC context already includes validated `priceSeries: prices`
+- No actuator/device writes
+- Remaining functional gap: PBTH event branch only
 
-- Name: `EM v2 | 30 Context | Contract Price Adapter v0.10 FIXED+DYNAMIC LOW-LOAD`
-- Flow ID: `69648157-892b-49d2-bc4d-e61a1a4d78ab`
-- Schedule: every 15 minutes plus manual start
-- DYNAMIC PBTH action: `homey:device:d28cdd44-ab8c-4f4c-8ea7-279f444ecd81:prices_json`
-- PBTH argument: `period=next_hours`
-- Buffer: `TEMP_PBTH_JSON_BUFFER`
-- Canonical DYNAMIC context now includes `priceSeries: prices`
-- `priceSeries` additive extension was validated through Adapter -> Planner -> Publisher without downstream regression
-- No actuator/device writes in this context flow
+## PBTH trigger resolved from upstream source — no Homey discovery needed
 
-Verified remaining gap in live v0.10: **no PBTH event trigger branch** for `New prices received for period`.
+Upstream source file: `gruijter/com.gruijter.powerhour/.homeycompose/flow/triggers/new_prices.json`.
 
-## Stable IDs — no rediscovery required
+It defines:
+
+```text
+base trigger id     new_prices
+title               New prices received
+titleFormatted      New prices received for [[period]]
+device filter       driver_id=dap|dap15|dapg
+periods             this_day | tomorrow | next_hours
+tokens              prices | provider
+```
+
+Our branch uses device `d28cdd44-ab8c-4f4c-8ea7-279f444ecd81` and `period=next_hours`. Expected device-scoped Homey representation: `homey:device:d28cdd44-ab8c-4f4c-8ea7-279f444ecd81:new_prices`. Only verify this representation once if the Homey mutation API rejects the source-derived form; do not run broad/repeated trigger-card discovery.
+
+PBTH community evidence also confirms that a `New prices received` event can occur around a calendar boundary without the useful future horizon being complete. Therefore the event is only a wake-up signal; semantic comparison remains mandatory.
+
+## Stable IDs — no rediscovery
 
 ```text
 PBTH device                        d28cdd44-ab8c-4f4c-8ea7-279f444ecd81
@@ -37,125 +50,59 @@ Planner flow                      27617767-0a64-43a3-9bcb-e34b0dd6a5c0
 Planner publisher flow            5b3b80fe-96d1-406d-91ef-cf75a4e65d45
 ```
 
-## Only remaining Homey-specific unknowns
+## Only remaining runtime identifier
 
-```text
-EVENT_STATE_ID   = ID of EM2_ContractPrice_EventRefresh_State after one-time provisioning
-PBTH_EVENT_CARD  = exact trigger card ID/args for "New prices received for period"
-```
+`EVENT_STATE_ID` = exact ID of Text Logic variable `EM2_ContractPrice_EventRefresh_State` after one-time provisioning.
 
-Do not perform broad variable/device discovery to obtain these. A single targeted card discovery and one-shot state provisioning are the intended maximum discovery footprint.
-
-## Exact mutation delta
-
-### Delta A — scheduled DYNAMIC path — COMPLETE
-
-The scheduled DYNAMIC path already publishes:
-
-```js
-priceSeries: prices,
-```
-
-This has been validated. **Do not modify the scheduled path again as part of event-refresh deployment.** Keep `quality`, `horizon`, `slots`, `slotMinutes`, PBTH card, contract routing, schedule and existing connections unchanged.
-
-### Delta B — event branch — REMAINING
-
-```text
-PBTH New prices received for period
-  -> HomeyScript boolean: EVENT ELIGIBILITY GATE
-      false -> stop
-      true  -> prices_json(next_hours) exactly once
-             -> write result token to TEMP_PBTH_JSON_BUFFER
-             -> HomeyScript boolean: EVENT POST-FETCH PROCESSOR
-                 false -> stop; no canonical context publication/fan-out
-                 true  -> canonical price context changed; normal downstream semantics apply
-```
-
-Eligibility:
-
-```text
-contract == DYNAMIC
-AND horizonHours < 12
-AND cooldown expired
-```
-
-No-change/degraded result starts 60-minute cooldown. Successful semantic change clears cooldown.
-
-## Event state initialization
-
-Create exactly one Text Logic variable:
-
-`EM2_ContractPrice_EventRefresh_State`
-
-Initial value:
+Initial payload:
 
 ```json
 {"schema":"EM2_PRICE_EVENT_REFRESH_STATE_V0.1","lastAttemptAt":null,"cooldownUntil":null,"lastResult":"NEVER","lastReason":null}
 ```
 
-After creation, capture its ID once and replace `__CAPTURE_ONCE_AFTER_PROVISIONING__` in both scripts in `contract-price-adapter-v0.10-event-refresh.candidate.md`.
+Capture it by exact-name targeted lookup. Never enumerate Logic variables broadly.
 
-## Deployment safety order
+## Exact remaining mutation delta
 
-1. Prepare/update GitHub first; do not use Homey for work that can be resolved statically.
-2. Confirm no parallel Homey diagnostic run is active.
-3. Capture only the exact PBTH event trigger card ID/args using one targeted discovery call if not already available.
-4. Provision only `EM2_ContractPrice_EventRefresh_State` with the documented initial payload.
-5. Capture only its exact Logic ID; do not enumerate Logic variables broadly.
-6. Commit both runtime-specific identifiers back to GitHub and substitute them into the candidate scripts.
-7. Read the current production flow once to verify it still matches this documented baseline.
-8. Prepare one atomic flow patch preserving every existing scheduled card and connection.
-9. Add only the event branch, disabled/SHADOW first where the Homey flow model permits it.
-10. Validate graph integrity: no duplicate production adapter, scheduled route preserved, no actuator cards.
-11. Enable the event branch for controlled semantic testing only when Homey is not rate-limited.
-12. Stop immediately on HTTP 429; do not retry in the same round.
+```text
+PBTH new_prices(period=next_hours)
+  -> EVENT ELIGIBILITY GATE
+      false -> stop
+      true  -> PBTH prices_json(next_hours) exactly once
+             -> TEMP_PBTH_JSON_BUFFER
+             -> EVENT POST-FETCH PROCESSOR
+                 false -> stop; no canonical publish
+                 true  -> canonical context update -> normal downstream semantic chain
+```
+
+Eligibility: DYNAMIC + horizonHours<12 + cooldown expired. Degraded/unchanged starts 60-minute cooldown; semantic extension/change clears it.
+
+## GitHub-first deployment order
+
+1. Keep candidate, exact scripts, topology, acceptance matrix and rollback current in GitHub.
+2. Provision exactly one `EM2_ContractPrice_EventRefresh_State` variable.
+3. Obtain its ID via exact-name autocomplete lookup only.
+4. Commit the ID into GitHub and replace both script placeholders.
+5. Read live production flow exactly once to verify baseline.
+6. Prepare one atomic patch preserving all existing cards/connections and adding only the event branch.
+7. No change to scheduled v0.10 path or `priceSeries`.
+8. Stop immediately on HTTP 429; no same-round retry.
 
 ## Acceptance matrix
 
-| Case | Expected PBTH action calls | Context publication | Cooldown | Planner fan-out |
+| Case | PBTH calls | Context publication | Cooldown | Planner fan-out |
 |---|---:|---|---|---|
-| FIXED contract | 0 | none | unchanged | none |
+| FIXED | 0 | none | unchanged | none |
 | DYNAMIC, horizon >=12h | 0 | none | unchanged | none |
-| DYNAMIC, horizon <12h, cooldown active | 0 | none | unchanged | none |
-| DYNAMIC, horizon <12h, degraded result | 1 | none | 60 min | none |
-| DYNAMIC, horizon <12h, unchanged result | 1 | none | 60 min | none |
-| DYNAMIC, horizon <12h, extended/changed result | 1 | once | cleared | once via normal chain |
+| DYNAMIC, <12h, cooldown active | 0 | none | unchanged | none |
+| DYNAMIC, <12h, degraded | 1 | none | 60 min | none |
+| DYNAMIC, <12h, unchanged | 1 | none | 60 min | none |
+| DYNAMIC, <12h, changed/extended | 1 | once | cleared | once |
 
 ## Rollback
 
-Rollback is intentionally simple:
-
-- disable/remove only the event branch;
-- retain the existing scheduled 15-minute v0.10 route;
-- retain the already validated `priceSeries` field in the canonical context.
-
-No actuator rollback is required because this change never writes devices.
-
-## Validation evidence to capture
-
-For the controlled test, record only:
-
-```text
-before: contractType, horizonHours, slots, updatedAt, event state
-trigger: one PBTH new-prices event
-actual PBTH action count: 0 or 1
-result: lastResult / lastReason / cooldownUntil
-after: horizonHours, slots, priceSeries length, updatedAt
-planner: sourceRevision before/after only when semantic update=true
-```
-
-Avoid broad Homey device/variable dumps.
+Remove/disable only the event branch. Retain existing scheduled 15-minute v0.10 route and validated `priceSeries` field. No actuator rollback is required.
 
 ## Definition of done
 
-Event-refresh is complete only when all are true:
-
-- live flow contains the PBTH event branch;
-- scheduled 15-minute fallback remains intact and unchanged;
-- event branch is gated by DYNAMIC + `<12h` + cooldown;
-- one admitted event performs at most one `prices_json(next_hours)` call;
-- unchanged result does not republish price context;
-- successful update reaches Planner once through the normal semantic chain;
-- canonical DYNAMIC context continues to carry `priceSeries`;
-- exact state-variable and PBTH trigger IDs are committed back to GitHub;
-- live Homey and GitHub documentation describe the same topology.
+Live branch exists; scheduled fallback unchanged; DYNAMIC/<12h/cooldown gate enforced; max one PBTH call per admitted event; unchanged data causes no canonical republish; successful semantic update reaches Planner once; exact state ID committed to GitHub; Homey and GitHub topology match.
