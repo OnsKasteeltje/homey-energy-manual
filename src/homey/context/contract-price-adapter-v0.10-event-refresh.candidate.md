@@ -1,28 +1,30 @@
 # EM v2 | 30 Context | Contract Price Adapter v0.10 EVENT REFRESH CANDIDATE
 
-Status: **READY FOR CONTROLLED HOMEY DEPLOYMENT / NOT YET DEPLOYED**
+Status: **GITHUB IMPLEMENTATION READY / LIVE HOMEY v0.10 EXISTS BUT EVENT REFRESH IS NOT YET IMPLEMENTED**
 
-Base runtime: `Contract Price Adapter v0.9 DYNAMIC LOW-LOAD`
+Live runtime baseline (verified 2026-08-31): `EM v2 | 30 Context | Contract Price Adapter v0.10 FIXED+DYNAMIC LOW-LOAD`, existing flow ID `69648157-892b-49d2-bc4d-e61a1a4d78ab`.
+
+Important reconciliation: the live Homey flow already carries the **v0.10** name, but its current topology is still the scheduled/manual low-load path. It does **not** yet contain the PBTH `New prices received for period` event branch, does **not** yet publish `priceSeries`, and therefore does not yet implement the event-refresh behavior described below. GitHub must treat the event-refresh work as a delta on top of the current live v0.10 flow, not as a rename/promotion from v0.9.
 
 ## Objective
 
-Extend the existing low-load DYNAMIC price adapter with an event-driven PBTH refresh only while the currently published dynamic-price horizon is below 12 hours.
+Extend the existing low-load FIXED+DYNAMIC price adapter with an event-driven PBTH refresh only while the currently published dynamic-price horizon is below 12 hours.
 
 The Planner does **not** call PBTH. The Context/Contract Price Adapter owns the refresh.
 
 ## Exact PBTH cards
 
-For the configured PBTH **Day-Ahead 15m E Prices** device:
+For the configured PBTH **Day-Ahead 15m E Prices** device (`d28cdd44-ab8c-4f4c-8ea7-279f444ecd81`):
 
-- WHEN card: **`New prices received for period`**
-- ACTION card already used by v0.9: **`prices_json(next_hours)`**
+- WHEN card: **`New prices received for period`** — exact Homey card ID still to be captured once during the controlled deployment round.
+- ACTION card: `homey:device:d28cdd44-ab8c-4f4c-8ea7-279f444ecd81:prices_json`, argument `period=next_hours`.
 
 The PBTH event is only an opportunity to refresh. It does not by itself imply that the usable horizon changed.
 
 ## Runtime topology
 
 ```text
-existing scheduled 15-minute v0.9 path -------------------------+
+existing scheduled 15-minute live v0.10 path --------------------+
                                                                   |
 PBTH: New prices received for period                              |
         |                                                         |
@@ -86,7 +88,7 @@ When an admitted event refresh yields no semantic improvement:
 - suppress further event-driven attempts for 60 minutes;
 - allow at most one unsuccessful extra refresh per hour;
 - never loop or immediately retry;
-- keep the normal 15-minute scheduled v0.9 path intact.
+- keep the normal 15-minute scheduled path intact.
 
 A successful horizon extension or semantic price change clears the cooldown.
 
@@ -100,6 +102,7 @@ Recommended JSON payload:
 
 ```json
 {
+  "schema": "EM2_PRICE_EVENT_REFRESH_STATE_V0.1",
   "lastAttemptAt": null,
   "cooldownUntil": null,
   "lastResult": "NEVER",
@@ -110,6 +113,7 @@ Recommended JSON payload:
 Allowed result values:
 
 - `NEVER`
+- `ATTEMPT_ADMITTED`
 - `SKIPPED_FIXED`
 - `SKIPPED_HORIZON_OK`
 - `SKIPPED_COOLDOWN`
@@ -117,7 +121,9 @@ Allowed result values:
 - `UNCHANGED`
 - `UPDATED`
 
-## Targeted Logic IDs inherited from v0.9
+The variable ID must be captured after it is provisioned once in Homey; do not rediscover variables broadly.
+
+## Targeted Logic IDs inherited from the live flow
 
 - `EMS_ContractType`: `8d346495-f183-4072-86d0-c4bc9da94e2e`
 - `EM2_Contract_Type`: `211e5846-aada-4607-8d52-01b2ef578866`
@@ -128,11 +134,19 @@ Allowed result values:
 - `EM2_ContractPrice_Horizon`: `587ea957-f9e9-44c7-b975-3bed53bd9ab8`
 - `EM2_ContractPrice_UpdatedAt`: `77e16ec7-9ebb-4488-9caf-47c1ab3d4ddb`
 
-The event-state variable ID must be captured after it is provisioned once in Homey; do not rediscover variables broadly.
+## Scheduled-path compatibility delta
+
+The live v0.10 scheduled DYNAMIC branch currently publishes horizon metadata but does not include the actual accepted price array. Add this field to the canonical context on the scheduled path:
+
+```js
+priceSeries: prices,
+```
+
+This is a backward-compatible context extension and is required for exact semantic comparison by the event path. Existing consumers may ignore it.
+
+Do **not** change the existing 15-minute schedule, FIXED bypass, PBTH device/action card, buffer variable, or actuator behavior.
 
 ## HomeyScript: event eligibility gate
-
-This script is intended to run **before** the PBTH action card on the event branch. It returns `true` only if exactly one PBTH refresh may be attempted.
 
 ```js
 // Contract Price Adapter v0.10 — EVENT ELIGIBILITY GATE
@@ -144,7 +158,6 @@ const IDS={
   eventState:'__CAPTURE_ONCE_AFTER_PROVISIONING__'
 };
 
-const COOLDOWN_MS=60*60*1000;
 const read=async id=>Homey.logic.getVariable({id});
 const write=async(id,value)=>Homey.logic.updateVariable({id,variable:{value}});
 const parse=s=>{try{return JSON.parse(String(s??''));}catch{return null;}};
@@ -154,7 +167,7 @@ const nowIso=new Date(nowMs).toISOString();
 const canonical=await read(IDS.canonical);
 const contract=String(canonical?.value||'FIXED').toUpperCase();
 const stateVar=await read(IDS.eventState);
-const eventState=parse(stateVar?.value)||{lastAttemptAt:null,cooldownUntil:null,lastResult:'NEVER',lastReason:null};
+const eventState=parse(stateVar?.value)||{schema:'EM2_PRICE_EVENT_REFRESH_STATE_V0.1',lastAttemptAt:null,cooldownUntil:null,lastResult:'NEVER',lastReason:null};
 
 async function stop(result,reason){
   await write(IDS.eventState,JSON.stringify({...eventState,lastResult:result,lastReason:reason}));
@@ -184,8 +197,6 @@ return true;
 
 ## HomeyScript: post-fetch semantic processor
 
-Run this immediately after PBTH `prices_json(next_hours)` has written its token into `TEMP_PBTH_JSON_BUFFER`.
-
 ```js
 // Contract Price Adapter v0.10 — EVENT POST-FETCH PROCESSOR
 // Targeted Logic reads/writes only. Context-only. No actuator/device writes.
@@ -201,7 +212,7 @@ const IDS={
   eventState:'__CAPTURE_ONCE_AFTER_PROVISIONING__'
 };
 
-const STEP_MS=15*60000,COOLDOWN_MS=60*60*1000,EPS=1e-9;
+const COOLDOWN_MS=60*60*1000,EPS=1e-9;
 const read=async id=>Homey.logic.getVariable({id});
 const write=async(id,value)=>Homey.logic.updateVariable({id,variable:{value}});
 const parse=s=>{try{return JSON.parse(String(s??''));}catch{return null;}};
@@ -224,12 +235,7 @@ for(const v of source){
 }
 
 if(prices.length<4){
-  await write(IDS.eventState,JSON.stringify({
-    ...eventState,
-    cooldownUntil:new Date(nowMs+COOLDOWN_MS).toISOString(),
-    lastResult:'DEGRADED',
-    lastReason:'LT_4_CONTIGUOUS_SLOTS'
-  }));
+  await write(IDS.eventState,JSON.stringify({...eventState,cooldownUntil:new Date(nowMs+COOLDOWN_MS).toISOString(),lastResult:'DEGRADED',lastReason:'LT_4_CONTIGUOUS_SLOTS'}));
   return false;
 }
 
@@ -244,12 +250,7 @@ for(let i=0;i<overlap;i++){
 const changed=newSlots>oldSlots||newHorizon>oldHorizon+EPS||priceChanged;
 
 if(!changed){
-  await write(IDS.eventState,JSON.stringify({
-    ...eventState,
-    cooldownUntil:new Date(nowMs+COOLDOWN_MS).toISOString(),
-    lastResult:'UNCHANGED',
-    lastReason:'NO_SEMANTIC_PRICE_CHANGE'
-  }));
+  await write(IDS.eventState,JSON.stringify({...eventState,cooldownUntil:new Date(nowMs+COOLDOWN_MS).toISOString(),lastResult:'UNCHANGED',lastReason:'NO_SEMANTIC_PRICE_CHANGE'}));
   return false;
 }
 
@@ -287,37 +288,39 @@ await write(IDS.source,ctx.source);
 await write(IDS.quality,'GOOD');
 await write(IDS.horizon,horizon);
 await write(IDS.updatedAt,nowIso);
-await write(IDS.eventState,JSON.stringify({
-  ...eventState,
-  cooldownUntil:null,
-  lastResult:'UPDATED',
-  lastReason:'SEMANTIC_PRICE_CHANGE'
-}));
+await write(IDS.eventState,JSON.stringify({...eventState,cooldownUntil:null,lastResult:'UPDATED',lastReason:'SEMANTIC_PRICE_CHANGE'}));
 return true;
 ```
 
-## Important compatibility note
+## Remaining Homey-only unknowns
 
-The current v0.9 published context shown in the repository does not include `priceSeries`. For robust semantic value comparison, v0.10 should add `priceSeries: prices` to the canonical context on both the regular scheduled path and the event path. This is a context-schema extension only; existing consumers may ignore the extra field.
+Everything below is intentionally left unresolved in GitHub because it can only be obtained safely from Homey itself:
 
-Until the scheduled v0.9/v0.10 path publishes `priceSeries`, the event processor still detects a useful horizon extension by slot/horizon growth, but exact overlapping price-value comparison is not fully available from the context alone.
+1. exact Logic ID for `EM2_ContractPrice_EventRefresh_State` after one-time provisioning;
+2. exact PBTH WHEN-card ID/arguments for **New prices received for period**;
+3. exact Advanced Flow card/node IDs generated when the new branch is added.
+
+No other broad Homey discovery is required.
 
 ## Controlled deployment sequence
 
 1. Provision `EM2_ContractPrice_EventRefresh_State` once and record its Logic ID.
-2. Add `priceSeries: prices` to the scheduled adapter output while keeping the existing 15-minute schedule unchanged.
-3. Add the PBTH **New prices received for period** event branch disabled/SHADOW.
-4. Event branch: eligibility script -> only on `true` -> PBTH `prices_json(next_hours)` -> write token to existing buffer -> post-fetch semantic processor.
-5. Validate `horizon >=12h` produces zero PBTH action calls.
-6. Validate `<12h` produces one and only one PBTH action call per admitted event.
-7. Validate unchanged result starts 60-minute cooldown and produces no Planner fan-out.
-8. Validate changed/extended result updates price context once and permits normal Planner recalculation.
-9. Keep the scheduled 15-minute route as rollback/fallback throughout validation.
+2. Capture only the exact PBTH **New prices received for period** trigger card ID/args.
+3. Patch the existing live flow ID `69648157-892b-49d2-bc4d-e61a1a4d78ab`; do not create a competing second production adapter.
+4. Add `priceSeries: prices` to the scheduled DYNAMIC context output while keeping the existing 15-minute schedule unchanged.
+5. Add the PBTH event branch disabled/SHADOW first.
+6. Event branch: eligibility script -> only on `true` -> PBTH `prices_json(next_hours)` -> existing buffer -> post-fetch semantic processor.
+7. Validate `horizon >=12h` produces zero PBTH action calls.
+8. Validate `<12h` produces one and only one PBTH action call per admitted event.
+9. Validate unchanged result starts 60-minute cooldown and produces no Planner fan-out.
+10. Validate changed/extended result updates price context once and permits normal Planner recalculation.
+11. Keep the scheduled 15-minute route as rollback/fallback throughout validation.
 
 ## Load-budget invariant
 
 - no `Homey.logic.getVariables()`;
 - no `Homey.devices.getDevices()`;
+- no broad card/device enumeration during deployment;
 - no device/actuator writes;
 - one PBTH action maximum per admitted event;
 - zero PBTH action calls when horizon is already >=12h;
