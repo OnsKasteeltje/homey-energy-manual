@@ -54,24 +54,67 @@ test('PV-first beats cheaper imported electricity', () => {
 
 test('deadline fallback uses lowest marginal import then price', () => {
   const slots = [
-    slot(0, 11, 0, { pv: 600, base: 500, price: 0.10 }), // 1800 W grid
-    slot(1, 11, 15, { pv: 1200, base: 500, price: 0.35 }), // 1200 W grid
-    slot(2, 11, 30, { pv: 1200, base: 500, price: 0.20 }), // 1200 W grid, cheaper tie
+    slot(0, 11, 0, { pv: 600, base: 500, price: 0.10 }),
+    slot(1, 11, 15, { pv: 1200, base: 500, price: 0.35 }),
+    slot(2, 11, 30, { pv: 1200, base: 500, price: 0.20 }),
   ];
   const result = optimizeWarmWater({
     slots,
     wwRemainingEnergyKWh: 0.475,
+    deadlineMs: Date.parse('2026-08-31T11:45:00.000Z'),
     contract: 'DYNAMIC',
   });
   const chosen = result.actions.find((x) => x.targets.wwTargetW > 0);
+  assert.equal(result.deadlineUrgent, true);
   assert.equal(chosen.i, 2);
   assert.equal(chosen.score.marginalImportW, 1200);
 });
 
+test('defers grid fallback while deadline still has spare quarters', () => {
+  const slots = [
+    slot(0, 14, 0, { pv: 500, base: 500, price: 0.01 }),
+    slot(1, 14, 15, { pv: 500, base: 500, price: 0.02 }),
+    slot(2, 14, 30, { pv: 500, base: 500, price: 0.03 }),
+    slot(3, 14, 45, { pv: 500, base: 500, price: 0.04 }),
+  ];
+  const result = optimizeWarmWater({
+    slots,
+    wwRemainingEnergyKWh: 0.475,
+    deadlineMs: Date.parse('2026-08-31T15:00:00.000Z'),
+    contract: 'DYNAMIC',
+    gridFallbackSafetySlots: 2,
+  });
+  assert.equal(result.gridSlotsNeeded, 1);
+  assert.equal(result.deadlineUrgent, false);
+  assert.equal(result.gridFallbackActive, false);
+  assert.equal(result.selectedSlots, 0);
+  assert.equal(result.unallocatedEnergyKWh, 0.475);
+});
+
+test('activates only minimum grid fallback when deadline feasibility becomes tight', () => {
+  const slots = [
+    slot(0, 14, 15, { pv: 500, base: 500, price: 0.30 }),
+    slot(1, 14, 30, { pv: 500, base: 500, price: 0.10 }),
+    slot(2, 14, 45, { pv: 500, base: 500, price: 0.20 }),
+  ];
+  const result = optimizeWarmWater({
+    slots,
+    wwRemainingEnergyKWh: 0.475,
+    deadlineMs: Date.parse('2026-08-31T15:00:00.000Z'),
+    contract: 'DYNAMIC',
+    gridFallbackSafetySlots: 2,
+  });
+  assert.equal(result.deadlineUrgent, true);
+  assert.equal(result.gridFallbackActive, true);
+  assert.equal(result.selectedSlots, 1);
+  const chosen = result.actions.find((x) => x.targets.wwTargetW > 0);
+  assert.equal(chosen.i, 1);
+});
+
 test('already allocated flexible load is subtracted from residual PV', () => {
   const slots = [
-    slot(0, 12, 0, { pv: 4000, base: 500, flex: 2500 }), // only 1000 W residual
-    slot(1, 12, 15, { pv: 3000, base: 500, flex: 0 }), // 2500 W residual -> full WW
+    slot(0, 12, 0, { pv: 4000, base: 500, flex: 2500 }),
+    slot(1, 12, 15, { pv: 3000, base: 500, flex: 0 }),
   ];
   const result = optimizeWarmWater({ slots, wwRemainingEnergyKWh: 0.475, contract: 'DYNAMIC' });
   const chosen = result.actions.find((x) => x.targets.wwTargetW > 0);
@@ -106,6 +149,16 @@ test('deadline excludes slots starting at or after the deadline', () => {
   });
   const chosen = result.actions.find((x) => x.targets.wwTargetW > 0);
   assert.equal(chosen.i, 0);
+});
+
+test('partial final demand is accounted without inflating analyzed energy', () => {
+  const slots = [slot(0, 15, 0, { pv: 3000, base: 500 })];
+  const result = optimizeWarmWater({ slots, wwRemainingEnergyKWh: 0.202, contract: 'DYNAMIC' });
+  assert.equal(result.selectedSlots, 1);
+  assert.equal(result.allocatedDemandKWh, 0.202);
+  assert.equal(result.scheduledEnergyKWh, 0.475);
+  assert.equal(result.plannedExcessEnergyKWh, 0.273);
+  assert.equal(result.estimatedPvEnergyKWh, 0.202);
 });
 
 test('candidate stays SHADOW-only and never claims physical writes', () => {
