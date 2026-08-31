@@ -1,18 +1,20 @@
-# Publisher v1.0.13 CONTROL EVIDENCE — PREPARED OUTSIDE HOMEY
+# Publisher v1.0.13 CONTROL EVIDENCE
 
-Status: **PREPARED / NOT DEPLOYED / HOMEY ID BINDING PENDING**
+Status: **DEPLOYED / NATURAL PUBLICATION SMOKE PENDING**
 
-Goal: extend the existing scheduled low-load public-state publisher with a read-only `control_evidence` section so the Planner page can compare the current Planner slot against actual Power Intent and adapter output without introducing any physical write path.
+Goal: extend the scheduled low-load public-state publisher with a read-only `control_evidence` section so the Planner page can compare the current Planner slot against actual Power Intent and adapter output without introducing any physical write path.
 
-## Runtime contracts to publish
+## Deployed runtime contracts
 
-The publication layer must copy the existing runtime objects as-is:
+The publication layer copies these existing runtime objects as-is:
 
-- `EM2_Power_Intent` (`EM2_POWER_INTENT_V0.2`)
-- `EM2_EV_Power_Adapter` (`EM2_EV_POWER_ADAPTER_V0.1`)
-- `EM2_WW_Power_Adapter` (`EM2_WW_POWER_ADAPTER_V0.1`)
+- `EM2_Power_Intent` (`EM2_POWER_INTENT_V0.2`) — ID `04b57041-dd7f-41f7-a00a-f023afb1ccee`
+- `EM2_EV_Power_Adapter` (`EM2_EV_POWER_ADAPTER_V0.1`) — ID `f2118322-d59d-4aa8-b478-234effc3983c`
+- `EM2_WW_Power_Adapter` (`EM2_WW_POWER_ADAPTER_V0.2`) — ID `686181b9-e135-40fe-b09d-df5928269466`
 
-No EV current, executable power, WW state or revision may be reconstructed by the publisher. The publisher is observability-only.
+Exact deployed source is captured in `src/homey/publisher/publisher-v1.0.13-control-evidence.js`.
+
+No EV current, executable power, WW state or revision is reconstructed by the publisher. The publisher is observability-only.
 
 ## Canonical web shape
 
@@ -24,86 +26,53 @@ No EV current, executable power, WW state or revision may be reconstructed by th
     "readOnly": true,
     "observabilityOnly": true,
     "controlImpact": "NONE",
-    "power_intent": { "...raw EM2_Power_Intent...": "..." },
-    "adapter": {
-      "ev": { "...raw EM2_EV_Power_Adapter...": "..." },
-      "warm_water": { "...raw EM2_WW_Power_Adapter...": "..." }
-    },
-    "revisions": {
-      "powerIntent": 0,
-      "evAdapter": 0,
-      "wwAdapter": 0,
-      "aligned": false
-    },
+    "power_intent": {},
+    "adapter": {"ev": {}, "warm_water": {}},
+    "revisions": {"powerIntent": 0, "evAdapter": 0, "wwAdapter": 0, "aligned": false},
     "complete": false,
-    "safety": {
-      "deviceWritesIntroduced": false,
-      "derivedValues": false,
-      "rawRuntimeContracts": true
-    }
+    "safety": {"deviceWritesIntroduced": false, "derivedValues": false, "rawRuntimeContracts": true}
   }
 }
 ```
 
-Reference implementation: `src/homey/publisher/control-evidence-contract-v0.1.mjs` with unit tests in `tests/control-evidence-contract.test.mjs`.
+Reference implementation: `src/homey/publisher/control-evidence-contract-v0.1.mjs`; unit tests: `tests/control-evidence-contract.test.mjs`.
 
-## Low-load integration rule
+## Low-load implementation
 
-Do **not** add a broad `Homey.logic.getVariables()` scan. After the existing 15-minute publisher gate has passed, add exactly three targeted Logic reads for the three runtime contracts above. Reads must happen only when a GitHub publication is already due; they must not create an additional trigger or publication cadence.
+The existing v1.0.12 structure is preserved:
 
-Known stable ID:
+- same 15-minute cron;
+- same +8 s phase offset;
+- same six targeted Logic reads before the publication gate;
+- no `Homey.logic.getVariables()` collection scan.
 
-- `EM2_Power_Intent`: `04b57041-dd7f-41f7-a00a-f023afb1ccee`
+Only after the existing publication gate has passed, v1.0.13 performs exactly three additional targeted Logic reads for Power Intent, EV Adapter and WW Adapter. No extra trigger, poller or GitHub publication cadence is introduced.
 
-Still requires one-time Homey binding before deployment:
+## Runtime deployment result
 
-- `EM2_EV_Power_Adapter`: ID pending
-- `EM2_WW_Power_Adapter`: ID pending
+Homey flow `fe84bc17-72d4-4fbb-9a69-b3d751b0ffcd` is now named `EM v2 | 40 Data | Publisher v1.0.13 CONTROL EVIDENCE LOW-LOAD` and readback after update reported:
 
-These IDs must be read once and then hard-bound. Do not discover them by a collection scan on every publisher run.
+- `enabled=true`
+- `broken=false`
+- triggerable=true
+- schedule unchanged: every 15 minutes
+- delay unchanged: 8 seconds
+- no device-read or actuator-write code added
 
-## Publisher merge fragment
+The deployment was performed after capturing the exact v1.0.12 HomeyScript and binding the adapter output IDs from the exact enabled adapter flows.
 
-The exact current Homey v1.0.12 source is not yet captured in GitHub, so this is deliberately a merge fragment rather than a guessed full replacement.
+## Remaining acceptance gate
 
-```js
-// only after existing <=1/15min publish gate says a publication is due
-const [intentV,evAdapterV,wwAdapterV]=await Promise.all([
-  Homey.logic.getVariable({id:ID.powerIntent}),
-  Homey.logic.getVariable({id:ID.evPowerAdapter}),
-  Homey.logic.getVariable({id:ID.wwPowerAdapter})
-]);
-const powerIntent=parse(intentV?.value);
-const evAdapter=parse(evAdapterV?.value);
-const wwAdapter=parse(wwAdapterV?.value);
-const nr=v=>Number.isFinite(Number(v))?Number(v):null;
-const ir=nr(powerIntent?.sourceRevision),er=nr(evAdapter?.sourceRevision),wr=nr(wwAdapter?.sourceRevision);
-payload.control_evidence={
-  schema:'EM2_CONTROL_EVIDENCE_V0.1',
-  generatedAt:now,
-  readOnly:true,
-  observabilityOnly:true,
-  controlImpact:'NONE',
-  power_intent:powerIntent||null,
-  adapter:{ev:evAdapter||null,warm_water:wwAdapter||null},
-  revisions:{powerIntent:ir,evAdapter:er,wwAdapter:wr,aligned:ir!==null&&er===ir&&wr===ir},
-  complete:!!powerIntent&&!!evAdapter&&!!wwAdapter,
-  safety:{deviceWritesIntroduced:false,derivedValues:false,rawRuntimeContracts:true}
-};
-```
+Do not force a publication inside the 15-minute gate. Let the next natural scheduled publication run. PASS requires:
 
-## Acceptance gates before deployment
-
-1. Capture/read back exact current Publisher v1.0.12 HomeyScript and reconcile it into GitHub first.
-2. Bind both adapter variable IDs with targeted one-time reads.
-3. Confirm the three additional reads occur only after the existing 15-minute hard gate has passed.
-4. Confirm no trigger changes and no additional GitHub PUT cadence.
-5. Confirm `control_evidence.power_intent` preserves `EM2_POWER_INTENT_V0.2` unchanged.
-6. Confirm EV `command.requested_A` and `electrical.executable_W` are copied, not recomputed.
-7. Confirm WW `command.value` is copied, not inferred from boiler state.
-8. Confirm any missing/invalid input is published as null/incomplete rather than synthesized.
-9. Confirm no physical device write and no actuator ownership change.
-10. One SHADOW publication smoke followed by website revision/alignment check.
+1. `meta.publisher_version = EM2_PUBLISHER_V1.0.13`;
+2. `control_evidence.schema = EM2_CONTROL_EVIDENCE_V0.1`;
+3. raw Power Intent schema remains `EM2_POWER_INTENT_V0.2`;
+4. EV adapter publishes raw `command.requested_A` and `electrical.executable_W`;
+5. WW adapter publishes raw `command.value` and schema `EM2_WW_POWER_ADAPTER_V0.2`;
+6. `control_evidence.complete=true` when all three objects are present;
+7. revision alignment is reported truthfully, never synthesized;
+8. no physical write or actuator ownership change occurs.
 
 ## Expected Homey load delta
 
