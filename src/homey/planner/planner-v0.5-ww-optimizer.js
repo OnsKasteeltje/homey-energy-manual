@@ -19,7 +19,7 @@ function round(value, digits = 3) {
   return Number(Number(value).toFixed(digits));
 }
 
-function normalizeSlot(slot, index, boilerW) {
+function normalizeSlot(slot, index, boilerW, slotMinutes = DEFAULT_SLOT_MINUTES) {
   const baseLoadW = finiteNumber(slot.baseLoadForecastW) ? Number(slot.baseLoadForecastW) : null;
   const pvForecastW = finiteNumber(slot.pvForecastW) ? Number(slot.pvForecastW) : null;
   const alreadyAllocatedFlexibleLoadW = Math.max(0, finiteNumber(slot.alreadyAllocatedFlexibleLoadW) ? Number(slot.alreadyAllocatedFlexibleLoadW) : 0);
@@ -48,8 +48,8 @@ function normalizeSlot(slot, index, boilerW) {
     score: {
       pvCoverageW,
       marginalImportW,
-      marginalImportKWh: marginalImportW === null ? null : round(marginalImportW * DEFAULT_SLOT_MINUTES / 60000),
-      pricePenalty: marginalImportW === null || price === null ? null : round(marginalImportW * DEFAULT_SLOT_MINUTES / 60000 * price, 6),
+      marginalImportKWh: marginalImportW === null ? null : round(marginalImportW * slotMinutes / 60000),
+      pricePenalty: marginalImportW === null || price === null ? null : round(marginalImportW * slotMinutes / 60000 * price, 6),
       deadlinePenalty: 0,
       phasePenalty: 0,
     },
@@ -57,7 +57,6 @@ function normalizeSlot(slot, index, boilerW) {
 }
 
 function compareWwSlots(a, b, contract) {
-  // Unknown forecast quality is always less attractive than a known forecast.
   const aKnown = finiteNumber(a.score.marginalImportW);
   const bKnown = finiteNumber(b.score.marginalImportW);
   if (aKnown !== bKnown) return aKnown ? -1 : 1;
@@ -67,19 +66,19 @@ function compareWwSlots(a, b, contract) {
     return a.score.marginalImportW - b.score.marginalImportW;
   }
 
-  // For equal marginal import, maximize PV coverage.
+  // Equivalent import: prefer greatest direct PV coverage.
   if (aKnown && bKnown && a.score.pvCoverageW !== b.score.pvCoverageW) {
     return b.score.pvCoverageW - a.score.pvCoverageW;
   }
 
-  // Price only breaks ties on imported energy; it does not outrank PV self-consumption.
+  // Price only breaks ties on imported energy; cheap grid never outranks better PV cover.
   if (String(contract || '').toUpperCase() === 'DYNAMIC') {
     const ap = finiteNumber(a.price_eur_kwh) ? Number(a.price_eur_kwh) : Number.POSITIVE_INFINITY;
     const bp = finiteNumber(b.price_eur_kwh) ? Number(b.price_eur_kwh) : Number.POSITIVE_INFINITY;
     if (ap !== bp) return ap - bp;
   }
 
-  // Deterministic final tie-breaker. This does not impose contiguity.
+  // Deterministic final tie-breaker. This intentionally does not impose contiguity.
   const at = Date.parse(String(a.start || ''));
   const bt = Date.parse(String(b.start || ''));
   if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return at - bt;
@@ -99,7 +98,7 @@ function optimizeWarmWater({
   if (!finiteNumber(boilerW) || Number(boilerW) <= 0) throw new TypeError('boilerW must be > 0');
   if (!finiteNumber(slotMinutes) || Number(slotMinutes) <= 0) throw new TypeError('slotMinutes must be > 0');
 
-  const normalized = slots.map((slot, index) => normalizeSlot(slot, index, Number(boilerW)));
+  const normalized = slots.map((slot, index) => normalizeSlot(slot, index, Number(boilerW), Number(slotMinutes)));
   const requestedEnergyKWh = goalReachedToday ? 0 : Math.max(0, Number(wwRemainingEnergyKWh) || 0);
   const slotEnergyKWh = Number(boilerW) * Number(slotMinutes) / 60000;
   const requiredSlots = requestedEnergyKWh > 0 ? Math.ceil(requestedEnergyKWh / slotEnergyKWh) : 0;
@@ -130,13 +129,18 @@ function optimizeWarmWater({
   });
 
   const selectedSlots = actions.filter((slot) => slot.targets.wwTargetW > 0);
-  const allocatedEnergyKWh = Math.min(requestedEnergyKWh, selectedSlots.length * slotEnergyKWh);
-  const unallocatedEnergyKWh = Math.max(0, requestedEnergyKWh - allocatedEnergyKWh);
+  const scheduledEnergyKWh = selectedSlots.length * slotEnergyKWh;
+  const allocatedDemandKWh = Math.min(requestedEnergyKWh, scheduledEnergyKWh);
+  const plannedExcessEnergyKWh = Math.max(0, scheduledEnergyKWh - requestedEnergyKWh);
+  const unallocatedEnergyKWh = Math.max(0, requestedEnergyKWh - scheduledEnergyKWh);
   const estimatedGridEnergyKWh = selectedSlots.reduce((sum, slot) => {
     if (!finiteNumber(slot.score.marginalImportW)) return sum;
     return sum + Number(slot.score.marginalImportW) * Number(slotMinutes) / 60000;
   }, 0);
-  const estimatedPvEnergyKWh = Math.max(0, allocatedEnergyKWh - estimatedGridEnergyKWh);
+  const estimatedPvEnergyKWh = selectedSlots.reduce((sum, slot) => {
+    if (!finiteNumber(slot.score.pvCoverageW)) return sum;
+    return sum + Number(slot.score.pvCoverageW) * Number(slotMinutes) / 60000;
+  }, 0);
   const estimatedImportCostEur = selectedSlots.reduce((sum, slot) => {
     if (!finiteNumber(slot.score.marginalImportW) || !finiteNumber(slot.price_eur_kwh)) return sum;
     return sum + Number(slot.score.marginalImportW) * Number(slotMinutes) / 60000 * Number(slot.price_eur_kwh);
@@ -152,7 +156,9 @@ function optimizeWarmWater({
     slotEnergyKWh: round(slotEnergyKWh),
     requiredSlots,
     selectedSlots: selectedSlots.length,
-    allocatedEnergyKWh: round(allocatedEnergyKWh),
+    scheduledEnergyKWh: round(scheduledEnergyKWh),
+    allocatedDemandKWh: round(allocatedDemandKWh),
+    plannedExcessEnergyKWh: round(plannedExcessEnergyKWh),
     unallocatedEnergyKWh: round(unallocatedEnergyKWh),
     estimatedPvEnergyKWh: round(estimatedPvEnergyKWh),
     estimatedGridEnergyKWh: round(estimatedGridEnergyKWh),
