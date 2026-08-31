@@ -1,0 +1,43 @@
+name: Planner v0.5 runtime candidate
+
+on:
+  push:
+    branches:
+      - prep/planner-v0.5-power-intent-efficiency
+    paths:
+      - 'src/homey/planner/energy-plan-24h-v0.5.0.shadow-candidate.js'
+      - '.github/workflows/planner-v0.5-runtime-candidate.yml'
+  pull_request:
+    paths:
+      - 'src/homey/planner/energy-plan-24h-v0.5.0.shadow-candidate.js'
+      - '.github/workflows/planner-v0.5-runtime-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Parse HomeyScript candidate in async wrapper
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const source = fs.readFileSync('src/homey/planner/energy-plan-24h-v0.5.0.shadow-candidate.js', 'utf8');
+          new Function(`return (async()=>{${source}\n})`);
+          console.log('syntax: PASS');
+          NODE
+      - name: Enforce low-load Homey contract
+        run: |
+          f=src/homey/planner/energy-plan-24h-v0.5.0.shadow-candidate.js
+          test "$(grep -o 'Homey.logic.getVariable' "$f" | wc -l)" -eq 1
+          test "$(grep -o 'Homey.logic.updateVariable' "$f" | wc -l)" -eq 1
+          ! grep -En 'Homey\.logic\.getVariables|Homey\.devices|setCapabilityValue|triggerFlow|Homey\.flow' "$f"
+          grep -q "controlMode:'SHADOW'" "$f"
+          grep -q 'physicalWritePerformed:false' "$f"
+          grep -q 'noAdditionalHomeyReads:true' "$f"
+          echo 'low-load guard: PASS'
