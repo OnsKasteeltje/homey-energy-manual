@@ -1,8 +1,8 @@
 # Contract Price Adapter v0.10 — Event Refresh Deployment Pack
 
-Status: **READY OUTSIDE HOMEY / ONLY EVENT STATE ID REMAINS TO PROVISION**
+Status: **FULLY PREPARED OUTSIDE HOMEY / ONLY ONE-SHOT STATE PROVISION + ONE CURRENT FLOW READ + ONE ATOMIC UPDATE REMAIN**
 
-Purpose: prepare and validate everything possible outside Homey first. Homey is used only for runtime-specific state provisioning and the final controlled flow mutation.
+Purpose: prepare and validate everything possible outside Homey first. Homey is used only for runtime-specific state provisioning and the final current-state-preserving mutation.
 
 ## Live baseline
 
@@ -14,7 +14,7 @@ Purpose: prepare and validate everything possible outside Homey first. Homey is 
 - No actuator/device writes
 - Remaining functional gap: PBTH event branch only
 
-## PBTH trigger resolved from upstream source — no Homey discovery needed
+## PBTH trigger resolved outside Homey
 
 Upstream source file: `gruijter/com.gruijter.powerhour/.homeycompose/flow/triggers/new_prices.json`.
 
@@ -29,9 +29,15 @@ periods             this_day | tomorrow | next_hours
 tokens              prices | provider
 ```
 
-Our branch uses device `d28cdd44-ab8c-4f4c-8ea7-279f444ecd81` and `period=next_hours`. Expected device-scoped Homey representation: `homey:device:d28cdd44-ab8c-4f4c-8ea7-279f444ecd81:new_prices`. Only verify this representation once if the Homey mutation API rejects the source-derived form; do not run broad/repeated trigger-card discovery.
+Our branch uses device `d28cdd44-ab8c-4f4c-8ea7-279f444ecd81` and `period=next_hours`, therefore the source-derived device-scoped card ID is:
 
-PBTH community evidence also confirms that a `New prices received` event can occur around a calendar boundary without the useful future horizon being complete. Therefore the event is only a wake-up signal; semantic comparison remains mandatory.
+```text
+homey:device:d28cdd44-ab8c-4f4c-8ea7-279f444ecd81:new_prices
+```
+
+No Homey trigger-card enumeration is part of the deployment plan. Only if Homey explicitly rejects this source-derived card ID may one targeted verification be considered.
+
+The PBTH event is only a wake-up signal. Semantic comparison remains mandatory because an event does not prove that the useful future horizon extended.
 
 ## Stable IDs — no rediscovery
 
@@ -50,43 +56,117 @@ Planner flow                      27617767-0a64-43a3-9bcb-e34b0dd6a5c0
 Planner publisher flow            5b3b80fe-96d1-406d-91ef-cf75a4e65d45
 ```
 
-## Only remaining runtime identifier
+## Exact one-shot state provisioning
 
-`EVENT_STATE_ID` = exact ID of Text Logic variable `EM2_ContractPrice_EventRefresh_State` after one-time provisioning.
+Prepared script:
 
-Initial payload:
+`src/homey/context/contract-price-event-refresh-v0.11-provision-state.homeyscript.js`
 
-```json
-{"schema":"EM2_PRICE_EVENT_REFRESH_STATE_V0.1","lastAttemptAt":null,"cooldownUntil":null,"lastResult":"NEVER","lastReason":null}
+It performs exactly one API mutation:
+
+```js
+Homey.logic.createVariable({
+  variable: {
+    name: 'EM2_ContractPrice_EventRefresh_State',
+    type: 'string',
+    value: '{"schema":"EM2_PRICE_EVENT_REFRESH_STATE_V0.1","lastAttemptAt":null,"cooldownUntil":null,"lastResult":"NEVER","lastReason":null}'
+  }
+})
 ```
 
-Capture it by exact-name targeted lookup. Never enumerate Logic variables broadly.
+Crucially, `createVariable()` returns the created object including its ID. Therefore **no follow-up Logic enumeration, autocomplete lookup or full variable read is needed**. The script returns the ID directly. Run it exactly once; do not retry blindly because a second successful execution would create a duplicate variable.
 
-## Exact remaining mutation delta
+`EVENT_STATE_ID` is then substituted into the prepared eligibility and post-fetch scripts.
+
+## Prepared scripts
+
+```text
+contract-price-event-refresh-v0.11-provision-state.homeyscript.js
+contract-price-event-refresh-v0.11-eligibility.homeyscript.js
+contract-price-event-refresh-v0.11-post-fetch.homeyscript.js
+build-contract-price-event-refresh-v0.11-patch.mjs
+```
+
+The first three contain the complete runtime logic. The patch builder performs no Homey calls.
+
+## Exact event branch
 
 ```text
 PBTH new_prices(period=next_hours)
-  -> EVENT ELIGIBILITY GATE
+  -> HomeyScript runCode_v2 condition: EVENT ELIGIBILITY GATE
       false -> stop
       true  -> PBTH prices_json(next_hours) exactly once
-             -> TEMP_PBTH_JSON_BUFFER
-             -> EVENT POST-FETCH PROCESSOR
+             -> cloned existing TEMP_PBTH_JSON_BUFFER setter
+             -> HomeyScript runCode_v2 condition: EVENT POST-FETCH PROCESSOR
                  false -> stop; no canonical publish
                  true  -> canonical context update -> normal downstream semantic chain
 ```
 
-Eligibility: DYNAMIC + horizonHours<12 + cooldown expired. Degraded/unchanged starts 60-minute cooldown; semantic extension/change clears it.
+Eligibility: `DYNAMIC && horizonHours < 12 && cooldown expired`.
+
+Degraded/unchanged starts a 60-minute cooldown. A semantic extension/change clears it.
+
+## Deterministic flow-patch builder
+
+Prepared file:
+
+`src/homey/context/build-contract-price-event-refresh-v0.11-patch.mjs`
+
+It takes exactly two runtime inputs:
+
+1. the **single current production Advanced Flow read** immediately before mutation;
+2. the provisioned `EVENT_STATE_ID` returned by the one-shot provisioning script.
+
+It then, entirely outside Homey:
+
+- verifies the expected existing PBTH `prices_json(next_hours)` action exists;
+- identifies its existing immediate buffer-setter successor;
+- clones those exact live cards rather than guessing their Homey card schema;
+- rewrites the cloned PBTH droptoken source to the new event PBTH node;
+- injects the source-derived PBTH `new_prices(period=next_hours)` trigger;
+- injects the complete eligibility and semantic-processor HomeyScript conditions;
+- uses fixed, pre-generated node UUIDs;
+- leaves all existing scheduled cards and connections unchanged;
+- validates basic static invariants;
+- emits the **complete patched Advanced Flow JSON** for one atomic update.
+
+Usage:
+
+```bash
+node src/homey/context/build-contract-price-event-refresh-v0.11-patch.mjs \
+  current-contract-price-adapter.json \
+  <EVENT_STATE_ID> \
+  contract-price-adapter-v0.11.patched.json
+```
+
+This design intentionally avoids trying to reconstruct the complete production Advanced Flow from stale documentation. One fresh current-flow read is required immediately before an atomic full-flow update because Homey's update API replaces the whole Advanced Flow object. That read is therefore mutation-safety-critical, not exploratory discovery.
 
 ## GitHub-first deployment order
 
-1. Keep candidate, exact scripts, topology, acceptance matrix and rollback current in GitHub.
-2. Provision exactly one `EM2_ContractPrice_EventRefresh_State` variable.
-3. Obtain its ID via exact-name autocomplete lookup only.
-4. Commit the ID into GitHub and replace both script placeholders.
-5. Read live production flow exactly once to verify baseline.
-6. Prepare one atomic patch preserving all existing cards/connections and adding only the event branch.
-7. No change to scheduled v0.10 path or `priceSeries`.
-8. Stop immediately on HTTP 429; no same-round retry.
+1. **DONE:** exact PBTH trigger resolved from upstream source; no Homey card enumeration required.
+2. **DONE:** provisioning script prepared.
+3. **DONE:** eligibility and post-fetch processors prepared.
+4. **DONE:** deterministic full-flow patch builder prepared.
+5. Run the one-shot state provisioning only when Homey is not rate-limited; capture `EVENT_STATE_ID` directly from its return value.
+6. Commit/substitute that ID in GitHub before touching the production flow.
+7. Read production flow `69648157-892b-49d2-bc4d-e61a1a4d78ab` exactly once.
+8. Run the patch builder offline against that read.
+9. Review generated diff/invariants outside Homey.
+10. Perform one atomic Advanced Flow update.
+11. Do only targeted post-update validation; stop immediately on HTTP 429 and do not retry in the same round.
+
+## Homey call budget for the actual deployment
+
+Expected minimum:
+
+```text
+1  one-shot provisioning execution          -> returns EVENT_STATE_ID
+1  get current production Advanced Flow      -> required to preserve full current graph
+1  atomic update of production Advanced Flow -> event branch only
+1  targeted post-update verification         -> only if Homey remains healthy
+```
+
+No `list_devices`, no Logic enumeration, no trigger/action card enumeration, no TEMP-flow inspection, and no repeated production-flow reads are part of this plan.
 
 ## Acceptance matrix
 
@@ -101,7 +181,7 @@ Eligibility: DYNAMIC + horizonHours<12 + cooldown expired. Degraded/unchanged st
 
 ## Rollback
 
-Remove/disable only the event branch. Retain existing scheduled 15-minute v0.10 route and validated `priceSeries` field. No actuator rollback is required.
+Remove/disable only the six fixed-ID event-branch nodes generated by the patch builder. Retain the existing scheduled 15-minute v0.10 route and validated `priceSeries` field. No actuator rollback is required.
 
 ## Definition of done
 
