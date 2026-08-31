@@ -1,17 +1,15 @@
 # EM v2 | 30 Context | Contract Price Adapter v0.10 FIXED+DYNAMIC LOW-LOAD
 
-_Status: deployed to Homey and smoke-started successfully on 2026-08-30. Full two-direction FIXED ↔ DYNAMIC selector validation remains pending._
+_Status: deployed to Homey and smoke-started successfully on 2026-08-30. DYNAMIC `priceSeries` extension deployed and smoke-validated on 2026-08-31. Full two-direction FIXED ↔ DYNAMIC selector validation remains pending._
 
 ## Runtime state
 
 - Homey flow ID: `69648157-892b-49d2-bc4d-e61a1a4d78ab`
 - Name: `EM v2 | 30 Context | Contract Price Adapter v0.10 FIXED+DYNAMIC LOW-LOAD`
-- After deployment: `enabled=true`, `broken=false`, `triggerable=true`
-- Manual flow start after deployment: successful
-- Website command at validation time: `contractType=FIXED`, `hotWaterSource=BOILER`
+- Current state: `enabled=true`, `broken=false`, `triggerable=true`
+- Trigger: every 15 minutes + manual start.
+- DYNAMIC path publishes `priceSeries: prices` additively in `EM2_ContractPrice_Context` for deterministic semantic comparison by the future event-refresh branch.
 - No physical device or actuator writes were introduced or executed by this adapter.
-
-The smoke run was deliberately performed without changing the user's contract selector. Because the website command was FIXED, the intended exercised path was the FIXED branch. This does not substitute for a later explicit two-direction FIXED -> DYNAMIC -> FIXED selector test.
 
 ## Purpose
 
@@ -55,21 +53,25 @@ if(contract==='FIXED'){
  await publish(ctx);return true;
 }
 const buffer=await read(IDS.buffer);let arr=null;try{arr=JSON.parse(String(buffer?.value??'[]'));}catch{}const raw=Array.isArray(arr)?arr:[],prices=[];for(const v of raw){const n=Number(v);if(!Number.isFinite(n)||n<=-2||n>=5)break;prices.push(n);}const quality=prices.length>=4?'GOOD':'DEGRADED',horizonHours=prices.length*STEP_MS/3600000,horizon=horizonHours>=12?'FULL':horizonHours>=6?'INTRADAY':'DIAGNOSTIC',ts=new Date().toISOString();
-const ctx={schema:'EM2_UNIFORM_PRICE_CONTEXT_V0.4',contractType:'DYNAMIC',source:'PBTH_PRICES_JSON_TARGETED',quality,updatedAt:ts,importPriceNow:prices.length?prices[0]:null,exportPriceNow:null,selfUseGainNow:null,negativeNow:prices.length?prices[0]<0:false,horizon,horizonHours,slotMinutes:15,slots:prices.length,guards:{canonicalContractSource:'EMS_ContractType',targetedLogicReads:true,broadLogicEnumeration:false,broadDeviceEnumeration:false,pbthActionCardOnly:true,noActuatorWrites:true,productionScheduleMinutes:15,dynamicOnly:true}};
+const ctx={schema:'EM2_UNIFORM_PRICE_CONTEXT_V0.4',contractType:'DYNAMIC',source:'PBTH_PRICES_JSON_TARGETED',quality,updatedAt:ts,importPriceNow:prices.length?prices[0]:null,exportPriceNow:null,selfUseGainNow:null,negativeNow:prices.length?prices[0]<0:false,horizon,horizonHours,slotMinutes:15,slots:prices.length,priceSeries:prices,guards:{canonicalContractSource:'EMS_ContractType',targetedLogicReads:true,broadLogicEnumeration:false,broadDeviceEnumeration:false,pbthActionCardOnly:true,noActuatorWrites:true,productionScheduleMinutes:15,dynamicOnly:true}};
 await publish(ctx);return true;
 ```
 
 ## Safety / compatibility
 
-The context schema remains `EM2_UNIFORM_PRICE_CONTEXT_V0.4` to avoid an unnecessary downstream schema change. Core v0.11b consumes `EM2_ContractPrice_Context` and the compatibility mirror `EM2_Contract_Type`; no physical-control ownership is introduced here.
+The context schema remains `EM2_UNIFORM_PRICE_CONTEXT_V0.4`; `priceSeries` is an additive field. Existing consumers can ignore it. It is present specifically to allow the future event-refresh processor to distinguish horizon extension from overlapping price-value changes. No physical-control ownership is introduced here.
 
 ## Validation status
 
 - Deployment structure: **PASS** (`enabled=true`, `broken=false`, `triggerable=true`).
-- Manual start: **PASS**.
+- DYNAMIC `priceSeries` extension deployment: **PASS** on 2026-08-31.
+- Manual DYNAMIC adapter start after extension: **PASS**.
+- Manual Planner v0.4.9 recalculation: **PASS**.
+- Manual Planner Shadow publication: **PASS**.
+- Published planner contract remains `DYNAMIC`, `quality=GOOD`, `fresh=true`, `usable=true`; 96-slot energy axis unchanged. Dynamic price slot count continued to track the naturally shrinking current-day PBTH horizon (20 slots at the validation snapshot), with no downstream schema/control-mode regression.
 - FIXED branch topology: **PASS by structure**; PBTH is unreachable from the FALSE/FIXED branch.
 - DYNAMIC branch topology: **PASS by structure**; exactly one PBTH `prices_json(next_hours)` call precedes normalization.
-- Explicit FIXED -> DYNAMIC -> FIXED selector smoke: **PENDING**; the operational selector was not changed for testing.
+- Explicit FIXED -> DYNAMIC -> FIXED selector smoke: **PENDING**.
 - Long-duration low-load/throttling soak: **PENDING**.
 
-The existing proposed <12h PBTH event refresh remains a separate DYNAMIC-only follow-up and must never execute for FIXED.
+The proposed <12h PBTH event refresh remains a separate DYNAMIC-only follow-up and must never execute for FIXED.
