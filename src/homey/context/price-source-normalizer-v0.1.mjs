@@ -16,6 +16,15 @@ function assertFiniteNumber(value, code, label) {
   return value;
 }
 
+function parseFiniteNumeric(value, code, label) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  throw new PriceSourceError(code, `${label} must be a finite numeric value`);
+}
+
 function toIso(value, code, label) {
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) throw new PriceSourceError(code, `${label} is not a valid timestamp`);
@@ -80,7 +89,7 @@ export function normalizeEnergyZeroRest(payload, options = {}) {
     if (Date.parse(end) - Date.parse(start) !== FIFTEEN_MIN_MS) {
       throw new PriceSourceError('WRONG_RESOLUTION', `${stream}[${index}] is not a 15-minute slot`);
     }
-    const marketPriceEurPerKwh = assertFiniteNumber(row?.price?.value, 'BAD_PRICE', `${stream}[${index}].price.value`);
+    const marketPriceEurPerKwh = parseFiniteNumeric(row?.price?.value, 'BAD_PRICE', `${stream}[${index}].price.value`);
     return {
       start,
       end,
