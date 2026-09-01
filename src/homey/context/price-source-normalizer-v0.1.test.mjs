@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeEnergyZero, normalizePbthInterApp, compareByTimestamp, PriceSourceError } from './price-source-normalizer-v0.1.mjs';
+import { normalizeEnergyZero, normalizeEnergyZeroRest, normalizePbthInterApp, compareByTimestamp, PriceSourceError } from './price-source-normalizer-v0.1.mjs';
 
 const t0 = '2026-09-01T10:00:00Z';
 const t1 = '2026-09-01T10:15:00Z';
@@ -10,24 +10,45 @@ function ez(prices = [[t0, 0.1], [t1, 0.2], [t2, 0.3]]) {
   return { intervalType: 3, Prices: prices.map(([readingDate, price]) => ({ readingDate, price })) };
 }
 
-test('normalizes EnergyZero quarter-hour payload deterministically', () => {
-  const out = normalizeEnergyZero(ez(), { retrievedAt: '2026-09-01T11:00:00Z' });
-  assert.equal(out.source, 'ENERGYZERO');
-  assert.equal(out.resolutionMinutes, 15);
+function restRows(startIso, count, startPrice = 0.1) {
+  const startMs = Date.parse(startIso);
+  return Array.from({ length: count }, (_, i) => ({
+    start: new Date(startMs + i * 15 * 60 * 1000).toISOString().replace('.000Z', 'Z'),
+    end: new Date(startMs + (i + 1) * 15 * 60 * 1000).toISOString().replace('.000Z', 'Z'),
+    price: { value: startPrice + i / 10000 },
+  }));
+}
+
+test('normalizes current EnergyZero REST market stream and filters Amsterdam local date', () => {
+  const payload = { base: restRows('2026-08-30T22:00:00Z', 288) };
+  const out = normalizeEnergyZeroRest(payload, {
+    localDate: '2026-09-01',
+    retrievedAt: '2026-09-01T18:30:00Z',
+  });
+  assert.equal(out.source, 'ENERGYZERO_PUBLIC_REST');
   assert.equal(out.priceBasis, 'MARKET_EX_VAT');
-  assert.equal(out.slots.length, 3);
-  assert.equal(out.slots[0].end, '2026-09-01T10:15:00.000Z');
-  assert.equal(out.health.horizonEnd, '2026-09-01T10:45:00.000Z');
+  assert.equal(out.slots.length, 96);
+  assert.equal(out.slots[0].start, '2026-08-31T22:00:00.000Z');
+  assert.equal(out.slots.at(-1).end, '2026-09-01T22:00:00.000Z');
+  assert.equal(out.health.complete, true);
+  assert.equal(out.sourceMeta.rawStreamCount, 288);
 });
 
-test('rejects EnergyZero gaps and duplicates', () => {
+test('current EnergyZero REST rejects malformed or non-quarter-hour slots', () => {
+  assert.throws(() => normalizeEnergyZeroRest({ base: [{ start: t0, end: t1, price: { value: null } }] }), e => e instanceof PriceSourceError && e.code === 'BAD_PRICE');
+  assert.throws(() => normalizeEnergyZeroRest({ base: [{ start: t0, end: t2, price: { value: 0.1 } }] }), e => e instanceof PriceSourceError && e.code === 'WRONG_RESOLUTION');
+});
+
+test('legacy EnergyZero normalizer now fails closed on price basis', () => {
+  const out = normalizeEnergyZero(ez(), { retrievedAt: '2026-09-01T11:00:00Z' });
+  assert.equal(out.source, 'ENERGYZERO_LEGACY');
+  assert.equal(out.priceBasis, 'SOURCE_PRICE_UNKNOWN');
+  assert.equal(out.slots.length, 3);
+});
+
+test('rejects legacy EnergyZero gaps and duplicates', () => {
   assert.throws(() => normalizeEnergyZero(ez([[t0, 0.1], [t2, 0.3]])), e => e instanceof PriceSourceError && e.code === 'SLOT_GAP');
   assert.throws(() => normalizeEnergyZero(ez([[t0, 0.1], [t0, 0.2]])), e => e instanceof PriceSourceError && e.code === 'DUPLICATE_TIMESTAMP');
-});
-
-test('rejects malformed prices and wrong resolution', () => {
-  assert.throws(() => normalizeEnergyZero(ez([[t0, null]])), e => e.code === 'BAD_PRICE');
-  assert.throws(() => normalizeEnergyZero({ intervalType: 4, Prices: [{ readingDate: t0, price: 0.1 }] }), e => e.code === 'WRONG_RESOLUTION');
 });
 
 test('normalizes exactly one NL PBTH dap15 device', () => {
