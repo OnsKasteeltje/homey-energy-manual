@@ -15,7 +15,7 @@ function restRows(startIso, count, startPrice = 0.1) {
   return Array.from({ length: count }, (_, i) => ({
     start: new Date(startMs + i * 15 * 60 * 1000).toISOString().replace('.000Z', 'Z'),
     end: new Date(startMs + (i + 1) * 15 * 60 * 1000).toISOString().replace('.000Z', 'Z'),
-    price: { value: startPrice + i / 10000 },
+    price: { value: (startPrice + i / 10000).toFixed(6) },
   }));
 }
 
@@ -32,11 +32,13 @@ test('normalizes current EnergyZero REST market stream and filters Amsterdam loc
   assert.equal(out.slots.at(-1).end, '2026-09-01T22:00:00.000Z');
   assert.equal(out.health.complete, true);
   assert.equal(out.sourceMeta.rawStreamCount, 288);
+  assert.equal(typeof out.slots[0].marketPriceEurPerKwh, 'number');
 });
 
 test('current EnergyZero REST rejects malformed or non-quarter-hour slots', () => {
   assert.throws(() => normalizeEnergyZeroRest({ base: [{ start: t0, end: t1, price: { value: null } }] }), e => e instanceof PriceSourceError && e.code === 'BAD_PRICE');
-  assert.throws(() => normalizeEnergyZeroRest({ base: [{ start: t0, end: t2, price: { value: 0.1 } }] }), e => e instanceof PriceSourceError && e.code === 'WRONG_RESOLUTION');
+  assert.throws(() => normalizeEnergyZeroRest({ base: [{ start: t0, end: t1, price: { value: 'not-a-number' } }] }), e => e instanceof PriceSourceError && e.code === 'BAD_PRICE');
+  assert.throws(() => normalizeEnergyZeroRest({ base: [{ start: t0, end: t2, price: { value: '0.1' } }] }), e => e instanceof PriceSourceError && e.code === 'WRONG_RESOLUTION');
 });
 
 test('legacy EnergyZero normalizer now fails closed on price basis', () => {
