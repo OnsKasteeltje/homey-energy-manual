@@ -48,3 +48,9 @@ jobs:
           test "$(grep -o 'Homey.logic.getVariables()' src/homey/core/core-v0.11f.live-homey.js | wc -l)" = "$(grep -o 'Homey.logic.getVariables()' build/core-v0.11g-planner-v05.candidate.js | wc -l)"
           test "$(grep -o 'Homey.devices.getDevice(' src/homey/core/core-v0.11f.live-homey.js | wc -l)" = "$(grep -o 'Homey.devices.getDevice(' build/core-v0.11g-planner-v05.candidate.js | wc -l)"
           test "$(grep -o 'setCapabilityValue' src/homey/core/core-v0.11f.live-homey.js | wc -l)" = "$(grep -o 'setCapabilityValue' build/core-v0.11g-planner-v05.candidate.js | wc -l)"
+      - name: Upload deploy candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-v0.11g-planner-v05-candidate
+          path: build/core-v0.11g-planner-v05.candidate.js
+          retention-days: 7
