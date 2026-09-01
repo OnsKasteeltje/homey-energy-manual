@@ -14,23 +14,31 @@ The 2026-08-31 incident demonstrated that PBTH can have a truncated horizon even
 
 ## Candidate independent sources
 
-### 1. EnergyZero Public API — preferred independent candidate
+### 1. EnergyZero Public API — validated independent candidate
 
-EnergyZero documents a Public API `GetPrices` operation that returns definitive energy prices for the day before, the requested day, and the day after when available. EnergyZero also publicly states that electricity prices are quarter-hour based from 2026 onward and that next-day electricity prices are normally published around 15:00.
+Current endpoint validated live on 2026-09-01:
+
+`https://public.api.energyzero.nl/public/v1/prices`
+
+Electricity request parameters:
+- `energyType=ENERGY_TYPE_ELECTRICITY`
+- `interval=INTERVAL_QUARTER`
+- `date=DD-MM-YYYY`
+
+Observed response streams:
+- `base` = market price excluding VAT
+- `base_with_vat` = market price including VAT
+- `all_in` = all-in excluding VAT
+- `all_in_with_vat` = all-in including VAT
+
+The API returned 288 quarter-hour rows per stream in the live capture: three complete 96-slot local days around the requested date. Consumers must therefore filter by explicit `Europe/Amsterdam` local calendar date and must not assume the response contains only the requested day.
 
 Why it is attractive:
 - independent of the PBTH Homey app;
-- native market-price use case;
+- native quarter-hour market-price use case;
 - suitable for a lightweight server/Pi HTTP adapter;
 - can provide day-ahead data independently from Homey runtime state;
 - aligns with the future Pi-based EMS runtime.
-
-Open validation points before production use:
-- exact unauthenticated/authenticated access requirements for `GetPrices` in the intended machine-to-machine use case;
-- exact response schema and timestamp semantics;
-- whether returned electricity values are raw market prices or include VAT / commercial components;
-- DST behavior and expected 92/96/100 quarter-hour slot counts;
-- operational rate limits / SLA.
 
 ### 2. ENTSO-E Transparency Platform — strong canonical fallback candidate
 
@@ -51,7 +59,7 @@ Trade-offs:
 
 Nord Pool publishes official Day-Ahead prices in 15-minute resolution after the SDAC 15-minute transition and exposes them via its Market Data API.
 
-However, current commercial API pricing is far beyond what is justified for a residential HEMS. This source is therefore **not selected as a production dependency**. It remains useful as a reference when validating market semantics.
+However, commercial API pricing is far beyond what is justified for a residential HEMS. This source is therefore **not selected as a production dependency**. It remains useful as a reference when validating market semantics.
 
 ## Target architecture
 
@@ -79,17 +87,17 @@ The source layer produces one normalized contract. Downstream consumers remain s
 ```json
 {
   "schemaVersion": "price-source-v0.1",
-  "source": "ENERGYZERO",
+  "source": "ENERGYZERO_PUBLIC_REST",
   "biddingZone": "10YNL----------L",
   "currency": "EUR",
   "resolutionMinutes": 15,
-  "generatedAt": "2026-09-01T13:05:00Z",
+  "generatedAt": null,
   "retrievedAt": "2026-09-01T13:05:04Z",
   "priceBasis": "MARKET_EX_VAT",
   "slots": [
     {
-      "start": "2026-09-01T13:00:00+02:00",
-      "end": "2026-09-01T13:15:00+02:00",
+      "start": "2026-09-01T13:00:00Z",
+      "end": "2026-09-01T13:15:00Z",
       "marketPriceEurPerKwh": 0.05731,
       "importPriceEurPerKwh": null,
       "exportPriceEurPerKwh": null,
@@ -100,41 +108,95 @@ The source layer produces one normalized contract. Downstream consumers remain s
     "valid": true,
     "complete": true,
     "stale": false,
-    "horizonEnd": "2026-09-02T00:00:00+02:00"
+    "horizonEnd": "2026-09-01T22:00:00Z"
   }
 }
 ```
 
 `priceBasis` is mandatory. A value from one source may **never** silently be treated as equal to another source unless market-price/all-in semantics are proven equivalent.
 
-## Source-selection policy candidate
+## Live A/B validation — 2026-09-01
 
-Do not implement automatic failover until A/B validation proves semantic equivalence.
+A read-only HomeyScript compared PBTH Inter-App DAP15 data directly against all four EnergyZero streams by exact timestamp.
 
-Initial SHADOW policy:
+PBTH capture:
+- device `NL_Netherlands`
+- bidding zone `10YNL----------L`
+- 15-minute interval
+- 109 slots
+- 109 confirmed / 0 forecast
+- first slot `2026-09-01T18:45:00Z`
+- last slot `2026-09-02T21:45:00Z`
 
-1. PBTH remains production publisher.
-2. EnergyZero is fetched independently and normalized in SHADOW.
-3. ENTSO-E is optional CHECK source for disagreement diagnosis.
-4. Compare overlapping slots by timestamp, not array position.
-5. Report source disagreement; do not silently switch source.
+EnergyZero response:
+- 288 rows in each of the four streams
+- full overlap with all 109 PBTH timestamps
 
-Future production policy after validation:
+Result for EnergyZero `base` (`MARKET_EX_VAT`):
 
 ```text
-PRIMARY   = independent market source (candidate: EnergyZero)
-SECONDARY = PBTH
+overlapSlots = 109
+meanDelta    = 0
+meanAbsDelta = 0
+rmsDelta     = 0
+stddevDelta  = 0
+minDelta     = 0
+maxDelta     = 0
+```
+
+Therefore, for the tested PBTH configuration and dataset:
+
+`PBTH importPrice == EnergyZero base == MARKET_EX_VAT`
+
+for every one of the 109 overlapping quarter-hours.
+
+Other EnergyZero streams did not match PBTH:
+- `base_with_vat`: mean delta about `-0.0360 EUR/kWh`
+- `all_in`: constant delta `-0.09161 EUR/kWh`
+- `all_in_with_vat`: mean delta about `-0.14685 EUR/kWh`
+
+### Validation conclusion
+
+**A/B VALIDATED — 109/109 exact timestamp and price matches for PBTH importPrice versus EnergyZero `base`.**
+
+This is sufficient to promote EnergyZero from “candidate semantics unknown” to **validated independent SHADOW market-price source**.
+
+It is not yet sufficient to enable automatic production failover. Remaining validation gates are:
+- repeat on at least one additional normal day;
+- observe next-day publication transition and compare source horizons;
+- validate degraded/truncated PBTH behavior while EnergyZero remains complete;
+- validate DST 92/100-slot dates;
+- implement deterministic source-health and selector logic outside production.
+
+## Source-selection policy
+
+Current production policy remains unchanged:
+
+1. PBTH remains production publisher.
+2. EnergyZero is independent SHADOW source.
+3. Compare source health and overlapping `MARKET_EX_VAT` slots.
+4. Do not silently switch production source.
+
+Target policy after remaining validation:
+
+```text
+PRIMARY   = ENERGYZERO_PUBLIC_REST / base / MARKET_EX_VAT
+SECONDARY = PBTH_INTERAPP_DAP_PRICES / MARKET_EX_VAT
 CHECK     = ENTSO-E
 ```
 
-Failover is allowed only if:
-- source schema validates;
-- expected NL bidding zone is confirmed;
-- resolution is 15 minutes;
+A selector may consider a source eligible only when:
+- schema validates;
+- bidding zone is `10YNL----------L`;
+- currency is EUR;
+- resolution is exactly 15 minutes;
 - timestamps are monotonic and gap-free for the required horizon;
 - values are finite;
-- `priceBasis` matches the configured Contract Price transformation;
-- data is fresh enough for the Planner horizon.
+- `priceBasis` is explicitly `MARKET_EX_VAT`;
+- data is fresh enough for the Planner horizon;
+- missing data is represented as missing, never as `0`.
+
+Automatic production failover remains disabled until the shadow selector and horizon-publication tests pass.
 
 ## Contract Price Adapter responsibility
 
@@ -144,7 +206,7 @@ Target separation:
 
 ```text
 Price source
-  -> normalized market price
+  -> normalized MARKET_EX_VAT price
   -> Contract Price Adapter
        + supplier markup
        + energy tax where applicable
@@ -156,74 +218,51 @@ Price source
 
 This avoids coupling Planner logic to a supplier, public API or Homey app.
 
-## Required validation pack — outside Homey
+## Required validation pack — status
 
 ### V1 — schema and semantics
 
-- capture one full Netherlands quarter-hour day from EnergyZero;
-- verify 96 slots on a normal day;
-- verify timestamps and `Europe/Amsterdam` conversion;
-- identify raw market-price vs VAT/all-in basis from source documentation and sample values;
-- document retrieval/publication time for next-day prices.
+**PASS for normal-day EnergyZero capture.**
+
+Validated:
+- current public REST endpoint;
+- quarter-hour schema;
+- numeric-string price parsing;
+- local-date filtering;
+- normal 96-slot local day;
+- tomorrow available in the same live response;
+- `base` semantics established by live PBTH A/B.
+
+Still open:
+- DST 92/100-slot exact-day behavior;
+- operational rate limits / long-term availability.
 
 ### V2 — PBTH A/B comparison
 
-For every overlapping quarter-hour:
+**PASS — 109/109 exact.**
 
-```text
-timestamp
-pbth_import_price
-energyzero_market_price
-normalized_pbth_market_price (if derivable)
-delta
-```
-
-Acceptance criteria:
-- timestamp alignment 100%;
-- no unexplained 15-minute offset;
-- after correcting known contract components, numerical differences must be explainable and stable;
-- missing slots are explicit `null`/missing, never zero.
+No timestamp offset and no numerical difference for PBTH `importPrice` versus EnergyZero `base`.
 
 ### V3 — horizon behavior
 
-Observe at least one next-day publication event.
+**PARTIAL PASS.**
 
-Capture:
-- time EnergyZero first exposes tomorrow;
-- time PBTH first exposes tomorrow;
-- horizon length from both sources;
-- whether either source briefly publishes a partial/incomplete next day.
+At the 2026-09-01 test time both sources exposed next-day data. EnergyZero exposed a wider 288-slot response; PBTH exposed 109 future/current slots through the end of the next local day.
 
-This is the critical test for the 2026-08-31 failure mode.
+Still required: observe the actual next-day publication transition and a degraded/truncated source case.
 
 ### V4 — malformed/degraded source tests
 
-Unit-test the normalizer against:
-- truncated current day;
-- missing tomorrow;
-- one missing quarter-hour;
-- duplicate timestamp;
-- wrong resolution;
-- wrong currency;
-- NaN/non-numeric price;
-- stale payload;
-- DST 92/100-slot day.
+**IN PROGRESS.**
 
-Expected result: reject/degrade source; never synthesize €0/kWh.
+Normalizer tests cover malformed price values, wrong slot duration, gap/duplicate cases and deterministic normalization. Remaining: exact DST expected-slot logic, stale payload policy and selector-level degraded-source tests.
 
 ## Current decision
 
-**Prepare EnergyZero as the first independent SHADOW source. Keep PBTH production unchanged. Do not touch Homey yet.**
+**EnergyZero is now validated as an independent SHADOW source for the same `MARKET_EX_VAT` quarter-hour series used by PBTH in the tested configuration. Keep PBTH production unchanged. Build and validate the source selector outside Homey before any cut-over.**
 
-Nord Pool is rejected as a practical dependency because of commercial API cost. ENTSO-E remains the preferred independent validation/fallback lineage if EnergyZero semantics or access prove unsuitable.
+Nord Pool remains rejected as a practical dependency because of commercial API cost. ENTSO-E remains the preferred independent validation/check lineage.
 
 ## Next implementation step
 
-Build a small deterministic source normalizer and fixture-based A/B test in GitHub/Pi-compatible JavaScript. No Homey calls are required for this step. Only after the source schema and numerical equivalence are proven should a runtime fetch path be connected to the Contract Price Adapter.
-
-## External references checked 2026-09-01
-
-- EnergyZero Public API documentation: `GetPrices` returns the requested day plus adjacent day data when available.
-- EnergyZero current-prices page: quarter-hour electricity pricing in 2026; next-day publication around 15:00.
-- Nord Pool documentation: official Market Data API prices use 15-minute intervals after SDAC 15-minute go-live.
-- Nord Pool current market-data pricing: commercial API pricing is materially disproportionate for this residential HEMS use case.
+Implement a deterministic `Price Source Selector v0.1` in GitHub/Pi-compatible JavaScript. It must rank source eligibility from normalized health/horizon metadata, produce a SHADOW decision record, and never perform a production switch or device write.
