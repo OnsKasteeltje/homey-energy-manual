@@ -76,9 +76,11 @@ async function runCycle(config) {
 
   if (config.priceSources?.energyZero?.enabled) {
     const raw = await fetchEnergyZero(config, localDate);
+    // Keep the complete stream returned for the requested date instead of filtering
+    // back to one local calendar day: EnergyZero currently returns a wider horizon,
+    // and the selector must validate that actual forward horizon.
     const source = normalizeEnergyZeroRest(raw, {
       retrievedAt: generatedAt,
-      localDate,
       timeZone: config.timeZone,
       stream: 'base',
       priceBasis: 'MARKET_EX_VAT',
