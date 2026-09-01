@@ -9,7 +9,8 @@ This is the first executable Raspberry Pi runtime skeleton. It is intentionally 
 - Requires Node.js 20 or newer.
 - Reads `config.json`, or falls back to `config.example.json` for preparation/testing.
 - Fetches EnergyZero public quarter-hour prices.
-- Normalizes them through `price-source-normalizer-v0.1.mjs`.
+- Keeps the complete EnergyZero stream returned for the requested date so the selector can validate the real forward horizon.
+- Normalizes it through `price-source-normalizer-v0.1.mjs`.
 - Runs `price-source-selector-v0.1.mjs` in shadow mode.
 - Emits structured JSON logs to stdout.
 - Exposes local-only `GET /health` and `GET /state` on `127.0.0.1:8787` by default.
@@ -38,7 +39,7 @@ npm run check
 npm run once
 ```
 
-Expected result: JSON log records with `RUNTIME_STARTED` and `PRICE_SHADOW_CYCLE`. The cycle may report `NO_ELIGIBLE_SOURCE` when the EnergyZero response for the requested local date alone does not reach the configured 24-hour forward horizon. That is evidence about source horizon, not permission to relax the safety rules.
+Expected result: JSON log records with `RUNTIME_STARTED` and `PRICE_SHADOW_CYCLE`. A normal evening run should select `ENERGYZERO_PUBLIC_REST` when the returned stream reaches at least 24 hours beyond the current instant. `NO_ELIGIBLE_SOURCE` is a valid fail-safe outcome when that horizon is not available; it is evidence to investigate, not permission to relax the safety rules.
 
 For service mode:
 
