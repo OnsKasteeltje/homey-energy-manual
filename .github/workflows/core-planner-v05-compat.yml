@@ -1,0 +1,71 @@
+name: Core Planner v0.5 compatibility
+
+on:
+  push:
+    branches:
+      - prep/planner-v0.5-power-intent-efficiency
+    paths:
+      - 'src/homey/core/core-v0.11f.live-homey.js'
+      - 'src/homey/core/core-planner-v05-compat.js'
+      - 'scripts/build-core-v0.11g-planner-v05-candidate.js'
+      - 'tests/core-planner-v05-compat.test.js'
+      - 'tests/core-v0.11g-integration.test.js'
+      - '.github/workflows/core-planner-v05-compat.yml'
+  pull_request:
+    paths:
+      - 'src/homey/core/core-v0.11f.live-homey.js'
+      - 'src/homey/core/core-planner-v05-compat.js'
+      - 'scripts/build-core-v0.11g-planner-v05-candidate.js'
+      - 'tests/core-planner-v05-compat.test.js'
+      - 'tests/core-v0.11g-integration.test.js'
+      - '.github/workflows/core-planner-v05-compat.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compatibility unit tests
+        run: node tests/core-planner-v05-compat.test.js
+      - name: Core integration/load invariant tests
+        run: node tests/core-v0.11g-integration.test.js
+      - name: Build integrated Core candidate
+        run: node scripts/build-core-v0.11g-planner-v05-candidate.js
+      - name: Syntax check integrated HomeyScript candidate
+        run: |
+          node -e "const fs=require('fs'); const s=fs.readFileSync('build/core-v0.11g-planner-v05.candidate.js','utf8'); new Function('return (async()=>{\\n'+s+'\\n});'); console.log('PASS HomeyScript syntax');"
+      - name: Guard pure compatibility helper
+        run: |
+          ! grep -Eq 'Homey\.|getVariables\(|getVariable\(|updateVariable\(|createVariable\(|fetch\(' src/homey/core/core-planner-v05-compat.js
+      - name: Guard no new Homey load or physical writes
+        run: |
+          test "$(grep -o 'Homey.logic.getVariables()' src/homey/core/core-v0.11f.live-homey.js | wc -l)" = "$(grep -o 'Homey.logic.getVariables()' build/core-v0.11g-planner-v05.candidate.js | wc -l)"
+          test "$(grep -o 'Homey.devices.getDevice(' src/homey/core/core-v0.11f.live-homey.js | wc -l)" = "$(grep -o 'Homey.devices.getDevice(' build/core-v0.11g-planner-v05.candidate.js | wc -l)"
+          test "$(grep -o 'setCapabilityValue' src/homey/core/core-v0.11f.live-homey.js | wc -l)" = "$(grep -o 'setCapabilityValue' build/core-v0.11g-planner-v05.candidate.js | wc -l)"
+      - name: Upload deploy candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-v0.11g-planner-v05-candidate
+          path: build/core-v0.11g-planner-v05.candidate.js
+          retention-days: 7
+      - name: Publish exact runtime source to branch
+        if: github.event_name == 'push'
+        run: |
+          cp build/core-v0.11g-planner-v05.candidate.js src/homey/core/core-v0.11g.live-homey.js
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/homey/core/core-v0.11g.live-homey.js
+          if git diff --cached --quiet; then
+            echo 'Runtime source already current'
+            exit 0
+          fi
+          git commit -m 'build: publish exact Core v0.11g runtime source'
+          git push

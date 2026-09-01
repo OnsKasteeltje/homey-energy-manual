@@ -1,0 +1,70 @@
+name: WW GitHub history replay
+
+on:
+  push:
+    branches:
+      - 'prep/planner-v0.5-power-intent-efficiency'
+    paths:
+      - 'scripts/replay_ww_from_github_history.py'
+      - 'scripts/validate_ww_v05_from_github_history.py'
+      - '.github/workflows/ww-github-history-replay.yml'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Local date to replay/validate (YYYY-MM-DD)'
+        required: true
+        default: '2026-09-02'
+      utc_offset_hours:
+        description: 'UTC offset for local date'
+        required: true
+        default: '2'
+
+permissions:
+  contents: read
+
+jobs:
+  ww-history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Resolve replay date
+        id: params
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "date=${{ inputs.date }}" >> "$GITHUB_OUTPUT"
+            echo "utc_offset=${{ inputs.utc_offset_hours }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "date=2026-09-01" >> "$GITHUB_OUTPUT"
+            echo "utc_offset=2" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Replay WW from GitHub history only
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out
+          python scripts/replay_ww_from_github_history.py \
+            --date "${{ steps.params.outputs.date }}" \
+            --utc-offset-hours "${{ steps.params.outputs.utc_offset }}" \
+            --csv "out/ww-realized-vs-optimal-${{ steps.params.outputs.date }}.csv" \
+            --summary "out/ww-summary-${{ steps.params.outputs.date }}.json"
+      - name: Validate WW v0.5 route from GitHub history only
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/validate_ww_v05_from_github_history.py \
+            --date "${{ steps.params.outputs.date }}" \
+            --utc-offset-hours "${{ steps.params.outputs.utc_offset }}" \
+            --out "out/ww-v05-validation-${{ steps.params.outputs.date }}.json"
+      - name: Show replay summary and validation
+        run: |
+          cat "out/ww-summary-${{ steps.params.outputs.date }}.json"
+          cat "out/ww-v05-validation-${{ steps.params.outputs.date }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ww-history-${{ steps.params.outputs.date }}
+          path: out/
+          retention-days: 14

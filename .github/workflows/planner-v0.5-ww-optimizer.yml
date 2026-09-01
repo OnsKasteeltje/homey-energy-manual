@@ -1,0 +1,32 @@
+name: Planner v0.5 WW optimizer
+
+on:
+  pull_request:
+    paths:
+      - 'src/homey/planner/planner-v0.5-ww-optimizer.js'
+      - 'tests/planner-v0.5-ww-optimizer.test.js'
+      - '.github/workflows/planner-v0.5-ww-optimizer.yml'
+  push:
+    branches:
+      - 'prep/planner-v0.5-power-intent-efficiency'
+    paths:
+      - 'src/homey/planner/planner-v0.5-ww-optimizer.js'
+      - 'tests/planner-v0.5-ww-optimizer.test.js'
+      - '.github/workflows/planner-v0.5-ww-optimizer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-ww-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run pure WW optimizer tests
+        run: node --test tests/planner-v0.5-ww-optimizer.test.js
+      - name: Guard against Homey/runtime writes in candidate
+        run: |
+          ! grep -En 'Homey\.|updateVariable|createVariable|setCapabilityValue|triggerFlow|fetch\(' src/homey/planner/planner-v0.5-ww-optimizer.js
