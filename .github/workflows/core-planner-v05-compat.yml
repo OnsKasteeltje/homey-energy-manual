@@ -1,0 +1,32 @@
+name: Core Planner v0.5 compatibility
+
+on:
+  push:
+    branches:
+      - prep/planner-v0.5-power-intent-efficiency
+    paths:
+      - 'src/homey/core/core-planner-v05-compat.js'
+      - 'tests/core-planner-v05-compat.test.js'
+      - '.github/workflows/core-planner-v05-compat.yml'
+  pull_request:
+    paths:
+      - 'src/homey/core/core-planner-v05-compat.js'
+      - 'tests/core-planner-v05-compat.test.js'
+      - '.github/workflows/core-planner-v05-compat.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compatibility tests
+        run: node tests/core-planner-v05-compat.test.js
+      - name: Guard pure helper
+        run: |
+          ! grep -Eq 'Homey\.|getVariables\(|getVariable\(|updateVariable\(|createVariable\(|fetch\(' src/homey/core/core-planner-v05-compat.js
