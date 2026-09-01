@@ -11,11 +11,14 @@
  * Usage:
  *   node energyzero-live-capture-v0.1.mjs 2026-09-01
  *   node energyzero-live-capture-v0.1.mjs 2026-09-01 ./energyzero-2026-09-01.json
+ *   node energyzero-live-capture-v0.1.mjs --help
  *
  * The requested date is interpreted as Europe/Amsterdam local calendar date.
+ * Compatible with Node.js 17+; does not depend on global fetch().
  */
 
 import fs from 'node:fs/promises';
+import https from 'node:https';
 
 const API = 'https://api.energyzero.nl/v1/energyprices';
 
@@ -24,11 +27,7 @@ function amsterdamUtcRange(dateString) {
     throw new Error(`Expected date YYYY-MM-DD, got: ${dateString}`);
   }
 
-  // Determine UTC offset for Europe/Amsterdam at local noon, then construct
-  // local midnight boundaries robustly for CET/CEST and DST transition days.
   const [y, m, d] = dateString.split('-').map(Number);
-
-  const localNoonAsUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
   const fmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Amsterdam',
     year: 'numeric', month: '2-digit', day: '2-digit',
@@ -49,7 +48,6 @@ function amsterdamUtcRange(dateString) {
 
   function localMidnightUtc(yy, mm, dd) {
     let guess = new Date(Date.UTC(yy, mm - 1, dd, 0, 0, 0));
-    // Two iterations handle offset differences around DST boundaries.
     for (let i = 0; i < 2; i++) {
       guess = new Date(Date.UTC(yy, mm - 1, dd, 0, 0, 0) - offsetMs(guess));
     }
@@ -66,16 +64,59 @@ function amsterdamUtcRange(dateString) {
   );
 
   return {
-    fromDate: start.toISOString().replace('.000Z', '.000Z'),
+    fromDate: start.toISOString(),
     tillDate: new Date(endExclusive.getTime() - 1).toISOString()
   };
+}
+
+function getJson(url, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        accept: 'application/json',
+        'user-agent': 'homey-energy-manual-shadow/0.1'
+      }
+    }, res => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => {
+        const status = res.statusCode ?? 0;
+        if (status < 200 || status >= 300) {
+          reject(new Error(`EnergyZero HTTP ${status}: ${body}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(body));
+        } catch (err) {
+          reject(new Error(`EnergyZero returned invalid JSON: ${err.message}`));
+        }
+      });
+    });
+
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`EnergyZero request timed out after ${timeoutMs} ms`));
+    });
+    req.on('error', reject);
+  });
+}
+
+function printUsage() {
+  console.log('Usage: node energyzero-live-capture-v0.1.mjs YYYY-MM-DD [output.json]');
+  console.log('Example: node energyzero-live-capture-v0.1.mjs 2026-09-01 energyzero-2026-09-01.json');
 }
 
 async function main() {
   const date = process.argv[2];
   const outputFile = process.argv[3] ?? null;
+
+  if (date === '--help' || date === '-h') {
+    printUsage();
+    return;
+  }
+
   if (!date) {
-    console.error('Usage: node energyzero-live-capture-v0.1.mjs YYYY-MM-DD [output.json]');
+    printUsage();
     process.exit(2);
   }
 
@@ -90,15 +131,8 @@ async function main() {
 
   const url = `${API}?${params.toString()}`;
   const retrievedAt = new Date().toISOString();
-  const response = await fetch(url, {
-    headers: { 'accept': 'application/json', 'user-agent': 'homey-energy-manual-shadow/0.1' }
-  });
+  const payload = await getJson(url);
 
-  if (!response.ok) {
-    throw new Error(`EnergyZero HTTP ${response.status}: ${await response.text()}`);
-  }
-
-  const payload = await response.json();
   const capture = {
     captureVersion: 'energyzero-live-v0.1',
     requestedLocalDate: date,
