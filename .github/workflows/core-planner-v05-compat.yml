@@ -37,8 +37,9 @@ jobs:
         run: node tests/core-v0.11g-integration.test.js
       - name: Build integrated Core candidate
         run: node scripts/build-core-v0.11g-planner-v05-candidate.js
-      - name: Syntax check integrated candidate
-        run: node --check build/core-v0.11g-planner-v05.candidate.js
+      - name: Syntax check integrated HomeyScript candidate
+        run: |
+          node -e "const fs=require('fs'); const s=fs.readFileSync('build/core-v0.11g-planner-v05.candidate.js','utf8'); new Function('return (async()=>{\\n'+s+'\\n});'); console.log('PASS HomeyScript syntax');"
       - name: Guard pure compatibility helper
         run: |
           ! grep -Eq 'Homey\.|getVariables\(|getVariable\(|updateVariable\(|createVariable\(|fetch\(' src/homey/core/core-planner-v05-compat.js
