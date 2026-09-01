@@ -1,0 +1,112 @@
+{
+  "schema": "EM2_PI_MIGRATION_MANIFEST_V0.1",
+  "status": "PREPARED_NOT_DEPLOYED",
+  "updatedAt": "2026-09-01",
+  "syncAnchor": "7dd8fb70c0d59d7885cbf0e7401865af6ab803b0",
+  "runtimeBaseline": "src/homey/runtime-sync-baseline-2026-08-30.md",
+  "rules": {
+    "physicalWritesFromPiAllowed": false,
+    "oneWriterPerActuator": true,
+    "homeyBroadPollingOnPi": false,
+    "shadowBeforeCutover": true,
+    "atomicOwnershipTransfer": true,
+    "victronDessPrimaryBatteryOptimizer": true
+  },
+  "components": [
+    {
+      "id": "core",
+      "current": "EM v2 | 00 Core Tick | v0.11a (Targeted Device Reads)",
+      "sourceArea": "src/homey/core/",
+      "piStage": "bridge_then_port",
+      "notes": "Keep current state/revision semantics. Do not recreate getDevices/getVariables collection polling on Pi."
+    },
+    {
+      "id": "power_intent",
+      "current": "EM v2 | 20 Power Intent | P1 v0.2.4 DUAL-SEMANTIC LOW-LOAD",
+      "sourceArea": "src/homey/power-intent/",
+      "piStage": "shadow_parity",
+      "notes": "Compare intended watts, semantic mode, reason and revision before any adapter cutover."
+    },
+    {
+      "id": "planner",
+      "current": "EM v2 | 45 Planner | 24h Energy Plan v0.4.7 SHADOW LOW-LOAD",
+      "source": "src/homey/planner/energy-plan-24h-v0.4.7.js",
+      "piStage": "native_pi_shadow_candidate",
+      "notes": "Replay first. Preserve day-boundary-aware WW planning and accepted price/forecast semantics."
+    },
+    {
+      "id": "planner_shadow_publisher",
+      "current": "EM v2 | 46 Publish | Planner Shadow v0.4 event-driven LOW-LOAD",
+      "sourceArea": "src/homey/publisher/",
+      "piStage": "compare_only",
+      "notes": "Pi output may be published separately for parity evidence; it must not overwrite the authoritative stream during shadow validation."
+    },
+    {
+      "id": "price_source_normalizer",
+      "current": "price-source-v0.1",
+      "source": "src/homey/context/price-source-normalizer-v0.1.mjs",
+      "piStage": "native_pi_shadow_candidate",
+      "notes": "Pure normalization boundary for 15-minute NL market-price sources."
+    },
+    {
+      "id": "price_source_selector",
+      "current": "EM2_PRICE_SOURCE_SELECTOR_SHADOW_V0.1",
+      "source": "src/homey/context/price-source-selector-v0.1.mjs",
+      "piStage": "native_pi_shadow_candidate",
+      "notes": "Deterministic, no Homey calls, no network, no writes. EnergyZero ranks before PBTH when eligible; productionSwitchAllowed remains false."
+    },
+    {
+      "id": "price_source_e2e_shadow",
+      "current": "EM2_PRICE_SOURCE_E2E_SHADOW_V0.1",
+      "source": "src/homey/context/price-source-e2e-shadow-v0.1.mjs",
+      "piStage": "native_pi_shadow_candidate",
+      "notes": "Explicitly Node/Pi-compatible. Uses captured PBTH input plus live EnergyZero REST; read-only."
+    },
+    {
+      "id": "price_evening_validation",
+      "current": "EM2_PRICE_SOURCE_EVENING_VALIDATION_V0.1",
+      "source": "docs/snippets/pbth-energyzero-evening-validation-v0.1.js",
+      "piStage": "evidence_input",
+      "notes": "Run in Homey for current PBTH inter-app visibility; use its results to specify Pi horizon/readiness rules."
+    },
+    {
+      "id": "ww_chain",
+      "current": {
+        "state": "Warm Water Observer v0.2",
+        "adapter": "WW Power v0.2 TARGETED-READ SHADOW",
+        "gate": "WW Power Adapter Gate v0.2 TARGETED-READ",
+        "actuator": "Warm Water Actuator v0.9 TARGETED-READ LIVE"
+      },
+      "piStage": "keep_homey_writer",
+      "notes": "Planner/decision parity may move first. Physical writer ownership remains on Homey until a dedicated WW cutover."
+    },
+    {
+      "id": "ev_chain",
+      "current": {
+        "goalInput": "EV Deadline Goal Adapter v0.1",
+        "adapter": "EV Power v0.1.1 TARGETED-READ SHADOW",
+        "gate": "EV Power Adapter Gate v0.2.1 TARGETED-READ",
+        "actuator": "EV Power v0.2.2 TARGETED-READ LIVE OWNERSHIP"
+      },
+      "piStage": "keep_homey_writer",
+      "notes": "Easee Equalizer remains independent hard safety. Do not transfer EV writer in same batch as WW."
+    },
+    {
+      "id": "quatt",
+      "current": "COMFORT_BASELOAD / OBSERVE_ONLY",
+      "piStage": "observe_only",
+      "notes": "No physical Quatt control is introduced by the Pi migration."
+    },
+    {
+      "id": "victron_dess",
+      "current": "future hardware integration",
+      "piStage": "after_commissioning",
+      "notes": "DESS is the primary battery optimizer. Pi/Planner may supply household-flex context, forecasts and reservations, not a competing realtime arbitrage loop."
+    }
+  ],
+  "nextValidationGate": {
+    "name": "price_horizon_evening_validation",
+    "requiredBefore": "production price-source selection or Planner price-source cutover",
+    "productionSwitchAllowed": false
+  }
+}
