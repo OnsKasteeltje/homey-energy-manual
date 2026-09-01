@@ -1,0 +1,30 @@
+{
+  "schema": "HEMS_PI_RUNTIME_CONFIG_V0.1",
+  "mode": "SHADOW_READ_ONLY",
+  "timeZone": "Europe/Amsterdam",
+  "pollIntervalSeconds": 900,
+  "requiredHorizonHours": 24,
+  "health": {
+    "host": "127.0.0.1",
+    "port": 8787
+  },
+  "priceSources": {
+    "energyZero": {
+      "enabled": true,
+      "baseUrl": "https://public.api.energyzero.nl/public/v1/prices"
+    },
+    "pbth": {
+      "enabled": false,
+      "note": "Keep disabled until a Pi-side read-only bridge/input contract is explicitly designed and validated."
+    }
+  },
+  "planner": {
+    "enabled": false,
+    "note": "Planner shadow integration follows after price/context parity; no physical control from this runtime."
+  },
+  "writes": {
+    "logic": false,
+    "devices": false,
+    "physicalActuators": false
+  }
+}
