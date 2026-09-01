@@ -35,7 +35,7 @@ function summarize(normalized) {
   const avg = prices.reduce((sum, value) => sum + value, 0) / prices.length;
   return {
     source: normalized.source,
-    date: normalized.sourceMeta.localDate,
+    date: normalized.sourceMeta.requestedLocalDate,
     slots: normalized.slots.length,
     priceBasis: normalized.priceBasis,
     first: normalized.slots[0],
