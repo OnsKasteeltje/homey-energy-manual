@@ -23,10 +23,14 @@ jobs:
       - name: Materialize candidate from immutable v0.11g baseline
         run: bash src/homey/core/tools/materialize-core-v0.11h.sh
 
-      - name: JavaScript syntax check as HomeyScript-style module
+      - name: JavaScript syntax check in HomeyScript async wrapper
         run: |
-          cp src/homey/core/core-v0.11h.candidate-homey.js /tmp/core-v0.11h.candidate-homey.mjs
-          node --check /tmp/core-v0.11h.candidate-homey.mjs
+          {
+            echo 'async function __homey_script__(){'
+            cat src/homey/core/core-v0.11h.candidate-homey.js
+            echo '}'
+          } > /tmp/core-v0.11h.syntax-check.js
+          node --check /tmp/core-v0.11h.syntax-check.js
 
       - name: WW thermostat regression matrix
         run: node src/homey/core/tests/core-v0.11h-ww-thermostat-regression.js
