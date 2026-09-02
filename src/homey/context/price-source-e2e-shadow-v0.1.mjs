@@ -2,12 +2,14 @@
 // GITHUB-ONLY / READ-ONLY / NO HOMEY WRITES / NO PRODUCTION CUTOVER
 //
 // Purpose: combine already captured PBTH Inter-App data with a live EnergyZero
-// public REST fetch, normalize both sources, and run the deterministic shadow selector.
-// This Node/Pi-compatible runner intentionally does not call Homey itself.
+// public REST fetch, normalize both sources, validate PBTH market semantics and
+// run the deterministic shadow selector. This Node/Pi-compatible runner
+// intentionally does not call Homey itself.
 
 import https from 'node:https';
 import fs from 'node:fs/promises';
 import { normalizeEnergyZeroRest, normalizePbthInterApp } from './price-source-normalizer-v0.1.mjs';
+import { promotePbthToMarketExVat } from './pbth-market-basis-policy-v0.1.mjs';
 import { selectPriceSourceShadow } from './price-source-selector-v0.1.mjs';
 
 const ENERGYZERO_HOST = 'public.api.energyzero.nl';
@@ -57,9 +59,10 @@ async function main() {
   const pbthFile = process.argv[2];
   const localDate = process.argv[3] || localDateInZone();
   const requiredHorizonEnd = process.argv[4] || null;
+  const requiredHorizonStart = process.argv[5] || null;
 
   if (!pbthFile) {
-    console.error('Usage: node price-source-e2e-shadow-v0.1.mjs <pbth-raw.json> [YYYY-MM-DD] [required-horizon-ISO]');
+    console.error('Usage: node price-source-e2e-shadow-v0.1.mjs <pbth-raw.json> [YYYY-MM-DD] [required-horizon-end-ISO] [required-horizon-start-ISO]');
     console.error('PBTH file must be a raw /dap-prices Inter-App response, not the compact HomeyScript summary.');
     process.exitCode = 2;
     return;
@@ -82,18 +85,14 @@ async function main() {
     priceBasis: 'MARKET_EX_VAT',
   });
 
-  // Live A/B validation on 2026-09-01 established PBTH importPrice == EnergyZero
-  // base MARKET_EX_VAT for 109/109 overlapping NL DAP15 slots. We therefore make
-  // that proven semantic basis explicit only in this SHADOW runner.
-  const pbth = normalizePbthInterApp(pbthRaw, { retrievedAt });
-  pbth.priceBasis = 'MARKET_EX_VAT';
-  pbth.slots = pbth.slots.map((slot) => ({
-    ...slot,
-    marketPriceEurPerKwh: slot.importPriceEurPerKwh,
-  }));
+  const pbthNormalized = normalizePbthInterApp(pbthRaw, { retrievedAt });
+  const pbthPromotion = promotePbthToMarketExVat(pbthNormalized, energyZero);
+  const sources = [energyZero];
+  if (pbthPromotion.confirmed) sources.push(pbthPromotion.source);
 
-  const result = selectPriceSourceShadow([energyZero, pbth], {
+  const result = selectPriceSourceShadow(sources, {
     now: retrievedAt,
+    requiredHorizonStart,
     requiredHorizonEnd,
     maxAgeMinutes: 30,
   });
@@ -104,12 +103,20 @@ async function main() {
     mode: 'SHADOW_READ_ONLY',
     generatedAt: retrievedAt,
     requestedLocalDate: localDate,
+    requiredHorizonStart,
     requiredHorizonEnd,
     selectedSource: result.selectedSource,
+    selectedHorizonStart: result.selectedHorizonStart,
     selectedHorizonEnd: result.selectedHorizonEnd,
     productionSwitchAllowed: false,
+    pbthMarketBasisValidation: {
+      confirmed: pbthPromotion.confirmed,
+      reasons: pbthPromotion.reasons,
+      overlapSlots: pbthPromotion.overlapSlots,
+      exactMatchSlots: pbthPromotion.exactMatchSlots,
+      maxAbsDelta: pbthPromotion.maxAbsDelta,
+    },
     evaluations: result.evaluations,
-    note: 'PBTH MARKET_EX_VAT mapping is shadow-only and based on 2026-09-01 live A/B 109/109 exact match.',
   };
 
   console.log(JSON.stringify(compact, null, 2));
