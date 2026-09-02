@@ -20,6 +20,7 @@ function sourceRank(source) {
 export function evaluatePriceSource(source, options = {}) {
   const {
     now = new Date().toISOString(),
+    requiredHorizonStart = null,
     requiredHorizonEnd = null,
     maxAgeMinutes = 30,
   } = options;
@@ -46,6 +47,20 @@ export function evaluatePriceSource(source, options = {}) {
     reasons.push('BAD_RETRIEVED_AT');
   } else if (nowMs - retrievedMs > maxAgeMinutes * 60000) {
     reasons.push('RETRIEVAL_TOO_OLD');
+  }
+
+  const firstSlotMs = Array.isArray(source.slots) && source.slots.length > 0
+    ? isoMs(source.slots[0]?.start)
+    : null;
+
+  if (requiredHorizonStart) {
+    const requiredStartMs = isoMs(requiredHorizonStart);
+    if (requiredStartMs === null) throw new Error(`invalid requiredHorizonStart: ${requiredHorizonStart}`);
+    if (firstSlotMs === null) {
+      reasons.push('BAD_HORIZON_START');
+    } else if (firstSlotMs > requiredStartMs) {
+      reasons.push('HORIZON_START_TOO_LATE');
+    }
   }
 
   const horizonMs = isoMs(source.health?.horizonEnd);
@@ -88,6 +103,7 @@ export function evaluatePriceSource(source, options = {}) {
     eligible: reasons.length === 0,
     reasons,
     source: source.source ?? null,
+    horizonStart: Array.isArray(source.slots) && source.slots.length > 0 ? source.slots[0]?.start ?? null : null,
     horizonEnd: source.health?.horizonEnd ?? null,
     retrievedAt: source.retrievedAt ?? null,
     slotCount: Array.isArray(source.slots) ? source.slots.length : 0,
@@ -116,12 +132,14 @@ export function selectPriceSourceShadow(sources, options = {}) {
     status: selected ? 'OK' : 'NO_ELIGIBLE_SOURCE',
     mode: 'SHADOW_READ_ONLY',
     selectedSource: selected?.source?.source ?? null,
+    selectedHorizonStart: selected?.evaluation?.horizonStart ?? null,
     selectedHorizonEnd: selected?.evaluation?.horizonEnd ?? null,
     productionSwitchAllowed: false,
     evaluations: evaluations.map(({ source, evaluation }) => ({
       source: source?.source ?? null,
       eligible: evaluation.eligible,
       reasons: evaluation.reasons,
+      horizonStart: evaluation.horizonStart,
       horizonEnd: evaluation.horizonEnd,
       retrievedAt: evaluation.retrievedAt,
       slotCount: evaluation.slotCount,
