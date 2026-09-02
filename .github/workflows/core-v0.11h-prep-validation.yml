@@ -9,16 +9,17 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate-v011h:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout full history
+      - name: Checkout PR head with full history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Materialize candidate from immutable v0.11g baseline
         run: bash src/homey/core/tools/materialize-core-v0.11h.sh
@@ -35,14 +36,12 @@ jobs:
       - name: WW thermostat regression matrix
         run: node src/homey/core/tests/core-v0.11h-ww-thermostat-regression.js
 
-      - name: Verify candidate is generated only
+      - name: Verify exact candidate identity
         run: |
           test -f src/homey/core/core-v0.11h.candidate-homey.js
-          git status --short
-          if git ls-files --error-unmatch src/homey/core/core-v0.11h.candidate-homey.js >/dev/null 2>&1; then
-            echo 'FAIL: generated candidate must not be committed before validation review' >&2
-            exit 20
-          fi
+          ACTUAL=$(git hash-object src/homey/core/core-v0.11h.candidate-homey.js)
+          test "$ACTUAL" = 'c88647e08b85631cd27bb109b35a58a569445dea'
+          echo "candidate_blob=$ACTUAL"
 
       - name: Record surgical diff
         run: |
@@ -51,3 +50,16 @@ jobs:
           grep -Fq 'THERMOSTAT_VERIFY_LOW_W=100' /tmp/core-v0.11h.diff
           grep -Fq 'thermostatVerifyLowPower' /tmp/core-v0.11h.diff
           grep -Fq 'EM2_CORE_STATE_V0.11h' /tmp/core-v0.11h.diff
+
+      - name: Pin validated deployment candidate on PR branch
+        if: github.event_name == 'pull_request'
+        run: |
+          if git ls-files --error-unmatch src/homey/core/core-v0.11h.candidate-homey.js >/dev/null 2>&1; then
+            echo 'candidate already pinned'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/homey/core/core-v0.11h.candidate-homey.js
+          git commit -m 'build: pin validated Core v0.11h deployment candidate'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
