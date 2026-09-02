@@ -1,0 +1,47 @@
+name: Core v0.11h prep validation
+
+on:
+  pull_request:
+    paths:
+      - 'src/homey/core/**'
+      - 'docs/architecture/core-v0.11h-ww-thermostat-low-power-prep.md'
+      - '.github/workflows/core-v0.11h-prep-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-v011h:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Materialize candidate from immutable v0.11g baseline
+        run: bash src/homey/core/tools/materialize-core-v0.11h.sh
+
+      - name: JavaScript syntax check
+        run: node --check src/homey/core/core-v0.11h.candidate-homey.js
+
+      - name: WW thermostat regression matrix
+        run: node src/homey/core/tests/core-v0.11h-ww-thermostat-regression.js
+
+      - name: Verify candidate is generated only
+        run: |
+          test -f src/homey/core/core-v0.11h.candidate-homey.js
+          git status --short
+          if git ls-files --error-unmatch src/homey/core/core-v0.11h.candidate-homey.js >/dev/null 2>&1; then
+            echo 'FAIL: generated candidate must not be committed before validation review' >&2
+            exit 20
+          fi
+
+      - name: Record surgical diff
+        run: |
+          git show bd4edecc219c035399a18671429c2cf24eaea1be:src/homey/core/core-v0.11g.live-homey.js > /tmp/core-v0.11g.js
+          diff -u /tmp/core-v0.11g.js src/homey/core/core-v0.11h.candidate-homey.js | tee /tmp/core-v0.11h.diff || test ${PIPESTATUS[0]} -eq 1
+          grep -Fq 'THERMOSTAT_VERIFY_LOW_W=100' /tmp/core-v0.11h.diff
+          grep -Fq 'thermostatVerifyLowPower' /tmp/core-v0.11h.diff
+          grep -Fq 'EM2_CORE_STATE_V0.11h' /tmp/core-v0.11h.diff
