@@ -16,6 +16,25 @@
     document.head.append(s);
   };
 
+  const priceSection=()=>[...root.querySelectorAll(':scope > section.ps-section')]
+    .find(section=>section.querySelector(':scope > h2')?.textContent.trim()==='Prijs & planneracties')||null;
+
+  const contract=()=>{
+    const summary=String(root.querySelector('.ps-summary span')?.textContent||'').toUpperCase();
+    if(summary.includes('· FIXED ·')||summary.includes('· VAST ·'))return 'FIXED';
+    if(summary.includes('· DYNAMIC ·')||summary.includes('· DYNAMISCH ·'))return 'DYNAMIC';
+    return 'UNKNOWN';
+  };
+
+  const updateContractVisibility=()=>{
+    const section=priceSection();
+    if(!section)return;
+    const fixed=contract()==='FIXED';
+    section.hidden=fixed;
+    section.style.display=fixed?'none':'';
+    section.dataset.hiddenForContract=fixed?'FIXED':'';
+  };
+
   const decorate=chart=>{
     if(!chart||chart.dataset.priceAvailability==='1')return;
     const cols=[...chart.querySelectorAll('.ps-price-col')];
@@ -40,7 +59,10 @@
     chart.dataset.priceAvailability='1';
   };
 
-  const scan=()=>root.querySelectorAll('.ps-price-chart').forEach(decorate);
+  const scan=()=>{
+    updateContractVisibility();
+    if(contract()!=='FIXED')root.querySelectorAll('.ps-price-chart').forEach(decorate);
+  };
   scan();
   new MutationObserver(scan).observe(root,{childList:true,subtree:true});
 })();
