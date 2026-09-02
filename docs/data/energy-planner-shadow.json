@@ -1,13 +1,13 @@
 {
   "schema": "EM2_PLANNER_SHADOW_PUBLISH_V0.4",
-  "publishedAt": "2026-09-02T11:30:47.575Z",
+  "publishedAt": "2026-09-02T11:45:47.580Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
-  "sourceRevision": 4155,
-  "generatedAt": "2026-09-02T11:30:45.183Z",
+  "sourceRevision": 4158,
+  "generatedAt": "2026-09-02T11:45:45.186Z",
   "plan": {
     "schema": "EM2_ENERGY_PLAN_24H_V0.5.0",
-    "generatedAt": "2026-09-02T11:30:45.183Z",
+    "generatedAt": "2026-09-02T11:45:45.186Z",
     "controlMode": "SHADOW",
     "readOnly": true,
     "physicalWritePerformed": false,
@@ -28,29 +28,29 @@
       "usableWindowKWh": 10.08
     },
     "inputs": {
-      "sourceRevision": 4155,
+      "sourceRevision": 4158,
       "contract": "DYNAMIC",
       "price": {
         "quality": "GOOD",
         "fresh": true,
         "usable": true,
-        "dynamicSlots": 44
+        "dynamicSlots": 43
       },
       "history": {
         "schema": "2.6",
         "source": "EM2_DAY_SERIES_LOCAL_V0.6.1",
-        "samples": 162,
-        "usableSamples": 162,
+        "samples": 165,
+        "usableSamples": 165,
         "cleanBaseSamples": 150,
         "rejectedHighLoadSamples": 8,
-        "rejectedKnownApplianceSamples": 4,
+        "rejectedKnownApplianceSamples": 7,
         "observedBaseQuarterBins": 51,
         "measurementControlIndependent": true
       },
       "forecastQuality": {
         "baseLoad": "CLEAN_QUARTER_PROFILE",
         "pv": "WEATHER_HAUWERT_CALIBRATED",
-        "pvNote": "PV forecast uses Hauwert weather shortwave radiation; scale=8.743 W per W/m2, calibrationPoints=65. No day-persistence PV forecast.",
+        "pvNote": "PV forecast uses Hauwert weather shortwave radiation; scale=8.456 W per W/m2, calibrationPoints=68. No day-persistence PV forecast.",
         "baseLoadNote": "Known Tesla/boiler are subtracted. Washer/dryer-active and residual >= 1500 W samples are excluded from base learning. Global fallback is unavailable until >=3 clean samples exist.",
         "pvSource": {
           "provider": "Open-Meteo",
@@ -59,7 +59,7 @@
           "longitude": 5.10003,
           "variable": "shortwave_radiation",
           "resolutionMinutes": 15,
-          "retrievedAt": "2026-09-02T11:30:45.381Z"
+          "retrievedAt": "2026-09-02T11:45:45.378Z"
         },
         "gridHeadroom": "NOT_MODELED_PHASE_AWARE"
       },
@@ -101,45 +101,6 @@
       "actions": [
         {
           "i": 0,
-          "start": "2026-09-02T11:30:00.000Z",
-          "end": "2026-09-02T11:45:00.000Z",
-          "localDate": "2026-09-02",
-          "localQuarter": 54,
-          "price_eur_kwh": 0.1015,
-          "priceClass": "CHEAP",
-          "baseLoadForecastW": 268,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 150,
-            "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
-          },
-          "pvForecastW": 3864,
-          "netBeforeFlexW": -3597,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3597,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_CALIBRATED"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          }
-        },
-        {
-          "i": 1,
           "start": "2026-09-02T11:45:00.000Z",
           "end": "2026-09-02T12:00:00.000Z",
           "localDate": "2026-09-02",
@@ -157,12 +118,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 3812,
-          "netBeforeFlexW": -3544,
+          "pvForecastW": 3687,
+          "netBeforeFlexW": -3419,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3544,
+          "pvSurplusBeforeFlexW": 3419,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -178,7 +139,7 @@
           }
         },
         {
-          "i": 2,
+          "i": 1,
           "start": "2026-09-02T12:00:00.000Z",
           "end": "2026-09-02T12:15:00.000Z",
           "localDate": "2026-09-02",
@@ -196,12 +157,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 3637,
-          "netBeforeFlexW": -3369,
+          "pvForecastW": 3518,
+          "netBeforeFlexW": -3250,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3369,
+          "pvSurplusBeforeFlexW": 3250,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -217,7 +178,7 @@
           }
         },
         {
-          "i": 3,
+          "i": 2,
           "start": "2026-09-02T12:15:00.000Z",
           "end": "2026-09-02T12:30:00.000Z",
           "localDate": "2026-09-02",
@@ -235,12 +196,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 3445,
-          "netBeforeFlexW": -3177,
+          "pvForecastW": 3332,
+          "netBeforeFlexW": -3064,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3177,
+          "pvSurplusBeforeFlexW": 3064,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -256,7 +217,7 @@
           }
         },
         {
-          "i": 4,
+          "i": 3,
           "start": "2026-09-02T12:30:00.000Z",
           "end": "2026-09-02T12:45:00.000Z",
           "localDate": "2026-09-02",
@@ -274,9 +235,48 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 3348,
+          "pvForecastW": 3239,
+          "netBeforeFlexW": -2971,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 2971,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_CALIBRATED"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          }
+        },
+        {
+          "i": 4,
+          "start": "2026-09-02T12:45:00.000Z",
+          "end": "2026-09-02T13:00:00.000Z",
+          "localDate": "2026-09-02",
+          "localQuarter": 59,
+          "price_eur_kwh": 0.1014,
+          "priceClass": "CHEAP",
+          "baseLoadForecastW": 268,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 150,
+            "rejectedHighLoadSamples": 8,
+            "rejectedKnownApplianceSamples": 7
+          },
+          "pvForecastW": 3349,
           "netBeforeFlexW": -3081,
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 3081,
@@ -296,45 +296,6 @@
         },
         {
           "i": 5,
-          "start": "2026-09-02T12:45:00.000Z",
-          "end": "2026-09-02T13:00:00.000Z",
-          "localDate": "2026-09-02",
-          "localQuarter": 59,
-          "price_eur_kwh": 0.1014,
-          "priceClass": "CHEAP",
-          "baseLoadForecastW": 268,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 150,
-            "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
-          },
-          "pvForecastW": 3462,
-          "netBeforeFlexW": -3195,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3195,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_CALIBRATED"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          }
-        },
-        {
-          "i": 6,
           "start": "2026-09-02T13:00:00.000Z",
           "end": "2026-09-02T13:15:00.000Z",
           "localDate": "2026-09-02",
@@ -352,12 +313,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 3864,
-          "netBeforeFlexW": -3597,
+          "pvForecastW": 3737,
+          "netBeforeFlexW": -3470,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3597,
+          "pvSurplusBeforeFlexW": 3470,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -373,7 +334,7 @@
           }
         },
         {
-          "i": 7,
+          "i": 6,
           "start": "2026-09-02T13:15:00.000Z",
           "end": "2026-09-02T13:30:00.000Z",
           "localDate": "2026-09-02",
@@ -391,12 +352,51 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 4310,
-          "netBeforeFlexW": -4043,
+          "pvForecastW": 4169,
+          "netBeforeFlexW": -3901,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 4043,
+          "pvSurplusBeforeFlexW": 3901,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_CALIBRATED"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          }
+        },
+        {
+          "i": 7,
+          "start": "2026-09-02T13:30:00.000Z",
+          "end": "2026-09-02T13:45:00.000Z",
+          "localDate": "2026-09-02",
+          "localQuarter": 62,
+          "price_eur_kwh": 0.117,
+          "priceClass": "CHEAP",
+          "baseLoadForecastW": 268,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 150,
+            "rejectedHighLoadSamples": 8,
+            "rejectedKnownApplianceSamples": 7
+          },
+          "pvForecastW": 4414,
+          "netBeforeFlexW": -4146,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 4146,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -413,45 +413,6 @@
         },
         {
           "i": 8,
-          "start": "2026-09-02T13:30:00.000Z",
-          "end": "2026-09-02T13:45:00.000Z",
-          "localDate": "2026-09-02",
-          "localQuarter": 62,
-          "price_eur_kwh": 0.117,
-          "priceClass": "NORMAL",
-          "baseLoadForecastW": 268,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 150,
-            "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
-          },
-          "pvForecastW": 4564,
-          "netBeforeFlexW": -4296,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 4296,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_CALIBRATED"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          }
-        },
-        {
-          "i": 9,
           "start": "2026-09-02T13:45:00.000Z",
           "end": "2026-09-02T14:00:00.000Z",
           "localDate": "2026-09-02",
@@ -469,12 +430,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 4433,
-          "netBeforeFlexW": -4165,
+          "pvForecastW": 4287,
+          "netBeforeFlexW": -4020,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 4165,
+          "pvSurplusBeforeFlexW": 4020,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -490,7 +451,7 @@
           }
         },
         {
-          "i": 10,
+          "i": 9,
           "start": "2026-09-02T14:00:00.000Z",
           "end": "2026-09-02T14:15:00.000Z",
           "localDate": "2026-09-02",
@@ -508,12 +469,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 4013,
-          "netBeforeFlexW": -3745,
+          "pvForecastW": 3881,
+          "netBeforeFlexW": -3614,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3745,
+          "pvSurplusBeforeFlexW": 3614,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -529,7 +490,7 @@
           }
         },
         {
-          "i": 11,
+          "i": 10,
           "start": "2026-09-02T14:15:00.000Z",
           "end": "2026-09-02T14:30:00.000Z",
           "localDate": "2026-09-02",
@@ -547,12 +508,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 3436,
-          "netBeforeFlexW": -3168,
+          "pvForecastW": 3323,
+          "netBeforeFlexW": -3056,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 3168,
+          "pvSurplusBeforeFlexW": 3056,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -568,7 +529,7 @@
           }
         },
         {
-          "i": 12,
+          "i": 11,
           "start": "2026-09-02T14:30:00.000Z",
           "end": "2026-09-02T14:45:00.000Z",
           "localDate": "2026-09-02",
@@ -586,12 +547,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 2841,
-          "netBeforeFlexW": -2574,
+          "pvForecastW": 2748,
+          "netBeforeFlexW": -2481,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 2574,
+          "pvSurplusBeforeFlexW": 2481,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -607,7 +568,7 @@
           }
         },
         {
-          "i": 13,
+          "i": 12,
           "start": "2026-09-02T14:45:00.000Z",
           "end": "2026-09-02T15:00:00.000Z",
           "localDate": "2026-09-02",
@@ -625,12 +586,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 2299,
-          "netBeforeFlexW": -2032,
+          "pvForecastW": 2224,
+          "netBeforeFlexW": -1956,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 2032,
+          "pvSurplusBeforeFlexW": 1956,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -646,7 +607,7 @@
           }
         },
         {
-          "i": 14,
+          "i": 13,
           "start": "2026-09-02T15:00:00.000Z",
           "end": "2026-09-02T15:15:00.000Z",
           "localDate": "2026-09-02",
@@ -664,12 +625,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 1705,
-          "netBeforeFlexW": -1437,
+          "pvForecastW": 1649,
+          "netBeforeFlexW": -1381,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1437,
+          "pvSurplusBeforeFlexW": 1381,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -685,7 +646,7 @@
           }
         },
         {
-          "i": 15,
+          "i": 14,
           "start": "2026-09-02T15:15:00.000Z",
           "end": "2026-09-02T15:30:00.000Z",
           "localDate": "2026-09-02",
@@ -703,12 +664,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 1163,
-          "netBeforeFlexW": -895,
+          "pvForecastW": 1125,
+          "netBeforeFlexW": -857,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 895,
+          "pvSurplusBeforeFlexW": 857,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -724,7 +685,7 @@
           }
         },
         {
-          "i": 16,
+          "i": 15,
           "start": "2026-09-02T15:30:00.000Z",
           "end": "2026-09-02T15:45:00.000Z",
           "localDate": "2026-09-02",
@@ -742,12 +703,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 752,
-          "netBeforeFlexW": -484,
+          "pvForecastW": 727,
+          "netBeforeFlexW": -460,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 484,
+          "pvSurplusBeforeFlexW": 460,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -763,7 +724,7 @@
           }
         },
         {
-          "i": 17,
+          "i": 16,
           "start": "2026-09-02T15:45:00.000Z",
           "end": "2026-09-02T16:00:00.000Z",
           "localDate": "2026-09-02",
@@ -781,12 +742,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 551,
-          "netBeforeFlexW": -283,
+          "pvForecastW": 533,
+          "netBeforeFlexW": -265,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 283,
+          "pvSurplusBeforeFlexW": 265,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -802,7 +763,7 @@
           }
         },
         {
-          "i": 18,
+          "i": 17,
           "start": "2026-09-02T16:00:00.000Z",
           "end": "2026-09-02T16:15:00.000Z",
           "localDate": "2026-09-02",
@@ -820,7 +781,46 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
+          },
+          "pvForecastW": 490,
+          "netBeforeFlexW": -223,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 223,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_CALIBRATED"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          }
+        },
+        {
+          "i": 18,
+          "start": "2026-09-02T16:15:00.000Z",
+          "end": "2026-09-02T16:30:00.000Z",
+          "localDate": "2026-09-02",
+          "localQuarter": 73,
+          "price_eur_kwh": 0.1906,
+          "priceClass": "NORMAL",
+          "baseLoadForecastW": 268,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 150,
+            "rejectedHighLoadSamples": 8,
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 507,
           "netBeforeFlexW": -240,
@@ -842,45 +842,6 @@
         },
         {
           "i": 19,
-          "start": "2026-09-02T16:15:00.000Z",
-          "end": "2026-09-02T16:30:00.000Z",
-          "localDate": "2026-09-02",
-          "localQuarter": 73,
-          "price_eur_kwh": 0.1906,
-          "priceClass": "NORMAL",
-          "baseLoadForecastW": 268,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 150,
-            "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
-          },
-          "pvForecastW": 525,
-          "netBeforeFlexW": -257,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 257,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_CALIBRATED"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          }
-        },
-        {
-          "i": 20,
           "start": "2026-09-02T16:30:00.000Z",
           "end": "2026-09-02T16:45:00.000Z",
           "localDate": "2026-09-02",
@@ -898,12 +859,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 533,
-          "netBeforeFlexW": -266,
+          "pvForecastW": 516,
+          "netBeforeFlexW": -248,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 266,
+          "pvSurplusBeforeFlexW": 248,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -919,7 +880,7 @@
           }
         },
         {
-          "i": 21,
+          "i": 20,
           "start": "2026-09-02T16:45:00.000Z",
           "end": "2026-09-02T17:00:00.000Z",
           "localDate": "2026-09-02",
@@ -937,12 +898,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 490,
-          "netBeforeFlexW": -222,
+          "pvForecastW": 474,
+          "netBeforeFlexW": -206,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 222,
+          "pvSurplusBeforeFlexW": 206,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -958,7 +919,7 @@
           }
         },
         {
-          "i": 22,
+          "i": 21,
           "start": "2026-09-02T17:00:00.000Z",
           "end": "2026-09-02T17:15:00.000Z",
           "localDate": "2026-09-02",
@@ -976,12 +937,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 428,
-          "netBeforeFlexW": -161,
+          "pvForecastW": 414,
+          "netBeforeFlexW": -147,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 161,
+          "pvSurplusBeforeFlexW": 147,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -997,7 +958,7 @@
           }
         },
         {
-          "i": 23,
+          "i": 22,
           "start": "2026-09-02T17:15:00.000Z",
           "end": "2026-09-02T17:30:00.000Z",
           "localDate": "2026-09-02",
@@ -1015,12 +976,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 358,
-          "netBeforeFlexW": -91,
+          "pvForecastW": 347,
+          "netBeforeFlexW": -79,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 91,
+          "pvSurplusBeforeFlexW": 79,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -1036,7 +997,7 @@
           }
         },
         {
-          "i": 24,
+          "i": 23,
           "start": "2026-09-02T17:30:00.000Z",
           "end": "2026-09-02T17:45:00.000Z",
           "localDate": "2026-09-02",
@@ -1054,12 +1015,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 280,
-          "netBeforeFlexW": -12,
+          "pvForecastW": 271,
+          "netBeforeFlexW": -3,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 12,
+          "pvSurplusBeforeFlexW": 3,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -1075,7 +1036,7 @@
           }
         },
         {
-          "i": 25,
+          "i": 24,
           "start": "2026-09-02T17:45:00.000Z",
           "end": "2026-09-02T18:00:00.000Z",
           "localDate": "2026-09-02",
@@ -1093,11 +1054,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 175,
-          "netBeforeFlexW": 93,
-          "importBeforeFlexW": 93,
+          "pvForecastW": 169,
+          "netBeforeFlexW": 98,
+          "importBeforeFlexW": 98,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -1114,7 +1075,7 @@
           }
         },
         {
-          "i": 26,
+          "i": 25,
           "start": "2026-09-02T18:00:00.000Z",
           "end": "2026-09-02T18:15:00.000Z",
           "localDate": "2026-09-02",
@@ -1132,11 +1093,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 79,
-          "netBeforeFlexW": 189,
-          "importBeforeFlexW": 189,
+          "pvForecastW": 76,
+          "netBeforeFlexW": 191,
+          "importBeforeFlexW": 191,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -1153,7 +1114,7 @@
           }
         },
         {
-          "i": 27,
+          "i": 26,
           "start": "2026-09-02T18:15:00.000Z",
           "end": "2026-09-02T18:30:00.000Z",
           "localDate": "2026-09-02",
@@ -1171,11 +1132,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 17,
-          "netBeforeFlexW": 250,
-          "importBeforeFlexW": 250,
+          "netBeforeFlexW": 251,
+          "importBeforeFlexW": 251,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -1192,7 +1153,7 @@
           }
         },
         {
-          "i": 28,
+          "i": 27,
           "start": "2026-09-02T18:30:00.000Z",
           "end": "2026-09-02T18:45:00.000Z",
           "localDate": "2026-09-02",
@@ -1210,7 +1171,46 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
+          },
+          "pvForecastW": 0,
+          "netBeforeFlexW": 268,
+          "importBeforeFlexW": 268,
+          "pvSurplusBeforeFlexW": 0,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_CALIBRATED"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          }
+        },
+        {
+          "i": 28,
+          "start": "2026-09-02T18:45:00.000Z",
+          "end": "2026-09-02T19:00:00.000Z",
+          "localDate": "2026-09-02",
+          "localQuarter": 83,
+          "price_eur_kwh": 0.2397,
+          "priceClass": "EXPENSIVE",
+          "baseLoadForecastW": 268,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 150,
+            "rejectedHighLoadSamples": 8,
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1232,11 +1232,11 @@
         },
         {
           "i": 29,
-          "start": "2026-09-02T18:45:00.000Z",
-          "end": "2026-09-02T19:00:00.000Z",
+          "start": "2026-09-02T19:00:00.000Z",
+          "end": "2026-09-02T19:15:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 83,
-          "price_eur_kwh": 0.2397,
+          "localQuarter": 84,
+          "price_eur_kwh": 0.2426,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
@@ -1249,7 +1249,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1271,11 +1271,11 @@
         },
         {
           "i": 30,
-          "start": "2026-09-02T19:00:00.000Z",
-          "end": "2026-09-02T19:15:00.000Z",
+          "start": "2026-09-02T19:15:00.000Z",
+          "end": "2026-09-02T19:30:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 84,
-          "price_eur_kwh": 0.2426,
+          "localQuarter": 85,
+          "price_eur_kwh": 0.2453,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
@@ -1288,7 +1288,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1310,11 +1310,11 @@
         },
         {
           "i": 31,
-          "start": "2026-09-02T19:15:00.000Z",
-          "end": "2026-09-02T19:30:00.000Z",
+          "start": "2026-09-02T19:30:00.000Z",
+          "end": "2026-09-02T19:45:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 85,
-          "price_eur_kwh": 0.2453,
+          "localQuarter": 86,
+          "price_eur_kwh": 0.2348,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
@@ -1327,7 +1327,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1349,11 +1349,11 @@
         },
         {
           "i": 32,
-          "start": "2026-09-02T19:30:00.000Z",
-          "end": "2026-09-02T19:45:00.000Z",
+          "start": "2026-09-02T19:45:00.000Z",
+          "end": "2026-09-02T20:00:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 86,
-          "price_eur_kwh": 0.2348,
+          "localQuarter": 87,
+          "price_eur_kwh": 0.2163,
           "priceClass": "EXPENSIVE",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
@@ -1366,7 +1366,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1388,12 +1388,12 @@
         },
         {
           "i": 33,
-          "start": "2026-09-02T19:45:00.000Z",
-          "end": "2026-09-02T20:00:00.000Z",
+          "start": "2026-09-02T20:00:00.000Z",
+          "end": "2026-09-02T20:15:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 87,
-          "price_eur_kwh": 0.2163,
-          "priceClass": "EXPENSIVE",
+          "localQuarter": 88,
+          "price_eur_kwh": 0.2108,
+          "priceClass": "NORMAL",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
             "basis": "CLEAN_GLOBAL_MEDIAN",
@@ -1405,7 +1405,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1427,11 +1427,11 @@
         },
         {
           "i": 34,
-          "start": "2026-09-02T20:00:00.000Z",
-          "end": "2026-09-02T20:15:00.000Z",
+          "start": "2026-09-02T20:15:00.000Z",
+          "end": "2026-09-02T20:30:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 88,
-          "price_eur_kwh": 0.2108,
+          "localQuarter": 89,
+          "price_eur_kwh": 0.1975,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
@@ -1444,7 +1444,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1466,11 +1466,11 @@
         },
         {
           "i": 35,
-          "start": "2026-09-02T20:15:00.000Z",
-          "end": "2026-09-02T20:30:00.000Z",
+          "start": "2026-09-02T20:30:00.000Z",
+          "end": "2026-09-02T20:45:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 89,
-          "price_eur_kwh": 0.1975,
+          "localQuarter": 90,
+          "price_eur_kwh": 0.1987,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
@@ -1483,7 +1483,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1505,11 +1505,11 @@
         },
         {
           "i": 36,
-          "start": "2026-09-02T20:30:00.000Z",
-          "end": "2026-09-02T20:45:00.000Z",
+          "start": "2026-09-02T20:45:00.000Z",
+          "end": "2026-09-02T21:00:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 90,
-          "price_eur_kwh": 0.1987,
+          "localQuarter": 91,
+          "price_eur_kwh": 0.1932,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
@@ -1522,7 +1522,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1544,11 +1544,11 @@
         },
         {
           "i": 37,
-          "start": "2026-09-02T20:45:00.000Z",
-          "end": "2026-09-02T21:00:00.000Z",
+          "start": "2026-09-02T21:00:00.000Z",
+          "end": "2026-09-02T21:15:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 91,
-          "price_eur_kwh": 0.1932,
+          "localQuarter": 92,
+          "price_eur_kwh": 0.1983,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
@@ -1561,7 +1561,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1583,11 +1583,11 @@
         },
         {
           "i": 38,
-          "start": "2026-09-02T21:00:00.000Z",
-          "end": "2026-09-02T21:15:00.000Z",
+          "start": "2026-09-02T21:15:00.000Z",
+          "end": "2026-09-02T21:30:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 92,
-          "price_eur_kwh": 0.1983,
+          "localQuarter": 93,
+          "price_eur_kwh": 0.187,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
@@ -1600,7 +1600,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1622,11 +1622,11 @@
         },
         {
           "i": 39,
-          "start": "2026-09-02T21:15:00.000Z",
-          "end": "2026-09-02T21:30:00.000Z",
+          "start": "2026-09-02T21:30:00.000Z",
+          "end": "2026-09-02T21:45:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 93,
-          "price_eur_kwh": 0.187,
+          "localQuarter": 94,
+          "price_eur_kwh": 0.1763,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
@@ -1639,7 +1639,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1661,11 +1661,11 @@
         },
         {
           "i": 40,
-          "start": "2026-09-02T21:30:00.000Z",
-          "end": "2026-09-02T21:45:00.000Z",
+          "start": "2026-09-02T21:45:00.000Z",
+          "end": "2026-09-02T22:00:00.000Z",
           "localDate": "2026-09-02",
-          "localQuarter": 94,
-          "price_eur_kwh": 0.1763,
+          "localQuarter": 95,
+          "price_eur_kwh": 0.1659,
           "priceClass": "NORMAL",
           "baseLoadForecastW": 268,
           "baseForecastTrace": {
@@ -1678,7 +1678,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 268,
@@ -1700,45 +1700,6 @@
         },
         {
           "i": 41,
-          "start": "2026-09-02T21:45:00.000Z",
-          "end": "2026-09-02T22:00:00.000Z",
-          "localDate": "2026-09-02",
-          "localQuarter": 95,
-          "price_eur_kwh": 0.1659,
-          "priceClass": "NORMAL",
-          "baseLoadForecastW": 268,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 150,
-            "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
-          },
-          "pvForecastW": 0,
-          "netBeforeFlexW": 268,
-          "importBeforeFlexW": 268,
-          "pvSurplusBeforeFlexW": 0,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_CALIBRATED"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          }
-        },
-        {
-          "i": 42,
           "start": "2026-09-02T22:00:00.000Z",
           "end": "2026-09-02T22:15:00.000Z",
           "localDate": "2026-09-03",
@@ -1764,7 +1725,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 287,
@@ -1785,7 +1746,7 @@
           }
         },
         {
-          "i": 43,
+          "i": 42,
           "start": "2026-09-02T22:15:00.000Z",
           "end": "2026-09-02T22:30:00.000Z",
           "localDate": "2026-09-03",
@@ -1811,7 +1772,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 263,
@@ -1832,7 +1793,7 @@
           }
         },
         {
-          "i": 44,
+          "i": 43,
           "start": "2026-09-02T22:30:00.000Z",
           "end": "2026-09-02T22:45:00.000Z",
           "localDate": "2026-09-03",
@@ -1858,7 +1819,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 253,
@@ -1879,7 +1840,7 @@
           }
         },
         {
-          "i": 45,
+          "i": 44,
           "start": "2026-09-02T22:45:00.000Z",
           "end": "2026-09-02T23:00:00.000Z",
           "localDate": "2026-09-03",
@@ -1905,7 +1866,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 289,
@@ -1926,7 +1887,7 @@
           }
         },
         {
-          "i": 46,
+          "i": 45,
           "start": "2026-09-02T23:00:00.000Z",
           "end": "2026-09-02T23:15:00.000Z",
           "localDate": "2026-09-03",
@@ -1952,7 +1913,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 289,
@@ -1973,7 +1934,7 @@
           }
         },
         {
-          "i": 47,
+          "i": 46,
           "start": "2026-09-02T23:15:00.000Z",
           "end": "2026-09-02T23:30:00.000Z",
           "localDate": "2026-09-03",
@@ -1999,7 +1960,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 210,
@@ -2020,7 +1981,7 @@
           }
         },
         {
-          "i": 48,
+          "i": 47,
           "start": "2026-09-02T23:30:00.000Z",
           "end": "2026-09-02T23:45:00.000Z",
           "localDate": "2026-09-03",
@@ -2046,7 +2007,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 256,
@@ -2067,7 +2028,7 @@
           }
         },
         {
-          "i": 49,
+          "i": 48,
           "start": "2026-09-02T23:45:00.000Z",
           "end": "2026-09-03T00:00:00.000Z",
           "localDate": "2026-09-03",
@@ -2093,7 +2054,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 327,
@@ -2114,7 +2075,7 @@
           }
         },
         {
-          "i": 50,
+          "i": 49,
           "start": "2026-09-03T00:00:00.000Z",
           "end": "2026-09-03T00:15:00.000Z",
           "localDate": "2026-09-03",
@@ -2140,7 +2101,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 340,
@@ -2161,7 +2122,7 @@
           }
         },
         {
-          "i": 51,
+          "i": 50,
           "start": "2026-09-03T00:15:00.000Z",
           "end": "2026-09-03T00:30:00.000Z",
           "localDate": "2026-09-03",
@@ -2187,7 +2148,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 275,
@@ -2208,7 +2169,7 @@
           }
         },
         {
-          "i": 52,
+          "i": 51,
           "start": "2026-09-03T00:30:00.000Z",
           "end": "2026-09-03T00:45:00.000Z",
           "localDate": "2026-09-03",
@@ -2234,7 +2195,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 271,
@@ -2255,7 +2216,7 @@
           }
         },
         {
-          "i": 53,
+          "i": 52,
           "start": "2026-09-03T00:45:00.000Z",
           "end": "2026-09-03T01:00:00.000Z",
           "localDate": "2026-09-03",
@@ -2281,7 +2242,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 212,
@@ -2302,7 +2263,7 @@
           }
         },
         {
-          "i": 54,
+          "i": 53,
           "start": "2026-09-03T01:00:00.000Z",
           "end": "2026-09-03T01:15:00.000Z",
           "localDate": "2026-09-03",
@@ -2328,7 +2289,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 256,
@@ -2349,7 +2310,7 @@
           }
         },
         {
-          "i": 55,
+          "i": 54,
           "start": "2026-09-03T01:15:00.000Z",
           "end": "2026-09-03T01:30:00.000Z",
           "localDate": "2026-09-03",
@@ -2375,7 +2336,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 254,
@@ -2396,7 +2357,7 @@
           }
         },
         {
-          "i": 56,
+          "i": 55,
           "start": "2026-09-03T01:30:00.000Z",
           "end": "2026-09-03T01:45:00.000Z",
           "localDate": "2026-09-03",
@@ -2422,7 +2383,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 281,
@@ -2443,7 +2404,7 @@
           }
         },
         {
-          "i": 57,
+          "i": 56,
           "start": "2026-09-03T01:45:00.000Z",
           "end": "2026-09-03T02:00:00.000Z",
           "localDate": "2026-09-03",
@@ -2469,7 +2430,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 278,
@@ -2490,7 +2451,7 @@
           }
         },
         {
-          "i": 58,
+          "i": 57,
           "start": "2026-09-03T02:00:00.000Z",
           "end": "2026-09-03T02:15:00.000Z",
           "localDate": "2026-09-03",
@@ -2516,7 +2477,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 277,
@@ -2537,7 +2498,7 @@
           }
         },
         {
-          "i": 59,
+          "i": 58,
           "start": "2026-09-03T02:15:00.000Z",
           "end": "2026-09-03T02:30:00.000Z",
           "localDate": "2026-09-03",
@@ -2563,7 +2524,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 209,
@@ -2584,7 +2545,7 @@
           }
         },
         {
-          "i": 60,
+          "i": 59,
           "start": "2026-09-03T02:30:00.000Z",
           "end": "2026-09-03T02:45:00.000Z",
           "localDate": "2026-09-03",
@@ -2610,7 +2571,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 255,
@@ -2631,7 +2592,7 @@
           }
         },
         {
-          "i": 61,
+          "i": 60,
           "start": "2026-09-03T02:45:00.000Z",
           "end": "2026-09-03T03:00:00.000Z",
           "localDate": "2026-09-03",
@@ -2657,7 +2618,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 322,
@@ -2678,7 +2639,7 @@
           }
         },
         {
-          "i": 62,
+          "i": 61,
           "start": "2026-09-03T03:00:00.000Z",
           "end": "2026-09-03T03:15:00.000Z",
           "localDate": "2026-09-03",
@@ -2704,7 +2665,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 337,
@@ -2725,7 +2686,7 @@
           }
         },
         {
-          "i": 63,
+          "i": 62,
           "start": "2026-09-03T03:15:00.000Z",
           "end": "2026-09-03T03:30:00.000Z",
           "localDate": "2026-09-03",
@@ -2751,7 +2712,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 264,
@@ -2772,7 +2733,7 @@
           }
         },
         {
-          "i": 64,
+          "i": 63,
           "start": "2026-09-03T03:30:00.000Z",
           "end": "2026-09-03T03:45:00.000Z",
           "localDate": "2026-09-03",
@@ -2798,7 +2759,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 262,
@@ -2819,7 +2780,7 @@
           }
         },
         {
-          "i": 65,
+          "i": 64,
           "start": "2026-09-03T03:45:00.000Z",
           "end": "2026-09-03T04:00:00.000Z",
           "localDate": "2026-09-03",
@@ -2845,7 +2806,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 279,
@@ -2866,7 +2827,7 @@
           }
         },
         {
-          "i": 66,
+          "i": 65,
           "start": "2026-09-03T04:00:00.000Z",
           "end": "2026-09-03T04:15:00.000Z",
           "localDate": "2026-09-03",
@@ -2892,7 +2853,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 369,
@@ -2913,7 +2874,7 @@
           }
         },
         {
-          "i": 67,
+          "i": 66,
           "start": "2026-09-03T04:15:00.000Z",
           "end": "2026-09-03T04:30:00.000Z",
           "localDate": "2026-09-03",
@@ -2939,7 +2900,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 250,
@@ -2960,7 +2921,7 @@
           }
         },
         {
-          "i": 68,
+          "i": 67,
           "start": "2026-09-03T04:30:00.000Z",
           "end": "2026-09-03T04:45:00.000Z",
           "localDate": "2026-09-03",
@@ -2986,7 +2947,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 280,
@@ -3007,7 +2968,7 @@
           }
         },
         {
-          "i": 69,
+          "i": 68,
           "start": "2026-09-03T04:45:00.000Z",
           "end": "2026-09-03T05:00:00.000Z",
           "localDate": "2026-09-03",
@@ -3033,7 +2994,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 279,
@@ -3054,7 +3015,7 @@
           }
         },
         {
-          "i": 70,
+          "i": 69,
           "start": "2026-09-03T05:00:00.000Z",
           "end": "2026-09-03T05:15:00.000Z",
           "localDate": "2026-09-03",
@@ -3080,7 +3041,7 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
           "pvForecastW": 0,
           "netBeforeFlexW": 207,
@@ -3101,7 +3062,7 @@
           }
         },
         {
-          "i": 71,
+          "i": 70,
           "start": "2026-09-03T05:15:00.000Z",
           "end": "2026-09-03T05:30:00.000Z",
           "localDate": "2026-09-03",
@@ -3127,11 +3088,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 9,
-          "netBeforeFlexW": 200,
-          "importBeforeFlexW": 200,
+          "pvForecastW": 8,
+          "netBeforeFlexW": 201,
+          "importBeforeFlexW": 201,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -3148,7 +3109,7 @@
           }
         },
         {
-          "i": 72,
+          "i": 71,
           "start": "2026-09-03T05:30:00.000Z",
           "end": "2026-09-03T05:45:00.000Z",
           "localDate": "2026-09-03",
@@ -3174,11 +3135,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 35,
-          "netBeforeFlexW": 256,
-          "importBeforeFlexW": 256,
+          "pvForecastW": 34,
+          "netBeforeFlexW": 258,
+          "importBeforeFlexW": 258,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -3195,7 +3156,7 @@
           }
         },
         {
-          "i": 73,
+          "i": 72,
           "start": "2026-09-03T05:45:00.000Z",
           "end": "2026-09-03T06:00:00.000Z",
           "localDate": "2026-09-03",
@@ -3221,11 +3182,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 52,
-          "netBeforeFlexW": 235,
-          "importBeforeFlexW": 235,
+          "pvForecastW": 51,
+          "netBeforeFlexW": 237,
+          "importBeforeFlexW": 237,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -3242,7 +3203,7 @@
           }
         },
         {
-          "i": 74,
+          "i": 73,
           "start": "2026-09-03T06:00:00.000Z",
           "end": "2026-09-03T06:15:00.000Z",
           "localDate": "2026-09-03",
@@ -3268,11 +3229,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 61,
-          "netBeforeFlexW": 201,
-          "importBeforeFlexW": 201,
+          "pvForecastW": 59,
+          "netBeforeFlexW": 203,
+          "importBeforeFlexW": 203,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -3289,7 +3250,7 @@
           }
         },
         {
-          "i": 75,
+          "i": 74,
           "start": "2026-09-03T06:15:00.000Z",
           "end": "2026-09-03T06:30:00.000Z",
           "localDate": "2026-09-03",
@@ -3315,11 +3276,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 52,
-          "netBeforeFlexW": 62,
-          "importBeforeFlexW": 62,
+          "pvForecastW": 51,
+          "netBeforeFlexW": 63,
+          "importBeforeFlexW": 63,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -3336,7 +3297,7 @@
           }
         },
         {
-          "i": 76,
+          "i": 75,
           "start": "2026-09-03T06:30:00.000Z",
           "end": "2026-09-03T06:45:00.000Z",
           "localDate": "2026-09-03",
@@ -3362,11 +3323,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 61,
-          "netBeforeFlexW": 788,
-          "importBeforeFlexW": 788,
+          "pvForecastW": 59,
+          "netBeforeFlexW": 790,
+          "importBeforeFlexW": 790,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -3383,7 +3344,7 @@
           }
         },
         {
-          "i": 77,
+          "i": 76,
           "start": "2026-09-03T06:45:00.000Z",
           "end": "2026-09-03T07:00:00.000Z",
           "localDate": "2026-09-03",
@@ -3407,11 +3368,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 96,
-          "netBeforeFlexW": 306,
-          "importBeforeFlexW": 306,
+          "pvForecastW": 93,
+          "netBeforeFlexW": 309,
+          "importBeforeFlexW": 309,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -3428,7 +3389,7 @@
           }
         },
         {
-          "i": 78,
+          "i": 77,
           "start": "2026-09-03T07:00:00.000Z",
           "end": "2026-09-03T07:15:00.000Z",
           "localDate": "2026-09-03",
@@ -3454,11 +3415,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 175,
-          "netBeforeFlexW": 154,
-          "importBeforeFlexW": 154,
+          "pvForecastW": 169,
+          "netBeforeFlexW": 160,
+          "importBeforeFlexW": 160,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -3475,7 +3436,7 @@
           }
         },
         {
-          "i": 79,
+          "i": 78,
           "start": "2026-09-03T07:15:00.000Z",
           "end": "2026-09-03T07:30:00.000Z",
           "localDate": "2026-09-03",
@@ -3501,12 +3462,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 297,
-          "netBeforeFlexW": -83,
+          "pvForecastW": 287,
+          "netBeforeFlexW": -73,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 83,
+          "pvSurplusBeforeFlexW": 73,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -3514,22 +3475,15 @@
           },
           "battery": "HOLD",
           "tesla": "HOLD",
-          "warmWater": "DEADLINE_REQUIRED",
+          "warmWater": "HOLD",
           "targets": {
             "evTargetW": 0,
-            "wwTargetW": 1900,
+            "wwTargetW": 0,
             "batteryTargetW": 0
-          },
-          "warmWaterReason": "PV_PARTIAL_FALLBACK",
-          "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 83,
-          "warmWaterGridRequiredW": 1817,
-          "warmWaterMarginalImportW": 1817,
-          "warmWaterPlanningDate": "2026-09-03",
-          "warmWaterDayRelation": "FUTURE_DAY"
+          }
         },
         {
-          "i": 80,
+          "i": 79,
           "start": "2026-09-03T07:30:00.000Z",
           "end": "2026-09-03T07:45:00.000Z",
           "localDate": "2026-09-03",
@@ -3555,12 +3509,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 420,
-          "netBeforeFlexW": -420,
+          "pvForecastW": 406,
+          "netBeforeFlexW": -406,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 420,
+          "pvSurplusBeforeFlexW": 406,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -3576,14 +3530,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 420,
-          "warmWaterGridRequiredW": 1480,
-          "warmWaterMarginalImportW": 1480,
+          "warmWaterPvCoverageW": 406,
+          "warmWaterGridRequiredW": 1494,
+          "warmWaterMarginalImportW": 1494,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 81,
+          "i": 80,
           "start": "2026-09-03T07:45:00.000Z",
           "end": "2026-09-03T08:00:00.000Z",
           "localDate": "2026-09-03",
@@ -3609,12 +3563,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 516,
-          "netBeforeFlexW": -516,
+          "pvForecastW": 499,
+          "netBeforeFlexW": -499,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 516,
+          "pvSurplusBeforeFlexW": 499,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -3630,14 +3584,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 516,
-          "warmWaterGridRequiredW": 1384,
-          "warmWaterMarginalImportW": 1384,
+          "warmWaterPvCoverageW": 499,
+          "warmWaterGridRequiredW": 1401,
+          "warmWaterMarginalImportW": 1401,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 82,
+          "i": 81,
           "start": "2026-09-03T08:00:00.000Z",
           "end": "2026-09-03T08:15:00.000Z",
           "localDate": "2026-09-03",
@@ -3663,12 +3617,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 568,
-          "netBeforeFlexW": -354,
+          "pvForecastW": 550,
+          "netBeforeFlexW": -336,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 354,
+          "pvSurplusBeforeFlexW": 336,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -3684,14 +3638,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 354,
-          "warmWaterGridRequiredW": 1546,
-          "warmWaterMarginalImportW": 1546,
+          "warmWaterPvCoverageW": 336,
+          "warmWaterGridRequiredW": 1564,
+          "warmWaterMarginalImportW": 1564,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 83,
+          "i": 82,
           "start": "2026-09-03T08:15:00.000Z",
           "end": "2026-09-03T08:30:00.000Z",
           "localDate": "2026-09-03",
@@ -3717,12 +3671,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 603,
-          "netBeforeFlexW": -446,
+          "pvForecastW": 583,
+          "netBeforeFlexW": -426,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 446,
+          "pvSurplusBeforeFlexW": 426,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -3738,14 +3692,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 446,
-          "warmWaterGridRequiredW": 1454,
-          "warmWaterMarginalImportW": 1454,
+          "warmWaterPvCoverageW": 426,
+          "warmWaterGridRequiredW": 1474,
+          "warmWaterMarginalImportW": 1474,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 84,
+          "i": 83,
           "start": "2026-09-03T08:30:00.000Z",
           "end": "2026-09-03T08:45:00.000Z",
           "localDate": "2026-09-03",
@@ -3771,12 +3725,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 664,
-          "netBeforeFlexW": -664,
+          "pvForecastW": 643,
+          "netBeforeFlexW": -643,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 664,
+          "pvSurplusBeforeFlexW": 643,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -3792,14 +3746,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 664,
-          "warmWaterGridRequiredW": 1236,
-          "warmWaterMarginalImportW": 1236,
+          "warmWaterPvCoverageW": 643,
+          "warmWaterGridRequiredW": 1257,
+          "warmWaterMarginalImportW": 1257,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 85,
+          "i": 84,
           "start": "2026-09-03T08:45:00.000Z",
           "end": "2026-09-03T09:00:00.000Z",
           "localDate": "2026-09-03",
@@ -3821,12 +3775,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 778,
-          "netBeforeFlexW": -511,
+          "pvForecastW": 753,
+          "netBeforeFlexW": -485,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 511,
+          "pvSurplusBeforeFlexW": 485,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -3842,14 +3796,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 511,
-          "warmWaterGridRequiredW": 1389,
-          "warmWaterMarginalImportW": 1389,
+          "warmWaterPvCoverageW": 485,
+          "warmWaterGridRequiredW": 1415,
+          "warmWaterMarginalImportW": 1415,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 86,
+          "i": 85,
           "start": "2026-09-03T09:00:00.000Z",
           "end": "2026-09-03T09:15:00.000Z",
           "localDate": "2026-09-03",
@@ -3873,11 +3827,11 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 970,
-          "netBeforeFlexW": 14,
-          "importBeforeFlexW": 14,
+          "pvForecastW": 939,
+          "netBeforeFlexW": 46,
+          "importBeforeFlexW": 46,
           "pvSurplusBeforeFlexW": 0,
           "gridHeadroomW": null,
           "forecastQuality": {
@@ -3894,7 +3848,7 @@
           }
         },
         {
-          "i": 87,
+          "i": 86,
           "start": "2026-09-03T09:15:00.000Z",
           "end": "2026-09-03T09:30:00.000Z",
           "localDate": "2026-09-03",
@@ -3920,12 +3874,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 1189,
-          "netBeforeFlexW": -1189,
+          "pvForecastW": 1150,
+          "netBeforeFlexW": -1150,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1189,
+          "pvSurplusBeforeFlexW": 1150,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -3941,14 +3895,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 1189,
-          "warmWaterGridRequiredW": 711,
-          "warmWaterMarginalImportW": 711,
+          "warmWaterPvCoverageW": 1150,
+          "warmWaterGridRequiredW": 750,
+          "warmWaterMarginalImportW": 750,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 88,
+          "i": 87,
           "start": "2026-09-03T09:30:00.000Z",
           "end": "2026-09-03T09:45:00.000Z",
           "localDate": "2026-09-03",
@@ -3974,12 +3928,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 1390,
-          "netBeforeFlexW": -1390,
+          "pvForecastW": 1344,
+          "netBeforeFlexW": -1344,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1390,
+          "pvSurplusBeforeFlexW": 1344,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -3995,14 +3949,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 1390,
-          "warmWaterGridRequiredW": 510,
-          "warmWaterMarginalImportW": 510,
+          "warmWaterPvCoverageW": 1344,
+          "warmWaterGridRequiredW": 556,
+          "warmWaterMarginalImportW": 556,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 89,
+          "i": 88,
           "start": "2026-09-03T09:45:00.000Z",
           "end": "2026-09-03T10:00:00.000Z",
           "localDate": "2026-09-03",
@@ -4026,12 +3980,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 1512,
-          "netBeforeFlexW": -1512,
+          "pvForecastW": 1463,
+          "netBeforeFlexW": -1463,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1512,
+          "pvSurplusBeforeFlexW": 1463,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4047,14 +4001,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 1512,
-          "warmWaterGridRequiredW": 388,
-          "warmWaterMarginalImportW": 388,
+          "warmWaterPvCoverageW": 1463,
+          "warmWaterGridRequiredW": 437,
+          "warmWaterMarginalImportW": 437,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 90,
+          "i": 89,
           "start": "2026-09-03T10:00:00.000Z",
           "end": "2026-09-03T10:15:00.000Z",
           "localDate": "2026-09-03",
@@ -4078,12 +4032,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 1565,
-          "netBeforeFlexW": -887,
+          "pvForecastW": 1514,
+          "netBeforeFlexW": -836,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 887,
+          "pvSurplusBeforeFlexW": 836,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4099,14 +4053,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 887,
-          "warmWaterGridRequiredW": 1013,
-          "warmWaterMarginalImportW": 1013,
+          "warmWaterPvCoverageW": 836,
+          "warmWaterGridRequiredW": 1064,
+          "warmWaterMarginalImportW": 1064,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 91,
+          "i": 90,
           "start": "2026-09-03T10:15:00.000Z",
           "end": "2026-09-03T10:30:00.000Z",
           "localDate": "2026-09-03",
@@ -4132,12 +4086,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 1565,
-          "netBeforeFlexW": -221,
+          "pvForecastW": 1514,
+          "netBeforeFlexW": -170,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 221,
+          "pvSurplusBeforeFlexW": 170,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4153,14 +4107,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 221,
-          "warmWaterGridRequiredW": 1679,
-          "warmWaterMarginalImportW": 1679,
+          "warmWaterPvCoverageW": 170,
+          "warmWaterGridRequiredW": 1730,
+          "warmWaterMarginalImportW": 1730,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 92,
+          "i": 91,
           "start": "2026-09-03T10:30:00.000Z",
           "end": "2026-09-03T10:45:00.000Z",
           "localDate": "2026-09-03",
@@ -4186,12 +4140,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 1539,
-          "netBeforeFlexW": -1539,
+          "pvForecastW": 1488,
+          "netBeforeFlexW": -1488,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1539,
+          "pvSurplusBeforeFlexW": 1488,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4207,14 +4161,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 1539,
-          "warmWaterGridRequiredW": 361,
-          "warmWaterMarginalImportW": 361,
+          "warmWaterPvCoverageW": 1488,
+          "warmWaterGridRequiredW": 412,
+          "warmWaterMarginalImportW": 412,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 93,
+          "i": 92,
           "start": "2026-09-03T10:45:00.000Z",
           "end": "2026-09-03T11:00:00.000Z",
           "localDate": "2026-09-03",
@@ -4238,12 +4192,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 1478,
-          "netBeforeFlexW": -1478,
+          "pvForecastW": 1429,
+          "netBeforeFlexW": -1429,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1478,
+          "pvSurplusBeforeFlexW": 1429,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4259,14 +4213,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 1478,
-          "warmWaterGridRequiredW": 422,
-          "warmWaterMarginalImportW": 422,
+          "warmWaterPvCoverageW": 1429,
+          "warmWaterGridRequiredW": 471,
+          "warmWaterMarginalImportW": 471,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 94,
+          "i": 93,
           "start": "2026-09-03T11:00:00.000Z",
           "end": "2026-09-03T11:15:00.000Z",
           "localDate": "2026-09-03",
@@ -4288,12 +4242,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 1338,
-          "netBeforeFlexW": -1070,
+          "pvForecastW": 1294,
+          "netBeforeFlexW": -1026,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1070,
+          "pvSurplusBeforeFlexW": 1026,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -4309,14 +4263,14 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 1070,
-          "warmWaterGridRequiredW": 830,
-          "warmWaterMarginalImportW": 830,
+          "warmWaterPvCoverageW": 1026,
+          "warmWaterGridRequiredW": 874,
+          "warmWaterMarginalImportW": 874,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 95,
+          "i": 94,
           "start": "2026-09-03T11:15:00.000Z",
           "end": "2026-09-03T11:30:00.000Z",
           "localDate": "2026-09-03",
@@ -4334,12 +4288,12 @@
             "dryerActiveSamples": 0,
             "globalCleanSampleCount": 150,
             "rejectedHighLoadSamples": 8,
-            "rejectedKnownApplianceSamples": 4
+            "rejectedKnownApplianceSamples": 7
           },
-          "pvForecastW": 1180,
-          "netBeforeFlexW": -913,
+          "pvForecastW": 1142,
+          "netBeforeFlexW": -874,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 913,
+          "pvSurplusBeforeFlexW": 874,
           "gridHeadroomW": null,
           "forecastQuality": {
             "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -4355,9 +4309,55 @@
           },
           "warmWaterReason": "PV_PARTIAL_FALLBACK",
           "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 913,
-          "warmWaterGridRequiredW": 987,
-          "warmWaterMarginalImportW": 987,
+          "warmWaterPvCoverageW": 874,
+          "warmWaterGridRequiredW": 1026,
+          "warmWaterMarginalImportW": 1026,
+          "warmWaterPlanningDate": "2026-09-03",
+          "warmWaterDayRelation": "FUTURE_DAY"
+        },
+        {
+          "i": 95,
+          "start": "2026-09-03T11:30:00.000Z",
+          "end": "2026-09-03T11:45:00.000Z",
+          "localDate": "2026-09-03",
+          "localQuarter": 54,
+          "price_eur_kwh": null,
+          "priceClass": "UNKNOWN",
+          "baseLoadForecastW": 268,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 150,
+            "rejectedHighLoadSamples": 8,
+            "rejectedKnownApplianceSamples": 7
+          },
+          "pvForecastW": 1082,
+          "netBeforeFlexW": -815,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 815,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_CALIBRATED"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "DEADLINE_REQUIRED",
+          "targets": {
+            "evTargetW": 0,
+            "wwTargetW": 1900,
+            "batteryTargetW": 0
+          },
+          "warmWaterReason": "PV_PARTIAL_FALLBACK",
+          "warmWaterAllocatedKWh": 0.475,
+          "warmWaterPvCoverageW": 815,
+          "warmWaterGridRequiredW": 1085,
+          "warmWaterMarginalImportW": 1085,
           "warmWaterPlanningDate": "2026-09-03",
           "warmWaterDayRelation": "FUTURE_DAY"
         }
@@ -4394,53 +4394,6 @@
         "allocatedSlots": [
           {
             "i": 79,
-            "start": "2026-09-03T07:15:00.000Z",
-            "end": "2026-09-03T07:30:00.000Z",
-            "localDate": "2026-09-03",
-            "localQuarter": 37,
-            "price_eur_kwh": null,
-            "priceClass": "UNKNOWN",
-            "baseLoadForecastW": 215,
-            "baseForecastTrace": {
-              "basis": "CLEAN_QUARTER_MEDIAN",
-              "sampleCount": 3,
-              "sampleValuesW": [
-                51,
-                215,
-                1037
-              ],
-              "sampleTimestamps": [
-                "2026-09-02T07:15:00.292Z",
-                "2026-09-02T07:20:00.329Z",
-                "2026-09-02T07:25:00.183Z"
-              ],
-              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-              "washerActiveSamples": 0,
-              "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 150,
-              "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
-            },
-            "pvForecastW": 297,
-            "netBeforeFlexW": -83,
-            "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 83,
-            "gridHeadroomW": null,
-            "forecastQuality": {
-              "baseLoad": "CLEAN_QUARTER_MEDIAN",
-              "pv": "WEATHER_HAUWERT_CALIBRATED"
-            },
-            "planningDate": "2026-09-03",
-            "dayRelation": "FUTURE_DAY",
-            "catchupRequired": false,
-            "allocatedKWh": 0.475,
-            "pvCoverageW": 83,
-            "gridRequiredW": 1817,
-            "marginalImportW": 1817,
-            "allocationReason": "PV_PARTIAL_FALLBACK"
-          },
-          {
-            "i": 80,
             "start": "2026-09-03T07:30:00.000Z",
             "end": "2026-09-03T07:45:00.000Z",
             "localDate": "2026-09-03",
@@ -4466,12 +4419,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 420,
-            "netBeforeFlexW": -420,
+            "pvForecastW": 406,
+            "netBeforeFlexW": -406,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 420,
+            "pvSurplusBeforeFlexW": 406,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4481,13 +4434,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 420,
-            "gridRequiredW": 1480,
-            "marginalImportW": 1480,
+            "pvCoverageW": 406,
+            "gridRequiredW": 1494,
+            "marginalImportW": 1494,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 81,
+            "i": 80,
             "start": "2026-09-03T07:45:00.000Z",
             "end": "2026-09-03T08:00:00.000Z",
             "localDate": "2026-09-03",
@@ -4513,12 +4466,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 516,
-            "netBeforeFlexW": -516,
+            "pvForecastW": 499,
+            "netBeforeFlexW": -499,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 516,
+            "pvSurplusBeforeFlexW": 499,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4528,13 +4481,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 516,
-            "gridRequiredW": 1384,
-            "marginalImportW": 1384,
+            "pvCoverageW": 499,
+            "gridRequiredW": 1401,
+            "marginalImportW": 1401,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 82,
+            "i": 81,
             "start": "2026-09-03T08:00:00.000Z",
             "end": "2026-09-03T08:15:00.000Z",
             "localDate": "2026-09-03",
@@ -4560,12 +4513,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 568,
-            "netBeforeFlexW": -354,
+            "pvForecastW": 550,
+            "netBeforeFlexW": -336,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 354,
+            "pvSurplusBeforeFlexW": 336,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4575,13 +4528,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 354,
-            "gridRequiredW": 1546,
-            "marginalImportW": 1546,
+            "pvCoverageW": 336,
+            "gridRequiredW": 1564,
+            "marginalImportW": 1564,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 83,
+            "i": 82,
             "start": "2026-09-03T08:15:00.000Z",
             "end": "2026-09-03T08:30:00.000Z",
             "localDate": "2026-09-03",
@@ -4607,12 +4560,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 603,
-            "netBeforeFlexW": -446,
+            "pvForecastW": 583,
+            "netBeforeFlexW": -426,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 446,
+            "pvSurplusBeforeFlexW": 426,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4622,13 +4575,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 446,
-            "gridRequiredW": 1454,
-            "marginalImportW": 1454,
+            "pvCoverageW": 426,
+            "gridRequiredW": 1474,
+            "marginalImportW": 1474,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 84,
+            "i": 83,
             "start": "2026-09-03T08:30:00.000Z",
             "end": "2026-09-03T08:45:00.000Z",
             "localDate": "2026-09-03",
@@ -4654,12 +4607,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 664,
-            "netBeforeFlexW": -664,
+            "pvForecastW": 643,
+            "netBeforeFlexW": -643,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 664,
+            "pvSurplusBeforeFlexW": 643,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4669,13 +4622,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 664,
-            "gridRequiredW": 1236,
-            "marginalImportW": 1236,
+            "pvCoverageW": 643,
+            "gridRequiredW": 1257,
+            "marginalImportW": 1257,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 85,
+            "i": 84,
             "start": "2026-09-03T08:45:00.000Z",
             "end": "2026-09-03T09:00:00.000Z",
             "localDate": "2026-09-03",
@@ -4697,12 +4650,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 778,
-            "netBeforeFlexW": -511,
+            "pvForecastW": 753,
+            "netBeforeFlexW": -485,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 511,
+            "pvSurplusBeforeFlexW": 485,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -4712,13 +4665,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 511,
-            "gridRequiredW": 1389,
-            "marginalImportW": 1389,
+            "pvCoverageW": 485,
+            "gridRequiredW": 1415,
+            "marginalImportW": 1415,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 87,
+            "i": 86,
             "start": "2026-09-03T09:15:00.000Z",
             "end": "2026-09-03T09:30:00.000Z",
             "localDate": "2026-09-03",
@@ -4744,12 +4697,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 1189,
-            "netBeforeFlexW": -1189,
+            "pvForecastW": 1150,
+            "netBeforeFlexW": -1150,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 1189,
+            "pvSurplusBeforeFlexW": 1150,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4759,13 +4712,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 1189,
-            "gridRequiredW": 711,
-            "marginalImportW": 711,
+            "pvCoverageW": 1150,
+            "gridRequiredW": 750,
+            "marginalImportW": 750,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 88,
+            "i": 87,
             "start": "2026-09-03T09:30:00.000Z",
             "end": "2026-09-03T09:45:00.000Z",
             "localDate": "2026-09-03",
@@ -4791,12 +4744,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 1390,
-            "netBeforeFlexW": -1390,
+            "pvForecastW": 1344,
+            "netBeforeFlexW": -1344,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 1390,
+            "pvSurplusBeforeFlexW": 1344,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4806,13 +4759,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 1390,
-            "gridRequiredW": 510,
-            "marginalImportW": 510,
+            "pvCoverageW": 1344,
+            "gridRequiredW": 556,
+            "marginalImportW": 556,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 89,
+            "i": 88,
             "start": "2026-09-03T09:45:00.000Z",
             "end": "2026-09-03T10:00:00.000Z",
             "localDate": "2026-09-03",
@@ -4836,12 +4789,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 1512,
-            "netBeforeFlexW": -1512,
+            "pvForecastW": 1463,
+            "netBeforeFlexW": -1463,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 1512,
+            "pvSurplusBeforeFlexW": 1463,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4851,13 +4804,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 1512,
-            "gridRequiredW": 388,
-            "marginalImportW": 388,
+            "pvCoverageW": 1463,
+            "gridRequiredW": 437,
+            "marginalImportW": 437,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 90,
+            "i": 89,
             "start": "2026-09-03T10:00:00.000Z",
             "end": "2026-09-03T10:15:00.000Z",
             "localDate": "2026-09-03",
@@ -4881,12 +4834,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 1565,
-            "netBeforeFlexW": -887,
+            "pvForecastW": 1514,
+            "netBeforeFlexW": -836,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 887,
+            "pvSurplusBeforeFlexW": 836,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4896,13 +4849,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 887,
-            "gridRequiredW": 1013,
-            "marginalImportW": 1013,
+            "pvCoverageW": 836,
+            "gridRequiredW": 1064,
+            "marginalImportW": 1064,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 91,
+            "i": 90,
             "start": "2026-09-03T10:15:00.000Z",
             "end": "2026-09-03T10:30:00.000Z",
             "localDate": "2026-09-03",
@@ -4928,12 +4881,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 1565,
-            "netBeforeFlexW": -221,
+            "pvForecastW": 1514,
+            "netBeforeFlexW": -170,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 221,
+            "pvSurplusBeforeFlexW": 170,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4943,13 +4896,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 221,
-            "gridRequiredW": 1679,
-            "marginalImportW": 1679,
+            "pvCoverageW": 170,
+            "gridRequiredW": 1730,
+            "marginalImportW": 1730,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 92,
+            "i": 91,
             "start": "2026-09-03T10:30:00.000Z",
             "end": "2026-09-03T10:45:00.000Z",
             "localDate": "2026-09-03",
@@ -4975,12 +4928,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 1539,
-            "netBeforeFlexW": -1539,
+            "pvForecastW": 1488,
+            "netBeforeFlexW": -1488,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 1539,
+            "pvSurplusBeforeFlexW": 1488,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -4990,13 +4943,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 1539,
-            "gridRequiredW": 361,
-            "marginalImportW": 361,
+            "pvCoverageW": 1488,
+            "gridRequiredW": 412,
+            "marginalImportW": 412,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 93,
+            "i": 92,
             "start": "2026-09-03T10:45:00.000Z",
             "end": "2026-09-03T11:00:00.000Z",
             "localDate": "2026-09-03",
@@ -5020,12 +4973,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 1478,
-            "netBeforeFlexW": -1478,
+            "pvForecastW": 1429,
+            "netBeforeFlexW": -1429,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 1478,
+            "pvSurplusBeforeFlexW": 1429,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5035,13 +4988,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 1478,
-            "gridRequiredW": 422,
-            "marginalImportW": 422,
+            "pvCoverageW": 1429,
+            "gridRequiredW": 471,
+            "marginalImportW": 471,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 94,
+            "i": 93,
             "start": "2026-09-03T11:00:00.000Z",
             "end": "2026-09-03T11:15:00.000Z",
             "localDate": "2026-09-03",
@@ -5063,12 +5016,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 1338,
-            "netBeforeFlexW": -1070,
+            "pvForecastW": 1294,
+            "netBeforeFlexW": -1026,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 1070,
+            "pvSurplusBeforeFlexW": 1026,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -5078,13 +5031,13 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 1070,
-            "gridRequiredW": 830,
-            "marginalImportW": 830,
+            "pvCoverageW": 1026,
+            "gridRequiredW": 874,
+            "marginalImportW": 874,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           },
           {
-            "i": 95,
+            "i": 94,
             "start": "2026-09-03T11:15:00.000Z",
             "end": "2026-09-03T11:30:00.000Z",
             "localDate": "2026-09-03",
@@ -5102,12 +5055,12 @@
               "dryerActiveSamples": 0,
               "globalCleanSampleCount": 150,
               "rejectedHighLoadSamples": 8,
-              "rejectedKnownApplianceSamples": 4
+              "rejectedKnownApplianceSamples": 7
             },
-            "pvForecastW": 1180,
-            "netBeforeFlexW": -913,
+            "pvForecastW": 1142,
+            "netBeforeFlexW": -874,
             "importBeforeFlexW": 0,
-            "pvSurplusBeforeFlexW": 913,
+            "pvSurplusBeforeFlexW": 874,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -5117,9 +5070,48 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 913,
-            "gridRequiredW": 987,
-            "marginalImportW": 987,
+            "pvCoverageW": 874,
+            "gridRequiredW": 1026,
+            "marginalImportW": 1026,
+            "allocationReason": "PV_PARTIAL_FALLBACK"
+          },
+          {
+            "i": 95,
+            "start": "2026-09-03T11:30:00.000Z",
+            "end": "2026-09-03T11:45:00.000Z",
+            "localDate": "2026-09-03",
+            "localQuarter": 54,
+            "price_eur_kwh": null,
+            "priceClass": "UNKNOWN",
+            "baseLoadForecastW": 268,
+            "baseForecastTrace": {
+              "basis": "CLEAN_GLOBAL_MEDIAN",
+              "sampleCount": 0,
+              "sampleValuesW": [],
+              "sampleTimestamps": [],
+              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+              "washerActiveSamples": 0,
+              "dryerActiveSamples": 0,
+              "globalCleanSampleCount": 150,
+              "rejectedHighLoadSamples": 8,
+              "rejectedKnownApplianceSamples": 7
+            },
+            "pvForecastW": 1082,
+            "netBeforeFlexW": -815,
+            "importBeforeFlexW": 0,
+            "pvSurplusBeforeFlexW": 815,
+            "gridHeadroomW": null,
+            "forecastQuality": {
+              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+              "pv": "WEATHER_HAUWERT_CALIBRATED"
+            },
+            "planningDate": "2026-09-03",
+            "dayRelation": "FUTURE_DAY",
+            "catchupRequired": false,
+            "allocatedKWh": 0.475,
+            "pvCoverageW": 815,
+            "gridRequiredW": 1085,
+            "marginalImportW": 1085,
             "allocationReason": "PV_PARTIAL_FALLBACK"
           }
         ],
@@ -5158,53 +5150,6 @@
             "allocatedSlots": [
               {
                 "i": 79,
-                "start": "2026-09-03T07:15:00.000Z",
-                "end": "2026-09-03T07:30:00.000Z",
-                "localDate": "2026-09-03",
-                "localQuarter": 37,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
-                "baseLoadForecastW": 215,
-                "baseForecastTrace": {
-                  "basis": "CLEAN_QUARTER_MEDIAN",
-                  "sampleCount": 3,
-                  "sampleValuesW": [
-                    51,
-                    215,
-                    1037
-                  ],
-                  "sampleTimestamps": [
-                    "2026-09-02T07:15:00.292Z",
-                    "2026-09-02T07:20:00.329Z",
-                    "2026-09-02T07:25:00.183Z"
-                  ],
-                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-                  "washerActiveSamples": 0,
-                  "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 150,
-                  "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
-                },
-                "pvForecastW": 297,
-                "netBeforeFlexW": -83,
-                "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 83,
-                "gridHeadroomW": null,
-                "forecastQuality": {
-                  "baseLoad": "CLEAN_QUARTER_MEDIAN",
-                  "pv": "WEATHER_HAUWERT_CALIBRATED"
-                },
-                "planningDate": "2026-09-03",
-                "dayRelation": "FUTURE_DAY",
-                "catchupRequired": false,
-                "allocatedKWh": 0.475,
-                "pvCoverageW": 83,
-                "gridRequiredW": 1817,
-                "marginalImportW": 1817,
-                "allocationReason": "PV_PARTIAL_FALLBACK"
-              },
-              {
-                "i": 80,
                 "start": "2026-09-03T07:30:00.000Z",
                 "end": "2026-09-03T07:45:00.000Z",
                 "localDate": "2026-09-03",
@@ -5230,12 +5175,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 420,
-                "netBeforeFlexW": -420,
+                "pvForecastW": 406,
+                "netBeforeFlexW": -406,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 420,
+                "pvSurplusBeforeFlexW": 406,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5245,13 +5190,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 420,
-                "gridRequiredW": 1480,
-                "marginalImportW": 1480,
+                "pvCoverageW": 406,
+                "gridRequiredW": 1494,
+                "marginalImportW": 1494,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 81,
+                "i": 80,
                 "start": "2026-09-03T07:45:00.000Z",
                 "end": "2026-09-03T08:00:00.000Z",
                 "localDate": "2026-09-03",
@@ -5277,12 +5222,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 516,
-                "netBeforeFlexW": -516,
+                "pvForecastW": 499,
+                "netBeforeFlexW": -499,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 516,
+                "pvSurplusBeforeFlexW": 499,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5292,13 +5237,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 516,
-                "gridRequiredW": 1384,
-                "marginalImportW": 1384,
+                "pvCoverageW": 499,
+                "gridRequiredW": 1401,
+                "marginalImportW": 1401,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 82,
+                "i": 81,
                 "start": "2026-09-03T08:00:00.000Z",
                 "end": "2026-09-03T08:15:00.000Z",
                 "localDate": "2026-09-03",
@@ -5324,12 +5269,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 568,
-                "netBeforeFlexW": -354,
+                "pvForecastW": 550,
+                "netBeforeFlexW": -336,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 354,
+                "pvSurplusBeforeFlexW": 336,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5339,13 +5284,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 354,
-                "gridRequiredW": 1546,
-                "marginalImportW": 1546,
+                "pvCoverageW": 336,
+                "gridRequiredW": 1564,
+                "marginalImportW": 1564,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 83,
+                "i": 82,
                 "start": "2026-09-03T08:15:00.000Z",
                 "end": "2026-09-03T08:30:00.000Z",
                 "localDate": "2026-09-03",
@@ -5371,12 +5316,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 603,
-                "netBeforeFlexW": -446,
+                "pvForecastW": 583,
+                "netBeforeFlexW": -426,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 446,
+                "pvSurplusBeforeFlexW": 426,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5386,13 +5331,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 446,
-                "gridRequiredW": 1454,
-                "marginalImportW": 1454,
+                "pvCoverageW": 426,
+                "gridRequiredW": 1474,
+                "marginalImportW": 1474,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 84,
+                "i": 83,
                 "start": "2026-09-03T08:30:00.000Z",
                 "end": "2026-09-03T08:45:00.000Z",
                 "localDate": "2026-09-03",
@@ -5418,12 +5363,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 664,
-                "netBeforeFlexW": -664,
+                "pvForecastW": 643,
+                "netBeforeFlexW": -643,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 664,
+                "pvSurplusBeforeFlexW": 643,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5433,13 +5378,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 664,
-                "gridRequiredW": 1236,
-                "marginalImportW": 1236,
+                "pvCoverageW": 643,
+                "gridRequiredW": 1257,
+                "marginalImportW": 1257,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 85,
+                "i": 84,
                 "start": "2026-09-03T08:45:00.000Z",
                 "end": "2026-09-03T09:00:00.000Z",
                 "localDate": "2026-09-03",
@@ -5461,12 +5406,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 778,
-                "netBeforeFlexW": -511,
+                "pvForecastW": 753,
+                "netBeforeFlexW": -485,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 511,
+                "pvSurplusBeforeFlexW": 485,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -5476,13 +5421,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 511,
-                "gridRequiredW": 1389,
-                "marginalImportW": 1389,
+                "pvCoverageW": 485,
+                "gridRequiredW": 1415,
+                "marginalImportW": 1415,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 87,
+                "i": 86,
                 "start": "2026-09-03T09:15:00.000Z",
                 "end": "2026-09-03T09:30:00.000Z",
                 "localDate": "2026-09-03",
@@ -5508,12 +5453,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1189,
-                "netBeforeFlexW": -1189,
+                "pvForecastW": 1150,
+                "netBeforeFlexW": -1150,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1189,
+                "pvSurplusBeforeFlexW": 1150,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5523,13 +5468,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1189,
-                "gridRequiredW": 711,
-                "marginalImportW": 711,
+                "pvCoverageW": 1150,
+                "gridRequiredW": 750,
+                "marginalImportW": 750,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 88,
+                "i": 87,
                 "start": "2026-09-03T09:30:00.000Z",
                 "end": "2026-09-03T09:45:00.000Z",
                 "localDate": "2026-09-03",
@@ -5555,12 +5500,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1390,
-                "netBeforeFlexW": -1390,
+                "pvForecastW": 1344,
+                "netBeforeFlexW": -1344,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1390,
+                "pvSurplusBeforeFlexW": 1344,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5570,13 +5515,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1390,
-                "gridRequiredW": 510,
-                "marginalImportW": 510,
+                "pvCoverageW": 1344,
+                "gridRequiredW": 556,
+                "marginalImportW": 556,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 89,
+                "i": 88,
                 "start": "2026-09-03T09:45:00.000Z",
                 "end": "2026-09-03T10:00:00.000Z",
                 "localDate": "2026-09-03",
@@ -5600,12 +5545,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1512,
-                "netBeforeFlexW": -1512,
+                "pvForecastW": 1463,
+                "netBeforeFlexW": -1463,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1512,
+                "pvSurplusBeforeFlexW": 1463,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5615,13 +5560,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1512,
-                "gridRequiredW": 388,
-                "marginalImportW": 388,
+                "pvCoverageW": 1463,
+                "gridRequiredW": 437,
+                "marginalImportW": 437,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 90,
+                "i": 89,
                 "start": "2026-09-03T10:00:00.000Z",
                 "end": "2026-09-03T10:15:00.000Z",
                 "localDate": "2026-09-03",
@@ -5645,12 +5590,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1565,
-                "netBeforeFlexW": -887,
+                "pvForecastW": 1514,
+                "netBeforeFlexW": -836,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 887,
+                "pvSurplusBeforeFlexW": 836,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5660,13 +5605,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 887,
-                "gridRequiredW": 1013,
-                "marginalImportW": 1013,
+                "pvCoverageW": 836,
+                "gridRequiredW": 1064,
+                "marginalImportW": 1064,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 91,
+                "i": 90,
                 "start": "2026-09-03T10:15:00.000Z",
                 "end": "2026-09-03T10:30:00.000Z",
                 "localDate": "2026-09-03",
@@ -5692,12 +5637,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1565,
-                "netBeforeFlexW": -221,
+                "pvForecastW": 1514,
+                "netBeforeFlexW": -170,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 221,
+                "pvSurplusBeforeFlexW": 170,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5707,13 +5652,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 221,
-                "gridRequiredW": 1679,
-                "marginalImportW": 1679,
+                "pvCoverageW": 170,
+                "gridRequiredW": 1730,
+                "marginalImportW": 1730,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 92,
+                "i": 91,
                 "start": "2026-09-03T10:30:00.000Z",
                 "end": "2026-09-03T10:45:00.000Z",
                 "localDate": "2026-09-03",
@@ -5739,12 +5684,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1539,
-                "netBeforeFlexW": -1539,
+                "pvForecastW": 1488,
+                "netBeforeFlexW": -1488,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1539,
+                "pvSurplusBeforeFlexW": 1488,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5754,13 +5699,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1539,
-                "gridRequiredW": 361,
-                "marginalImportW": 361,
+                "pvCoverageW": 1488,
+                "gridRequiredW": 412,
+                "marginalImportW": 412,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 93,
+                "i": 92,
                 "start": "2026-09-03T10:45:00.000Z",
                 "end": "2026-09-03T11:00:00.000Z",
                 "localDate": "2026-09-03",
@@ -5784,12 +5729,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1478,
-                "netBeforeFlexW": -1478,
+                "pvForecastW": 1429,
+                "netBeforeFlexW": -1429,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1478,
+                "pvSurplusBeforeFlexW": 1429,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5799,13 +5744,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1478,
-                "gridRequiredW": 422,
-                "marginalImportW": 422,
+                "pvCoverageW": 1429,
+                "gridRequiredW": 471,
+                "marginalImportW": 471,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 94,
+                "i": 93,
                 "start": "2026-09-03T11:00:00.000Z",
                 "end": "2026-09-03T11:15:00.000Z",
                 "localDate": "2026-09-03",
@@ -5827,12 +5772,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1338,
-                "netBeforeFlexW": -1070,
+                "pvForecastW": 1294,
+                "netBeforeFlexW": -1026,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1070,
+                "pvSurplusBeforeFlexW": 1026,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -5842,13 +5787,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1070,
-                "gridRequiredW": 830,
-                "marginalImportW": 830,
+                "pvCoverageW": 1026,
+                "gridRequiredW": 874,
+                "marginalImportW": 874,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 95,
+                "i": 94,
                 "start": "2026-09-03T11:15:00.000Z",
                 "end": "2026-09-03T11:30:00.000Z",
                 "localDate": "2026-09-03",
@@ -5866,12 +5811,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1180,
-                "netBeforeFlexW": -913,
+                "pvForecastW": 1142,
+                "netBeforeFlexW": -874,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 913,
+                "pvSurplusBeforeFlexW": 874,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -5881,16 +5826,55 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 913,
-                "gridRequiredW": 987,
-                "marginalImportW": 987,
+                "pvCoverageW": 874,
+                "gridRequiredW": 1026,
+                "marginalImportW": 1026,
+                "allocationReason": "PV_PARTIAL_FALLBACK"
+              },
+              {
+                "i": 95,
+                "start": "2026-09-03T11:30:00.000Z",
+                "end": "2026-09-03T11:45:00.000Z",
+                "localDate": "2026-09-03",
+                "localQuarter": 54,
+                "price_eur_kwh": null,
+                "priceClass": "UNKNOWN",
+                "baseLoadForecastW": 268,
+                "baseForecastTrace": {
+                  "basis": "CLEAN_GLOBAL_MEDIAN",
+                  "sampleCount": 0,
+                  "sampleValuesW": [],
+                  "sampleTimestamps": [],
+                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+                  "washerActiveSamples": 0,
+                  "dryerActiveSamples": 0,
+                  "globalCleanSampleCount": 150,
+                  "rejectedHighLoadSamples": 8,
+                  "rejectedKnownApplianceSamples": 7
+                },
+                "pvForecastW": 1082,
+                "netBeforeFlexW": -815,
+                "importBeforeFlexW": 0,
+                "pvSurplusBeforeFlexW": 815,
+                "gridHeadroomW": null,
+                "forecastQuality": {
+                  "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+                  "pv": "WEATHER_HAUWERT_CALIBRATED"
+                },
+                "planningDate": "2026-09-03",
+                "dayRelation": "FUTURE_DAY",
+                "catchupRequired": false,
+                "allocatedKWh": 0.475,
+                "pvCoverageW": 815,
+                "gridRequiredW": 1085,
+                "marginalImportW": 1085,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               }
             ],
             "unallocatedKWh": 0,
             "deferredGridEnergyKWh": 0,
             "deadlineFallbackArmed": true,
-            "deadlineSlackSlots": 38,
+            "deadlineSlackSlots": 39,
             "requiredFallbackSlots": 16,
             "deadlineSafetySlots": 2
           }
@@ -5927,53 +5911,6 @@
             "allocatedSlots": [
               {
                 "i": 79,
-                "start": "2026-09-03T07:15:00.000Z",
-                "end": "2026-09-03T07:30:00.000Z",
-                "localDate": "2026-09-03",
-                "localQuarter": 37,
-                "price_eur_kwh": null,
-                "priceClass": "UNKNOWN",
-                "baseLoadForecastW": 215,
-                "baseForecastTrace": {
-                  "basis": "CLEAN_QUARTER_MEDIAN",
-                  "sampleCount": 3,
-                  "sampleValuesW": [
-                    51,
-                    215,
-                    1037
-                  ],
-                  "sampleTimestamps": [
-                    "2026-09-02T07:15:00.292Z",
-                    "2026-09-02T07:20:00.329Z",
-                    "2026-09-02T07:25:00.183Z"
-                  ],
-                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-                  "washerActiveSamples": 0,
-                  "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 150,
-                  "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
-                },
-                "pvForecastW": 297,
-                "netBeforeFlexW": -83,
-                "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 83,
-                "gridHeadroomW": null,
-                "forecastQuality": {
-                  "baseLoad": "CLEAN_QUARTER_MEDIAN",
-                  "pv": "WEATHER_HAUWERT_CALIBRATED"
-                },
-                "planningDate": "2026-09-03",
-                "dayRelation": "FUTURE_DAY",
-                "catchupRequired": false,
-                "allocatedKWh": 0.475,
-                "pvCoverageW": 83,
-                "gridRequiredW": 1817,
-                "marginalImportW": 1817,
-                "allocationReason": "PV_PARTIAL_FALLBACK"
-              },
-              {
-                "i": 80,
                 "start": "2026-09-03T07:30:00.000Z",
                 "end": "2026-09-03T07:45:00.000Z",
                 "localDate": "2026-09-03",
@@ -5999,12 +5936,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 420,
-                "netBeforeFlexW": -420,
+                "pvForecastW": 406,
+                "netBeforeFlexW": -406,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 420,
+                "pvSurplusBeforeFlexW": 406,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6014,13 +5951,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 420,
-                "gridRequiredW": 1480,
-                "marginalImportW": 1480,
+                "pvCoverageW": 406,
+                "gridRequiredW": 1494,
+                "marginalImportW": 1494,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 81,
+                "i": 80,
                 "start": "2026-09-03T07:45:00.000Z",
                 "end": "2026-09-03T08:00:00.000Z",
                 "localDate": "2026-09-03",
@@ -6046,12 +5983,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 516,
-                "netBeforeFlexW": -516,
+                "pvForecastW": 499,
+                "netBeforeFlexW": -499,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 516,
+                "pvSurplusBeforeFlexW": 499,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6061,13 +5998,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 516,
-                "gridRequiredW": 1384,
-                "marginalImportW": 1384,
+                "pvCoverageW": 499,
+                "gridRequiredW": 1401,
+                "marginalImportW": 1401,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 82,
+                "i": 81,
                 "start": "2026-09-03T08:00:00.000Z",
                 "end": "2026-09-03T08:15:00.000Z",
                 "localDate": "2026-09-03",
@@ -6093,12 +6030,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 568,
-                "netBeforeFlexW": -354,
+                "pvForecastW": 550,
+                "netBeforeFlexW": -336,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 354,
+                "pvSurplusBeforeFlexW": 336,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6108,13 +6045,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 354,
-                "gridRequiredW": 1546,
-                "marginalImportW": 1546,
+                "pvCoverageW": 336,
+                "gridRequiredW": 1564,
+                "marginalImportW": 1564,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 83,
+                "i": 82,
                 "start": "2026-09-03T08:15:00.000Z",
                 "end": "2026-09-03T08:30:00.000Z",
                 "localDate": "2026-09-03",
@@ -6140,12 +6077,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 603,
-                "netBeforeFlexW": -446,
+                "pvForecastW": 583,
+                "netBeforeFlexW": -426,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 446,
+                "pvSurplusBeforeFlexW": 426,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6155,13 +6092,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 446,
-                "gridRequiredW": 1454,
-                "marginalImportW": 1454,
+                "pvCoverageW": 426,
+                "gridRequiredW": 1474,
+                "marginalImportW": 1474,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 84,
+                "i": 83,
                 "start": "2026-09-03T08:30:00.000Z",
                 "end": "2026-09-03T08:45:00.000Z",
                 "localDate": "2026-09-03",
@@ -6187,12 +6124,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 664,
-                "netBeforeFlexW": -664,
+                "pvForecastW": 643,
+                "netBeforeFlexW": -643,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 664,
+                "pvSurplusBeforeFlexW": 643,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6202,13 +6139,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 664,
-                "gridRequiredW": 1236,
-                "marginalImportW": 1236,
+                "pvCoverageW": 643,
+                "gridRequiredW": 1257,
+                "marginalImportW": 1257,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 85,
+                "i": 84,
                 "start": "2026-09-03T08:45:00.000Z",
                 "end": "2026-09-03T09:00:00.000Z",
                 "localDate": "2026-09-03",
@@ -6230,12 +6167,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 778,
-                "netBeforeFlexW": -511,
+                "pvForecastW": 753,
+                "netBeforeFlexW": -485,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 511,
+                "pvSurplusBeforeFlexW": 485,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -6245,13 +6182,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 511,
-                "gridRequiredW": 1389,
-                "marginalImportW": 1389,
+                "pvCoverageW": 485,
+                "gridRequiredW": 1415,
+                "marginalImportW": 1415,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 87,
+                "i": 86,
                 "start": "2026-09-03T09:15:00.000Z",
                 "end": "2026-09-03T09:30:00.000Z",
                 "localDate": "2026-09-03",
@@ -6277,12 +6214,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1189,
-                "netBeforeFlexW": -1189,
+                "pvForecastW": 1150,
+                "netBeforeFlexW": -1150,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1189,
+                "pvSurplusBeforeFlexW": 1150,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6292,13 +6229,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1189,
-                "gridRequiredW": 711,
-                "marginalImportW": 711,
+                "pvCoverageW": 1150,
+                "gridRequiredW": 750,
+                "marginalImportW": 750,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 88,
+                "i": 87,
                 "start": "2026-09-03T09:30:00.000Z",
                 "end": "2026-09-03T09:45:00.000Z",
                 "localDate": "2026-09-03",
@@ -6324,12 +6261,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1390,
-                "netBeforeFlexW": -1390,
+                "pvForecastW": 1344,
+                "netBeforeFlexW": -1344,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1390,
+                "pvSurplusBeforeFlexW": 1344,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6339,13 +6276,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1390,
-                "gridRequiredW": 510,
-                "marginalImportW": 510,
+                "pvCoverageW": 1344,
+                "gridRequiredW": 556,
+                "marginalImportW": 556,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 89,
+                "i": 88,
                 "start": "2026-09-03T09:45:00.000Z",
                 "end": "2026-09-03T10:00:00.000Z",
                 "localDate": "2026-09-03",
@@ -6369,12 +6306,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1512,
-                "netBeforeFlexW": -1512,
+                "pvForecastW": 1463,
+                "netBeforeFlexW": -1463,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1512,
+                "pvSurplusBeforeFlexW": 1463,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6384,13 +6321,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1512,
-                "gridRequiredW": 388,
-                "marginalImportW": 388,
+                "pvCoverageW": 1463,
+                "gridRequiredW": 437,
+                "marginalImportW": 437,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 90,
+                "i": 89,
                 "start": "2026-09-03T10:00:00.000Z",
                 "end": "2026-09-03T10:15:00.000Z",
                 "localDate": "2026-09-03",
@@ -6414,12 +6351,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1565,
-                "netBeforeFlexW": -887,
+                "pvForecastW": 1514,
+                "netBeforeFlexW": -836,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 887,
+                "pvSurplusBeforeFlexW": 836,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6429,13 +6366,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 887,
-                "gridRequiredW": 1013,
-                "marginalImportW": 1013,
+                "pvCoverageW": 836,
+                "gridRequiredW": 1064,
+                "marginalImportW": 1064,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 91,
+                "i": 90,
                 "start": "2026-09-03T10:15:00.000Z",
                 "end": "2026-09-03T10:30:00.000Z",
                 "localDate": "2026-09-03",
@@ -6461,12 +6398,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1565,
-                "netBeforeFlexW": -221,
+                "pvForecastW": 1514,
+                "netBeforeFlexW": -170,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 221,
+                "pvSurplusBeforeFlexW": 170,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6476,13 +6413,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 221,
-                "gridRequiredW": 1679,
-                "marginalImportW": 1679,
+                "pvCoverageW": 170,
+                "gridRequiredW": 1730,
+                "marginalImportW": 1730,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 92,
+                "i": 91,
                 "start": "2026-09-03T10:30:00.000Z",
                 "end": "2026-09-03T10:45:00.000Z",
                 "localDate": "2026-09-03",
@@ -6508,12 +6445,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1539,
-                "netBeforeFlexW": -1539,
+                "pvForecastW": 1488,
+                "netBeforeFlexW": -1488,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1539,
+                "pvSurplusBeforeFlexW": 1488,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6523,13 +6460,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1539,
-                "gridRequiredW": 361,
-                "marginalImportW": 361,
+                "pvCoverageW": 1488,
+                "gridRequiredW": 412,
+                "marginalImportW": 412,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 93,
+                "i": 92,
                 "start": "2026-09-03T10:45:00.000Z",
                 "end": "2026-09-03T11:00:00.000Z",
                 "localDate": "2026-09-03",
@@ -6553,12 +6490,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1478,
-                "netBeforeFlexW": -1478,
+                "pvForecastW": 1429,
+                "netBeforeFlexW": -1429,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1478,
+                "pvSurplusBeforeFlexW": 1429,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -6568,13 +6505,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1478,
-                "gridRequiredW": 422,
-                "marginalImportW": 422,
+                "pvCoverageW": 1429,
+                "gridRequiredW": 471,
+                "marginalImportW": 471,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 94,
+                "i": 93,
                 "start": "2026-09-03T11:00:00.000Z",
                 "end": "2026-09-03T11:15:00.000Z",
                 "localDate": "2026-09-03",
@@ -6596,12 +6533,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1338,
-                "netBeforeFlexW": -1070,
+                "pvForecastW": 1294,
+                "netBeforeFlexW": -1026,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 1070,
+                "pvSurplusBeforeFlexW": 1026,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -6611,13 +6548,13 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 1070,
-                "gridRequiredW": 830,
-                "marginalImportW": 830,
+                "pvCoverageW": 1026,
+                "gridRequiredW": 874,
+                "marginalImportW": 874,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               },
               {
-                "i": 95,
+                "i": 94,
                 "start": "2026-09-03T11:15:00.000Z",
                 "end": "2026-09-03T11:30:00.000Z",
                 "localDate": "2026-09-03",
@@ -6635,12 +6572,12 @@
                   "dryerActiveSamples": 0,
                   "globalCleanSampleCount": 150,
                   "rejectedHighLoadSamples": 8,
-                  "rejectedKnownApplianceSamples": 4
+                  "rejectedKnownApplianceSamples": 7
                 },
-                "pvForecastW": 1180,
-                "netBeforeFlexW": -913,
+                "pvForecastW": 1142,
+                "netBeforeFlexW": -874,
                 "importBeforeFlexW": 0,
-                "pvSurplusBeforeFlexW": 913,
+                "pvSurplusBeforeFlexW": 874,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_GLOBAL_MEDIAN",
@@ -6650,16 +6587,55 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 913,
-                "gridRequiredW": 987,
-                "marginalImportW": 987,
+                "pvCoverageW": 874,
+                "gridRequiredW": 1026,
+                "marginalImportW": 1026,
+                "allocationReason": "PV_PARTIAL_FALLBACK"
+              },
+              {
+                "i": 95,
+                "start": "2026-09-03T11:30:00.000Z",
+                "end": "2026-09-03T11:45:00.000Z",
+                "localDate": "2026-09-03",
+                "localQuarter": 54,
+                "price_eur_kwh": null,
+                "priceClass": "UNKNOWN",
+                "baseLoadForecastW": 268,
+                "baseForecastTrace": {
+                  "basis": "CLEAN_GLOBAL_MEDIAN",
+                  "sampleCount": 0,
+                  "sampleValuesW": [],
+                  "sampleTimestamps": [],
+                  "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+                  "washerActiveSamples": 0,
+                  "dryerActiveSamples": 0,
+                  "globalCleanSampleCount": 150,
+                  "rejectedHighLoadSamples": 8,
+                  "rejectedKnownApplianceSamples": 7
+                },
+                "pvForecastW": 1082,
+                "netBeforeFlexW": -815,
+                "importBeforeFlexW": 0,
+                "pvSurplusBeforeFlexW": 815,
+                "gridHeadroomW": null,
+                "forecastQuality": {
+                  "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+                  "pv": "WEATHER_HAUWERT_CALIBRATED"
+                },
+                "planningDate": "2026-09-03",
+                "dayRelation": "FUTURE_DAY",
+                "catchupRequired": false,
+                "allocatedKWh": 0.475,
+                "pvCoverageW": 815,
+                "gridRequiredW": 1085,
+                "marginalImportW": 1085,
                 "allocationReason": "PV_PARTIAL_FALLBACK"
               }
             ],
             "unallocatedKWh": 0,
             "deferredGridEnergyKWh": 0,
             "deadlineFallbackArmed": true,
-            "deadlineSlackSlots": 38,
+            "deadlineSlackSlots": 39,
             "requiredFallbackSlots": 16,
             "deadlineSafetySlots": 2
           }
@@ -6704,25 +6680,25 @@
             "netValuePerGridKWh": 0.1175
           },
           {
-            "chargeStart": "2026-09-02T11:30:00.000Z",
-            "dischargeStart": "2026-09-02T18:45:00.000Z",
-            "chargePrice": 0.1015,
-            "dischargePrice": 0.2397,
-            "netValuePerGridKWh": 0.1148
-          },
-          {
             "chargeStart": "2026-09-02T13:00:00.000Z",
-            "dischargeStart": "2026-09-02T19:30:00.000Z",
+            "dischargeStart": "2026-09-02T18:45:00.000Z",
             "chargePrice": 0.104,
-            "dischargePrice": 0.2348,
-            "netValuePerGridKWh": 0.1079
+            "dischargePrice": 0.2397,
+            "netValuePerGridKWh": 0.1123
           },
           {
             "chargeStart": "2026-09-02T13:15:00.000Z",
-            "dischargeStart": "2026-09-02T17:45:00.000Z",
+            "dischargeStart": "2026-09-02T19:30:00.000Z",
             "chargePrice": 0.1077,
+            "dischargePrice": 0.2348,
+            "netValuePerGridKWh": 0.1042
+          },
+          {
+            "chargeStart": "2026-09-02T13:45:00.000Z",
+            "dischargeStart": "2026-09-02T17:45:00.000Z",
+            "chargePrice": 0.1114,
             "dischargePrice": 0.2323,
-            "netValuePerGridKWh": 0.102
+            "netValuePerGridKWh": 0.0983
           }
         ],
         "note": "No physical battery dispatch until actual SOC and commissioning constraints are integrated."
@@ -6744,19 +6720,19 @@
   },
   "status": {
     "status": "READY_SHADOW_V0.5.0",
-    "at": "2026-09-02T11:30:45.183Z",
+    "at": "2026-09-02T11:45:45.186Z",
     "version": "EM2_ENERGY_PLAN_24H_V0.5.0",
     "contract": "DYNAMIC",
     "slots": 96,
     "baseQuality": "CLEAN_QUARTER_PROFILE",
     "pvQuality": "WEATHER_HAUWERT_CALIBRATED",
     "pvSource": "OPEN_METEO_HAUWERT",
-    "pvCalibrationPoints": 65,
-    "pvScaleWPerWm2": 8.743,
-    "usableHistory": 162,
+    "pvCalibrationPoints": 68,
+    "pvScaleWPerWm2": 8.456,
+    "usableHistory": 165,
     "cleanHistory": 150,
     "rejectedHighLoad": 8,
-    "rejectedKnownAppliance": 4,
+    "rejectedKnownAppliance": 7,
     "observedBaseBins": 51,
     "slotsWithNetForecast": 96,
     "traceableBaseLoad": true,
