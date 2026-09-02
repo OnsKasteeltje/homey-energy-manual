@@ -12,6 +12,23 @@
 .eh-tooltip-key:before{content:"";display:inline-block;width:10px;height:3px;margin-right:6px;vertical-align:middle;background:currentColor}
 .eh-tooltip-key.pv{color:#f4c21f}.eh-tooltip-key.home{color:#3da5ff}.eh-tooltip-key.import{color:#bf6cff}.eh-tooltip-key.export{color:#74d42d}.eh-tooltip-key.battery{color:#31d0c6}
 
+/* Dense day charts must fit the visible panel instead of creating a wider
+   intrinsic SVG canvas inside the horizontal scroll wrapper. If the child is
+   wider than the wrapper, the final ~15% of the day (including the last tick)
+   sits off-screen even though all samples are present. */
+#energy-history-dashboard .eh-chart-interactive[data-unit="W"]{
+  box-sizing:border-box;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+#energy-history-dashboard .eh-chart-interactive[data-unit="W"] .eh-chart{
+  box-sizing:border-box;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+
 @media(max-width:760px){
   #energy-history-dashboard .eh-chart-wrap{
     box-sizing:border-box;
