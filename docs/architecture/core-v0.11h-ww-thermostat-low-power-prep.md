@@ -13,6 +13,7 @@ On 2026-09-02 the boiler was still physically heating at roughly 1.9–2.0 kW wh
 In v0.11g, low measured power is not part of `thermostatVerifyBaseEligible`. As a result, the verification branch precedes and masks `PLANNER_SLOT_END`, `WAIT_PRICE`, or `WAIT_IMPORT` while the element may still be drawing ~1900 W.
 
 Exact runtime baseline: `src/homey/core/core-v0.11g.live-homey.js` from immutable commit `bd4edecc219c035399a18671429c2cf24eaea1be`.
+The exact baseline blob is pinned as `0bdd1fd7228cddcd2c5331df1dbbcfcaa3aab715`.
 
 ## Candidate v0.11h rule
 
@@ -29,6 +30,21 @@ The surgical change is restricted to thermostat-verification semantics:
 
 The candidate must not change the 15-minute PV run-lock, 30-minute price run-lock, catch-up MUST policy, post-goal policy, mode switch semantics, 19:00 hard stop, P1 freshness rules, planner compatibility, Tesla logic, actuator/adapters, or the `EM2_CONTROL_WW_V0.11` downstream schema.
 
+## Deterministic materialization outside Homey
+
+`src/homey/core/tools/materialize-core-v0.11h.sh` creates the candidate from the immutable v0.11g commit plus the checked-in surgical patch. It first verifies the pinned Git blob, then applies the patch in a temporary worktree and only then emits `src/homey/core/core-v0.11h.candidate-homey.js`. The generated candidate is intentionally **not committed yet**; this prevents an unvalidated hand-edited full Core source from becoming the deployment artifact.
+
+The PR-only workflow `.github/workflows/core-v0.11h-prep-validation.yml` is read-only with respect to repository contents and performs, outside Homey:
+
+- immutable baseline/blob verification;
+- deterministic candidate materialization;
+- JavaScript syntax validation with `node --check`;
+- the WW thermostat regression matrix;
+- a generated-only check so the candidate cannot accidentally be committed before review;
+- a unified v0.11g→v0.11h diff containing the required low-power gate markers.
+
+Only after this workflow and manual diff review pass should the generated full candidate be pinned as the immutable deployment source.
+
 ## Offline acceptance matrix
 
 The regression harness `src/homey/core/tests/core-v0.11h-ww-thermostat-regression.js` must pass all cases before any Homey edit. Critical cases are:
@@ -44,10 +60,11 @@ The regression harness `src/homey/core/tests/core-v0.11h-ww-thermostat-regressio
 Do not modify the current Homey Core until all of the following are true:
 
 - exact v0.11g baseline and candidate diff have been reviewed;
-- offline regression passes;
+- deterministic materialization has succeeded from the pinned baseline blob;
+- JavaScript syntax validation and offline regression pass;
 - only the intended WW thermostat-verification lines differ aside from version/diagnostic metadata;
 - candidate source is pinned to an immutable Git commit;
 - rollback source and current Homey flow configuration are recorded;
 - explicit deployment approval is given.
 
-When deployment is eventually approved, replace the Core code as one reviewed unit; do not live-edit individual fragments in Homey. After deployment, first observe a normal PV run and its natural run-lock without inducing a test load. A genuine low-power thermostat event should still be allowed to latch the daily goal. No actuator, adapter, or planner change is part of this patch.
+When deployment is eventually approved, replace the Core code as one reviewed unit; do not live-edit individual fragments in Homey. After deployment, first observe a normal PV run and its natural run-lock without inducing a test load. A genuine low-power thermostat event should still be allowed to latch the daily goal. No actuator, adapter or planner change is part of this patch.
