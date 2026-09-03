@@ -1,11 +1,10 @@
 // EM v2 | 82 Observability | EV Telemetry Mismatch Guard v0.1 SHADOW
-// PREPARED ONLY — NOT DEPLOYED.
+// HOMEY PREPARED — DISABLED / NOT RUN.
 // Logic-only runtime. Reads the existing EM2_State document; performs no device reads and no physical writes.
-// Deployment requires provisioning EM2_EV_Telemetry_Health once and replacing HEALTH_VAR_ID below.
 
 const VERSION='EM2_EV_TELEMETRY_HEALTH_V0.1';
 const STATE_VAR_ID='8e1efbb0-7999-494c-9429-7d274afacd79';
-const HEALTH_VAR_ID='__PROVISION_EM2_EV_Telemetry_Health__';
+const HEALTH_VAR_ID='db467a16-7d23-4033-af96-42a69b932a2b';
 
 const REQUIRED_COUNT=2;
 const MIN_GRID_IMPORT_W=4000;
