@@ -9,7 +9,9 @@ const HEALTH_VAR_ID='db467a16-7d23-4033-af96-42a69b932a2b';
 const REQUIRED_COUNT=2;
 const MIN_GRID_IMPORT_W=4000;
 const MIN_PHASE_A=5;
-const MAX_PHASE_SPREAD_A=2;
+// Tightened from 2.0 A to 1.0 A after offline replay of post-Quatt P1 history (2025-04-01..2026-08-31).
+// The tighter spread roughly halves historical candidate intervals while still covering the 2026-09-03 ~3x16 A incident signature.
+const MAX_PHASE_SPREAD_A=1;
 const STATE_FRESH_MS=7*60*1000; // allows one 5-minute Core interval plus margin
 
 const parse=x=>{try{return JSON.parse(String(x??''));}catch{return null;}};
