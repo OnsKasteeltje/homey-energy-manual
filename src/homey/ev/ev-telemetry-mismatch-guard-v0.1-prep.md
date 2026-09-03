@@ -1,6 +1,6 @@
 # EV Telemetry Mismatch Guard v0.1 — SHADOW PREP
 
-Status: **SHADOW IMPLEMENTATION PREPARED / NOT DEPLOYED**  
+Status: **HOMEY PREP PASS / DISABLED / NOT RUN**  
 Date: 2026-09-03  
 Target branch: `main`  
 Physical writes: **none**
@@ -19,18 +19,31 @@ The current Homey runtime was read directly on 2026-09-03.
 - `EM v2 | 80 Validation | EV Power Adapter Gate v0.2.1 TARGETED-READ` is `enabled=true`, `broken=false` and remains Logic-only validation.
 - Exact current runtime captures were synchronized to GitHub before this SHADOW implementation was prepared.
 
+## Homey preparation completed
+
+The output Logic variable now exists:
+
+- name: `EM2_EV_Telemetry_Health`
+- type: `string`
+- stable Logic ID: `db467a16-7d23-4033-af96-42a69b932a2b`
+
+The disabled Advanced Flow now exists:
+
+- name: `EM v2 | 82 Observability | EV Telemetry Mismatch Guard v0.1 SHADOW`
+- flow ID: `18a99261-421c-4c5f-a771-36a626b7496a`
+- `enabled=false`
+- `broken=false`
+- trigger: `EM2_State` changed
+- manual Start path exists for controlled future validation
+- the flow has **not been started**
+
+The runtime source in `src/homey/ev/ev-telemetry-mismatch-guard-v0.1-shadow.js` is bound to the stable Logic ID above.
+
+A temporary one-shot provisioning/readback flow was used because the Homey connector does not expose direct Logic-variable creation/readback. It is disabled. The temporary GitHub ID-readback artifact was deleted immediately after the ID was confirmed. No device or physical writes occurred during provisioning/readback.
+
 ## Design refinement: reuse EM2_State
 
-The first proposal considered new direct P1 and Easee reads. That is unnecessary and would add avoidable Homey load.
-
-Current Core already performs targeted reads of both P1 and Easee and publishes the relevant values together in `EM2_State`, including:
-
-- P1 total power and L1/L2/L3 current;
-- Tesla/Easee measured power;
-- Tesla/Easee requested current;
-- Tesla/Easee phase currents;
-- charger state;
-- charger cumulative meter value.
+Current Core already performs targeted reads of both P1 and Easee and publishes the relevant values together in `EM2_State`, including P1 total power and L1/L2/L3 current plus Tesla/Easee measured power, requested current, phase currents, charger state and cumulative meter value.
 
 Therefore v0.1 reads only the existing `EM2_State` Logic variable plus its own previous health document. It performs **zero device reads** and **zero physical writes**.
 
@@ -40,28 +53,7 @@ Prepared runtime source:
 
 ## Output contract
 
-Proposed Logic variable: `EM2_EV_Telemetry_Health`.
-
-```json
-{
-  "schema": "EM2_EV_TELEMETRY_HEALTH_V0.1",
-  "sampledAt": "<ISO-8601>",
-  "sourceStateSampledAt": "<ISO-8601>",
-  "sourceStateRevision": 0,
-  "status": "OK | MISMATCH | UNKNOWN",
-  "reason": "...",
-  "controlSafe": true,
-  "observabilityOnly": true,
-  "controlImpact": "NONE",
-  "p1": {},
-  "easee": {},
-  "persistence": {},
-  "thresholds": {},
-  "physicalWritePerformed": false
-}
-```
-
-`controlSafe=false` whenever status is not `OK`. In v0.1 that is **observability only** and has no effect on the live gate or actuator.
+`EM2_EV_Telemetry_Health` uses schema `EM2_EV_TELEMETRY_HEALTH_V0.1` with status `OK | MISMATCH | UNKNOWN`, a reason, `controlSafe`, source-state metadata, P1/Easee evidence, persistence counters and thresholds. `controlSafe=false` whenever status is not `OK`. In v0.1 this remains **observability only** and has no effect on the live gate or actuator.
 
 ## Mismatch signature
 
@@ -75,7 +67,7 @@ AND L3 >= 5 A
 AND max(L1,L2,L3) - min(L1,L2,L3) <= 2 A
 ```
 
-Contradiction requires the physical signature plus Easee-side evidence claiming no active charge, initially one of:
+Contradiction requires that physical signature plus Easee-side evidence claiming no active charge:
 
 ```text
 chargeState in plugged_out/disconnected/unplugged/idle
@@ -91,13 +83,13 @@ Easee measured power <= 100 W and all available Easee phase currents < 1 A
 - second consecutive contradictory sample -> `MISMATCH`;
 - recovery from an established mismatch also requires 2 consecutive consistent samples;
 - stale/invalid source state -> `UNKNOWN / INPUT_INVALID`;
-- source-state freshness limit in the prepared SHADOW is 7 minutes, matching the current 5-minute Core cadence with margin.
+- source-state freshness limit is 7 minutes, matching the current 5-minute Core cadence with margin.
 
-The initial v0.1 thresholds are deliberately conservative and must be validated before any control integration.
+The thresholds remain deliberately conservative and must be validated before any control integration.
 
 ## Homey load properties
 
-Steady-state guard execution is intended to use only:
+Steady-state guard execution is designed as:
 
 ```text
 1 targeted Logic read: EM2_State
@@ -109,13 +101,7 @@ Steady-state guard execution is intended to use only:
 <=1 Logic update, semantic-change only
 ```
 
-A one-time provisioning step is still required to create `EM2_EV_Telemetry_Health` and capture its stable Logic ID. The prepared runtime contains an explicit placeholder for that ID and therefore cannot be accidentally deployed as-is.
-
-## Trigger proposal
-
-Preferred trigger is event-driven on `EM2_State` change. Do not add a separate high-frequency timer. The guard must settle only after the Core state publication and must not fan out directly from raw P1 events.
-
-Because current Core applies semantic dedup to state writes, this is suitable for contradiction detection: meaningful P1/Tesla state changes generate a state mutation, while timestamp-only heartbeats do not create needless EV guard churn.
+Preferred runtime trigger is event-driven on `EM2_State` change. No separate high-frequency timer is used.
 
 ## Architectural finding
 
@@ -125,53 +111,42 @@ The existing architecture already requires requested, commanded and confirmed ac
 
 ## Future gate integration — only after SHADOW validation
 
-After v0.1 evidence is proven:
-
 ```text
 Telemetry Health OK       -> existing EV gate rules apply
 Telemetry Health UNKNOWN  -> no new positive EV command; physical state remains UNKNOWN
 Telemetry Health MISMATCH -> no new positive EV command; raise control-degraded state
 ```
 
-Do not automatically claim `EV_OFF` after a zero-current command while telemetry health is not OK.
-
-Any future physical stop/fail-safe action requires separate proof that the chosen Easee command actually removes the physical load at P1. That remains outside v0.1.
+Do not automatically claim `EV_OFF` after a zero-current command while telemetry health is not OK. Any future physical stop/fail-safe action requires separate proof that the chosen Easee command actually removes the physical load at P1. That remains outside v0.1.
 
 ## Validation plan
 
 ### Test A — normal unplugged
-
 Low/non-EV P1 load; Easee inactive. Expected: `OK`, no physical write.
 
 ### Test B — normal charging with healthy telemetry
-
 Balanced three-phase P1 load and Easee charge telemetry consistent with charging. Expected: `OK`, no physical write.
 
 ### Test C — reproduce 2026-09-03 mismatch
-
 Persistent EV-like P1 load while Easee reports inactive/zero. Expected: first sample `UNKNOWN`, second sample `MISMATCH`, no physical write.
 
 ### Test D — unrelated large load
-
 High household load without balanced three-phase signature. Expected: no Tesla assertion and no false mismatch.
 
 ### Test E — recovery
-
 Easee telemetry becomes consistent again. Expected: two consistent samples required to clear an established mismatch.
 
-## Deployment gate
+## Deployment/validation gate
 
-Before Homey deployment:
+Before enabling the Homey SHADOW flow:
 
-1. provision `EM2_EV_Telemetry_Health` once and insert its stable Logic ID;
-2. review thresholds against historical P1 patterns for obvious false positives;
-3. create one disabled SHADOW Advanced Flow triggered by `EM2_State` change;
-4. verify the flow contains no device write cards and the HomeyScript performs no device writes;
-5. execute tests A–E;
-6. only then consider feeding telemetry health into the existing EV validation gate.
+1. review thresholds against historical P1 patterns for obvious false positives;
+2. re-read the disabled flow and verify no device-write cards and no physical writes in script;
+3. execute tests A–E in controlled SHADOW validation;
+4. only then consider feeding telemetry health into the existing EV validation gate.
 
 ## Current decision
 
-**SHADOW PREP PASS. HOMEY DEPLOYMENT NOT YET PERFORMED.**
+**HOMEY PREP PASS. FLOW DISABLED. NOT RUN. NO CONTROL INTEGRATION.**
 
-The implementation is now aligned to the actual current v0.2.2 actuator/gate runtime and designed to add minimal Homey load.
+The implementation is aligned to the actual current v0.2.2 actuator/gate runtime, bound to stable Logic IDs, and designed to add minimal Homey load.
