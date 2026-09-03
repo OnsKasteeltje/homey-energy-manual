@@ -1,6 +1,6 @@
-# EV Telemetry Mismatch Guard v0.1 — PREP ONLY
+# EV Telemetry Mismatch Guard v0.1 — SHADOW PREP
 
-Status: **PREPARED / NOT DEPLOYED / READ-ONLY FIRST**  
+Status: **SHADOW IMPLEMENTATION PREPARED / NOT DEPLOYED**  
 Date: 2026-09-03  
 Target branch: `main`  
 Physical writes: **none**
@@ -9,74 +9,63 @@ Physical writes: **none**
 
 On 2026-09-03 the Tesla was physically connected to the Easee charger at approximately 21:52 local time. P1 then showed a characteristic three-phase ramp to approximately 11.7 kW (about 3×16 A), while the Homey Easee device continued to report `plugged_out`, `measure_power=0`, phase currents 0 and `target_charger_current=0`. The Easee cumulative energy value also remained unchanged during the observed interval.
 
-This exposes a control-observability gap: the EMS currently has freshness/coherence checks for its own intent/adapter/state/gate documents, but it does not independently prove that charger telemetry is current before interpreting charger state as physical truth.
+This exposes a control-observability gap: the EMS currently has freshness/coherence checks for its own intent/adapter/state/gate documents, but it does not independently detect a physical contradiction between authoritative P1 power and Easee charger telemetry.
 
-## Architectural finding
+## Runtime reconciliation completed
 
-The current EV actuator validates freshness of these EMS documents:
+The current Homey runtime was read directly on 2026-09-03.
 
-- Power Intent;
-- EV adapter output;
-- EM2 State;
-- EV adapter gate.
+- `EM v2 | 60 Actuator | EV Power v0.2.2 TARGETED-READ LIVE OWNERSHIP` is `enabled=true`, `broken=false` and remains the EV physical-write owner.
+- `EM v2 | 80 Validation | EV Power Adapter Gate v0.2.1 TARGETED-READ` is `enabled=true`, `broken=false` and remains Logic-only validation.
+- Exact current runtime captures were synchronized to GitHub before this SHADOW implementation was prepared.
 
-That is necessary but not sufficient. A completely coherent and fresh EMS chain can still consume stale Easee device capabilities.
+## Design refinement: reuse EM2_State
 
-Therefore **charger telemetry health must be a separately modelled input**. `plugged_out`, `0 W`, `0 A` or an API acknowledgement must never by themselves prove that the physical EV load is absent.
+The first proposal considered new direct P1 and Easee reads. That is unnecessary and would add avoidable Homey load.
 
-This follows the existing architecture guardrail that requested, commanded and confirmed actuator state are separate and that API acceptance is not physical confirmation.
+Current Core already performs targeted reads of both P1 and Easee and publishes the relevant values together in `EM2_State`, including:
 
-## Scope of v0.1
+- P1 total power and L1/L2/L3 current;
+- Tesla/Easee measured power;
+- Tesla/Easee requested current;
+- Tesla/Easee phase currents;
+- charger state;
+- charger cumulative meter value.
 
-v0.1 is deliberately observability-only. It must:
+Therefore v0.1 reads only the existing `EM2_State` Logic variable plus its own previous health document. It performs **zero device reads** and **zero physical writes**.
 
-1. read P1 as the authoritative physical grid signal;
-2. read only the required Easee charger capabilities;
-3. detect a persistent contradiction between a plausible three-phase EV load and charger telemetry claiming inactive/unplugged;
-4. publish one compact Logic document, proposed name `EM2_EV_Telemetry_Health`;
-5. perform **no physical charger write**;
-6. avoid high-frequency polling and broad `getDevices()` / `getVariables()` enumeration where targeted access is available;
-7. be idempotent: unchanged health state causes no Logic write.
+Prepared runtime source:
 
-## Proposed output contract
+`src/homey/ev/ev-telemetry-mismatch-guard-v0.1-shadow.js`
+
+## Output contract
+
+Proposed Logic variable: `EM2_EV_Telemetry_Health`.
 
 ```json
 {
   "schema": "EM2_EV_TELEMETRY_HEALTH_V0.1",
   "sampledAt": "<ISO-8601>",
+  "sourceStateSampledAt": "<ISO-8601>",
+  "sourceStateRevision": 0,
   "status": "OK | MISMATCH | UNKNOWN",
-  "reason": "CONSISTENT | P1_EV_LOAD_BUT_EASEE_INACTIVE | INPUT_INVALID",
+  "reason": "...",
   "controlSafe": true,
-  "p1": {
-    "gridW": 0,
-    "l1A": 0,
-    "l2A": 0,
-    "l3A": 0,
-    "evLike3Phase": false
-  },
-  "easee": {
-    "chargerStatus": null,
-    "charging": null,
-    "chargingState": null,
-    "targetA": null,
-    "measureW": null,
-    "lifetimeKWh": null
-  },
-  "persistence": {
-    "candidateCount": 0,
-    "requiredCount": 2
-  },
+  "observabilityOnly": true,
+  "controlImpact": "NONE",
+  "p1": {},
+  "easee": {},
+  "persistence": {},
+  "thresholds": {},
   "physicalWritePerformed": false
 }
 ```
 
-`controlSafe=false` when status is `MISMATCH` or `UNKNOWN` for reasons that prevent trustworthy confirmation of EV physical state.
+`controlSafe=false` whenever status is not `OK`. In v0.1 that is **observability only** and has no effect on the live gate or actuator.
 
-## Initial mismatch signature
+## Mismatch signature
 
-The detector must be conservative. A single high P1 sample is not sufficient.
-
-Candidate EV-like load, initial proposal:
+Candidate EV-like physical load:
 
 ```text
 P1 total import >= 4.0 kW
@@ -86,34 +75,57 @@ AND L3 >= 5 A
 AND max(L1,L2,L3) - min(L1,L2,L3) <= 2 A
 ```
 
-A mismatch candidate exists only when this physical signature is present **and** Easee reports an inactive contradiction such as:
+Contradiction requires the physical signature plus Easee-side evidence claiming no active charge, initially one of:
 
 ```text
-charging == false
-OR chargingState == plugged_out
+chargeState in plugged_out/disconnected/unplugged/idle
+OR
+Easee measured power <= 100 W and all available Easee phase currents < 1 A
 ```
 
-The target-current value is supporting evidence only. `target_charger_current == 0` does not prove the car is physically stopped.
+`requestedA == 0` remains supporting evidence only. It never proves physical stop.
 
-Promote candidate to `MISMATCH` only after at least 2 consecutive low-frequency samples. Clear a mismatch only after at least 2 consecutive consistent samples. Exact cadence is to be selected during Homey load review; v0.1 must not create a high-frequency P1 event fan-out.
+## Persistence / anti-flapping
 
-## Important limitations
+- first contradictory sample -> `UNKNOWN / ...PENDING_CONFIRMATION`;
+- second consecutive contradictory sample -> `MISMATCH`;
+- recovery from an established mismatch also requires 2 consecutive consistent samples;
+- stale/invalid source state -> `UNKNOWN / INPUT_INVALID`;
+- source-state freshness limit in the prepared SHADOW is 7 minutes, matching the current 5-minute Core cadence with margin.
 
-P1 alone cannot prove that the Tesla is the load. The signature means **EV-like balanced three-phase load**, not positive Tesla identification. For that reason v0.1 may raise a telemetry-health fault but must not autonomously execute a destructive or physical corrective action.
+The initial v0.1 thresholds are deliberately conservative and must be validated before any control integration.
 
-A stale Easee integration can also mean that a requested `0 A` or charger-off write is not physically confirmed. Therefore a future control gate must distinguish:
+## Homey load properties
+
+Steady-state guard execution is intended to use only:
 
 ```text
-command requested
-command accepted by API
-physical effect confirmed
+1 targeted Logic read: EM2_State
+1 targeted Logic read: EM2_EV_Telemetry_Health
+0 device reads
+0 Insights reads
+0 network calls
+0 physical writes
+<=1 Logic update, semantic-change only
 ```
 
-and must not treat the first two as equivalent to the third.
+A one-time provisioning step is still required to create `EM2_EV_Telemetry_Health` and capture its stable Logic ID. The prepared runtime contains an explicit placeholder for that ID and therefore cannot be accidentally deployed as-is.
 
-## Future gate integration — after SHADOW validation only
+## Trigger proposal
 
-After v0.1 produces reliable evidence in SHADOW/read-only mode, the EV gate may consume `EM2_EV_Telemetry_Health` with this rule:
+Preferred trigger is event-driven on `EM2_State` change. Do not add a separate high-frequency timer. The guard must settle only after the Core state publication and must not fan out directly from raw P1 events.
+
+Because current Core applies semantic dedup to state writes, this is suitable for contradiction detection: meaningful P1/Tesla state changes generate a state mutation, while timestamp-only heartbeats do not create needless EV guard churn.
+
+## Architectural finding
+
+The live EV actuator validates freshness of Power Intent, EV adapter output, Core State and EV adapter gate. That is necessary but not sufficient. A coherent EMS chain can still coexist with charger telemetry that contradicts physical P1 evidence.
+
+The existing architecture already requires requested, commanded and confirmed actuator state to remain distinct. The new health document fills the missing physical-consistency layer; it does not create another writer.
+
+## Future gate integration — only after SHADOW validation
+
+After v0.1 evidence is proven:
 
 ```text
 Telemetry Health OK       -> existing EV gate rules apply
@@ -121,60 +133,45 @@ Telemetry Health UNKNOWN  -> no new positive EV command; physical state remains 
 Telemetry Health MISMATCH -> no new positive EV command; raise control-degraded state
 ```
 
-Do **not** automatically claim `EV_OFF` after a zero-current command while telemetry health is not OK.
+Do not automatically claim `EV_OFF` after a zero-current command while telemetry health is not OK.
 
-Any future physical stop/fail-safe action requires a separately validated charger control path and explicit confirmation that the chosen Easee command causes physical power to disappear at P1. That is outside v0.1.
+Any future physical stop/fail-safe action requires separate proof that the chosen Easee command actually removes the physical load at P1. That remains outside v0.1.
 
 ## Validation plan
 
 ### Test A — normal unplugged
 
-- Tesla not connected.
-- Low/non-EV P1 load.
-- Easee reports unplugged/inactive.
-- Expected: `OK`, no alert, no physical write.
+Low/non-EV P1 load; Easee inactive. Expected: `OK`, no physical write.
 
 ### Test B — normal charging with healthy telemetry
 
-- Tesla connected and charging.
-- P1 shows balanced three-phase load.
-- Easee reports charging/current/power consistently.
-- Expected: `OK`, no alert, no physical write.
+Balanced three-phase P1 load and Easee charge telemetry consistent with charging. Expected: `OK`, no physical write.
 
 ### Test C — reproduce 2026-09-03 mismatch
 
-- P1 shows persistent EV-like balanced three-phase load.
-- Easee reports `plugged_out` / inactive.
-- Expected: candidate first, then `MISMATCH` after persistence requirement; no physical write.
+Persistent EV-like P1 load while Easee reports inactive/zero. Expected: first sample `UNKNOWN`, second sample `MISMATCH`, no physical write.
 
 ### Test D — unrelated large load
 
-- High household load without balanced EV-like three-phase signature.
-- Expected: no false Tesla assertion; `OK` or `UNKNOWN` depending input validity.
+High household load without balanced three-phase signature. Expected: no Tesla assertion and no false mismatch.
 
 ### Test E — recovery
 
-- Easee telemetry starts matching the physical condition again.
-- Expected: mismatch only clears after persistence requirement; no flapping.
+Easee telemetry becomes consistent again. Expected: two consistent samples required to clear an established mismatch.
 
 ## Deployment gate
 
-Do not deploy to Homey until all of the following are complete:
+Before Homey deployment:
 
-- exact current v0.2.2 EV actuator runtime source is captured/reconciled in GitHub;
-- exact current EV gate and state semantics are reconciled;
-- targeted device-read method and expected Homey load are confirmed;
-- thresholds/cadence have a documented false-positive analysis;
-- SHADOW test A–E can be executed without physical writes.
-
-## Repository reconciliation item discovered during preparation
-
-`docs/architecture/homey-runtime-baseline-2026-08-30.md` identifies `EV Power v0.2.2 TARGETED-READ LIVE OWNERSHIP` as the current EV physical writer, while `src/homey/actuators/ev-power/ev-power-v0.2-live-ownership.runtime.md` is an older 2026-08-28 v0.2.1 capture that records `enabled=false` and uses broad `Homey.logic.getVariables()` / `Homey.devices.getDevices()` access.
-
-This source mismatch must be corrected before using the repository copy as the deployable EV actuator baseline.
+1. provision `EM2_EV_Telemetry_Health` once and insert its stable Logic ID;
+2. review thresholds against historical P1 patterns for obvious false positives;
+3. create one disabled SHADOW Advanced Flow triggered by `EM2_State` change;
+4. verify the flow contains no device write cards and the HomeyScript performs no device writes;
+5. execute tests A–E;
+6. only then consider feeding telemetry health into the existing EV validation gate.
 
 ## Current decision
 
-**PREP PASS. DEPLOYMENT BLOCKED.**
+**SHADOW PREP PASS. HOMEY DEPLOYMENT NOT YET PERFORMED.**
 
-The 2026-09-03 incident is sufficient evidence that charger telemetry freshness/physical confirmation needs its own guard. It is not sufficient evidence to authorize automatic physical stop behavior when Easee telemetry itself is stale.
+The implementation is now aligned to the actual current v0.2.2 actuator/gate runtime and designed to add minimal Homey load.
