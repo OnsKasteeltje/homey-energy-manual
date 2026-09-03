@@ -1,32 +1,29 @@
-# EM v2 | 60 Actuator | EV Power v0.2 LIVE OWNERSHIP
+# EM v2 | 60 Actuator | EV Power v0.2.2 TARGETED-READ LIVE OWNERSHIP
 
 - Homey flow ID: `fea23193-a03f-49dd-9780-7e72ee48747d`
-- Runtime state at capture: `enabled=false`, `broken=false`, `triggerable=true`
+- Runtime state at capture: `enabled=true`, `broken=false`, `triggerable=true`
 - Trigger: `EM2_EV_Adapter_Gate` changed + manual start
-- Capture date: 2026-08-28
-- Status: exact runtime baseline captured; no runtime promotion performed
+- Capture date: 2026-09-03
+- Status: exact current runtime captured from Homey; no runtime mutation performed
 
 ## Runtime HomeyScript
 
 ```js
-// EM v2 | 60 Actuator | EV Power v0.2.1 LIVE OWNERSHIP — gate-driven revision-coherent
+// EM v2 | 60 Actuator | EV Power v0.2.2 TARGETED-READ LIVE OWNERSHIP
+// Gate-driven. Manual Start first normalizes LIVE=false. LIVE=false performs ZERO charger reads/writes.
 const VERSION='EM2_EV_ACTUATOR_V0.2';
 const CHARGER_ID='65ee9fda-9535-44ab-8037-809587bc8f1c';
-const LIVE='EM2_EV_Actuator_Live_Enabled',STATUS='EM2_EV_Actuator_Status';
 const FRESH_MS=120000;
-const vars=await Homey.logic.getVariables();
-const by=Object.fromEntries(Object.values(vars).map(v=>[v.name,v]));
+const IDS={live:'8d47e98d-e4bc-4f47-8c02-c2aca7f7a978',status:'ea1f8a44-2f6c-490e-9b86-bae761886cf9',intent:'04b57041-dd7f-41f7-a00a-f023afb1ccee',adapter:'f2118322-d59d-4aa8-b478-234effc3983c',gate:'4c66836b-77ae-43b5-b8e0-b32af15b57bc',state:'8e1efbb0-7999-494c-9429-7d274afacd79'};
+const [liveVar,statusVar,intentVar,adapterVar,gateVar,stateVar]=await Promise.all([Homey.logic.getVariable({id:IDS.live}),Homey.logic.getVariable({id:IDS.status}),Homey.logic.getVariable({id:IDS.intent}),Homey.logic.getVariable({id:IDS.adapter}),Homey.logic.getVariable({id:IDS.gate}),Homey.logic.getVariable({id:IDS.state})]);
 const parse=x=>{try{return JSON.parse(String(x??''));}catch{return null;}};
 const num=x=>{if(x===null||x===undefined||x==='')return null;const n=Number(x);return Number.isFinite(n)?n:null;};
 const age=x=>{const t=Date.parse(String(x||''));return Number.isFinite(t)?Date.now()-t:Infinity;};
-const ensure=async(name,type,value)=>{let v=by[name];if(!v){v=await Homey.logic.createVariable({variable:{name,type,value}});by[name]=v;}return v;};
-const put=async(name,type,value)=>{const v=await ensure(name,type,value);if(v.value!==value){await Homey.logic.updateVariable({id:v.id,variable:{value}});v.value=value;}};
-const report=async(status,extra={})=>put(STATUS,'string',JSON.stringify({schema:VERSION,status,at:new Date().toISOString(),...extra}));
-const live=await ensure(LIVE,'boolean',false);
-const intent=parse(by.EM2_Power_Intent?.value),adapter=parse(by.EM2_EV_Power_Adapter?.value),gate=parse(by.EM2_EV_Adapter_Gate?.value),state=parse(by.EM2_State?.value);
+const report=async(status,extra={})=>{const value=JSON.stringify({schema:VERSION,status,at:new Date().toISOString(),...extra});if(statusVar.value!==value){await Homey.logic.updateVariable({id:IDS.status,variable:{value}});statusVar.value=value;}};
+const intent=parse(intentVar?.value),adapter=parse(adapterVar?.value),gate=parse(gateVar?.value),state=parse(stateVar?.value);
 const r=num(intent?.sourceRevision),ar=num(adapter?.sourceRevision),sr=num(state?.revision),targetW=num(intent?.targets?.ev?.target_W),requestedA=num(adapter?.command?.requested_A);
 const gateR=num(gate?.sourceRevision),gateIntentR=num(gate?.intentRevision),gateStateR=num(gate?.stateRevision),gateCoreR=num(gate?.coreRevision);
-if(live.value!==true){await report('SHADOW_NO_WRITE',{targetW,requestedA,revision:r,gateRevision:gateR,gateStatus:String(gate?.finalStatus||'UNKNOWN'),live:false,physicalWritePerformed:false});return true;}
+if(liveVar.value!==true){await report('SHADOW_NO_WRITE',{targetW,requestedA,revision:r,gateRevision:gateR,gateStatus:String(gate?.finalStatus||'UNKNOWN'),live:false,physicalWritePerformed:false});return true;}
 let charger=null;
 const getCharger=async()=>{if(charger)return charger;const devices=await Homey.devices.getDevices();charger=devices[CHARGER_ID];if(!charger)throw new Error('CHARGER_MISSING');return charger;};
 const writeA=async a=>{const c=await getCharger();const current=num(c.capabilitiesObj?.target_charger_current?.value);if(current===a)return {write:false,previousA:current};await c.setCapabilityValue('target_charger_current',a);return {write:true,previousA:current};};
@@ -49,3 +46,7 @@ try{
  const w=await writeA(requestedA);await report(w.write?(requestedA===0?'WRITE_ZERO_NORMALIZE':'WRITE_OK'):'NOOP_ALREADY_TARGET',{targetW,targetA:requestedA,previousA:w.previousA,revision:r,gateRevision:gateR,gateStatus:'PASS',live:true,physicalWritePerformed:w.write,ownership:requestedA===0?'NORMALIZE_AUTOSTART_TO_ZERO':'APPLY_POWER_INTENT'});return true;
 }catch(e){try{return await failClosedLive('RUNTIME_EXCEPTION',{error:String(e?.message||e),r,gateR});}catch(_){throw e;}}
 ```
+
+## Reconciliation note
+
+This 2026-09-03 capture supersedes the previous 2026-08-28 v0.2.1 snapshot in this path. The Homey flow itself was only read; no flow or device write was performed during reconciliation.
