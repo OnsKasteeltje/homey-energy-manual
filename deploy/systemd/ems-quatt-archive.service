@@ -1,0 +1,21 @@
+[Unit]
+Description=EMS Quatt Homey Insights Archive
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+Group=jeroen
+Environment=HOME=/home/jeroen
+WorkingDirectory=/home/jeroen/homey-energy-manual
+ExecStart=/usr/bin/python3 /home/jeroen/homey-energy-manual/scripts/fetch_quatt_archive.py --resolution last6Hours --db /home/jeroen/homey-energy-manual/data/quatt/quatt-insights.sqlite3
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jeroen/homey-energy-manual/data/quatt
+
+[Install]
+WantedBy=multi-user.target
