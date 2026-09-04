@@ -1,29 +1,29 @@
 {
   "meta": {
     "schema_version": "2.12",
-    "generated_at": "2026-09-04T11:15:08.314Z",
-    "heartbeat_at": "2026-09-04T11:15:08.314Z",
+    "generated_at": "2026-09-04T11:30:08.283Z",
+    "heartbeat_at": "2026-09-04T11:30:08.283Z",
     "publisher_version": "EM2_PUBLISHER_V1.0.13",
     "control_mode": "SHADOW",
-    "source_sample_at": "2026-09-04T11:15:00.040Z",
-    "state_revision": 4621,
-    "decision_revision": 4621,
-    "shadow_revision": 4621,
+    "source_sample_at": "2026-09-04T11:30:00.433Z",
+    "state_revision": 4624,
+    "decision_revision": 4624,
+    "shadow_revision": 4624,
     "state_age_sec": 1,
     "publish_reason": "REVISION_EVENT",
     "min_publish_interval_sec": 900
   },
   "balance": {
-    "valid": false,
-    "reason": "SOURCE_STALE_OR_MISSING",
+    "valid": true,
+    "reason": "ASYNC_PV_RECONSTRUCTION_UNCERTAIN",
     "tolerance_w": 75,
     "source_timing": {
-      "valid": false,
-      "fresh": false,
+      "valid": true,
+      "fresh": true,
       "synchronized": false,
-      "warning": null,
-      "maxAgeSec": 1158,
-      "skewSec": 1156,
+      "warning": "SOURCE_SKEW_WARNING",
+      "maxAgeSec": 567,
+      "skewSec": 565,
       "maxAllowedAgeSec": 1200,
       "maxAllowedSkewSec": 180,
       "p1Fresh": true,
@@ -32,25 +32,25 @@
       "freshness": {
         "solarEdge": {
           "fresh": true,
-          "ageSec": 566,
+          "ageSec": 567,
           "maxAgeSec": 1200
         },
         "goodWe4200": {
-          "fresh": false,
-          "ageSec": 1158,
+          "fresh": true,
+          "ageSec": 558,
           "maxAgeSec": 600
         },
         "goodWe2000": {
           "fresh": true,
-          "ageSec": 257,
+          "ageSec": 258,
           "maxAgeSec": 600
         }
       },
       "sources": {
-        "p1": "2026-09-04T11:14:58.000Z",
-        "solarEdge": "2026-09-04T11:05:34.000Z",
-        "goodWe4200": "2026-09-04T10:55:42.000Z",
-        "goodWe2000": "2026-09-04T11:10:43.000Z"
+        "p1": "2026-09-04T11:29:59.000Z",
+        "solarEdge": "2026-09-04T11:20:34.000Z",
+        "goodWe4200": "2026-09-04T11:20:43.000Z",
+        "goodWe2000": "2026-09-04T11:25:43.000Z"
       }
     },
     "control_gate": {
@@ -59,24 +59,24 @@
       "derived_house_balance_valid": false,
       "flex_budget_source": "P1_NET_EXPORT"
     },
-    "physical_house_candidate_w": 688,
+    "physical_house_candidate_w": 567.5,
     "known_measured_load_w": 10.3,
     "residual_w": null,
     "fail_closed_flex_budget": false
   },
   "grid": {
-    "power_w": -77,
-    "l1_w": 245,
-    "l2_w": 17,
-    "l3_w": -339,
+    "power_w": -121,
+    "l1_w": 318,
+    "l2_w": -45,
+    "l3_w": -394,
     "import_w": 0,
-    "export_w": 77
+    "export_w": 121
   },
   "pv": {
-    "total_w": 764.96,
-    "solaredge_w": 320.96,
-    "goodwe_4200_w": 298,
-    "goodwe_2000_w": 146
+    "total_w": 688.49,
+    "solaredge_w": 317.49,
+    "goodwe_4200_w": 232,
+    "goodwe_2000_w": 139
   },
   "battery": {
     "soc_pct": null,
@@ -113,8 +113,8 @@
     "battery_integrated": false,
     "grid_measurement_valid": true,
     "derived_house_balance_valid": false,
-    "balance_valid": false,
-    "balance_reason": "SOURCE_STALE_OR_MISSING"
+    "balance_valid": true,
+    "balance_reason": "ASYNC_PV_RECONSTRUCTION_UNCERTAIN"
   },
   "tesla": {
     "connected": true,
@@ -147,9 +147,9 @@
       "schema": "EM2_WW_STATE_V0.8",
       "date": "2026-09-04",
       "startedAt": "2026-09-03T22:00:00.154Z",
-      "updatedAt": "2026-09-04T11:15:00.666Z",
-      "sourceRevision": 4621,
-      "lastStateSampleAt": "2026-09-04T11:15:00.040Z",
+      "updatedAt": "2026-09-04T11:30:01.040Z",
+      "sourceRevision": 4624,
+      "lastStateSampleAt": "2026-09-04T11:30:00.433Z",
       "boilerOnMinToday": 0,
       "heatingMinToday": 0,
       "heatingAccountingQuality": "FROM_STATE_START",
@@ -168,7 +168,7 @@
       "boilerOn": false,
       "boilerPowerW": 0,
       "remainingFallbackMin": 240,
-      "minuteOfDay": 795,
+      "minuteOfDay": 810,
       "catchupRequired": false,
       "stateAgeSec": 0,
       "fallbackAccounting": "CONFIRMED_HEATING_MINUTES",
@@ -189,10 +189,10 @@
     },
     "control": {
       "schema": "EM2_CONTROL_WW_V0.11",
-      "generatedAt": "2026-09-04T11:15:00.688Z",
+      "generatedAt": "2026-09-04T11:30:01.059Z",
       "controlMode": "SHADOW",
       "readOnly": true,
-      "sourceRevision": 4621,
+      "sourceRevision": 4624,
       "action": "HOLD",
       "priority": "MAY",
       "reason": "Geen actief uitvoerbaar Planner-WW-slot; P1-flex-exportbudget 0 W",
@@ -209,7 +209,7 @@
         "priceImportGuardOk": true,
         "gridMeasurementValid": true,
         "derivedHouseBalanceValid": false,
-        "balanceValid": false,
+        "balanceValid": true,
         "postGoalFresh": true,
         "postGoalEligible": false,
         "plannerFresh": true,
@@ -223,15 +223,15 @@
         "boilerOn": false,
         "boilerPowerW": 0,
         "mode": true,
-        "gridW": -77,
-        "exportW": 77,
+        "gridW": -121,
+        "exportW": 121,
         "importW": 0,
         "flexExportBudgetW": 0,
         "discretionaryImportBudgetW": 4000,
         "gridMeasurementValid": true,
         "derivedHouseBalanceValid": false,
-        "balanceValid": false,
-        "balanceReason": "SOURCE_STALE_OR_MISSING",
+        "balanceValid": true,
+        "balanceReason": "ASYNC_PV_RECONSTRUCTION_UNCERTAIN",
         "quattPowerW": 10.3,
         "quattRampReserveW": 100,
         "goalReached": false,
@@ -251,21 +251,21 @@
         "postGoalEligible": false,
         "postGoalDecision": "HOLD",
         "postGoalReason": "GOAL_NOT_REACHED",
-        "postGoalGeneratedAt": "2026-09-04T11:00:00.623Z",
+        "postGoalGeneratedAt": "2026-09-04T11:15:00.614Z",
         "contextFresh": false,
         "contextUpdatedAt": "2026-08-28T11:00:10.377Z",
         "priceNegative": false,
         "priceCheapNext4h": false,
         "priceExpensiveNext4h": false,
-        "priceHorizonMin": 45,
+        "priceHorizonMin": 30,
         "priceHorizonOk": true,
         "pvTop4h": false,
         "plannerWW": "HOLD",
         "plannerWWReason": "UNKNOWN",
-        "plannerWWStart": "2026-09-04T11:15:00.000Z",
-        "plannerWWEnd": "2026-09-04T11:30:00.000Z",
-        "plannerGeneratedAt": "2026-09-04T11:00:45.240Z",
-        "wwStateUpdatedAt": "2026-09-04T11:15:00.666Z",
+        "plannerWWStart": "2026-09-04T11:30:00.000Z",
+        "plannerWWEnd": "2026-09-04T11:45:00.000Z",
+        "plannerGeneratedAt": "2026-09-04T11:15:45.160Z",
+        "wwStateUpdatedAt": "2026-09-04T11:30:01.040Z",
         "wwStateQuality": "PARTIAL_FROM_START_TIME",
         "thermostatVerifyActive": false,
         "thermostatVerifyStartedAt": null,
@@ -468,12 +468,13 @@
   "manager": {
     "state": "BALANCED",
     "decision": "HOLD",
-    "reason": "PV/Huis diagnostiek SOURCE_STALE_OR_MISSING; P1-export blijft autoritatief voor flex",
+    "reason": "PV/Huis reconstructie onderdrukt: P1/PV niet tijdgelijk; P1-export blijft autoritatief voor flex",
     "priority": "MAY",
     "constraints": [
       "QUATT_OBSERVE_ONLY_10W",
       "QUATT_RAMP_RESERVE_100W",
-      "DERIVED_BALANCE_INVALID_SOURCE_STALE_OR_MISSING"
+      "SOURCE_SKEW_WARNING",
+      "DERIVED_BALANCE_UNCERTAIN_ASYNC_PV"
     ],
     "state_dirty": true,
     "state_age_sec": 0,
@@ -495,18 +496,18 @@
       "flexExportBudgetW": 0,
       "gridMeasurementValid": true,
       "derivedHouseBalanceValid": false,
-      "balanceValid": false
+      "balanceValid": true
     },
     "decision": {
       "priority": "MAY",
       "intent": "HOLD",
-      "reason": "PV/Huis diagnostiek SOURCE_STALE_OR_MISSING; P1-export blijft autoritatief voor flex"
+      "reason": "PV/Huis reconstructie onderdrukt: P1/PV niet tijdgelijk; P1-export blijft autoritatief voor flex"
     }
   },
   "context": {
     "updated_at": "2026-08-28T11:00:10.377Z",
     "fresh": false,
-    "age_sec": 605690,
+    "age_sec": 606590,
     "price_negative": false,
     "price_cheap_next4h": false,
     "price_expensive_next4h": false,
@@ -515,16 +516,16 @@
   "evGate": {
     "finalStatus": "PASS",
     "valid": false,
-    "sourceRevision": 4621,
+    "sourceRevision": 4624,
     "requested_A": 0,
     "target_W": 0,
     "generatedAt": null,
-    "updatedAt": "2026-09-04T11:15:02.872Z",
+    "updatedAt": "2026-09-04T11:30:03.287Z",
     "errors": []
   },
   "control_evidence": {
     "schema": "EM2_CONTROL_EVIDENCE_V0.1",
-    "generatedAt": "2026-09-04T11:15:08.314Z",
+    "generatedAt": "2026-09-04T11:30:08.283Z",
     "readOnly": true,
     "observabilityOnly": true,
     "controlImpact": "NONE",
@@ -532,18 +533,18 @@
       "schema": "EM2_POWER_INTENT_V0.2",
       "policyRevision": "P1_V0.2.2_PUBLIC_DECOUPLED",
       "engineVersion": "P1_V0.2.4_DUAL_SEMANTIC",
-      "generatedAt": "2026-09-04T11:15:00.815Z",
-      "sourceRevision": 4621,
+      "generatedAt": "2026-09-04T11:30:01.215Z",
+      "sourceRevision": 4624,
       "readOnly": true,
       "controlMode": "SHADOW",
       "deviceWrites": false,
       "valid": true,
       "status": "OK",
-      "inputSemanticKey": "{\"sourceRev\":4621,\"stateRev\":4621,\"decisionRev\":4621,\"wwRev\":4621,\"evSemanticRevision\":27,\"evMode\":\"HOLD\",\"decisionIntent\":\"HOLD\",\"priority\":\"MAY\",\"flexW\":0,\"importBudgetW\":4000,\"remainingKWh\":3.85,\"deadlineRaw\":\"2026-09-04T06:00:00.000Z\",\"wwAction\":\"HOLD\",\"valid\":true}",
+      "inputSemanticKey": "{\"sourceRev\":4624,\"stateRev\":4624,\"decisionRev\":4624,\"wwRev\":4624,\"evSemanticRevision\":27,\"evMode\":\"HOLD\",\"decisionIntent\":\"HOLD\",\"priority\":\"MAY\",\"flexW\":0,\"importBudgetW\":4000,\"remainingKWh\":3.85,\"deadlineRaw\":\"2026-09-04T06:00:00.000Z\",\"wwAction\":\"HOLD\",\"valid\":true}",
       "inputRevisions": {
-        "state": 4621,
-        "decision": 4621,
-        "wwControl": 4621,
+        "state": 4624,
+        "decision": 4624,
+        "wwControl": 4624,
         "evControlCore": 4580,
         "evSemantic": 27
       },
@@ -599,9 +600,9 @@
       "ev": {
         "schema": "EM2_EV_POWER_ADAPTER_V0.1",
         "inputSchema": "EM2_POWER_INTENT_V0.2",
-        "generatedAt": "2026-09-04T11:15:00.904Z",
-        "sourceRevision": 4621,
-        "stateRevision": 4621,
+        "generatedAt": "2026-09-04T11:30:01.363Z",
+        "sourceRevision": 4624,
+        "stateRevision": 4624,
         "valid": true,
         "status": "ZERO_INTENT",
         "reason": "0 W → idle",
@@ -667,8 +668,8 @@
       "warm_water": {
         "schema": "EM2_WW_POWER_ADAPTER_V0.2",
         "inputSchema": "EM2_POWER_INTENT_V0.2",
-        "generatedAt": "2026-09-04T11:15:00.873Z",
-        "sourceRevision": 4621,
+        "generatedAt": "2026-09-04T11:30:01.322Z",
+        "sourceRevision": 4624,
         "valid": true,
         "status": "OK_HOLD",
         "readOnly": true,
@@ -705,9 +706,9 @@
       }
     },
     "revisions": {
-      "powerIntent": 4621,
-      "evAdapter": 4621,
-      "wwAdapter": 4621,
+      "powerIntent": 4624,
+      "evAdapter": 4624,
+      "wwAdapter": 4624,
       "aligned": true
     },
     "complete": true,
