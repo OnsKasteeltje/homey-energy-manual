@@ -3,179 +3,70 @@
 Status: **PREP ONLY — NOT DEPLOYED TO HOMEY**
 Date: 2026-09-04
 
-## Scope
+## Confirmed live behavior
 
-This preparation is intentionally limited to two changes only:
+- Website deadline accepted around 07:19:30 Europe/Amsterdam.
+- Deadline was already beyond `latestStart` when accepted.
+- Charger target stayed 0 A until 07:24:55.
+- Charger target changed to 8 A at exactly 07:25:00 and remained there.
+- Therefore the deadline power path itself is healthy end-to-end.
 
-1. **Event-driven Core wake-up after a fully published EV deadline input update.**
-2. **Explicit `DEADLINE_INFEASIBLE_AT_MAX_A` status when the requested target can no longer be met within the remaining time at the configured current cap.**
+## Narrow deployment candidate
 
-Explicitly out of scope:
-- no changes to EV Power Intent deadline power calculation;
-- no changes to PV/export ownership;
-- no changes to `maxA` propagation/clamping;
-- no changes to Adapter/Gate/Actuator electrical mapping;
-- no change to `FRESH_MS=120000`;
-- no attempt to fix the earlier `STALE_INPUT -> 0 A` incident in this change.
+Only two changes remain in scope:
 
-## Live evidence
+1. Make `EM2_EV_Goal_Input_Status` a semantic/idempotent final commit marker in the Deadline Goal Adapter.
+2. Add one Core trigger on `EM2_EV_Goal_Input_Status changed`, while preserving the existing 5-minute cron and manual Start.
 
-Observed deadline command:
-- deadline 08:00 Europe/Amsterdam
-- current SOC 48%
-- target SOC 55%
-- goal 3.85 kWh
-- maxA 8
-- latest-start approximately 07:18:09
+Also add observability status `DEADLINE_INFEASIBLE_AT_MAX_A` when the deadline can no longer be met at configured maximum current, with a 60 s tolerance around latestStart.
 
-Timeline:
+## Important semantic behavior
 
-```text
-~07:19:30  deadline command written
-~07:20     deadline input adapter / Core ordering race
-07:25:00   Easee target changes from 0 A to 8 A
-07:25+     Tesla continues charging at 3x8 A
-```
+The marker is not a heartbeat and contains no polling timestamp.
 
-Verdict from live test:
-- deadline input: PASS
-- Core MUST decision: PASS
-- deadline Power Intent: PASS
-- maxA=8 clamp: PASS
-- Adapter/Gate/Actuator: PASS
-- physical charging at 3x8 A: PASS
-- responsiveness to a newly accepted deadline: FAIL (up to one 5-minute Core cycle latency)
+It stays byte-identical while:
+- requestId is unchanged;
+- command values are unchanged;
+- derived deadline status is unchanged.
 
-## Change A — event-driven Core wake-up
+The same request is intentionally allowed to mutate on real derived-status transitions:
+- `DEADLINE_WAIT -> DEADLINE_CATCH_UP`;
+- `DEADLINE_CATCH_UP -> DEADLINE_INFEASIBLE_AT_MAX_A`.
 
-Current behavior:
-- Deadline Goal Adapter runs every 1 minute.
-- Core runs independently every 5 minutes.
-- A new deadline can therefore be fully accepted just after a Core cycle and wait nearly five minutes before Core consumes it.
+Those transitions are beneficial: they wake Core near latestStart without raising normal Core cadence to once per minute.
 
-Minimal change:
-- retain the existing 5-minute Core cron trigger;
-- add a second Core trigger on semantic change of `EM2_EV_Goal_Input_Status`;
-- ensure the Deadline Goal Adapter writes `EM2_EV_Goal_Input_Status` **last**, after the complete goal set has been published.
+## Offline gate result
 
-The complete goal set is:
-- `EV Deadline actief`
-- `EV Deadline tijd`
-- `EV Doel kWh`
-- `EV Resterend kWh`
-- `EV Max laadstroom A`
-- `EV Latest start`
-- `EV Deadline status`
+All narrow-scope offline gates pass after correcting the idempotency definition:
 
-`EM2_EV_Goal_Input_Status` is the commit/event marker. A Core wake-up must never be triggered halfway through updating the goal set.
+- R1 semantic/idempotent marker: PASS
+- R2 marker-last event commit: PASS for event path
+- R3 existing cron/manual paths preserved: PASS
+- R4 observed incident replay: PASS
+- R5 latestStart semantic wake: PASS
+- R6 infeasibility observability only: PASS
+- R7 scope protection: PASS
 
-### Required Advanced Flow change
+The preserved independent 5-minute cron can theoretically overlap a goal-update transaction; that pre-existing cross-flow race is not worsened by this patch and is outside this minimal responsiveness change.
 
-Core currently has:
-- 5-minute cron -> existing Core HomeyScript action
-- manual Start -> existing Core HomeyScript action
+## Explicitly out of scope
 
-Candidate addition:
+No change to:
+- Power Intent EV calculation;
+- maxA electrical clamp;
+- EV Adapter mapping;
+- EV Gate validation;
+- Actuator behavior;
+- `FRESH_MS`;
+- physical writer logic;
+- earlier `STALE_INPUT -> 0 A` root-cause investigation.
 
-```text
-Logic variable changed: EM2_EV_Goal_Input_Status
-    -> existing Core HomeyScript action
-```
+## Remaining deployment precondition
 
-No new HomeyScript and no extra device reader are required. This preserves Core as the single-reader decision owner and adds only event responsiveness.
+Before Homey update:
+1. render exact full Advanced Flow payloads for the Deadline Goal Adapter and Core;
+2. structurally compare them against the current live flows;
+3. verify only the intended adapter script delta and one Core trigger card differ;
+4. keep PR draft until explicit deployment approval.
 
-### Idempotency requirement
-
-`EM2_EV_Goal_Input_Status` should only change for a new semantic deadline command/state, not because a timestamp is refreshed every minute. The event payload should contain stable command identity such as `requestId` plus semantic fields. The adapter should avoid rewriting an equivalent status value.
-
-This prevents a new Core execution every minute when nothing meaningful changed.
-
-## Change B — explicit infeasibility status
-
-At configured maximum current:
-
-```js
-const maxPowerW = maxA * 690;
-const requiredMs = (remainingKWh / (maxPowerW / 1000)) * 3600000;
-const remainingWallClockMs = deadlineMs - Date.now();
-const infeasibleAtMaxA = active && remainingKWh > 0 && remainingWallClockMs >= 0 && requiredMs > remainingWallClockMs;
-```
-
-Status rules:
-
-```text
-inactive / no remaining goal         -> existing inactive/completed status
-active, feasible, now < latestStart  -> DEADLINE_WAIT
-active, feasible, now >= latestStart -> DEADLINE_CATCH_UP
-active, infeasible at configured cap -> DEADLINE_INFEASIBLE_AT_MAX_A
-```
-
-Important: `DEADLINE_INFEASIBLE_AT_MAX_A` is **observability**, not a block. Core should still choose `MUST / TESLA_CHARGE_DEADLINE` and the existing Power Intent/Adapter path should charge at the configured maximum allowed current.
-
-## Offline acceptance tests
-
-### T1 — event wake-up
-A deadline is accepted immediately after a Core cron cycle.
-
-Expected:
-- adapter completes all goal writes;
-- commit marker `EM2_EV_Goal_Input_Status` changes once;
-- Core runs from that change without waiting for the next 5-minute cron.
-
-### T2 — no partial-state wake-up
-During publication of the individual goal Logic variables, Core must not be triggered by this new path.
-
-Expected:
-- only final commit-marker update wakes Core;
-- Core observes one coherent goal set.
-
-### T3 — idempotency / Homey load
-Same website command is polled again one minute later.
-
-Expected:
-- semantic commit marker unchanged;
-- no additional event-driven Core run;
-- normal 5-minute cron remains unchanged.
-
-### T4 — deadline path regression
-MUST deadline with flexExportBudgetW=0 and maxA=8.
-
-Expected:
-- numeric deadline Power Intent remains >0;
-- EV adapter clamps to 8 A;
-- no changes to existing Power Intent/Adapter/Gate/Actuator code required.
-
-### T5 — infeasible status
-Deadline has insufficient remaining wall-clock time for remaining kWh at maxA.
-
-Expected:
-- `DEADLINE_INFEASIBLE_AT_MAX_A`;
-- immediate Core wake-up;
-- Core still emits `MUST / TESLA_CHARGE_DEADLINE`;
-- physical path remains capped at configured maxA.
-
-### T6 — stale-input separation
-No freshness constants or stale fail-closed logic change as part of this patch.
-
-Expected:
-- diff contains no Adapter/Gate/Actuator freshness modification.
-
-## Deployment gate
-
-Do not deploy until:
-1. exact Advanced Flow trigger addition is prepared from the current live Core definition;
-2. exact Deadline Goal Adapter status/idempotency patch is prepared from the current live definition;
-3. T1-T6 are reviewed offline;
-4. PR remains draft until the Homey patch is fully reproducible;
-5. only then perform one controlled Homey update with explicit approval;
-6. post-deploy observation is read-only.
-
-## Current verdict
-
-**Keep:** event-driven deadline wake-up.
-
-**Keep:** explicit infeasibility reporting.
-
-**Drop from this update:** PV/deadline power changes, maxA changes, 120s->420s freshness change, stale-input remediation.
-
-No physical Homey writes were performed while preparing this narrowed scope.
+No physical Homey writes were performed during preparation or offline validation.
