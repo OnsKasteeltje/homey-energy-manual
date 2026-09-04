@@ -16,17 +16,11 @@ const markerValue = obj => JSON.stringify({schema:'EM2_EV_GOAL_INPUT_V0.1', ...o
 const setMarker = async obj => set('EM2_EV_Goal_Input_Status','string',markerValue(obj));
 ```
 
-Important: the marker MUST NOT contain `at`, `generatedAt`, `updatedAt`, or another polling timestamp. Identical semantic input must therefore produce an identical string.
+Important: the marker MUST NOT contain `at`, `generatedAt`, `updatedAt`, or another polling timestamp. Identical semantic state must therefore produce an identical string.
 
 ## 2. FETCH_FAILED
 
-Replace:
-
-```js
-await set('EM2_EV_Goal_Input_Status','string',JSON.stringify({status:'FETCH_FAILED',at:new Date().toISOString()}));
-```
-
-with:
+Replace the timestamped `FETCH_FAILED` marker with:
 
 ```js
 await setMarker({status:'FETCH_FAILED'});
@@ -36,13 +30,10 @@ This changes the marker only when the semantic state transitions to/from `FETCH_
 
 ## 3. Inactive command
 
-After all inactive goal variables have been committed, replace the current timestamped marker with:
+After all inactive goal variables have been committed, use:
 
 ```js
-await setMarker({
-  status:'IDLE',
-  requestId
-});
+await setMarker({status:'IDLE',requestId});
 ```
 
 The marker remains the **last write** of the transaction.
@@ -88,7 +79,7 @@ The 60-second tolerance prevents tiny poll/scheduling jitter around `latestStart
 
 ## 6. Valid command: commit order
 
-Commit all goal fields first, exactly in this logical transaction:
+Commit all goal fields first:
 
 ```js
 await set('EV Deadline actief','boolean',true);
@@ -121,21 +112,20 @@ await setMarker({
 
 - No device writes.
 - Existing 1-minute website polling remains unchanged.
-- `EM2_EV_Goal_Input_Status` changes only for semantic input/status changes.
-- Re-reading the same `requestId` with identical values causes **zero marker mutation**.
+- Marker changes only for a semantic input or derived deadline-status transition.
+- Same request + same values + same derived status band causes **zero marker mutation**.
+- The same request is intentionally allowed to mutate once on `WAIT -> CATCH_UP` and, if applicable, once on `CATCH_UP -> INFEASIBLE_AT_MAX_A`; these transitions should wake Core.
 - Marker is always the final write after the complete goal set.
-- Core may therefore safely use marker-change as an event trigger.
-- Existing `maxA` handling remains unchanged.
-- Existing Power Intent / Adapter / Gate / Actuator logic remains unchanged.
+- Existing `maxA`, Power Intent, Adapter, Gate and Actuator behavior remains unchanged.
 
 ## Offline acceptance vectors
 
 | Case | Input | Expected marker mutation | Deadline status |
 |---|---|---:|---|
-| same valid command, next minute | identical requestId/goal/deadline/maxA | no | unchanged |
+| same valid command, same status band next minute | identical requestId/goal/deadline/maxA | no | unchanged |
+| same valid command crosses latestStart | identical inputs, derived status changes | yes, once | `DEADLINE_CATCH_UP` |
+| same valid command becomes >60s late | identical inputs, derived status changes | yes, once | `DEADLINE_INFEASIBLE_AT_MAX_A` |
 | new valid command before latestStart | new requestId | yes | `DEADLINE_WAIT` |
-| new valid command <=60s after latestStart | new requestId | yes | `DEADLINE_CATCH_UP` |
-| new valid command >60s after latestStart | new requestId | yes | `DEADLINE_INFEASIBLE_AT_MAX_A` |
 | same inactive command, next minute | identical requestId | no | `NO_DEADLINE` |
 | fetch failure persists | repeated failure | only first transition | n/a |
 
