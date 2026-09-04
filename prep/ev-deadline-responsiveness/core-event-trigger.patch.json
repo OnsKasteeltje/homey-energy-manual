@@ -1,0 +1,30 @@
+{
+  "status": "PREP_ONLY_NOT_DEPLOYED",
+  "targetFlow": {
+    "id": "227f8d3b-7551-46dd-837d-1b8c69add824",
+    "name": "EM v2 | 00 Core Tick | v0.11h PINNED SOURCE"
+  },
+  "change": "ADD_ONE_TRIGGER_ONLY",
+  "triggerCard": {
+    "type": "trigger",
+    "id": "homey:manager:logic:variable_changed",
+    "x": 0,
+    "y": 300,
+    "args": {
+      "variable": {
+        "id": "a800bcdc-ca0a-481e-94ff-419b90f5348b",
+        "name": "EM2_EV_Goal_Input_Status"
+      }
+    },
+    "outputSuccess": [
+      "33333333-0981-4981-8981-333333333333"
+    ]
+  },
+  "preserve": [
+    "existing 5-minute cron trigger",
+    "existing manual Start trigger",
+    "existing Core HomeyScript action unchanged",
+    "no physical device writes in Core"
+  ],
+  "precondition": "EM2_EV_Goal_Input_Status must first be made semantic/idempotent; otherwise current adapter timestamp churn would wake Core every minute."
+}
