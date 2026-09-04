@@ -16,13 +16,19 @@ from typing import Any, Iterable
 
 
 def iter_entries(payload: Any) -> Iterable[dict[str, Any]]:
-    if isinstance(payload, dict) and isinstance(payload.get("entries"), list):
-        yield from payload["entries"]
-        return
+    if isinstance(payload, dict):
+        if isinstance(payload.get("entries"), list):
+            yield from payload["entries"]
+            return
+        if isinstance(payload.get("values"), list):
+            yield from payload["values"]
+            return
     if isinstance(payload, list):
         yield from payload
         return
-    raise ValueError("Expected a JSON list or an object containing an 'entries' list")
+    raise ValueError(
+        "Expected a JSON list or an object containing an 'entries' or 'values' list"
+    )
 
 
 def init_db(conn: sqlite3.Connection) -> None:
