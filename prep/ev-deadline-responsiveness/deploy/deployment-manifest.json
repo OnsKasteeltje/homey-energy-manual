@@ -1,0 +1,63 @@
+{
+  "status": "PREP_ONLY_NOT_DEPLOYED",
+  "scope": "EV deadline responsiveness only",
+  "targets": [
+    {
+      "flowId": "445cb82c-5e1f-43c3-b2cf-f2d78fec6e16",
+      "flowName": "EM v2 | 10 Input | EV Deadline Goal Adapter v0.1",
+      "operation": "replace_homeyscript_source_only",
+      "cardId": "33333333-3333-4333-8333-333333333333",
+      "candidateSource": "prep/ev-deadline-responsiveness/deploy/deadline-goal-adapter-v0.1.1.full.js",
+      "preserve": [
+        "1-minute cron trigger",
+        "manual Start",
+        "all card ids and topology",
+        "enabled=true",
+        "no device writes"
+      ]
+    },
+    {
+      "flowId": "227f8d3b-7551-46dd-837d-1b8c69add824",
+      "flowName": "EM v2 | 00 Core Tick | v0.11h PINNED SOURCE",
+      "operation": "add_trigger_card_only",
+      "newCardId": "55555555-0981-4981-8981-555555555555",
+      "newCard": {
+        "type": "trigger",
+        "id": "homey:manager:logic:variable_changed",
+        "x": 0,
+        "y": 300,
+        "args": {
+          "variable": {
+            "id": "a800bcdc-ca0a-481e-94ff-419b90f5348b",
+            "name": "EM2_EV_Goal_Input_Status"
+          }
+        },
+        "outputSuccess": ["33333333-0981-4981-8981-333333333333"]
+      },
+      "preserve": [
+        "existing 5-minute cron trigger",
+        "existing manual Start",
+        "existing Core HomeyScript source byte-for-byte",
+        "all existing cards and coordinates",
+        "enabled=true",
+        "no physical writes in Core"
+      ]
+    }
+  ],
+  "hardPreconditions": [
+    "adapter semantic marker must be deployed before or atomically with Core trigger",
+    "current Core must still contain action card 33333333-0981-4981-8981-333333333333",
+    "EM2_EV_Goal_Input_Status variable id must equal a800bcdc-ca0a-481e-94ff-419b90f5348b",
+    "no changes to Power Intent, EV Adapter, Gate, Actuator or FRESH_MS"
+  ],
+  "deploymentOrder": [
+    "1 update deadline adapter source",
+    "2 verify semantic marker no longer changes on unchanged poll",
+    "3 add Core trigger card",
+    "4 perform read-only post-deploy validation"
+  ],
+  "rollback": [
+    "remove Core trigger card 55555555-0981-4981-8981-555555555555",
+    "restore prior deadline adapter HomeyScript source"
+  ]
+}
