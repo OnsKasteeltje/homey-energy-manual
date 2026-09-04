@@ -72,10 +72,19 @@ def main():
                 raise AssertionError("uncaught page errors: " + " | ".join(errors))
             if console_errors:
                 raise AssertionError("console errors: " + " | ".join(console_errors))
-        except Exception:
-            page.screenshot(path="planner-smoke-failure.png", full_page=True)
-            print("PAGE_ERRORS:", errors)
-            print("CONSOLE_ERRORS:", console_errors)
+        except Exception as exc:
+            print("PRIMARY_FAILURE:", repr(exc), flush=True)
+            print("URL:", page.url, flush=True)
+            print("PAGE_ERRORS:", errors, flush=True)
+            print("CONSOLE_ERRORS:", console_errors, flush=True)
+            try:
+                print("STATUS_TEXT:", page.locator("#ps-status").inner_text(timeout=1000), flush=True)
+            except Exception:
+                print("STATUS_TEXT: <unavailable>", flush=True)
+            try:
+                page.screenshot(path="planner-smoke-failure.png", full_page=False, timeout=3000)
+            except Exception as screenshot_exc:
+                print("SCREENSHOT_FAILURE:", repr(screenshot_exc), flush=True)
             raise
         finally:
             browser.close()
