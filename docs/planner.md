@@ -124,6 +124,32 @@
     return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'});
   };
 
+  const PLANNER_AXIS_PROMISE = Promise.all(
+    [...document.querySelectorAll('.planner-minimal')].map(async ROOT => {
+      const url = ROOT.dataset.plannerUrl;
+      const r = await fetch(`${url}?ts=${Date.now()}`, {cache:'no-store'});
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const payload = await r.json();
+      const p = unwrap(payload);
+      const actions = Array.isArray(p?.plan?.actions) ? p.plan.actions : [];
+      if (actions.length !== 96) {
+        throw new Error(`verwacht 96 kwartiersslots, ontvangen ${actions.length}`);
+      }
+      return {ROOT, actions};
+    })
+  ).then(planners => {
+    const starts = planners.map(x => new Date(x.actions[0].start).getTime());
+    const ends = planners.map(x =>
+      new Date(x.actions[x.actions.length - 1].start).getTime() + 15 * 60000
+    );
+
+    const axisStartMs = Math.min(...starts);
+    const axisEndMs = Math.max(...ends);
+    const axisSlots = Math.round((axisEndMs - axisStartMs) / (15 * 60000));
+
+    return {axisStartMs, axisSlots};
+  });
+
   function initPlanner(ROOT) {
     if (!ROOT || ROOT.dataset.initialized === '1') return;
     ROOT.dataset.initialized = '1';
@@ -152,7 +178,7 @@
       deadlineEl.hidden = false;
     }
 
-    function renderForecast(actions) {
+    function renderForecast(actions, axisStartMs, axisSlots) {
       forecast.replaceChildren();
       timeAxis.replaceChildren();
 
@@ -164,50 +190,60 @@
       });
 
       const max = Math.max(1000, ...values);
+      const byTime = new Map(actions.map(a => [new Date(a.start).getTime(), a]));
 
-      actions.forEach((a, idx) => {
+      forecast.style.gridTemplateColumns = `repeat(${axisSlots}, minmax(0, 1fr))`;
+      timeAxis.style.gridTemplateColumns = `repeat(${axisSlots}, minmax(0, 1fr))`;
+
+      for (let idx = 0; idx < axisSlots; idx++) {
+        const slotMs = axisStartMs + idx * 15 * 60000;
+        const a = byTime.get(slotMs);
+
         const col = document.createElement('div');
         col.className = 'pm-balance-col';
-        col.style.gridColumn = `${idx+1}`;
+        col.style.gridColumn = `${idx + 1}`;
 
         const zero = document.createElement('div');
         zero.className = 'pm-zero';
         col.append(zero);
 
-        const addBar = (kind, v) => {
-          if (!finite(v)) return;
-          const n = Number(v);
-          const h = Math.max(2, Math.min(48, Math.abs(n) / max * 48));
+        if (a) {
+          const addBar = (kind, v) => {
+            if (!finite(v)) return;
 
-          const b = document.createElement('div');
-          b.className = `pm-bar ${kind}`;
-          b.style.height = `${h}%`;
+            const n = Number(v);
+            const h = Math.max(2, Math.min(48, Math.abs(n) / max * 48));
 
-          if (kind === 'net') {
-            b.classList.add(n < 0 ? 'export' : 'import');
-            b.style.bottom = n < 0 ? `${50-h}%` : '50%';
-          } else {
-            b.style.bottom = '50%';
-          }
+            const b = document.createElement('div');
+            b.className = `pm-bar ${kind}`;
+            b.style.height = `${h}%`;
 
-          b.title = `${hhmm(a.start)} · ${kind==='base'?'Base load':kind==='pv'?'PV':'Verwachte import/export'} ${Math.round(n)} W`;
-          col.append(b);
-        };
+            if (kind === 'net') {
+              b.classList.add(n < 0 ? 'export' : 'import');
+              b.style.bottom = n < 0 ? `${50-h}%` : '50%';
+            } else {
+              b.style.bottom = '50%';
+            }
 
-        addBar('base', a.baseLoadForecastW);
-        addBar('pv', a.pvForecastW);
-        addBar('net', a.netBeforeFlexW);
+            b.title = `${hhmm(a.start)} · ${kind==='base'?'Base load':kind==='pv'?'PV':'Verwachte import/export'} ${Math.round(n)} W`;
+            col.append(b);
+          };
+
+          addBar('base', a.baseLoadForecastW);
+          addBar('pv', a.pvForecastW);
+          addBar('net', a.netBeforeFlexW);
+        }
 
         forecast.append(col);
 
         if (idx % 12 === 0) {
           const t = document.createElement('span');
           t.className = 'pm-time';
-          t.style.gridColumn = `${idx+1} / span 12`;
-          t.textContent = hhmm(a.start);
+          t.style.gridColumn = `${idx + 1} / span 12`;
+          t.textContent = hhmm(new Date(slotMs).toISOString());
           timeAxis.append(t);
         }
-      });
+      }
     }
 
     function actionActive(asset, a) {
@@ -281,7 +317,8 @@
         }
 
         renderDeadline(p);
-        renderForecast(actions);
+        const {axisStartMs, axisSlots} = await PLANNER_AXIS_PROMISE;
+        renderForecast(actions, axisStartMs, axisSlots);
 
         slotsEl.replaceChildren();
         addRow('Tesla', 'tesla', 'tesla', actions);
