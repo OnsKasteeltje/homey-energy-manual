@@ -157,7 +157,7 @@ class Handler(BaseHTTPRequestHandler):
 
         weather = forecast_status(
             WEATHER_FILE,
-            "EMS_PI_WEATHER_FORECAST_V0.1"
+            "EMS_PI_WEATHER_FORECAST_V0.2"
         )
 
         quatt = forecast_status(
