@@ -1,13 +1,13 @@
 {
   "schema": "EM2_PLANNER_SHADOW_PUBLISH_V0.4",
-  "publishedAt": "2026-09-05T05:45:47.507Z",
+  "publishedAt": "2026-09-05T06:00:47.778Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
-  "sourceRevision": 4799,
-  "generatedAt": "2026-09-05T05:45:45.147Z",
+  "sourceRevision": 4802,
+  "generatedAt": "2026-09-05T06:00:45.250Z",
   "plan": {
     "schema": "EM2_ENERGY_PLAN_24H_V0.5.0",
-    "generatedAt": "2026-09-05T05:45:45.147Z",
+    "generatedAt": "2026-09-05T06:00:45.250Z",
     "controlMode": "SHADOW",
     "readOnly": true,
     "physicalWritePerformed": false,
@@ -28,7 +28,7 @@
       "usableWindowKWh": 10.08
     },
     "inputs": {
-      "sourceRevision": 4799,
+      "sourceRevision": 4802,
       "contract": "FIXED",
       "price": {
         "quality": "GOOD",
@@ -39,16 +39,16 @@
       "history": {
         "schema": "2.6",
         "source": "EM2_DAY_SERIES_LOCAL_V0.6.1",
-        "samples": 93,
-        "usableSamples": 93,
-        "cleanBaseSamples": 92,
+        "samples": 96,
+        "usableSamples": 96,
+        "cleanBaseSamples": 95,
         "rejectedHighLoadSamples": 1,
         "rejectedKnownApplianceSamples": 0,
-        "observedBaseQuarterBins": 31,
+        "observedBaseQuarterBins": 32,
         "measurementControlIndependent": true
       },
       "forecastQuality": {
-        "baseLoad": "CLEAN_GLOBAL_MEDIAN_FALLBACK",
+        "baseLoad": "CLEAN_QUARTER_PROFILE",
         "pv": "WEATHER_HAUWERT_THEORETICAL_SCALE",
         "pvNote": "PV forecast uses Hauwert weather shortwave radiation; scale=8 W per W/m2, calibrationPoints=0. No day-persistence PV forecast.",
         "baseLoadNote": "Known Tesla/boiler are subtracted. Washer/dryer-active and residual >= 1500 W samples are excluded from base learning. Global fallback is unavailable until >=3 clean samples exist.",
@@ -59,7 +59,7 @@
           "longitude": 5.10003,
           "variable": "shortwave_radiation",
           "resolutionMinutes": 15,
-          "retrievedAt": "2026-09-05T05:45:45.308Z"
+          "retrievedAt": "2026-09-05T06:00:45.578Z"
         },
         "gridHeadroom": "NOT_MODELED_PHASE_AWARE"
       },
@@ -101,45 +101,6 @@
       "actions": [
         {
           "i": 0,
-          "start": "2026-09-05T05:45:00.000Z",
-          "end": "2026-09-05T06:00:00.000Z",
-          "localDate": "2026-09-05",
-          "localQuarter": 31,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 349,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
-            "rejectedHighLoadSamples": 1,
-            "rejectedKnownApplianceSamples": 0
-          },
-          "pvForecastW": 96,
-          "netBeforeFlexW": 253,
-          "importBeforeFlexW": 253,
-          "pvSurplusBeforeFlexW": 0,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_THEORETICAL_SCALE"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          }
-        },
-        {
-          "i": 1,
           "start": "2026-09-05T06:00:00.000Z",
           "end": "2026-09-05T06:15:00.000Z",
           "localDate": "2026-09-05",
@@ -155,7 +116,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -178,7 +139,7 @@
           }
         },
         {
-          "i": 2,
+          "i": 1,
           "start": "2026-09-05T06:15:00.000Z",
           "end": "2026-09-05T06:30:00.000Z",
           "localDate": "2026-09-05",
@@ -194,7 +155,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -217,7 +178,7 @@
           }
         },
         {
-          "i": 3,
+          "i": 2,
           "start": "2026-09-05T06:30:00.000Z",
           "end": "2026-09-05T06:45:00.000Z",
           "localDate": "2026-09-05",
@@ -233,7 +194,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -256,7 +217,7 @@
           }
         },
         {
-          "i": 4,
+          "i": 3,
           "start": "2026-09-05T06:45:00.000Z",
           "end": "2026-09-05T07:00:00.000Z",
           "localDate": "2026-09-05",
@@ -272,7 +233,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -295,7 +256,7 @@
           }
         },
         {
-          "i": 5,
+          "i": 4,
           "start": "2026-09-05T07:00:00.000Z",
           "end": "2026-09-05T07:15:00.000Z",
           "localDate": "2026-09-05",
@@ -311,7 +272,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -334,7 +295,7 @@
           }
         },
         {
-          "i": 6,
+          "i": 5,
           "start": "2026-09-05T07:15:00.000Z",
           "end": "2026-09-05T07:30:00.000Z",
           "localDate": "2026-09-05",
@@ -350,7 +311,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -373,7 +334,7 @@
           }
         },
         {
-          "i": 7,
+          "i": 6,
           "start": "2026-09-05T07:30:00.000Z",
           "end": "2026-09-05T07:45:00.000Z",
           "localDate": "2026-09-05",
@@ -389,7 +350,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -412,7 +373,7 @@
           }
         },
         {
-          "i": 8,
+          "i": 7,
           "start": "2026-09-05T07:45:00.000Z",
           "end": "2026-09-05T08:00:00.000Z",
           "localDate": "2026-09-05",
@@ -428,7 +389,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -451,7 +412,7 @@
           }
         },
         {
-          "i": 9,
+          "i": 8,
           "start": "2026-09-05T08:00:00.000Z",
           "end": "2026-09-05T08:15:00.000Z",
           "localDate": "2026-09-05",
@@ -467,7 +428,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -490,7 +451,7 @@
           }
         },
         {
-          "i": 10,
+          "i": 9,
           "start": "2026-09-05T08:15:00.000Z",
           "end": "2026-09-05T08:30:00.000Z",
           "localDate": "2026-09-05",
@@ -506,7 +467,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -536,7 +497,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 11,
+          "i": 10,
           "start": "2026-09-05T08:30:00.000Z",
           "end": "2026-09-05T08:45:00.000Z",
           "localDate": "2026-09-05",
@@ -552,7 +513,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -582,7 +543,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 12,
+          "i": 11,
           "start": "2026-09-05T08:45:00.000Z",
           "end": "2026-09-05T09:00:00.000Z",
           "localDate": "2026-09-05",
@@ -598,7 +559,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -628,7 +589,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 13,
+          "i": 12,
           "start": "2026-09-05T09:00:00.000Z",
           "end": "2026-09-05T09:15:00.000Z",
           "localDate": "2026-09-05",
@@ -644,7 +605,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -674,7 +635,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 14,
+          "i": 13,
           "start": "2026-09-05T09:15:00.000Z",
           "end": "2026-09-05T09:30:00.000Z",
           "localDate": "2026-09-05",
@@ -690,7 +651,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -720,7 +681,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 15,
+          "i": 14,
           "start": "2026-09-05T09:30:00.000Z",
           "end": "2026-09-05T09:45:00.000Z",
           "localDate": "2026-09-05",
@@ -736,7 +697,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -759,7 +720,7 @@
           }
         },
         {
-          "i": 16,
+          "i": 15,
           "start": "2026-09-05T09:45:00.000Z",
           "end": "2026-09-05T10:00:00.000Z",
           "localDate": "2026-09-05",
@@ -775,7 +736,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -798,7 +759,7 @@
           }
         },
         {
-          "i": 17,
+          "i": 16,
           "start": "2026-09-05T10:00:00.000Z",
           "end": "2026-09-05T10:15:00.000Z",
           "localDate": "2026-09-05",
@@ -814,7 +775,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -837,7 +798,7 @@
           }
         },
         {
-          "i": 18,
+          "i": 17,
           "start": "2026-09-05T10:15:00.000Z",
           "end": "2026-09-05T10:30:00.000Z",
           "localDate": "2026-09-05",
@@ -853,7 +814,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -876,7 +837,7 @@
           }
         },
         {
-          "i": 19,
+          "i": 18,
           "start": "2026-09-05T10:30:00.000Z",
           "end": "2026-09-05T10:45:00.000Z",
           "localDate": "2026-09-05",
@@ -892,7 +853,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -915,7 +876,7 @@
           }
         },
         {
-          "i": 20,
+          "i": 19,
           "start": "2026-09-05T10:45:00.000Z",
           "end": "2026-09-05T11:00:00.000Z",
           "localDate": "2026-09-05",
@@ -931,7 +892,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -954,7 +915,7 @@
           }
         },
         {
-          "i": 21,
+          "i": 20,
           "start": "2026-09-05T11:00:00.000Z",
           "end": "2026-09-05T11:15:00.000Z",
           "localDate": "2026-09-05",
@@ -970,7 +931,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -993,7 +954,7 @@
           }
         },
         {
-          "i": 22,
+          "i": 21,
           "start": "2026-09-05T11:15:00.000Z",
           "end": "2026-09-05T11:30:00.000Z",
           "localDate": "2026-09-05",
@@ -1009,7 +970,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1032,7 +993,7 @@
           }
         },
         {
-          "i": 23,
+          "i": 22,
           "start": "2026-09-05T11:30:00.000Z",
           "end": "2026-09-05T11:45:00.000Z",
           "localDate": "2026-09-05",
@@ -1048,7 +1009,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1071,7 +1032,7 @@
           }
         },
         {
-          "i": 24,
+          "i": 23,
           "start": "2026-09-05T11:45:00.000Z",
           "end": "2026-09-05T12:00:00.000Z",
           "localDate": "2026-09-05",
@@ -1087,7 +1048,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1110,7 +1071,7 @@
           }
         },
         {
-          "i": 25,
+          "i": 24,
           "start": "2026-09-05T12:00:00.000Z",
           "end": "2026-09-05T12:15:00.000Z",
           "localDate": "2026-09-05",
@@ -1126,7 +1087,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1149,7 +1110,7 @@
           }
         },
         {
-          "i": 26,
+          "i": 25,
           "start": "2026-09-05T12:15:00.000Z",
           "end": "2026-09-05T12:30:00.000Z",
           "localDate": "2026-09-05",
@@ -1165,7 +1126,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1188,7 +1149,7 @@
           }
         },
         {
-          "i": 27,
+          "i": 26,
           "start": "2026-09-05T12:30:00.000Z",
           "end": "2026-09-05T12:45:00.000Z",
           "localDate": "2026-09-05",
@@ -1204,7 +1165,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1234,7 +1195,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 28,
+          "i": 27,
           "start": "2026-09-05T12:45:00.000Z",
           "end": "2026-09-05T13:00:00.000Z",
           "localDate": "2026-09-05",
@@ -1250,7 +1211,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1280,7 +1241,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 29,
+          "i": 28,
           "start": "2026-09-05T13:00:00.000Z",
           "end": "2026-09-05T13:15:00.000Z",
           "localDate": "2026-09-05",
@@ -1296,7 +1257,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1326,7 +1287,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 30,
+          "i": 29,
           "start": "2026-09-05T13:15:00.000Z",
           "end": "2026-09-05T13:30:00.000Z",
           "localDate": "2026-09-05",
@@ -1342,7 +1303,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1372,7 +1333,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 31,
+          "i": 30,
           "start": "2026-09-05T13:30:00.000Z",
           "end": "2026-09-05T13:45:00.000Z",
           "localDate": "2026-09-05",
@@ -1388,7 +1349,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1418,7 +1379,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 32,
+          "i": 31,
           "start": "2026-09-05T13:45:00.000Z",
           "end": "2026-09-05T14:00:00.000Z",
           "localDate": "2026-09-05",
@@ -1434,7 +1395,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1464,7 +1425,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 33,
+          "i": 32,
           "start": "2026-09-05T14:00:00.000Z",
           "end": "2026-09-05T14:15:00.000Z",
           "localDate": "2026-09-05",
@@ -1480,7 +1441,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1510,7 +1471,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 34,
+          "i": 33,
           "start": "2026-09-05T14:15:00.000Z",
           "end": "2026-09-05T14:30:00.000Z",
           "localDate": "2026-09-05",
@@ -1526,7 +1487,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1556,7 +1517,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 35,
+          "i": 34,
           "start": "2026-09-05T14:30:00.000Z",
           "end": "2026-09-05T14:45:00.000Z",
           "localDate": "2026-09-05",
@@ -1572,7 +1533,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1602,7 +1563,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 36,
+          "i": 35,
           "start": "2026-09-05T14:45:00.000Z",
           "end": "2026-09-05T15:00:00.000Z",
           "localDate": "2026-09-05",
@@ -1618,7 +1579,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1648,7 +1609,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 37,
+          "i": 36,
           "start": "2026-09-05T15:00:00.000Z",
           "end": "2026-09-05T15:15:00.000Z",
           "localDate": "2026-09-05",
@@ -1664,7 +1625,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1694,7 +1655,7 @@
           "warmWaterDayRelation": "CURRENT_DAY"
         },
         {
-          "i": 38,
+          "i": 37,
           "start": "2026-09-05T15:15:00.000Z",
           "end": "2026-09-05T15:30:00.000Z",
           "localDate": "2026-09-05",
@@ -1710,7 +1671,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1733,7 +1694,7 @@
           }
         },
         {
-          "i": 39,
+          "i": 38,
           "start": "2026-09-05T15:30:00.000Z",
           "end": "2026-09-05T15:45:00.000Z",
           "localDate": "2026-09-05",
@@ -1749,7 +1710,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1772,7 +1733,7 @@
           }
         },
         {
-          "i": 40,
+          "i": 39,
           "start": "2026-09-05T15:45:00.000Z",
           "end": "2026-09-05T16:00:00.000Z",
           "localDate": "2026-09-05",
@@ -1788,7 +1749,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1811,7 +1772,7 @@
           }
         },
         {
-          "i": 41,
+          "i": 40,
           "start": "2026-09-05T16:00:00.000Z",
           "end": "2026-09-05T16:15:00.000Z",
           "localDate": "2026-09-05",
@@ -1827,7 +1788,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1850,7 +1811,7 @@
           }
         },
         {
-          "i": 42,
+          "i": 41,
           "start": "2026-09-05T16:15:00.000Z",
           "end": "2026-09-05T16:30:00.000Z",
           "localDate": "2026-09-05",
@@ -1866,7 +1827,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1889,7 +1850,7 @@
           }
         },
         {
-          "i": 43,
+          "i": 42,
           "start": "2026-09-05T16:30:00.000Z",
           "end": "2026-09-05T16:45:00.000Z",
           "localDate": "2026-09-05",
@@ -1905,7 +1866,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1928,7 +1889,7 @@
           }
         },
         {
-          "i": 44,
+          "i": 43,
           "start": "2026-09-05T16:45:00.000Z",
           "end": "2026-09-05T17:00:00.000Z",
           "localDate": "2026-09-05",
@@ -1944,7 +1905,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -1967,7 +1928,7 @@
           }
         },
         {
-          "i": 45,
+          "i": 44,
           "start": "2026-09-05T17:00:00.000Z",
           "end": "2026-09-05T17:15:00.000Z",
           "localDate": "2026-09-05",
@@ -1983,7 +1944,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2006,7 +1967,7 @@
           }
         },
         {
-          "i": 46,
+          "i": 45,
           "start": "2026-09-05T17:15:00.000Z",
           "end": "2026-09-05T17:30:00.000Z",
           "localDate": "2026-09-05",
@@ -2022,7 +1983,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2045,7 +2006,7 @@
           }
         },
         {
-          "i": 47,
+          "i": 46,
           "start": "2026-09-05T17:30:00.000Z",
           "end": "2026-09-05T17:45:00.000Z",
           "localDate": "2026-09-05",
@@ -2061,7 +2022,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2084,7 +2045,7 @@
           }
         },
         {
-          "i": 48,
+          "i": 47,
           "start": "2026-09-05T17:45:00.000Z",
           "end": "2026-09-05T18:00:00.000Z",
           "localDate": "2026-09-05",
@@ -2100,7 +2061,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2123,7 +2084,7 @@
           }
         },
         {
-          "i": 49,
+          "i": 48,
           "start": "2026-09-05T18:00:00.000Z",
           "end": "2026-09-05T18:15:00.000Z",
           "localDate": "2026-09-05",
@@ -2139,7 +2100,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2162,7 +2123,7 @@
           }
         },
         {
-          "i": 50,
+          "i": 49,
           "start": "2026-09-05T18:15:00.000Z",
           "end": "2026-09-05T18:30:00.000Z",
           "localDate": "2026-09-05",
@@ -2178,7 +2139,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2201,7 +2162,7 @@
           }
         },
         {
-          "i": 51,
+          "i": 50,
           "start": "2026-09-05T18:30:00.000Z",
           "end": "2026-09-05T18:45:00.000Z",
           "localDate": "2026-09-05",
@@ -2217,7 +2178,46 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
+            "rejectedHighLoadSamples": 1,
+            "rejectedKnownApplianceSamples": 0
+          },
+          "pvForecastW": 0,
+          "netBeforeFlexW": 349,
+          "importBeforeFlexW": 349,
+          "pvSurplusBeforeFlexW": 0,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+            "pv": "WEATHER_HAUWERT_THEORETICAL_SCALE"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          }
+        },
+        {
+          "i": 51,
+          "start": "2026-09-05T18:45:00.000Z",
+          "end": "2026-09-05T19:00:00.000Z",
+          "localDate": "2026-09-05",
+          "localQuarter": 83,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 349,
+          "baseForecastTrace": {
+            "basis": "CLEAN_GLOBAL_MEDIAN",
+            "sampleCount": 0,
+            "sampleValuesW": [],
+            "sampleTimestamps": [],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2241,10 +2241,10 @@
         },
         {
           "i": 52,
-          "start": "2026-09-05T18:45:00.000Z",
-          "end": "2026-09-05T19:00:00.000Z",
+          "start": "2026-09-05T19:00:00.000Z",
+          "end": "2026-09-05T19:15:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 83,
+          "localQuarter": 84,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2256,7 +2256,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2280,10 +2280,10 @@
         },
         {
           "i": 53,
-          "start": "2026-09-05T19:00:00.000Z",
-          "end": "2026-09-05T19:15:00.000Z",
+          "start": "2026-09-05T19:15:00.000Z",
+          "end": "2026-09-05T19:30:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 84,
+          "localQuarter": 85,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2295,7 +2295,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2319,10 +2319,10 @@
         },
         {
           "i": 54,
-          "start": "2026-09-05T19:15:00.000Z",
-          "end": "2026-09-05T19:30:00.000Z",
+          "start": "2026-09-05T19:30:00.000Z",
+          "end": "2026-09-05T19:45:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 85,
+          "localQuarter": 86,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2334,7 +2334,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2358,10 +2358,10 @@
         },
         {
           "i": 55,
-          "start": "2026-09-05T19:30:00.000Z",
-          "end": "2026-09-05T19:45:00.000Z",
+          "start": "2026-09-05T19:45:00.000Z",
+          "end": "2026-09-05T20:00:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 86,
+          "localQuarter": 87,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2373,7 +2373,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2397,10 +2397,10 @@
         },
         {
           "i": 56,
-          "start": "2026-09-05T19:45:00.000Z",
-          "end": "2026-09-05T20:00:00.000Z",
+          "start": "2026-09-05T20:00:00.000Z",
+          "end": "2026-09-05T20:15:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 87,
+          "localQuarter": 88,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2412,7 +2412,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2436,10 +2436,10 @@
         },
         {
           "i": 57,
-          "start": "2026-09-05T20:00:00.000Z",
-          "end": "2026-09-05T20:15:00.000Z",
+          "start": "2026-09-05T20:15:00.000Z",
+          "end": "2026-09-05T20:30:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 88,
+          "localQuarter": 89,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2451,7 +2451,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2475,10 +2475,10 @@
         },
         {
           "i": 58,
-          "start": "2026-09-05T20:15:00.000Z",
-          "end": "2026-09-05T20:30:00.000Z",
+          "start": "2026-09-05T20:30:00.000Z",
+          "end": "2026-09-05T20:45:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 89,
+          "localQuarter": 90,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2490,7 +2490,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2514,10 +2514,10 @@
         },
         {
           "i": 59,
-          "start": "2026-09-05T20:30:00.000Z",
-          "end": "2026-09-05T20:45:00.000Z",
+          "start": "2026-09-05T20:45:00.000Z",
+          "end": "2026-09-05T21:00:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 90,
+          "localQuarter": 91,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2529,7 +2529,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2553,10 +2553,10 @@
         },
         {
           "i": 60,
-          "start": "2026-09-05T20:45:00.000Z",
-          "end": "2026-09-05T21:00:00.000Z",
+          "start": "2026-09-05T21:00:00.000Z",
+          "end": "2026-09-05T21:15:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 91,
+          "localQuarter": 92,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2568,7 +2568,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2592,10 +2592,10 @@
         },
         {
           "i": 61,
-          "start": "2026-09-05T21:00:00.000Z",
-          "end": "2026-09-05T21:15:00.000Z",
+          "start": "2026-09-05T21:15:00.000Z",
+          "end": "2026-09-05T21:30:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 92,
+          "localQuarter": 93,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2607,7 +2607,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2631,10 +2631,10 @@
         },
         {
           "i": 62,
-          "start": "2026-09-05T21:15:00.000Z",
-          "end": "2026-09-05T21:30:00.000Z",
+          "start": "2026-09-05T21:30:00.000Z",
+          "end": "2026-09-05T21:45:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 93,
+          "localQuarter": 94,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2646,7 +2646,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2670,10 +2670,10 @@
         },
         {
           "i": 63,
-          "start": "2026-09-05T21:30:00.000Z",
-          "end": "2026-09-05T21:45:00.000Z",
+          "start": "2026-09-05T21:45:00.000Z",
+          "end": "2026-09-05T22:00:00.000Z",
           "localDate": "2026-09-05",
-          "localQuarter": 94,
+          "localQuarter": 95,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 349,
@@ -2685,7 +2685,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2709,45 +2709,6 @@
         },
         {
           "i": 64,
-          "start": "2026-09-05T21:45:00.000Z",
-          "end": "2026-09-05T22:00:00.000Z",
-          "localDate": "2026-09-05",
-          "localQuarter": 95,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 349,
-          "baseForecastTrace": {
-            "basis": "CLEAN_GLOBAL_MEDIAN",
-            "sampleCount": 0,
-            "sampleValuesW": [],
-            "sampleTimestamps": [],
-            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
-            "washerActiveSamples": 0,
-            "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
-            "rejectedHighLoadSamples": 1,
-            "rejectedKnownApplianceSamples": 0
-          },
-          "pvForecastW": 0,
-          "netBeforeFlexW": 349,
-          "importBeforeFlexW": 349,
-          "pvSurplusBeforeFlexW": 0,
-          "gridHeadroomW": null,
-          "forecastQuality": {
-            "baseLoad": "CLEAN_GLOBAL_MEDIAN",
-            "pv": "WEATHER_HAUWERT_THEORETICAL_SCALE"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          }
-        },
-        {
-          "i": 65,
           "start": "2026-09-05T22:00:00.000Z",
           "end": "2026-09-05T22:15:00.000Z",
           "localDate": "2026-09-06",
@@ -2771,7 +2732,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2801,7 +2762,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 66,
+          "i": 65,
           "start": "2026-09-05T22:15:00.000Z",
           "end": "2026-09-05T22:30:00.000Z",
           "localDate": "2026-09-06",
@@ -2825,7 +2786,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2855,7 +2816,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 67,
+          "i": 66,
           "start": "2026-09-05T22:30:00.000Z",
           "end": "2026-09-05T22:45:00.000Z",
           "localDate": "2026-09-06",
@@ -2879,7 +2840,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2909,7 +2870,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 68,
+          "i": 67,
           "start": "2026-09-05T22:45:00.000Z",
           "end": "2026-09-05T23:00:00.000Z",
           "localDate": "2026-09-06",
@@ -2933,7 +2894,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -2963,7 +2924,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 69,
+          "i": 68,
           "start": "2026-09-05T23:00:00.000Z",
           "end": "2026-09-05T23:15:00.000Z",
           "localDate": "2026-09-06",
@@ -2987,7 +2948,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3017,7 +2978,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 70,
+          "i": 69,
           "start": "2026-09-05T23:15:00.000Z",
           "end": "2026-09-05T23:30:00.000Z",
           "localDate": "2026-09-06",
@@ -3039,7 +3000,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3069,7 +3030,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 71,
+          "i": 70,
           "start": "2026-09-05T23:30:00.000Z",
           "end": "2026-09-05T23:45:00.000Z",
           "localDate": "2026-09-06",
@@ -3093,7 +3054,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3123,7 +3084,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 72,
+          "i": 71,
           "start": "2026-09-05T23:45:00.000Z",
           "end": "2026-09-06T00:00:00.000Z",
           "localDate": "2026-09-06",
@@ -3147,7 +3108,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3177,7 +3138,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 73,
+          "i": 72,
           "start": "2026-09-06T00:00:00.000Z",
           "end": "2026-09-06T00:15:00.000Z",
           "localDate": "2026-09-06",
@@ -3201,7 +3162,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3231,7 +3192,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 74,
+          "i": 73,
           "start": "2026-09-06T00:15:00.000Z",
           "end": "2026-09-06T00:30:00.000Z",
           "localDate": "2026-09-06",
@@ -3255,7 +3216,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3285,7 +3246,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 75,
+          "i": 74,
           "start": "2026-09-06T00:30:00.000Z",
           "end": "2026-09-06T00:45:00.000Z",
           "localDate": "2026-09-06",
@@ -3309,7 +3270,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3339,7 +3300,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 76,
+          "i": 75,
           "start": "2026-09-06T00:45:00.000Z",
           "end": "2026-09-06T01:00:00.000Z",
           "localDate": "2026-09-06",
@@ -3363,7 +3324,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3393,7 +3354,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 77,
+          "i": 76,
           "start": "2026-09-06T01:00:00.000Z",
           "end": "2026-09-06T01:15:00.000Z",
           "localDate": "2026-09-06",
@@ -3417,7 +3378,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3447,7 +3408,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 78,
+          "i": 77,
           "start": "2026-09-06T01:15:00.000Z",
           "end": "2026-09-06T01:30:00.000Z",
           "localDate": "2026-09-06",
@@ -3471,7 +3432,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3501,7 +3462,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 79,
+          "i": 78,
           "start": "2026-09-06T01:30:00.000Z",
           "end": "2026-09-06T01:45:00.000Z",
           "localDate": "2026-09-06",
@@ -3525,7 +3486,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3555,7 +3516,7 @@
           "warmWaterDayRelation": "FUTURE_DAY"
         },
         {
-          "i": 80,
+          "i": 79,
           "start": "2026-09-06T01:45:00.000Z",
           "end": "2026-09-06T02:00:00.000Z",
           "localDate": "2026-09-06",
@@ -3579,7 +3540,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3594,22 +3555,15 @@
           },
           "battery": "HOLD",
           "tesla": "HOLD",
-          "warmWater": "DEADLINE_REQUIRED",
+          "warmWater": "HOLD",
           "targets": {
             "evTargetW": 0,
-            "wwTargetW": 1900,
+            "wwTargetW": 0,
             "batteryTargetW": 0
-          },
-          "warmWaterReason": "DEADLINE_FALLBACK",
-          "warmWaterAllocatedKWh": 0.475,
-          "warmWaterPvCoverageW": 0,
-          "warmWaterGridRequiredW": 1900,
-          "warmWaterMarginalImportW": 1900,
-          "warmWaterPlanningDate": "2026-09-06",
-          "warmWaterDayRelation": "FUTURE_DAY"
+          }
         },
         {
-          "i": 81,
+          "i": 80,
           "start": "2026-09-06T02:00:00.000Z",
           "end": "2026-09-06T02:15:00.000Z",
           "localDate": "2026-09-06",
@@ -3633,7 +3587,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3656,7 +3610,7 @@
           }
         },
         {
-          "i": 82,
+          "i": 81,
           "start": "2026-09-06T02:15:00.000Z",
           "end": "2026-09-06T02:30:00.000Z",
           "localDate": "2026-09-06",
@@ -3680,7 +3634,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3703,7 +3657,7 @@
           }
         },
         {
-          "i": 83,
+          "i": 82,
           "start": "2026-09-06T02:30:00.000Z",
           "end": "2026-09-06T02:45:00.000Z",
           "localDate": "2026-09-06",
@@ -3727,7 +3681,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3750,7 +3704,7 @@
           }
         },
         {
-          "i": 84,
+          "i": 83,
           "start": "2026-09-06T02:45:00.000Z",
           "end": "2026-09-06T03:00:00.000Z",
           "localDate": "2026-09-06",
@@ -3774,7 +3728,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3797,7 +3751,7 @@
           }
         },
         {
-          "i": 85,
+          "i": 84,
           "start": "2026-09-06T03:00:00.000Z",
           "end": "2026-09-06T03:15:00.000Z",
           "localDate": "2026-09-06",
@@ -3821,7 +3775,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3844,7 +3798,7 @@
           }
         },
         {
-          "i": 86,
+          "i": 85,
           "start": "2026-09-06T03:15:00.000Z",
           "end": "2026-09-06T03:30:00.000Z",
           "localDate": "2026-09-06",
@@ -3868,7 +3822,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3891,7 +3845,7 @@
           }
         },
         {
-          "i": 87,
+          "i": 86,
           "start": "2026-09-06T03:30:00.000Z",
           "end": "2026-09-06T03:45:00.000Z",
           "localDate": "2026-09-06",
@@ -3915,7 +3869,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3938,7 +3892,7 @@
           }
         },
         {
-          "i": 88,
+          "i": 87,
           "start": "2026-09-06T03:45:00.000Z",
           "end": "2026-09-06T04:00:00.000Z",
           "localDate": "2026-09-06",
@@ -3962,7 +3916,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -3985,7 +3939,7 @@
           }
         },
         {
-          "i": 89,
+          "i": 88,
           "start": "2026-09-06T04:00:00.000Z",
           "end": "2026-09-06T04:15:00.000Z",
           "localDate": "2026-09-06",
@@ -4009,7 +3963,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -4032,7 +3986,7 @@
           }
         },
         {
-          "i": 90,
+          "i": 89,
           "start": "2026-09-06T04:15:00.000Z",
           "end": "2026-09-06T04:30:00.000Z",
           "localDate": "2026-09-06",
@@ -4056,7 +4010,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -4079,7 +4033,7 @@
           }
         },
         {
-          "i": 91,
+          "i": 90,
           "start": "2026-09-06T04:30:00.000Z",
           "end": "2026-09-06T04:45:00.000Z",
           "localDate": "2026-09-06",
@@ -4103,7 +4057,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -4126,7 +4080,7 @@
           }
         },
         {
-          "i": 92,
+          "i": 91,
           "start": "2026-09-06T04:45:00.000Z",
           "end": "2026-09-06T05:00:00.000Z",
           "localDate": "2026-09-06",
@@ -4150,7 +4104,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -4173,7 +4127,7 @@
           }
         },
         {
-          "i": 93,
+          "i": 92,
           "start": "2026-09-06T05:00:00.000Z",
           "end": "2026-09-06T05:15:00.000Z",
           "localDate": "2026-09-06",
@@ -4197,7 +4151,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -4220,7 +4174,7 @@
           }
         },
         {
-          "i": 94,
+          "i": 93,
           "start": "2026-09-06T05:15:00.000Z",
           "end": "2026-09-06T05:30:00.000Z",
           "localDate": "2026-09-06",
@@ -4244,7 +4198,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -4267,7 +4221,7 @@
           }
         },
         {
-          "i": 95,
+          "i": 94,
           "start": "2026-09-06T05:30:00.000Z",
           "end": "2026-09-06T05:45:00.000Z",
           "localDate": "2026-09-06",
@@ -4291,7 +4245,7 @@
             "likelyContributor": "STRUCTURAL_CLEAN_BASE",
             "washerActiveSamples": 0,
             "dryerActiveSamples": 0,
-            "globalCleanSampleCount": 92,
+            "globalCleanSampleCount": 95,
             "rejectedHighLoadSamples": 1,
             "rejectedKnownApplianceSamples": 0
           },
@@ -4312,6 +4266,60 @@
             "wwTargetW": 0,
             "batteryTargetW": 0
           }
+        },
+        {
+          "i": 95,
+          "start": "2026-09-06T05:45:00.000Z",
+          "end": "2026-09-06T06:00:00.000Z",
+          "localDate": "2026-09-06",
+          "localQuarter": 31,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 220,
+          "baseForecastTrace": {
+            "basis": "CLEAN_QUARTER_MEDIAN",
+            "sampleCount": 3,
+            "sampleValuesW": [
+              361,
+              220,
+              0
+            ],
+            "sampleTimestamps": [
+              "2026-09-05T05:45:00.363Z",
+              "2026-09-05T05:50:00.206Z",
+              "2026-09-05T05:55:00.313Z"
+            ],
+            "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+            "washerActiveSamples": 0,
+            "dryerActiveSamples": 0,
+            "globalCleanSampleCount": 95,
+            "rejectedHighLoadSamples": 1,
+            "rejectedKnownApplianceSamples": 0
+          },
+          "pvForecastW": 376,
+          "netBeforeFlexW": -156,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 156,
+          "gridHeadroomW": null,
+          "forecastQuality": {
+            "baseLoad": "CLEAN_QUARTER_MEDIAN",
+            "pv": "WEATHER_HAUWERT_THEORETICAL_SCALE"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "DEADLINE_REQUIRED",
+          "targets": {
+            "evTargetW": 0,
+            "wwTargetW": 1900,
+            "batteryTargetW": 0
+          },
+          "warmWaterReason": "PV_PARTIAL_FALLBACK",
+          "warmWaterAllocatedKWh": 0.475,
+          "warmWaterPvCoverageW": 156,
+          "warmWaterGridRequiredW": 1744,
+          "warmWaterMarginalImportW": 1744,
+          "warmWaterPlanningDate": "2026-09-06",
+          "warmWaterDayRelation": "FUTURE_DAY"
         }
       ],
       "energyBalance": {
@@ -4345,7 +4353,7 @@
       "warmWater": {
         "allocatedSlots": [
           {
-            "i": 10,
+            "i": 9,
             "start": "2026-09-05T08:15:00.000Z",
             "end": "2026-09-05T08:30:00.000Z",
             "localDate": "2026-09-05",
@@ -4361,7 +4369,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4384,7 +4392,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 11,
+            "i": 10,
             "start": "2026-09-05T08:30:00.000Z",
             "end": "2026-09-05T08:45:00.000Z",
             "localDate": "2026-09-05",
@@ -4400,7 +4408,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4423,7 +4431,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 12,
+            "i": 11,
             "start": "2026-09-05T08:45:00.000Z",
             "end": "2026-09-05T09:00:00.000Z",
             "localDate": "2026-09-05",
@@ -4439,7 +4447,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4462,7 +4470,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 13,
+            "i": 12,
             "start": "2026-09-05T09:00:00.000Z",
             "end": "2026-09-05T09:15:00.000Z",
             "localDate": "2026-09-05",
@@ -4478,7 +4486,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4501,7 +4509,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 14,
+            "i": 13,
             "start": "2026-09-05T09:15:00.000Z",
             "end": "2026-09-05T09:30:00.000Z",
             "localDate": "2026-09-05",
@@ -4517,7 +4525,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4540,7 +4548,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 27,
+            "i": 26,
             "start": "2026-09-05T12:30:00.000Z",
             "end": "2026-09-05T12:45:00.000Z",
             "localDate": "2026-09-05",
@@ -4556,7 +4564,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4579,7 +4587,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 28,
+            "i": 27,
             "start": "2026-09-05T12:45:00.000Z",
             "end": "2026-09-05T13:00:00.000Z",
             "localDate": "2026-09-05",
@@ -4595,7 +4603,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4618,7 +4626,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 29,
+            "i": 28,
             "start": "2026-09-05T13:00:00.000Z",
             "end": "2026-09-05T13:15:00.000Z",
             "localDate": "2026-09-05",
@@ -4634,7 +4642,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4657,7 +4665,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 30,
+            "i": 29,
             "start": "2026-09-05T13:15:00.000Z",
             "end": "2026-09-05T13:30:00.000Z",
             "localDate": "2026-09-05",
@@ -4673,7 +4681,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4696,7 +4704,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 31,
+            "i": 30,
             "start": "2026-09-05T13:30:00.000Z",
             "end": "2026-09-05T13:45:00.000Z",
             "localDate": "2026-09-05",
@@ -4712,7 +4720,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4735,7 +4743,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 32,
+            "i": 31,
             "start": "2026-09-05T13:45:00.000Z",
             "end": "2026-09-05T14:00:00.000Z",
             "localDate": "2026-09-05",
@@ -4751,7 +4759,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4774,7 +4782,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 33,
+            "i": 32,
             "start": "2026-09-05T14:00:00.000Z",
             "end": "2026-09-05T14:15:00.000Z",
             "localDate": "2026-09-05",
@@ -4790,7 +4798,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4813,7 +4821,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 34,
+            "i": 33,
             "start": "2026-09-05T14:15:00.000Z",
             "end": "2026-09-05T14:30:00.000Z",
             "localDate": "2026-09-05",
@@ -4829,7 +4837,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4852,7 +4860,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 35,
+            "i": 34,
             "start": "2026-09-05T14:30:00.000Z",
             "end": "2026-09-05T14:45:00.000Z",
             "localDate": "2026-09-05",
@@ -4868,7 +4876,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4891,7 +4899,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 36,
+            "i": 35,
             "start": "2026-09-05T14:45:00.000Z",
             "end": "2026-09-05T15:00:00.000Z",
             "localDate": "2026-09-05",
@@ -4907,7 +4915,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4930,7 +4938,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 37,
+            "i": 36,
             "start": "2026-09-05T15:00:00.000Z",
             "end": "2026-09-05T15:15:00.000Z",
             "localDate": "2026-09-05",
@@ -4946,7 +4954,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -4969,7 +4977,7 @@
             "allocationReason": "PV_SURPLUS_FULL"
           },
           {
-            "i": 65,
+            "i": 64,
             "start": "2026-09-05T22:00:00.000Z",
             "end": "2026-09-05T22:15:00.000Z",
             "localDate": "2026-09-06",
@@ -4993,7 +5001,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5016,7 +5024,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 66,
+            "i": 65,
             "start": "2026-09-05T22:15:00.000Z",
             "end": "2026-09-05T22:30:00.000Z",
             "localDate": "2026-09-06",
@@ -5040,7 +5048,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5063,7 +5071,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 67,
+            "i": 66,
             "start": "2026-09-05T22:30:00.000Z",
             "end": "2026-09-05T22:45:00.000Z",
             "localDate": "2026-09-06",
@@ -5087,7 +5095,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5110,7 +5118,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 68,
+            "i": 67,
             "start": "2026-09-05T22:45:00.000Z",
             "end": "2026-09-05T23:00:00.000Z",
             "localDate": "2026-09-06",
@@ -5134,7 +5142,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5157,7 +5165,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 69,
+            "i": 68,
             "start": "2026-09-05T23:00:00.000Z",
             "end": "2026-09-05T23:15:00.000Z",
             "localDate": "2026-09-06",
@@ -5181,7 +5189,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5204,7 +5212,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 70,
+            "i": 69,
             "start": "2026-09-05T23:15:00.000Z",
             "end": "2026-09-05T23:30:00.000Z",
             "localDate": "2026-09-06",
@@ -5226,7 +5234,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5249,7 +5257,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 71,
+            "i": 70,
             "start": "2026-09-05T23:30:00.000Z",
             "end": "2026-09-05T23:45:00.000Z",
             "localDate": "2026-09-06",
@@ -5273,7 +5281,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5296,7 +5304,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 72,
+            "i": 71,
             "start": "2026-09-05T23:45:00.000Z",
             "end": "2026-09-06T00:00:00.000Z",
             "localDate": "2026-09-06",
@@ -5320,7 +5328,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5343,7 +5351,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 73,
+            "i": 72,
             "start": "2026-09-06T00:00:00.000Z",
             "end": "2026-09-06T00:15:00.000Z",
             "localDate": "2026-09-06",
@@ -5367,7 +5375,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5390,7 +5398,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 74,
+            "i": 73,
             "start": "2026-09-06T00:15:00.000Z",
             "end": "2026-09-06T00:30:00.000Z",
             "localDate": "2026-09-06",
@@ -5414,7 +5422,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5437,7 +5445,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 75,
+            "i": 74,
             "start": "2026-09-06T00:30:00.000Z",
             "end": "2026-09-06T00:45:00.000Z",
             "localDate": "2026-09-06",
@@ -5461,7 +5469,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5484,7 +5492,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 76,
+            "i": 75,
             "start": "2026-09-06T00:45:00.000Z",
             "end": "2026-09-06T01:00:00.000Z",
             "localDate": "2026-09-06",
@@ -5508,7 +5516,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5531,7 +5539,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 77,
+            "i": 76,
             "start": "2026-09-06T01:00:00.000Z",
             "end": "2026-09-06T01:15:00.000Z",
             "localDate": "2026-09-06",
@@ -5555,7 +5563,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5578,7 +5586,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 78,
+            "i": 77,
             "start": "2026-09-06T01:15:00.000Z",
             "end": "2026-09-06T01:30:00.000Z",
             "localDate": "2026-09-06",
@@ -5602,7 +5610,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5625,7 +5633,7 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 79,
+            "i": 78,
             "start": "2026-09-06T01:30:00.000Z",
             "end": "2026-09-06T01:45:00.000Z",
             "localDate": "2026-09-06",
@@ -5649,7 +5657,7 @@
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
@@ -5672,38 +5680,38 @@
             "allocationReason": "DEADLINE_FALLBACK"
           },
           {
-            "i": 80,
-            "start": "2026-09-06T01:45:00.000Z",
-            "end": "2026-09-06T02:00:00.000Z",
+            "i": 95,
+            "start": "2026-09-06T05:45:00.000Z",
+            "end": "2026-09-06T06:00:00.000Z",
             "localDate": "2026-09-06",
-            "localQuarter": 15,
+            "localQuarter": 31,
             "price_eur_kwh": null,
             "priceClass": "FIXED",
-            "baseLoadForecastW": 408,
+            "baseLoadForecastW": 220,
             "baseForecastTrace": {
               "basis": "CLEAN_QUARTER_MEDIAN",
               "sampleCount": 3,
               "sampleValuesW": [
-                273,
-                414,
-                408
+                361,
+                220,
+                0
               ],
               "sampleTimestamps": [
-                "2026-09-05T01:45:00.353Z",
-                "2026-09-05T01:50:00.180Z",
-                "2026-09-05T01:55:00.303Z"
+                "2026-09-05T05:45:00.363Z",
+                "2026-09-05T05:50:00.206Z",
+                "2026-09-05T05:55:00.313Z"
               ],
               "likelyContributor": "STRUCTURAL_CLEAN_BASE",
               "washerActiveSamples": 0,
               "dryerActiveSamples": 0,
-              "globalCleanSampleCount": 92,
+              "globalCleanSampleCount": 95,
               "rejectedHighLoadSamples": 1,
               "rejectedKnownApplianceSamples": 0
             },
-            "pvForecastW": 0,
-            "netBeforeFlexW": 408,
-            "importBeforeFlexW": 408,
-            "pvSurplusBeforeFlexW": 0,
+            "pvForecastW": 376,
+            "netBeforeFlexW": -156,
+            "importBeforeFlexW": 0,
+            "pvSurplusBeforeFlexW": 156,
             "gridHeadroomW": null,
             "forecastQuality": {
               "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -5713,10 +5721,10 @@
             "dayRelation": "FUTURE_DAY",
             "catchupRequired": false,
             "allocatedKWh": 0.475,
-            "pvCoverageW": 0,
-            "gridRequiredW": 1900,
-            "marginalImportW": 1900,
-            "allocationReason": "DEADLINE_FALLBACK"
+            "pvCoverageW": 156,
+            "gridRequiredW": 1744,
+            "marginalImportW": 1744,
+            "allocationReason": "PV_PARTIAL_FALLBACK"
           }
         ],
         "unallocatedKWh": 0,
@@ -5734,7 +5742,7 @@
           "deadlineAt": "2026-09-05T17:00:00.000Z",
           "allocatedSlots": [
             {
-              "i": 10,
+              "i": 9,
               "start": "2026-09-05T08:15:00.000Z",
               "end": "2026-09-05T08:30:00.000Z",
               "localDate": "2026-09-05",
@@ -5750,7 +5758,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -5773,7 +5781,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 11,
+              "i": 10,
               "start": "2026-09-05T08:30:00.000Z",
               "end": "2026-09-05T08:45:00.000Z",
               "localDate": "2026-09-05",
@@ -5789,7 +5797,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -5812,7 +5820,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 12,
+              "i": 11,
               "start": "2026-09-05T08:45:00.000Z",
               "end": "2026-09-05T09:00:00.000Z",
               "localDate": "2026-09-05",
@@ -5828,7 +5836,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -5851,7 +5859,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 13,
+              "i": 12,
               "start": "2026-09-05T09:00:00.000Z",
               "end": "2026-09-05T09:15:00.000Z",
               "localDate": "2026-09-05",
@@ -5867,7 +5875,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -5890,7 +5898,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 14,
+              "i": 13,
               "start": "2026-09-05T09:15:00.000Z",
               "end": "2026-09-05T09:30:00.000Z",
               "localDate": "2026-09-05",
@@ -5906,7 +5914,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -5929,7 +5937,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 27,
+              "i": 26,
               "start": "2026-09-05T12:30:00.000Z",
               "end": "2026-09-05T12:45:00.000Z",
               "localDate": "2026-09-05",
@@ -5945,7 +5953,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -5968,7 +5976,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 28,
+              "i": 27,
               "start": "2026-09-05T12:45:00.000Z",
               "end": "2026-09-05T13:00:00.000Z",
               "localDate": "2026-09-05",
@@ -5984,7 +5992,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -6007,7 +6015,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 29,
+              "i": 28,
               "start": "2026-09-05T13:00:00.000Z",
               "end": "2026-09-05T13:15:00.000Z",
               "localDate": "2026-09-05",
@@ -6023,7 +6031,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -6046,7 +6054,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 30,
+              "i": 29,
               "start": "2026-09-05T13:15:00.000Z",
               "end": "2026-09-05T13:30:00.000Z",
               "localDate": "2026-09-05",
@@ -6062,7 +6070,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -6085,7 +6093,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 31,
+              "i": 30,
               "start": "2026-09-05T13:30:00.000Z",
               "end": "2026-09-05T13:45:00.000Z",
               "localDate": "2026-09-05",
@@ -6101,7 +6109,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -6124,7 +6132,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 32,
+              "i": 31,
               "start": "2026-09-05T13:45:00.000Z",
               "end": "2026-09-05T14:00:00.000Z",
               "localDate": "2026-09-05",
@@ -6140,7 +6148,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -6163,7 +6171,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 33,
+              "i": 32,
               "start": "2026-09-05T14:00:00.000Z",
               "end": "2026-09-05T14:15:00.000Z",
               "localDate": "2026-09-05",
@@ -6179,7 +6187,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -6202,7 +6210,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 34,
+              "i": 33,
               "start": "2026-09-05T14:15:00.000Z",
               "end": "2026-09-05T14:30:00.000Z",
               "localDate": "2026-09-05",
@@ -6218,7 +6226,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -6241,7 +6249,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 35,
+              "i": 34,
               "start": "2026-09-05T14:30:00.000Z",
               "end": "2026-09-05T14:45:00.000Z",
               "localDate": "2026-09-05",
@@ -6257,7 +6265,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -6280,7 +6288,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 36,
+              "i": 35,
               "start": "2026-09-05T14:45:00.000Z",
               "end": "2026-09-05T15:00:00.000Z",
               "localDate": "2026-09-05",
@@ -6296,7 +6304,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -6319,7 +6327,7 @@
               "allocationReason": "PV_SURPLUS_FULL"
             },
             {
-              "i": 37,
+              "i": 36,
               "start": "2026-09-05T15:00:00.000Z",
               "end": "2026-09-05T15:15:00.000Z",
               "localDate": "2026-09-05",
@@ -6335,7 +6343,7 @@
                 "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                 "washerActiveSamples": 0,
                 "dryerActiveSamples": 0,
-                "globalCleanSampleCount": 92,
+                "globalCleanSampleCount": 95,
                 "rejectedHighLoadSamples": 1,
                 "rejectedKnownApplianceSamples": 0
               },
@@ -6378,7 +6386,7 @@
             "deadlineAt": "2026-09-06T17:00:00.000Z",
             "allocatedSlots": [
               {
-                "i": 65,
+                "i": 64,
                 "start": "2026-09-05T22:00:00.000Z",
                 "end": "2026-09-05T22:15:00.000Z",
                 "localDate": "2026-09-06",
@@ -6402,7 +6410,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6425,7 +6433,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 66,
+                "i": 65,
                 "start": "2026-09-05T22:15:00.000Z",
                 "end": "2026-09-05T22:30:00.000Z",
                 "localDate": "2026-09-06",
@@ -6449,7 +6457,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6472,7 +6480,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 67,
+                "i": 66,
                 "start": "2026-09-05T22:30:00.000Z",
                 "end": "2026-09-05T22:45:00.000Z",
                 "localDate": "2026-09-06",
@@ -6496,7 +6504,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6519,7 +6527,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 68,
+                "i": 67,
                 "start": "2026-09-05T22:45:00.000Z",
                 "end": "2026-09-05T23:00:00.000Z",
                 "localDate": "2026-09-06",
@@ -6543,7 +6551,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6566,7 +6574,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 69,
+                "i": 68,
                 "start": "2026-09-05T23:00:00.000Z",
                 "end": "2026-09-05T23:15:00.000Z",
                 "localDate": "2026-09-06",
@@ -6590,7 +6598,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6613,7 +6621,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 70,
+                "i": 69,
                 "start": "2026-09-05T23:15:00.000Z",
                 "end": "2026-09-05T23:30:00.000Z",
                 "localDate": "2026-09-06",
@@ -6635,7 +6643,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6658,7 +6666,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 71,
+                "i": 70,
                 "start": "2026-09-05T23:30:00.000Z",
                 "end": "2026-09-05T23:45:00.000Z",
                 "localDate": "2026-09-06",
@@ -6682,7 +6690,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6705,7 +6713,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 72,
+                "i": 71,
                 "start": "2026-09-05T23:45:00.000Z",
                 "end": "2026-09-06T00:00:00.000Z",
                 "localDate": "2026-09-06",
@@ -6729,7 +6737,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6752,7 +6760,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 73,
+                "i": 72,
                 "start": "2026-09-06T00:00:00.000Z",
                 "end": "2026-09-06T00:15:00.000Z",
                 "localDate": "2026-09-06",
@@ -6776,7 +6784,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6799,7 +6807,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 74,
+                "i": 73,
                 "start": "2026-09-06T00:15:00.000Z",
                 "end": "2026-09-06T00:30:00.000Z",
                 "localDate": "2026-09-06",
@@ -6823,7 +6831,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6846,7 +6854,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 75,
+                "i": 74,
                 "start": "2026-09-06T00:30:00.000Z",
                 "end": "2026-09-06T00:45:00.000Z",
                 "localDate": "2026-09-06",
@@ -6870,7 +6878,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6893,7 +6901,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 76,
+                "i": 75,
                 "start": "2026-09-06T00:45:00.000Z",
                 "end": "2026-09-06T01:00:00.000Z",
                 "localDate": "2026-09-06",
@@ -6917,7 +6925,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6940,7 +6948,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 77,
+                "i": 76,
                 "start": "2026-09-06T01:00:00.000Z",
                 "end": "2026-09-06T01:15:00.000Z",
                 "localDate": "2026-09-06",
@@ -6964,7 +6972,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -6987,7 +6995,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 78,
+                "i": 77,
                 "start": "2026-09-06T01:15:00.000Z",
                 "end": "2026-09-06T01:30:00.000Z",
                 "localDate": "2026-09-06",
@@ -7011,7 +7019,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7034,7 +7042,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 79,
+                "i": 78,
                 "start": "2026-09-06T01:30:00.000Z",
                 "end": "2026-09-06T01:45:00.000Z",
                 "localDate": "2026-09-06",
@@ -7058,7 +7066,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7081,38 +7089,38 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 80,
-                "start": "2026-09-06T01:45:00.000Z",
-                "end": "2026-09-06T02:00:00.000Z",
+                "i": 95,
+                "start": "2026-09-06T05:45:00.000Z",
+                "end": "2026-09-06T06:00:00.000Z",
                 "localDate": "2026-09-06",
-                "localQuarter": 15,
+                "localQuarter": 31,
                 "price_eur_kwh": null,
                 "priceClass": "FIXED",
-                "baseLoadForecastW": 408,
+                "baseLoadForecastW": 220,
                 "baseForecastTrace": {
                   "basis": "CLEAN_QUARTER_MEDIAN",
                   "sampleCount": 3,
                   "sampleValuesW": [
-                    273,
-                    414,
-                    408
+                    361,
+                    220,
+                    0
                   ],
                   "sampleTimestamps": [
-                    "2026-09-05T01:45:00.353Z",
-                    "2026-09-05T01:50:00.180Z",
-                    "2026-09-05T01:55:00.303Z"
+                    "2026-09-05T05:45:00.363Z",
+                    "2026-09-05T05:50:00.206Z",
+                    "2026-09-05T05:55:00.313Z"
                   ],
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
-                "pvForecastW": 0,
-                "netBeforeFlexW": 408,
-                "importBeforeFlexW": 408,
-                "pvSurplusBeforeFlexW": 0,
+                "pvForecastW": 376,
+                "netBeforeFlexW": -156,
+                "importBeforeFlexW": 0,
+                "pvSurplusBeforeFlexW": 156,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -7122,16 +7130,16 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 0,
-                "gridRequiredW": 1900,
-                "marginalImportW": 1900,
-                "allocationReason": "DEADLINE_FALLBACK"
+                "pvCoverageW": 156,
+                "gridRequiredW": 1744,
+                "marginalImportW": 1744,
+                "allocationReason": "PV_PARTIAL_FALLBACK"
               }
             ],
             "unallocatedKWh": 0,
             "deferredGridEnergyKWh": 0,
             "deadlineFallbackArmed": true,
-            "deadlineSlackSlots": 15,
+            "deadlineSlackSlots": 16,
             "requiredFallbackSlots": 16,
             "deadlineSafetySlots": 2
           }
@@ -7149,7 +7157,7 @@
             "deadlineAt": "2026-09-05T17:00:00.000Z",
             "allocatedSlots": [
               {
-                "i": 10,
+                "i": 9,
                 "start": "2026-09-05T08:15:00.000Z",
                 "end": "2026-09-05T08:30:00.000Z",
                 "localDate": "2026-09-05",
@@ -7165,7 +7173,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7188,7 +7196,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 11,
+                "i": 10,
                 "start": "2026-09-05T08:30:00.000Z",
                 "end": "2026-09-05T08:45:00.000Z",
                 "localDate": "2026-09-05",
@@ -7204,7 +7212,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7227,7 +7235,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 12,
+                "i": 11,
                 "start": "2026-09-05T08:45:00.000Z",
                 "end": "2026-09-05T09:00:00.000Z",
                 "localDate": "2026-09-05",
@@ -7243,7 +7251,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7266,7 +7274,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 13,
+                "i": 12,
                 "start": "2026-09-05T09:00:00.000Z",
                 "end": "2026-09-05T09:15:00.000Z",
                 "localDate": "2026-09-05",
@@ -7282,7 +7290,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7305,7 +7313,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 14,
+                "i": 13,
                 "start": "2026-09-05T09:15:00.000Z",
                 "end": "2026-09-05T09:30:00.000Z",
                 "localDate": "2026-09-05",
@@ -7321,7 +7329,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7344,7 +7352,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 27,
+                "i": 26,
                 "start": "2026-09-05T12:30:00.000Z",
                 "end": "2026-09-05T12:45:00.000Z",
                 "localDate": "2026-09-05",
@@ -7360,7 +7368,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7383,7 +7391,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 28,
+                "i": 27,
                 "start": "2026-09-05T12:45:00.000Z",
                 "end": "2026-09-05T13:00:00.000Z",
                 "localDate": "2026-09-05",
@@ -7399,7 +7407,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7422,7 +7430,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 29,
+                "i": 28,
                 "start": "2026-09-05T13:00:00.000Z",
                 "end": "2026-09-05T13:15:00.000Z",
                 "localDate": "2026-09-05",
@@ -7438,7 +7446,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7461,7 +7469,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 30,
+                "i": 29,
                 "start": "2026-09-05T13:15:00.000Z",
                 "end": "2026-09-05T13:30:00.000Z",
                 "localDate": "2026-09-05",
@@ -7477,7 +7485,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7500,7 +7508,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 31,
+                "i": 30,
                 "start": "2026-09-05T13:30:00.000Z",
                 "end": "2026-09-05T13:45:00.000Z",
                 "localDate": "2026-09-05",
@@ -7516,7 +7524,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7539,7 +7547,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 32,
+                "i": 31,
                 "start": "2026-09-05T13:45:00.000Z",
                 "end": "2026-09-05T14:00:00.000Z",
                 "localDate": "2026-09-05",
@@ -7555,7 +7563,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7578,7 +7586,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 33,
+                "i": 32,
                 "start": "2026-09-05T14:00:00.000Z",
                 "end": "2026-09-05T14:15:00.000Z",
                 "localDate": "2026-09-05",
@@ -7594,7 +7602,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7617,7 +7625,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 34,
+                "i": 33,
                 "start": "2026-09-05T14:15:00.000Z",
                 "end": "2026-09-05T14:30:00.000Z",
                 "localDate": "2026-09-05",
@@ -7633,7 +7641,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7656,7 +7664,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 35,
+                "i": 34,
                 "start": "2026-09-05T14:30:00.000Z",
                 "end": "2026-09-05T14:45:00.000Z",
                 "localDate": "2026-09-05",
@@ -7672,7 +7680,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7695,7 +7703,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 36,
+                "i": 35,
                 "start": "2026-09-05T14:45:00.000Z",
                 "end": "2026-09-05T15:00:00.000Z",
                 "localDate": "2026-09-05",
@@ -7711,7 +7719,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7734,7 +7742,7 @@
                 "allocationReason": "PV_SURPLUS_FULL"
               },
               {
-                "i": 37,
+                "i": 36,
                 "start": "2026-09-05T15:00:00.000Z",
                 "end": "2026-09-05T15:15:00.000Z",
                 "localDate": "2026-09-05",
@@ -7750,7 +7758,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7792,7 +7800,7 @@
             "deadlineAt": "2026-09-06T17:00:00.000Z",
             "allocatedSlots": [
               {
-                "i": 65,
+                "i": 64,
                 "start": "2026-09-05T22:00:00.000Z",
                 "end": "2026-09-05T22:15:00.000Z",
                 "localDate": "2026-09-06",
@@ -7816,7 +7824,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7839,7 +7847,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 66,
+                "i": 65,
                 "start": "2026-09-05T22:15:00.000Z",
                 "end": "2026-09-05T22:30:00.000Z",
                 "localDate": "2026-09-06",
@@ -7863,7 +7871,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7886,7 +7894,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 67,
+                "i": 66,
                 "start": "2026-09-05T22:30:00.000Z",
                 "end": "2026-09-05T22:45:00.000Z",
                 "localDate": "2026-09-06",
@@ -7910,7 +7918,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7933,7 +7941,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 68,
+                "i": 67,
                 "start": "2026-09-05T22:45:00.000Z",
                 "end": "2026-09-05T23:00:00.000Z",
                 "localDate": "2026-09-06",
@@ -7957,7 +7965,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -7980,7 +7988,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 69,
+                "i": 68,
                 "start": "2026-09-05T23:00:00.000Z",
                 "end": "2026-09-05T23:15:00.000Z",
                 "localDate": "2026-09-06",
@@ -8004,7 +8012,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -8027,7 +8035,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 70,
+                "i": 69,
                 "start": "2026-09-05T23:15:00.000Z",
                 "end": "2026-09-05T23:30:00.000Z",
                 "localDate": "2026-09-06",
@@ -8049,7 +8057,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -8072,7 +8080,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 71,
+                "i": 70,
                 "start": "2026-09-05T23:30:00.000Z",
                 "end": "2026-09-05T23:45:00.000Z",
                 "localDate": "2026-09-06",
@@ -8096,7 +8104,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -8119,7 +8127,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 72,
+                "i": 71,
                 "start": "2026-09-05T23:45:00.000Z",
                 "end": "2026-09-06T00:00:00.000Z",
                 "localDate": "2026-09-06",
@@ -8143,7 +8151,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -8166,7 +8174,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 73,
+                "i": 72,
                 "start": "2026-09-06T00:00:00.000Z",
                 "end": "2026-09-06T00:15:00.000Z",
                 "localDate": "2026-09-06",
@@ -8190,7 +8198,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -8213,7 +8221,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 74,
+                "i": 73,
                 "start": "2026-09-06T00:15:00.000Z",
                 "end": "2026-09-06T00:30:00.000Z",
                 "localDate": "2026-09-06",
@@ -8237,7 +8245,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -8260,7 +8268,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 75,
+                "i": 74,
                 "start": "2026-09-06T00:30:00.000Z",
                 "end": "2026-09-06T00:45:00.000Z",
                 "localDate": "2026-09-06",
@@ -8284,7 +8292,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -8307,7 +8315,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 76,
+                "i": 75,
                 "start": "2026-09-06T00:45:00.000Z",
                 "end": "2026-09-06T01:00:00.000Z",
                 "localDate": "2026-09-06",
@@ -8331,7 +8339,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -8354,7 +8362,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 77,
+                "i": 76,
                 "start": "2026-09-06T01:00:00.000Z",
                 "end": "2026-09-06T01:15:00.000Z",
                 "localDate": "2026-09-06",
@@ -8378,7 +8386,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -8401,7 +8409,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 78,
+                "i": 77,
                 "start": "2026-09-06T01:15:00.000Z",
                 "end": "2026-09-06T01:30:00.000Z",
                 "localDate": "2026-09-06",
@@ -8425,7 +8433,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -8448,7 +8456,7 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 79,
+                "i": 78,
                 "start": "2026-09-06T01:30:00.000Z",
                 "end": "2026-09-06T01:45:00.000Z",
                 "localDate": "2026-09-06",
@@ -8472,7 +8480,7 @@
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
@@ -8495,38 +8503,38 @@
                 "allocationReason": "DEADLINE_FALLBACK"
               },
               {
-                "i": 80,
-                "start": "2026-09-06T01:45:00.000Z",
-                "end": "2026-09-06T02:00:00.000Z",
+                "i": 95,
+                "start": "2026-09-06T05:45:00.000Z",
+                "end": "2026-09-06T06:00:00.000Z",
                 "localDate": "2026-09-06",
-                "localQuarter": 15,
+                "localQuarter": 31,
                 "price_eur_kwh": null,
                 "priceClass": "FIXED",
-                "baseLoadForecastW": 408,
+                "baseLoadForecastW": 220,
                 "baseForecastTrace": {
                   "basis": "CLEAN_QUARTER_MEDIAN",
                   "sampleCount": 3,
                   "sampleValuesW": [
-                    273,
-                    414,
-                    408
+                    361,
+                    220,
+                    0
                   ],
                   "sampleTimestamps": [
-                    "2026-09-05T01:45:00.353Z",
-                    "2026-09-05T01:50:00.180Z",
-                    "2026-09-05T01:55:00.303Z"
+                    "2026-09-05T05:45:00.363Z",
+                    "2026-09-05T05:50:00.206Z",
+                    "2026-09-05T05:55:00.313Z"
                   ],
                   "likelyContributor": "STRUCTURAL_CLEAN_BASE",
                   "washerActiveSamples": 0,
                   "dryerActiveSamples": 0,
-                  "globalCleanSampleCount": 92,
+                  "globalCleanSampleCount": 95,
                   "rejectedHighLoadSamples": 1,
                   "rejectedKnownApplianceSamples": 0
                 },
-                "pvForecastW": 0,
-                "netBeforeFlexW": 408,
-                "importBeforeFlexW": 408,
-                "pvSurplusBeforeFlexW": 0,
+                "pvForecastW": 376,
+                "netBeforeFlexW": -156,
+                "importBeforeFlexW": 0,
+                "pvSurplusBeforeFlexW": 156,
                 "gridHeadroomW": null,
                 "forecastQuality": {
                   "baseLoad": "CLEAN_QUARTER_MEDIAN",
@@ -8536,16 +8544,16 @@
                 "dayRelation": "FUTURE_DAY",
                 "catchupRequired": false,
                 "allocatedKWh": 0.475,
-                "pvCoverageW": 0,
-                "gridRequiredW": 1900,
-                "marginalImportW": 1900,
-                "allocationReason": "DEADLINE_FALLBACK"
+                "pvCoverageW": 156,
+                "gridRequiredW": 1744,
+                "marginalImportW": 1744,
+                "allocationReason": "PV_PARTIAL_FALLBACK"
               }
             ],
             "unallocatedKWh": 0,
             "deferredGridEnergyKWh": 0,
             "deadlineFallbackArmed": true,
-            "deadlineSlackSlots": 15,
+            "deadlineSlackSlots": 16,
             "requiredFallbackSlots": 16,
             "deadlineSafetySlots": 2
           }
@@ -8573,20 +8581,20 @@
   },
   "status": {
     "status": "READY_SHADOW_V0.5.0",
-    "at": "2026-09-05T05:45:45.147Z",
+    "at": "2026-09-05T06:00:45.250Z",
     "version": "EM2_ENERGY_PLAN_24H_V0.5.0",
     "contract": "FIXED",
     "slots": 96,
-    "baseQuality": "CLEAN_GLOBAL_MEDIAN_FALLBACK",
+    "baseQuality": "CLEAN_QUARTER_PROFILE",
     "pvQuality": "WEATHER_HAUWERT_THEORETICAL_SCALE",
     "pvSource": "OPEN_METEO_HAUWERT",
     "pvCalibrationPoints": 0,
     "pvScaleWPerWm2": 8,
-    "usableHistory": 93,
-    "cleanHistory": 92,
+    "usableHistory": 96,
+    "cleanHistory": 95,
     "rejectedHighLoad": 1,
     "rejectedKnownAppliance": 0,
-    "observedBaseBins": 31,
+    "observedBaseBins": 32,
     "slotsWithNetForecast": 96,
     "traceableBaseLoad": true,
     "teslaObligation": false,
