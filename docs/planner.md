@@ -5,11 +5,13 @@
   <div class="pm-content" id="pm-content" hidden>
     <section class="pm-section">
       <h2>24-uurs forecast</h2>
-      <p class="pm-note">Base load, PV en net vóór flex. Positief net = import; negatief net = export.</p>
-      <div class="pm-timeline" id="pm-forecast-wrap">
-        <svg id="pm-forecast" class="pm-forecast" viewBox="0 0 960 260" preserveAspectRatio="none" role="img" aria-label="24-uurs forecastgrafiek"></svg>
-        <div class="pm-time-axis" id="pm-time-axis"></div>
+      <p class="pm-note">Base load, PV en verwachte import/export. Positief = import; negatief = export.</p>
+      <div class="pm-legend">
+        <span><i class="pm-key base"></i>Base load</span>
+        <span><i class="pm-key pv"></i>PV</span>
+        <span><i class="pm-key net"></i>Verwachte import/export</span>
       </div>
+      <div class="pm-balance-chart" id="pm-forecast" aria-label="24-uurs forecastgrafiek"></div>
     </section>
 
     <section class="pm-section">
@@ -23,26 +25,38 @@
   .planner-minimal{max-width:1200px;margin:0 auto}
   .pm-status{padding:1rem 0;color:var(--md-default-fg-color--light)}
   .pm-status.pm-error{color:var(--md-typeset-color)}
-  .pm-section{margin:1.25rem 0 2rem}
-  .pm-section h2{margin-bottom:.25rem}
-  .pm-note{margin:.25rem 0 1rem;color:var(--md-default-fg-color--light);font-size:.9rem}
-  .pm-timeline{width:100%;min-width:0}
-  .pm-forecast{display:block;width:100%;height:260px;background:var(--md-code-bg-color);border-radius:.45rem;overflow:visible}
-  .pm-time-axis{display:grid;grid-template-columns:repeat(8,1fr);font-size:.72rem;color:var(--md-default-fg-color--light);margin-top:.35rem}
-  .pm-time-axis span:last-child{text-align:right}
-  .pm-slots{display:grid;gap:.8rem}
-  .pm-row{display:grid;grid-template-columns:78px minmax(0,1fr);align-items:center;gap:.75rem}
-  .pm-row-label{font-weight:600;font-size:.85rem}
-  .pm-track{position:relative;height:34px;background:var(--md-code-bg-color);border-radius:.4rem;overflow:hidden}
-  .pm-segment{position:absolute;top:5px;height:24px;border-radius:.3rem;background:var(--md-accent-fg-color);min-width:2px}
-  .pm-segment.boiler{opacity:.75}
-  .pm-segment.battery{opacity:.5}
-  .pm-empty{font-size:.85rem;color:var(--md-default-fg-color--light);padding:.45rem .6rem}
-  .pm-legend{display:flex;flex-wrap:wrap;gap:.8rem;margin:.6rem 0 .8rem;font-size:.8rem;color:var(--md-default-fg-color--light)}
-  .pm-key{display:inline-flex;align-items:center;gap:.35rem}
-  .pm-key i{display:inline-block;width:18px;height:3px;border-radius:3px;background:currentColor}
-  .pm-key.base{color:#7e57c2}.pm-key.pv{color:#2e7d32}.pm-key.net{color:#c62828}
-  @media(max-width:600px){.pm-forecast{height:220px}.pm-row{grid-template-columns:64px minmax(0,1fr);gap:.5rem}.pm-row-label{font-size:.78rem}.pm-time-axis{font-size:.66rem}}
+  .pm-section{margin:1.1rem 0 1.5rem}
+  .pm-section h2{font-size:.9rem;margin:0 0 .3rem}
+  .pm-note{margin:.15rem 0 .45rem;color:var(--md-default-fg-color--light);font-size:.7rem}
+  .pm-legend{display:flex;flex-wrap:wrap;gap:.35rem .7rem;margin-bottom:.4rem}
+  .pm-legend span{font-size:.64rem;display:inline-flex;align-items:center;gap:.25rem}
+  .pm-key{display:inline-block;width:.62rem;height:.62rem;border-radius:2px}
+  .pm-key.base,.pm-bar.base{background:#6e7f90}
+  .pm-key.pv,.pm-bar.pv{background:#d7a900}
+  .pm-key.net,.pm-bar.net.import{background:#3277b3}
+  .pm-bar.net.export{background:#2e9b67}
+  .pm-balance-chart{display:grid;grid-template-columns:repeat(96,minmax(5px,1fr));gap:1px;height:185px;border:1px solid var(--md-default-fg-color--lightest);border-radius:.45rem;padding:.35rem .2rem .2rem;overflow:hidden;background:color-mix(in srgb,var(--md-default-bg-color) 96%,var(--md-default-fg-color) 4%)}
+  .pm-balance-col{min-width:0;display:flex;flex-direction:column;align-items:center;min-height:0}
+  .pm-balance-plot{position:relative;width:100%;height:150px}
+  .pm-zero{position:absolute;left:0;right:0;top:50%;border-top:1px solid var(--md-default-fg-color--lightest)}
+  .pm-bar{position:absolute;width:26%;min-height:2px}
+  .pm-bar.base{left:4%;border-radius:2px 2px 0 0}
+  .pm-bar.pv{left:36%;border-radius:2px 2px 0 0}
+  .pm-bar.net{left:68%}
+  .pm-bar.net.import{border-radius:2px 2px 0 0}
+  .pm-bar.net.export{border-radius:0 0 2px 2px}
+  .pm-time{font-size:.48rem;opacity:.7;white-space:nowrap;transform:translateX(-1px)}
+  .pm-slots{display:grid;gap:.22rem}
+  .pm-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:.4rem;align-items:center}
+  .pm-row-label{font-size:.62rem;font-weight:700;opacity:.78;text-align:right}
+  .pm-track{position:relative;height:24px;border-bottom:1px solid var(--md-default-fg-color--lightest)}
+  .pm-segment{position:absolute;top:3px;height:18px;border-radius:.25rem;min-width:2px}
+  .pm-segment.tesla{background:#8f4ac7}
+  .pm-segment.boiler{background:#2aa9b8}
+  .pm-segment.battery{background:#66aa45}
+  .pm-empty{font-size:.62rem;opacity:.65;line-height:24px}
+  @media(prefers-color-scheme:dark){.pm-key.base,.pm-bar.base{background:#98a8b7}.pm-key.pv,.pm-bar.pv{background:#e4bd35}.pm-key.net,.pm-bar.net.import{background:#69a4d7}.pm-bar.net.export{background:#54b889}}
+  @media(max-width:600px){.pm-balance-chart{height:170px;grid-template-columns:repeat(96,minmax(3px,1fr))}.pm-balance-plot{height:135px}.pm-row{grid-template-columns:54px minmax(0,1fr)}.pm-row-label{font-size:.56rem}}
 </style>
 
 <script>
@@ -54,10 +68,8 @@
   const DATA_URL = 'https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/energy-planner-shadow.json';
   const status = document.getElementById('pm-status');
   const content = document.getElementById('pm-content');
-  const svg = document.getElementById('pm-forecast');
-  const axis = document.getElementById('pm-time-axis');
+  const forecast = document.getElementById('pm-forecast');
   const slotsEl = document.getElementById('pm-slots');
-  const NS = 'http://www.w3.org/2000/svg';
 
   const finite = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
   const unwrap = payload => payload?.plan?.plan?.actions ? payload.plan : (payload?.plan || payload || {});
@@ -65,52 +77,38 @@
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'});
   };
-  const svgEl = (name, attrs={}) => {
-    const n = document.createElementNS(NS, name);
-    Object.entries(attrs).forEach(([k,v]) => n.setAttribute(k, v));
-    return n;
-  };
-
-  function linePath(actions, key, maxAbs) {
-    const pts = [];
-    actions.forEach((a,i) => {
-      if (!finite(a[key])) return;
-      const x = actions.length > 1 ? i * 960 / (actions.length - 1) : 0;
-      const y = 130 - (Number(a[key]) / maxAbs) * 108;
-      pts.push(`${pts.length ? 'L' : 'M'} ${x.toFixed(2)} ${Math.max(12,Math.min(248,y)).toFixed(2)}`);
-    });
-    return pts.join(' ');
-  }
 
   function renderForecast(actions) {
-    svg.replaceChildren();
-    const all = [];
-    for (const a of actions) for (const k of ['baseLoadForecastW','pvForecastW','netBeforeFlexW']) if (finite(a[k])) all.push(Math.abs(Number(a[k])));
-    const maxAbs = Math.max(1000, ...all);
-
-    svg.append(svgEl('line',{x1:0,y1:130,x2:960,y2:130,stroke:'currentColor','stroke-opacity':'.25','stroke-width':'1'}));
-    for (let i=0;i<=8;i++) {
-      const x=i*120;
-      svg.append(svgEl('line',{x1:x,y1:0,x2:x,y2:260,stroke:'currentColor','stroke-opacity':'.08','stroke-width':'1'}));
-    }
-
-    const series = [
-      ['baseLoadForecastW','#7e57c2'],
-      ['pvForecastW','#2e7d32'],
-      ['netBeforeFlexW','#c62828']
-    ];
-    series.forEach(([key,color]) => {
-      const d=linePath(actions,key,maxAbs);
-      if (!d) return;
-      svg.append(svgEl('path',{d,fill:'none',stroke:color,'stroke-width':'2.4','vector-effect':'non-scaling-stroke'}));
+    forecast.replaceChildren();
+    const values=[];
+    actions.forEach(a=>{
+      ['baseLoadForecastW','pvForecastW','netBeforeFlexW'].forEach(k=>{if(finite(a[k]))values.push(Math.abs(Number(a[k])));});
     });
+    const max=Math.max(1000,...values);
 
-    const legend=document.createElement('div'); legend.className='pm-legend';
-    [['base','Base load'],['pv','PV'],['net','Net vóór flex']].forEach(([c,t])=>{const s=document.createElement('span');s.className=`pm-key ${c}`;s.innerHTML='<i></i>'+t;legend.append(s);});
-    svg.parentElement.insertBefore(legend,svg);
-
-    axis.replaceChildren();
-    for(let h=0;h<=21;h+=3){const s=document.createElement('span');s.textContent=String(h).padStart(2,'0')+':00';axis.append(s);}
+    actions.forEach((a,idx)=>{
+      const col=document.createElement('div'); col.className='pm-balance-col';
+      const plot=document.createElement('div'); plot.className='pm-balance-plot';
+      const zero=document.createElement('div'); zero.className='pm-zero'; plot.append(zero);
+      const addBar=(kind,v)=>{
+        if(!finite(v))return;
+        const n=Number(v), h=Math.max(2,Math.min(48,Math.abs(n)/max*48));
+        const b=document.createElement('div'); b.className=`pm-bar ${kind}`;
+        b.style.height=`${h}%`;
+        if(kind==='net'){
+          b.classList.add(n<0?'export':'import');
+          b.style.bottom=n<0?`${50-h}%`:'50%';
+        } else b.style.bottom='50%';
+        b.title=`${hhmm(a.start)} · ${kind==='base'?'Base load':kind==='pv'?'PV':'Verwachte import/export'} ${Math.round(n)} W`;
+        plot.append(b);
+      };
+      addBar('base',a.baseLoadForecastW);
+      addBar('pv',a.pvForecastW);
+      addBar('net',a.netBeforeFlexW);
+      col.append(plot);
+      if(idx%12===0){const t=document.createElement('span');t.className='pm-time';t.textContent=hhmm(a.start);col.append(t);}
+      forecast.append(col);
+    });
   }
 
   function actionActive(asset,a) {
@@ -123,7 +121,6 @@
     const name=document.createElement('div'); name.className='pm-row-label'; name.textContent=label;
     const track=document.createElement('div'); track.className='pm-track';
     row.append(name,track);
-
     let start=null;
     const flush=end=>{
       if(start===null)return;
