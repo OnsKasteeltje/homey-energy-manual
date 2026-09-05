@@ -1,8 +1,9 @@
 # Planner
 
-<div id="planner-minimal" class="planner-minimal">
-  <div class="pm-status" id="pm-status">Plannerdata laden…</div>
-  <div class="pm-content" id="pm-content" hidden>
+<div class="planner-minimal" data-planner-url="https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/energy-planner-shadow.json" data-planner-title="Homey Planner">
+  <h2 class="pm-planner-title">Homey Planner</h2>
+  <div class="pm-status">Plannerdata laden…</div>
+  <div class="pm-content" hidden>
     <section class="pm-section">
       <h2>24-uurs forecast</h2>
       <p class="pm-note">Base load, PV en verwachte import/export. Positief = import; negatief = export.</p>
@@ -15,19 +16,51 @@
       <div class="pm-aligned-row pm-forecast-row">
         <div class="pm-label-gutter" aria-hidden="true"></div>
         <div class="pm-forecast-frame">
-          <div class="pm-quarter-grid pm-balance-grid" id="pm-forecast" aria-label="24-uurs forecastgrafiek"></div>
+          <div class="pm-quarter-grid pm-balance-grid pm-forecast" aria-label="24-uurs forecastgrafiek"></div>
         </div>
       </div>
       <div class="pm-aligned-row pm-axis-row" aria-hidden="true">
         <div class="pm-label-gutter"></div>
-        <div class="pm-quarter-grid pm-time-axis" id="pm-time-axis"></div>
+        <div class="pm-quarter-grid pm-time-axis"></div>
       </div>
     </section>
 
     <section class="pm-section">
       <h2>Geplande tijdsvakken</h2>
-      <div class="pm-deadline" id="pm-tesla-deadline" hidden></div>
-      <div class="pm-slots" id="pm-slots"></div>
+      <div class="pm-deadline" hidden></div>
+      <div class="pm-slots"></div>
+    </section>
+  </div>
+</div>
+
+<div class="planner-minimal" data-planner-url="https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/energy-planner-shadow-pi.json" data-planner-title="Pi Planner (shadow)">
+  <h2 class="pm-planner-title">Pi Planner (shadow)</h2>
+  <div class="pm-status">Plannerdata laden…</div>
+  <div class="pm-content" hidden>
+    <section class="pm-section">
+      <h2>24-uurs forecast</h2>
+      <p class="pm-note">Base load, PV en verwachte import/export. Positief = import; negatief = export.</p>
+      <div class="pm-legend">
+        <span><i class="pm-key base"></i>Base load</span>
+        <span><i class="pm-key pv"></i>PV</span>
+        <span><i class="pm-key net"></i>Verwachte import/export</span>
+      </div>
+      <div class="pm-aligned-row pm-forecast-row">
+        <div class="pm-label-gutter" aria-hidden="true"></div>
+        <div class="pm-forecast-frame">
+          <div class="pm-quarter-grid pm-balance-grid pm-forecast" aria-label="24-uurs forecastgrafiek"></div>
+        </div>
+      </div>
+      <div class="pm-aligned-row pm-axis-row" aria-hidden="true">
+        <div class="pm-label-gutter"></div>
+        <div class="pm-quarter-grid pm-time-axis"></div>
+      </div>
+    </section>
+
+    <section class="pm-section">
+      <h2>Geplande tijdsvakken</h2>
+      <div class="pm-deadline" hidden></div>
+      <div class="pm-slots"></div>
     </section>
   </div>
 </div>
@@ -84,18 +117,6 @@
 
 <script>
 (() => {
-  const ROOT = document.getElementById('planner-minimal');
-  if (!ROOT || ROOT.dataset.initialized === '1') return;
-  ROOT.dataset.initialized = '1';
-
-  const DATA_URL = 'https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/energy-planner-shadow.json';
-  const status = document.getElementById('pm-status');
-  const content = document.getElementById('pm-content');
-  const forecast = document.getElementById('pm-forecast');
-  const timeAxis = document.getElementById('pm-time-axis');
-  const deadlineEl = document.getElementById('pm-tesla-deadline');
-  const slotsEl = document.getElementById('pm-slots');
-
   const finite = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
   const unwrap = payload => payload?.plan?.plan?.actions ? payload.plan : (payload?.plan || payload || {});
   const hhmm = iso => {
@@ -103,142 +124,185 @@
     return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'});
   };
 
-  function renderDeadline(p) {
-    const t = p?.inputs?.tesla || {};
-    const active = t.deadlineActive === true;
-    if (!active) {
-      deadlineEl.hidden = true;
-      deadlineEl.textContent = '';
-      return;
+  function initPlanner(ROOT) {
+    if (!ROOT || ROOT.dataset.initialized === '1') return;
+    ROOT.dataset.initialized = '1';
+
+    const DATA_URL = ROOT.dataset.plannerUrl;
+    const status = ROOT.querySelector('.pm-status');
+    const content = ROOT.querySelector('.pm-content');
+    const forecast = ROOT.querySelector('.pm-forecast');
+    const timeAxis = ROOT.querySelector('.pm-time-axis');
+    const deadlineEl = ROOT.querySelector('.pm-deadline');
+    const slotsEl = ROOT.querySelector('.pm-slots');
+
+    function renderDeadline(p) {
+      const t = p?.inputs?.tesla || {};
+      const active = t.deadlineActive === true;
+      if (!active) {
+        deadlineEl.hidden = true;
+        deadlineEl.textContent = '';
+        return;
+      }
+      const parts = [`Tesla deadline actief · ${hhmm(t.deadlineAt)}`];
+      if (finite(t.maxA)) parts.push(`max ${Math.round(Number(t.maxA))} A`);
+      if (finite(t.requiredDeadlineSlots)) parts.push(`${Math.round(Number(t.requiredDeadlineSlots))} slots nodig`);
+      if (finite(t.remainingKWh)) parts.push(`${Number(t.remainingKWh).toFixed(2).replace('.', ',')} kWh resterend`);
+      deadlineEl.textContent = parts.join(' · ');
+      deadlineEl.hidden = false;
     }
-    const parts = [`Tesla deadline actief · ${hhmm(t.deadlineAt)}`];
-    if (finite(t.maxA)) parts.push(`max ${Math.round(Number(t.maxA))} A`);
-    if (finite(t.requiredDeadlineSlots)) parts.push(`${Math.round(Number(t.requiredDeadlineSlots))} slots nodig`);
-    if (finite(t.remainingKWh)) parts.push(`${Number(t.remainingKWh).toFixed(2).replace('.', ',')} kWh resterend`);
-    deadlineEl.textContent = parts.join(' · ');
-    deadlineEl.hidden = false;
-  }
 
-  function renderForecast(actions) {
-    forecast.replaceChildren();
-    timeAxis.replaceChildren();
+    function renderForecast(actions) {
+      forecast.replaceChildren();
+      timeAxis.replaceChildren();
 
-    const values=[];
-    actions.forEach(a=>{
-      ['baseLoadForecastW','pvForecastW','netBeforeFlexW'].forEach(k=>{if(finite(a[k]))values.push(Math.abs(Number(a[k])));});
-    });
-    const max=Math.max(1000,...values);
+      const values = [];
+      actions.forEach(a => {
+        ['baseLoadForecastW','pvForecastW','netBeforeFlexW'].forEach(k => {
+          if (finite(a[k])) values.push(Math.abs(Number(a[k])));
+        });
+      });
 
-    actions.forEach((a,idx)=>{
-      const col=document.createElement('div');
-      col.className='pm-balance-col';
-      col.style.gridColumn=`${idx+1}`;
+      const max = Math.max(1000, ...values);
 
-      const zero=document.createElement('div');
-      zero.className='pm-zero';
-      col.append(zero);
+      actions.forEach((a, idx) => {
+        const col = document.createElement('div');
+        col.className = 'pm-balance-col';
+        col.style.gridColumn = `${idx+1}`;
 
-      const addBar=(kind,v)=>{
-        if(!finite(v))return;
-        const n=Number(v), h=Math.max(2,Math.min(48,Math.abs(n)/max*48));
-        const b=document.createElement('div');
-        b.className=`pm-bar ${kind}`;
-        b.style.height=`${h}%`;
-        if(kind==='net'){
-          b.classList.add(n<0?'export':'import');
-          b.style.bottom=n<0?`${50-h}%`:'50%';
-        } else {
-          b.style.bottom='50%';
+        const zero = document.createElement('div');
+        zero.className = 'pm-zero';
+        col.append(zero);
+
+        const addBar = (kind, v) => {
+          if (!finite(v)) return;
+          const n = Number(v);
+          const h = Math.max(2, Math.min(48, Math.abs(n) / max * 48));
+
+          const b = document.createElement('div');
+          b.className = `pm-bar ${kind}`;
+          b.style.height = `${h}%`;
+
+          if (kind === 'net') {
+            b.classList.add(n < 0 ? 'export' : 'import');
+            b.style.bottom = n < 0 ? `${50-h}%` : '50%';
+          } else {
+            b.style.bottom = '50%';
+          }
+
+          b.title = `${hhmm(a.start)} · ${kind==='base'?'Base load':kind==='pv'?'PV':'Verwachte import/export'} ${Math.round(n)} W`;
+          col.append(b);
+        };
+
+        addBar('base', a.baseLoadForecastW);
+        addBar('pv', a.pvForecastW);
+        addBar('net', a.netBeforeFlexW);
+
+        forecast.append(col);
+
+        if (idx % 12 === 0) {
+          const t = document.createElement('span');
+          t.className = 'pm-time';
+          t.style.gridColumn = `${idx+1} / span 12`;
+          t.textContent = hhmm(a.start);
+          timeAxis.append(t);
         }
-        b.title=`${hhmm(a.start)} · ${kind==='base'?'Base load':kind==='pv'?'PV':'Verwachte import/export'} ${Math.round(n)} W`;
-        col.append(b);
+      });
+    }
+
+    function actionActive(asset, a) {
+      const raw = String(a?.[asset] ?? 'HOLD').toUpperCase();
+      return !(raw === 'HOLD' || raw === 'NONE' || raw === 'OFF' || raw === '0' || raw === '');
+    }
+
+    function addRow(label, asset, cssClass, actions) {
+      const row = document.createElement('div');
+      row.className = 'pm-row';
+
+      const name = document.createElement('div');
+      name.className = 'pm-row-label';
+      name.textContent = label;
+
+      const frame = document.createElement('div');
+      frame.className = 'pm-track-frame';
+
+      const track = document.createElement('div');
+      track.className = 'pm-quarter-grid pm-track';
+
+      frame.append(track);
+      row.append(name, frame);
+
+      let start = null;
+
+      const flush = end => {
+        if (start === null) return;
+
+        const seg = document.createElement('div');
+        seg.className = `pm-segment ${cssClass}`;
+        seg.style.gridColumn = `${start+1} / ${end+1}`;
+
+        const first = actions[start];
+        const last = actions[end-1];
+
+        seg.title = `${label}: ${hhmm(first.start)}–${hhmm(last.end || new Date(new Date(last.start).getTime()+15*60000).toISOString())}`;
+        track.append(seg);
       };
 
-      addBar('base',a.baseLoadForecastW);
-      addBar('pv',a.pvForecastW);
-      addBar('net',a.netBeforeFlexW);
-      forecast.append(col);
-
-      if(idx%12===0){
-        const t=document.createElement('span');
-        t.className='pm-time';
-        t.style.gridColumn=`${idx+1} / span 12`;
-        t.textContent=hhmm(a.start);
-        timeAxis.append(t);
+      for (let i = 0; i <= actions.length; i++) {
+        const active = i < actions.length && actionActive(asset, actions[i]);
+        if (active && start === null) start = i;
+        if (!active && start !== null) {
+          flush(i);
+          start = null;
+        }
       }
-    });
-  }
 
-  function actionActive(asset,a) {
-    const raw = String(a?.[asset] ?? 'HOLD').toUpperCase();
-    return !(raw === 'HOLD' || raw === 'NONE' || raw === 'OFF' || raw === '0' || raw === '');
-  }
+      if (!track.children.length) {
+        const e = document.createElement('div');
+        e.className = 'pm-empty';
+        e.textContent = 'geen tijdsvakken';
+        track.append(e);
+      }
 
-  function addRow(label, asset, cssClass, actions) {
-    const row=document.createElement('div');
-    row.className='pm-row';
-
-    const name=document.createElement('div');
-    name.className='pm-row-label';
-    name.textContent=label;
-
-    const frame=document.createElement('div');
-    frame.className='pm-track-frame';
-    const track=document.createElement('div');
-    track.className='pm-quarter-grid pm-track';
-    frame.append(track);
-    row.append(name,frame);
-
-    let start=null;
-    const flush=end=>{
-      if(start===null)return;
-      const seg=document.createElement('div');
-      seg.className=`pm-segment ${cssClass}`;
-      seg.style.gridColumn=`${start+1} / ${end+1}`;
-      const first=actions[start], last=actions[end-1];
-      seg.title=`${label}: ${hhmm(first.start)}–${hhmm(last.end || new Date(new Date(last.start).getTime()+15*60000).toISOString())}`;
-      track.append(seg);
-    };
-
-    for(let i=0;i<=actions.length;i++){
-      const active=i<actions.length && actionActive(asset,actions[i]);
-      if(active && start===null) start=i;
-      if(!active && start!==null){flush(i);start=null;}
+      slotsEl.append(row);
     }
 
-    if(!track.children.length){
-      const e=document.createElement('div');
-      e.className='pm-empty';
-      e.textContent='geen tijdsvakken';
-      track.append(e);
+    async function load() {
+      try {
+        const r = await fetch(`${DATA_URL}?ts=${Date.now()}`, {cache:'no-store'});
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+        const payload = await r.json();
+        const p = unwrap(payload);
+        const actions = Array.isArray(p?.plan?.actions) ? p.plan.actions : [];
+
+        if (actions.length !== 96) {
+          throw new Error(`verwacht 96 kwartierslots, ontvangen ${actions.length}`);
+        }
+
+        renderDeadline(p);
+        renderForecast(actions);
+
+        slotsEl.replaceChildren();
+        addRow('Tesla', 'tesla', 'tesla', actions);
+        addRow('Boiler', 'warmWater', 'boiler', actions);
+
+        if (actions.some(a => actionActive('battery', a))) {
+          addRow('Accu', 'battery', 'battery', actions);
+        }
+
+        status.remove();
+        content.hidden = false;
+
+      } catch (e) {
+        status.className = 'pm-status pm-error';
+        status.textContent = `Plannerdata laden mislukt: ${e.message}`;
+      }
     }
-    slotsEl.append(row);
+
+    load();
   }
 
-  async function load() {
-    try {
-      const r = await fetch(`${DATA_URL}?ts=${Date.now()}`, {cache:'no-store'});
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const payload = await r.json();
-      const p = unwrap(payload);
-      const actions = Array.isArray(p?.plan?.actions) ? p.plan.actions : [];
-      if (actions.length !== 96) throw new Error(`verwacht 96 kwartierslots, ontvangen ${actions.length}`);
-
-      renderDeadline(p);
-      renderForecast(actions);
-      slotsEl.replaceChildren();
-      addRow('Tesla','tesla','tesla',actions);
-      addRow('Boiler','warmWater','boiler',actions);
-      if(actions.some(a=>actionActive('battery',a))) addRow('Accu','battery','battery',actions);
-
-      status.remove();
-      content.hidden=false;
-    } catch (e) {
-      status.className='pm-status pm-error';
-      status.textContent=`Plannerdata laden mislukt: ${e.message}`;
-    }
-  }
-
-  load();
+  document.querySelectorAll('.planner-minimal').forEach(initPlanner);
 })();
 </script>
