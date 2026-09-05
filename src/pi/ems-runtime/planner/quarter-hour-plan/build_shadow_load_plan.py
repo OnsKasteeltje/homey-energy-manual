@@ -7,17 +7,21 @@ PV_FILE = Path("/home/jeroen/ems/data/pv-forecast.json")
 QUATT_FILE = Path("/home/jeroen/ems/data/quatt-forecast.json")
 BASE_FILE = Path("/home/jeroen/ems/data/base-load-forecast.json")
 WW_FILE = Path("/home/jeroen/ems/data/ww-plan.json")
+PRICE_FILE = Path("/home/jeroen/ems/data/price-forecast.json")
 OUTPUT = Path("/home/jeroen/ems/data/shadow-load-plan.json")
 
 def load(path):
     return json.loads(path.read_text())
 
 def timestamp(slot):
-    return (
+    ts = (
         slot.get("slot_start_utc")
         or slot.get("start")
         or slot.get("startAt")
     )
+    if ts and ts.endswith(".000Z"):
+        ts = ts[:-5] + "Z"
+    return ts
 
 def pv_power(slot):
     for key in (
@@ -34,17 +38,20 @@ pv = load(PV_FILE)
 quatt = load(QUATT_FILE)
 base = load(BASE_FILE)
 ww = load(WW_FILE)
+price = load(PRICE_FILE)
 
 pv_map = {timestamp(s): s for s in pv.get("slots", [])}
 q_map = {timestamp(s): s for s in quatt.get("slots", [])}
 b_map = {timestamp(s): s for s in base.get("slots", [])}
 ww_map = {timestamp(s): s for s in ww.get("slots", [])}
+price_map = {timestamp(s): s for s in price.get("slots", [])}
 
 common = sorted(
     set(pv_map)
     & set(q_map)
     & set(b_map)
     & set(ww_map)
+    & set(price_map)
 )
 
 if len(common) != 96:
@@ -59,6 +66,7 @@ for ts in common:
     q = q_map[ts]
     b = b_map[ts]
     w = ww_map[ts]
+    pr = price_map[ts]
 
     pv_w = max(0.0, pv_power(p))
     quatt_w = max(0.0, float(q.get("quattForecastW") or 0))
@@ -89,6 +97,7 @@ for ts in common:
 
         "wwPlanW": round(ww_w),
         "wwAllocationReason": w.get("allocationReason"),
+        "price_eur_kwh": pr.get("marketPriceEurPerKwh"),
 
         "netAfterWWW": round(net_after_ww),
         "gridImportAfterWWW": round(max(0.0, net_after_ww)),
@@ -96,7 +105,7 @@ for ts in common:
     })
 
 payload = {
-    "schema": "EMS_PI_SHADOW_LOAD_PLAN_V0.3",
+    "schema": "EMS_PI_SHADOW_LOAD_PLAN_V0.4",
     "mode": "shadow",
     "control_writes": False,
 
@@ -138,7 +147,7 @@ exp_before = energy("gridExportBeforeFlexW")
 imp_after = energy("gridImportAfterWWW")
 exp_after = energy("gridExportAfterWWW")
 
-print("PASS: shadow load plan v0.3 built")
+print("PASS: shadow load plan v0.4 built")
 print("slots                    :", len(slots))
 print("base load kWh            :", round(base_kwh, 2))
 print("Quatt kWh                :", round(quatt_kwh, 2))
