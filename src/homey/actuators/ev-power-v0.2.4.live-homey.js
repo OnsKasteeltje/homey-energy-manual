@@ -9,7 +9,7 @@
 //   6) plugged_in_charging -> no session command.
 // Desired 0A remains dynamic-current zero; no explicit Stop/Pause is added.
 const VERSION='EM2_EV_ACTUATOR_V0.2';
-const CHARGER_ID='65ee9fda-9535-44ab-8037-809587bc8f1c';
+const CHARGER_ID='4d0b6913-d940-474e-95d6-b43f194c4119';
 const FRESH_MS=120000;
 const IDS={live:'8d47e98d-e4bc-4f47-8c02-c2aca7f7a978',status:'ea1f8a44-2f6c-490e-9b86-bae761886cf9',intent:'04b57041-dd7f-41f7-a00a-f023afb1ccee',adapter:'f2118322-d59d-4aa8-b478-234effc3983c',gate:'4c66836b-77ae-43b5-b8e0-b32af15b57bc',state:'8e1efbb0-7999-494c-9429-7d274afacd79'};
 const [liveVar,statusVar,intentVar,adapterVar,gateVar,stateVar]=await Promise.all([Homey.logic.getVariable({id:IDS.live}),Homey.logic.getVariable({id:IDS.status}),Homey.logic.getVariable({id:IDS.intent}),Homey.logic.getVariable({id:IDS.adapter}),Homey.logic.getVariable({id:IDS.gate}),Homey.logic.getVariable({id:IDS.state})]);
