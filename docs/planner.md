@@ -26,6 +26,7 @@
 
     <section class="pm-section">
       <h2>Geplande tijdsvakken</h2>
+      <div class="pm-deadline" id="pm-tesla-deadline" hidden></div>
       <div class="pm-slots" id="pm-slots"></div>
     </section>
   </div>
@@ -65,6 +66,7 @@
   .pm-time-axis{padding:0 .2rem;box-sizing:border-box;min-height:14px}
   .pm-time{font-size:.48rem;opacity:.7;white-space:nowrap;transform:translateX(-1px)}
 
+  .pm-deadline{margin:.15rem 0 .45rem calc(var(--pm-label-col) + var(--pm-col-gap));padding:.38rem .55rem;border:1px solid var(--md-default-fg-color--lightest);border-radius:.35rem;font-size:.65rem;font-weight:600}
   .pm-slots{display:grid;gap:.22rem}
   .pm-row{align-items:center}
   .pm-row-label{font-size:.62rem;font-weight:700;opacity:.78;text-align:right}
@@ -91,6 +93,7 @@
   const content = document.getElementById('pm-content');
   const forecast = document.getElementById('pm-forecast');
   const timeAxis = document.getElementById('pm-time-axis');
+  const deadlineEl = document.getElementById('pm-tesla-deadline');
   const slotsEl = document.getElementById('pm-slots');
 
   const finite = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
@@ -99,6 +102,22 @@
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'});
   };
+
+  function renderDeadline(p) {
+    const t = p?.inputs?.tesla || {};
+    const active = t.deadlineActive === true;
+    if (!active) {
+      deadlineEl.hidden = true;
+      deadlineEl.textContent = '';
+      return;
+    }
+    const parts = [`Tesla deadline actief · ${hhmm(t.deadlineAt)}`];
+    if (finite(t.maxA)) parts.push(`max ${Math.round(Number(t.maxA))} A`);
+    if (finite(t.requiredDeadlineSlots)) parts.push(`${Math.round(Number(t.requiredDeadlineSlots))} slots nodig`);
+    if (finite(t.remainingKWh)) parts.push(`${Number(t.remainingKWh).toFixed(2).replace('.', ',')} kWh resterend`);
+    deadlineEl.textContent = parts.join(' · ');
+    deadlineEl.hidden = false;
+  }
 
   function renderForecast(actions) {
     forecast.replaceChildren();
@@ -205,6 +224,7 @@
       const actions = Array.isArray(p?.plan?.actions) ? p.plan.actions : [];
       if (actions.length !== 96) throw new Error(`verwacht 96 kwartierslots, ontvangen ${actions.length}`);
 
+      renderDeadline(p);
       renderForecast(actions);
       slotsEl.replaceChildren();
       addRow('Tesla','tesla','tesla',actions);
