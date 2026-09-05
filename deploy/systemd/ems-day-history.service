@@ -1,0 +1,10 @@
+[Unit]
+Description=EMS P1 and PV Day History Collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/base-load/fetch_day_history.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/datastore/import_em2_day_history.py

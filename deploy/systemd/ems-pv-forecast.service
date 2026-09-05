@@ -1,0 +1,13 @@
+[Unit]
+Description=EMS PV forecast
+After=network-online.target ems-weather-forecast.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/pv-forecast/fetch_pv_forecast.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/base-load/build_base_load_forecast.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/warm-water/fetch_ww_input.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/warm-water/build_ww_plan.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/quarter-hour-plan/build_shadow_load_plan.py

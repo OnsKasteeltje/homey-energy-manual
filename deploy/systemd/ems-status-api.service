@@ -1,0 +1,14 @@
+[Unit]
+Description=EMS Status API
+After=network.target
+
+[Service]
+Type=simple
+User=jeroen
+WorkingDirectory=/home/jeroen/ems/runtime/status-api
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/status-api/server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
