@@ -4,8 +4,9 @@
 //   1) LIVE must still be true.
 //   2) target_charger_current must be > 6A.
 //   3) plugged_in_paused -> Easee resumeCharging.
-//   4) plugged_in -> evcharger_charging_start.
-//   5) plugged_in_charging -> no session command.
+//   4) if Resume returns but charger remains paused after 10s -> evcharger_charging_start fallback.
+//   5) plugged_in -> evcharger_charging_start.
+//   6) plugged_in_charging -> no session command.
 // Desired 0A remains dynamic-current zero; no explicit Stop/Pause is added.
 const VERSION='EM2_EV_ACTUATOR_V0.2';
 const CHARGER_ID='65ee9fda-9535-44ab-8037-809587bc8f1c';
