@@ -1,13 +1,13 @@
 {
   "schema": "EM2_PLANNER_SHADOW_PUBLISH_V0.4",
-  "publishedAt": "2026-09-05T15:30:57.380Z",
+  "publishedAt": "2026-09-05T15:35:22.050Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
   "sourceRevision": 4899,
-  "generatedAt": "2026-09-05T15:30:55.293Z",
+  "generatedAt": "2026-09-05T15:35:19.592Z",
   "plan": {
-    "schema": "EM2_ENERGY_PLAN_24H_V0.5.0",
-    "generatedAt": "2026-09-05T15:30:55.293Z",
+    "schema": "EM2_ENERGY_PLAN_24H_V0.5.1",
+    "generatedAt": "2026-09-05T15:35:19.592Z",
     "controlMode": "SHADOW",
     "readOnly": true,
     "physicalWritePerformed": false,
@@ -59,7 +59,7 @@
           "longitude": 5.10003,
           "variable": "shortwave_radiation",
           "resolutionMinutes": 15,
-          "retrievedAt": "2026-09-05T15:30:45.455Z"
+          "retrievedAt": "2026-09-05T15:35:19.841Z"
         },
         "gridHeadroom": "NOT_MODELED_PHASE_AWARE"
       },
@@ -68,18 +68,18 @@
         "remainingKWh": 41.25,
         "deadlineAt": "2026-09-05T15:30:00.000Z",
         "latestStart": "2026-09-05T10:31:05.217Z",
+        "maxA": 16,
+        "maxPowerW": 11040,
+        "slotEnergyKWh": 2.76,
+        "requiredDeadlineSlots": 15,
+        "deadlineCatchUp": true,
         "throughputModel": "NOT_ASSUMED",
         "opportunityPolicy": "PV_SURPLUS_START_CONTINUE_MIN_RUN",
         "opportunityStartMinW": 4830,
         "opportunityContinueMinW": 4140,
         "opportunityMinRunSlots": 2,
         "opportunityMinRunMinutes": 30,
-        "pricePolicy": "DEADLINE_OPTIMIZATION_ONLY",
-        "maxA": 12,
-        "maxPowerW": 8280,
-        "slotEnergyKWh": 2.07,
-        "requiredDeadlineSlots": 20,
-        "deadlineCatchUp": true
+        "pricePolicy": "DEADLINE_OPTIMIZATION_ONLY"
       },
       "warmWater": {
         "goalReachedToday": true,
@@ -4387,13 +4387,13 @@
         "pvOpportunityRuns": [],
         "obligationKWh": 41.25,
         "deadlineAt": "2026-09-05T15:30:00.000Z",
-        "allocationPolicy": "PV_SURPLUS_THEN_CHEAPEST_REQUIRED_GRID_SLOTS_V0.5.1_HOTFIX",
         "allocatedKWh": 0,
         "unallocatedKWh": 41.25,
-        "maxA": 12,
-        "maxPowerW": 8280,
-        "requiredDeadlineSlots": 20,
-        "deadlineCatchUp": true
+        "maxA": 16,
+        "maxPowerW": 11040,
+        "requiredDeadlineSlots": 15,
+        "deadlineCatchUp": true,
+        "allocationPolicy": "PV_SURPLUS_THEN_CHEAPEST_REQUIRED_GRID_SLOTS"
       },
       "warmWater": {
         "allocatedSlots": [
@@ -6478,7 +6478,7 @@
         "note": "No physical battery dispatch until actual SOC and commissioning constraints are integrated."
       }
     },
-    "plannerStatus": "READY_SHADOW_V0.5.0",
+    "plannerStatus": "READY_SHADOW_V0.5.1",
     "nextPhase": "SHADOW_VALIDATE_WW_RECEDING_HORIZON_BEFORE_POWER_INTENT",
     "safety": {
       "noDeviceWrites": true,
@@ -6490,13 +6490,12 @@
       "simulationOnly": true,
       "phaseAwareHeadroomNotClaimed": true,
       "noAdditionalHomeyReads": true
-    },
-    "plannerPatchVersion": "EV_DEADLINE_ALLOCATION_V0.5.1_HOTFIX"
+    }
   },
   "status": {
-    "status": "READY_SHADOW_V0.5.0",
-    "at": "2026-09-05T15:30:55.293Z",
-    "version": "EM2_ENERGY_PLAN_24H_V0.5.0",
+    "status": "READY_SHADOW_V0.5.1",
+    "at": "2026-09-05T15:35:19.592Z",
+    "version": "EM2_ENERGY_PLAN_24H_V0.5.1",
     "contract": "FIXED",
     "slots": 96,
     "baseQuality": "CLEAN_QUARTER_PROFILE",
@@ -6515,6 +6514,12 @@
     "teslaOpportunitySlots": 0,
     "teslaOpportunityRuns": 0,
     "teslaAllocationPolicy": "PV_SURPLUS_THEN_CHEAPEST_REQUIRED_GRID_SLOTS",
+    "teslaMaxA": 16,
+    "teslaMaxPowerW": 11040,
+    "teslaRequiredSlots": 15,
+    "teslaAllocatedSlots": 0,
+    "teslaUnallocatedKWh": 41.25,
+    "teslaDeadlineCatchUp": true,
     "wwObligation": true,
     "wwDayBoundaryAware": true,
     "wwPlanningDates": [
@@ -6535,14 +6540,7 @@
       "hardWWDeadlineLocal": "19:00"
     },
     "noActuatorWrites": true,
-    "noAdditionalHomeyReads": true,
-    "teslaMaxA": 12,
-    "teslaMaxPowerW": 8280,
-    "teslaRequiredSlots": 20,
-    "teslaAllocatedSlots": 0,
-    "teslaUnallocatedKWh": 41.25,
-    "teslaDeadlineCatchUp": true,
-    "plannerPatchVersion": "EV_DEADLINE_ALLOCATION_V0.5.1_HOTFIX"
+    "noAdditionalHomeyReads": true
   },
   "regression": {
     "schema": "EM2_WW_PLANNER_REGRESSION_V0.4.2",
