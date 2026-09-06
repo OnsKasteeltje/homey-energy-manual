@@ -8,7 +8,7 @@ DB = Path("/home/jeroen/ems/data/ems-history.sqlite")
 ARCHIVE_DIR = Path("/home/jeroen/ems/repo/homey-energy-manual/docs/data/history/days")
 SOURCE_RESOLUTION_SECONDS = 300
 
-DEVICES = {
+POWER_DEVICES = {
     "grid_p1": {
         "source_device_id": "em2:p1",
         "name": "P1 Grid",
@@ -33,6 +33,33 @@ DEVICES = {
         "device_type": "pv_inverter",
         "field": "goodWe2000W",
     },
+    "tesla": {
+        "source_device_id": "em2:tesla",
+        "name": "Tesla charging",
+        "device_type": "ev_charger",
+        "field": "teslaW",
+    },
+    "boiler": {
+        "source_device_id": "em2:boiler",
+        "name": "Stiebel Eltron HSTP200",
+        "device_type": "water_heater",
+        "field": "boilerW",
+    },
+}
+
+STATE_DEVICES = {
+    "washer": {
+        "source_device_id": "em2:washer",
+        "name": "Washing machine",
+        "device_type": "appliance",
+        "field": "washerActive",
+    },
+    "dryer": {
+        "source_device_id": "em2:dryer",
+        "name": "Dryer",
+        "device_type": "appliance",
+        "field": "dryerActive",
+    },
 }
 
 
@@ -48,6 +75,33 @@ def find_samples(payload):
     return None
 
 
+def ensure_device(con, device_key, spec):
+    row = con.execute(
+        "SELECT id FROM devices WHERE device_key=?",
+        (device_key,),
+    ).fetchone()
+    if row:
+        return row[0]
+
+    con.execute(
+        """
+        INSERT INTO devices
+        (source, source_device_id, device_key, name, device_type)
+        VALUES ('homey_em2', ?, ?, ?, ?)
+        """,
+        (
+            spec["source_device_id"],
+            device_key,
+            spec["name"],
+            spec["device_type"],
+        ),
+    )
+    return con.execute(
+        "SELECT id FROM devices WHERE device_key=?",
+        (device_key,),
+    ).fetchone()[0]
+
+
 def main():
     if not ARCHIVE_DIR.exists():
         raise SystemExit(f"FAIL: archive dir missing: {ARCHIVE_DIR}")
@@ -58,33 +112,32 @@ def main():
 
     con = sqlite3.connect(DB)
     try:
-        metric = con.execute(
+        power_metric = con.execute(
             "SELECT id FROM metrics WHERE metric_key='electrical_power_w'"
         ).fetchone()
-        if not metric:
+        if not power_metric:
             raise RuntimeError("Metric electrical_power_w not found")
-        metric_id = metric[0]
+        power_metric_id = power_metric[0]
 
-        device_ids = {}
-        for device_key, spec in DEVICES.items():
-            con.execute(
-                """
-                INSERT OR IGNORE INTO devices
-                (source, source_device_id, device_key, name, device_type)
-                VALUES ('homey_em2', ?, ?, ?, ?)
-                """,
-                (
-                    spec["source_device_id"],
-                    device_key,
-                    spec["name"],
-                    spec["device_type"],
-                ),
-            )
-            row = con.execute(
-                "SELECT id FROM devices WHERE device_key=?",
-                (device_key,),
-            ).fetchone()
-            device_ids[device_key] = row[0]
+        con.execute(
+            """
+            INSERT OR IGNORE INTO metrics
+            (metric_key, unit, value_type, description)
+            VALUES ('active', NULL, 'boolean', 'Device active state')
+            """
+        )
+        active_metric_id = con.execute(
+            "SELECT id FROM metrics WHERE metric_key='active'"
+        ).fetchone()[0]
+
+        power_device_ids = {
+            key: ensure_device(con, key, spec)
+            for key, spec in POWER_DEVICES.items()
+        }
+        state_device_ids = {
+            key: ensure_device(con, key, spec)
+            for key, spec in STATE_DEVICES.items()
+        }
 
         total_files = 0
         total_samples = 0
@@ -109,12 +162,16 @@ def main():
             for sample in samples:
                 ts = sample.get("ts") or sample.get("timestamp")
                 if not ts:
-                    skipped += len(DEVICES)
+                    skipped += len(POWER_DEVICES) + len(STATE_DEVICES)
                     continue
 
                 quality = "held" if sample.get("held") else "observed"
 
-                for device_key, spec in DEVICES.items():
+                for device_key, spec in POWER_DEVICES.items():
+                    if device_key == "grid_p1" and sample.get("p1Valid") is not True:
+                        skipped += 1
+                        continue
+
                     value = sample.get(spec["field"])
                     if value is None:
                         skipped += 1
@@ -124,20 +181,42 @@ def main():
                         """
                         INSERT OR IGNORE INTO measurements
                         (
-                            ts_utc,
-                            device_id,
-                            metric_id,
-                            value_real,
-                            quality,
-                            source_resolution_seconds
+                            ts_utc, device_id, metric_id, value_real,
+                            quality, source_resolution_seconds
                         )
                         VALUES (?, ?, ?, ?, ?, ?)
                         """,
                         (
                             ts,
-                            device_ids[device_key],
-                            metric_id,
+                            power_device_ids[device_key],
+                            power_metric_id,
                             float(value),
+                            quality,
+                            SOURCE_RESOLUTION_SECONDS,
+                        ),
+                    )
+                    inserted += cur.rowcount
+
+                for device_key, spec in STATE_DEVICES.items():
+                    value = sample.get(spec["field"])
+                    if value is None:
+                        skipped += 1
+                        continue
+
+                    cur = con.execute(
+                        """
+                        INSERT OR IGNORE INTO measurements
+                        (
+                            ts_utc, device_id, metric_id, value_real,
+                            quality, source_resolution_seconds
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            ts,
+                            state_device_ids[device_key],
+                            active_metric_id,
+                            1.0 if value is True else 0.0,
                             quality,
                             SOURCE_RESOLUTION_SECONDS,
                         ),
