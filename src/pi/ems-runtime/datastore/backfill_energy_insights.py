@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import subprocess
+import time
 from pathlib import Path
 
 DB = Path("/home/jeroen/ems/data/ems-history.sqlite")
@@ -14,27 +15,28 @@ HOMEY_CLI = HOMEY_PROJECT / "node_modules" / ".bin" / "homey"
 NODE24_BIN = Path("/opt/node-v24.20.0/bin")
 
 METRIC_KEY = "electrical_power_w"
+CALL_PAUSE_SECONDS = 3
 
 DEVICES = [
     {
         "device_key": "grid_p1",
         "device_id": "7a696d77-15fb-4b68-9bce-f1e39bff5045",
-        "capability": "measure_power",
+        "capability": "energy_power",
     },
     {
         "device_key": "pv_solaredge",
         "device_id": "c52c1c1d-9080-4a3b-b2e0-acc1eed7bf20",
-        "capability": "measure_power",
+        "capability": "energy_power",
     },
     {
         "device_key": "pv_goodwe4200",
         "device_id": "9f55af14-a080-4129-8887-c81b95f649bb",
-        "capability": "measure_power",
+        "capability": "energy_power",
     },
     {
         "device_key": "pv_goodwe2000",
         "device_id": "cbb98288-1c44-4718-9a66-13709b9d0172",
-        "capability": "measure_power",
+        "capability": "energy_power",
     },
 ]
 
@@ -47,6 +49,10 @@ LAYERS = [
     ("last7Days", 3600),
     ("last6Hours", 60),
 ]
+
+
+class HomeyRateLimit(RuntimeError):
+    pass
 
 
 def fetch(uri: str, log_id: str, resolution: str):
@@ -77,6 +83,10 @@ def fetch(uri: str, log_id: str, resolution: str):
 
     if result.returncode != 0:
         err = (result.stderr or result.stdout or "").strip()
+        if "429" in err or "Too many requests" in err:
+            raise HomeyRateLimit(
+                f"Homey rate limit for {log_id} / {resolution}"
+            )
         raise RuntimeError(
             f"Homey Insights read failed for {log_id} / {resolution}: {err}"
         )
@@ -187,7 +197,13 @@ def main():
             print(f"=== {spec['device_key']} ===")
 
             for resolution, source_seconds in LAYERS:
-                payload = fetch(uri, log_id, resolution)
+                try:
+                    payload = fetch(uri, log_id, resolution)
+                except HomeyRateLimit as exc:
+                    print(f"STOP: {exc}")
+                    print("Existing committed rows are preserved; rerun later to continue idempotently.")
+                    return 2
+
                 values = get_values(payload)
 
                 inserted, upgraded, skipped, gaps = upsert_layer(
@@ -210,15 +226,18 @@ def main():
                     f"skipped={skipped} gaps={gaps}"
                 )
 
+                time.sleep(CALL_PAUSE_SECONDS)
+
         print(
             "PASS: energy Insights backfill complete "
             f"inserted={grand_inserted} upgraded={grand_upgraded} "
             f"skipped={grand_skipped} gaps={grand_gaps}"
         )
+        return 0
 
     finally:
         con.close()
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
