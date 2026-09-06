@@ -8,7 +8,7 @@ from pathlib import Path
 
 DB = Path("/home/jeroen/ems/data/ems-history.sqlite")
 OUTPUT = Path("/home/jeroen/ems/data/clean-base-history.json")
-MAX_MATCH_SECONDS = 450
+BASE_MATCH_SECONDS = 450
 
 
 def parse_ts(s):
@@ -32,7 +32,7 @@ def load_series(cur, device_key, metric_key):
     device_id, metric_id = row
     rows = cur.execute(
         """
-        SELECT ts_utc, value_real
+        SELECT ts_utc, value_real, source_resolution_seconds
         FROM measurements
         WHERE device_id=?
           AND metric_id=?
@@ -42,11 +42,31 @@ def load_series(cur, device_key, metric_key):
         (device_id, metric_id),
     ).fetchall()
 
-    parsed = [(parse_ts(ts), ts, float(value)) for ts, value in rows]
+    parsed = [
+        (
+            parse_ts(ts),
+            ts,
+            float(value),
+            None if source_resolution_seconds is None else int(source_resolution_seconds),
+        )
+        for ts, value, source_resolution_seconds in rows
+    ]
     return {
         "rows": parsed,
         "times": [x[0] for x in parsed],
     }
+
+
+def row_tolerance_seconds(row):
+    source_resolution_seconds = row[3]
+    if source_resolution_seconds is None:
+        return BASE_MATCH_SECONDS
+
+    # Insights timestamps can represent coarse aggregation buckets. Treat the
+    # bucket timestamp as its centre: half the source resolution on either side.
+    # Keep the previous 7.5-minute floor for current/fine-grained series so
+    # small collection/timestamp offsets do not create artificial gaps.
+    return max(BASE_MATCH_SECONDS, source_resolution_seconds / 2.0)
 
 
 def nearest(series, target_ts):
@@ -62,9 +82,15 @@ def nearest(series, target_ts):
     if pos > 0:
         candidates.append(rows[pos - 1])
 
-    best = min(candidates, key=lambda row: abs(row[0] - target_ts))
-    if abs(best[0] - target_ts) > MAX_MATCH_SECONDS:
+    valid = [
+        row
+        for row in candidates
+        if abs(row[0] - target_ts) <= row_tolerance_seconds(row)
+    ]
+    if not valid:
         return None
+
+    best = min(valid, key=lambda row: abs(row[0] - target_ts))
     return best[2]
 
 
@@ -97,7 +123,7 @@ def main():
         "dryer": 0,
     }
 
-    for t, ts, p1_w in series["p1"]["rows"]:
+    for t, ts, p1_w, _ in series["p1"]["rows"]:
         solar_edge_w = nearest(series["solaredge"], t)
         goodwe4200_w = nearest(series["goodwe4200"], t)
         goodwe2000_w = nearest(series["goodwe2000"], t)
@@ -158,10 +184,14 @@ def main():
         raise SystemExit("FAIL: no fully matched SQLite clean-base samples")
 
     payload = {
-        "schema": "EMS_PI_CLEAN_BASE_HISTORY_V0.2",
+        "schema": "EMS_PI_CLEAN_BASE_HISTORY_V0.3",
         "source": "local SQLite only",
         "control_writes": False,
-        "match_tolerance_seconds": MAX_MATCH_SECONDS,
+        "matching": {
+            "mode": "source_resolution_aware_nearest",
+            "base_tolerance_seconds": BASE_MATCH_SECONDS,
+            "coarse_tolerance": "half_source_resolution",
+        },
         "p1_samples": len(series["p1"]["rows"]),
         "sample_count": len(out),
         "skipped": skipped,
