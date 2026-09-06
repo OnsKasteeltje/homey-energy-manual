@@ -1,6 +1,6 @@
 # Architectuuroverzicht
 
-> **Current-state authority:** actuele procesflows en statusclaims op deze pagina moeten worden gelezen tegen `docs/architecture/homey-runtime-baseline-2026-09-04.md` en `docs/architecture/current-runtime-source-policy.md`. Voor Core is `src/homey/core/core-v0.11i.live-homey.js` de exacte actuele bron. Historische candidate/patch/smoke/rollback-bestanden zijn geen huidige architectuur.
+> **Current-state authority:** actuele procesflows en statusclaims op deze pagina moeten worden gelezen tegen `docs/architecture/homey-runtime-baseline-2026-09-04.md` en `docs/architecture/current-runtime-source-policy.md`. Voor Core is `src/homey/core/core-v0.11i.live-homey.js` de exacte actuele bron. Voor de actuele Pi Planner-policy is `docs/pi-planner.md` de detailbron. Historische candidate/patch/smoke/rollback-bestanden zijn geen huidige architectuur.
 
 Deze pagina beschrijft de **actuele gecodeerde architectuur van Energy Core v2**. Procesflows en statusbeschrijvingen moeten overeenkomen met de productiecode; toekomstige of historische architectuur wordt expliciet gemarkeerd.
 
@@ -34,6 +34,15 @@ Contract-/prijscontext · Tesla/WW-verplichtingen · PV-context
                     │
                     ▼
         plan/intents · geen fysieke writes
+
+Parallelle Pi-validatielaag:
+PV/Quatt/base-load/WW forecast · Tesla availability forecast
+                    │
+                    ▼
+       Pi Planner v0.6 SHADOW/read-only
+                    │
+                    ▼
+     website shadow · geen fysieke writes
 ```
 
 De Energy Manager ligt niet in het fysieke stroompad. Installatieveiligheid, lokale apparaatbeveiligingen en Easee Equalizer blijven hoger in de hiërarchie.
@@ -168,17 +177,24 @@ De flow gebruikt targeted Logic-reads. De canonical raw GitHub command-route hee
 
 ## 9. 24h Energy Planner
 
-Actuele planner:
+De actuele Homey-planner is:
 
 ```text
 EM v2 | 45 Planner | 24h Energy Plan v0.5.0 SHADOW LOW-LOAD
 ```
 
-De Planner is actief als SHADOW-planningslaag en plant 96 × 15-minutenslots. Hij gebruikt Hauwert Open-Meteo 15-minuten shortwave-radiation forecast plus historische calibratie wanneer voldoende samples beschikbaar zijn. `SHADOW` betekent hier niet obsolete: hij levert actuele plan/intents, maar verricht geen fysieke device-writes. Core blijft realtime safety-arbiter voor WW en Tesla.
+De Homey Planner is actief als SHADOW-planningslaag en plant 96 × 15-minutenslots. Hij gebruikt Hauwert Open-Meteo 15-minuten shortwave-radiation forecast plus historische calibratie wanneer voldoende samples beschikbaar zijn. `SHADOW` betekent hier niet obsolete: hij levert actuele plan/intents, maar verricht geen fysieke device-writes. Core blijft realtime safety-arbiter voor WW en Tesla.
 
 WW-planning is energy-budget based, rangschikt eerst volledige PV-surplusdekking en daarna marginale import, en gebruikt receding-horizon deadline fallback met twee slots/30 minuten veiligheidsmarge vóór 19:00. Tesla deadline-slots behouden prioriteit boven niet-MUST WW-slots; WW SHOULD-slots worden waar mogelijk verplaatst. Batterijlogica blijft theoretisch/simulatie-only.
 
+Daarnaast draait op de Raspberry Pi een afzonderlijke **Pi Planner v0.6** als parallelle SHADOW/read-only validatielaag. Deze planner combineert de Pi-forecasts voor PV, Quatt, basislast en warm water en publiceert een eigen 96-slots website-shadow. Hij heeft geen fysieke actuatorownership en wijzigt de Homey/Easee control-route niet.
+
+Tesla-planning op de Pi is in v0.6 **opportunity-only**: een opportunity heeft geen kWh-doel of target-SoC nodig en wordt alleen gepland bij voldoende voorspeld PV-overschot én verwachte voertuigbeschikbaarheid. De Pi gebruikt START7/RUN6 en maximaal 16 A. Toekomstige beschikbaarheid gebruikt een normaal weekpatroon; een actuele `connected=true` mag dit alleen voor de nabije horizon overrulen en niet voor alle toekomstige slots. Deadline-planning op de Pi is nog niet geïmplementeerd en krijgt later een hogere beleidsprioriteit dan het normale weekpatroon.
+
+De volledige Pi-specifieke policy, exacte availability-semantiek, validatie-evidence en open punten staan uitsluitend in **`docs/pi-planner.md`**. Deze architectuurpagina houdt alleen de hoofdrol en grenzen vast om dubbele detailwaarheden te voorkomen.
+
 ```text
+Homey:
 State + contract/prijs + Tesla/WW doelen + PV-context
                          │
                          ▼
@@ -193,6 +209,16 @@ State + contract/prijs + Tesla/WW doelen + PV-context
                          │
                          ▼
                  downstream writers
+
+Pi (parallel, read-only):
+Pi forecasts + WW plan + Tesla availability forecast
+                         │
+                         ▼
+                 Pi Planner v0.6
+                         │
+                         ▼
+              website shadow / analyse
+                 geen fysieke writes
 ```
 
 ## 10. Actuele EV- en WW-lagen
@@ -241,6 +267,7 @@ Actuele publicatielagen zijn onder andere:
 
 - `Publisher v1.0.13 CONTROL EVIDENCE LOW-LOAD`;
 - `Planner Shadow v0.4 event-driven LOW-LOAD`;
+- Pi Planner website shadow, read-only;
 - freshness watchdog v0.3.3;
 - aparte historie/evidence/publicatielagen zoals geregistreerd in de runtime-baseline.
 
@@ -270,7 +297,9 @@ Gevalideerde huishoudelijke actuator-writers
 
 ## 15. Documentatie- en synchronisatieregel
 
-Procesflowdiagrammen beschrijven altijd de **actuele gecodeerde stand**. Voor current-state documentatie geldt de authority order uit `docs/architecture/current-runtime-source-policy.md`, met `docs/architecture/homey-runtime-baseline-2026-09-04.md` als actuele runtime-classificatie.
+Procesflowdiagrammen beschrijven altijd de **actuele gecodeerde stand**. Voor current-state documentatie geldt de authority order uit `docs/architecture/current-runtime-source-policy.md`, met `docs/architecture/homey-runtime-baseline-2026-09-04.md` als actuele runtime-classificatie. Pi Planner-details worden centraal onderhouden in `docs/pi-planner.md` en niet volledig gedupliceerd in dit architectuuroverzicht.
+
+**Projectregel:** iedere functionele, architecturale of operationele wijziging moet in dezelfde change-set ook de relevante projectdocumentatie bijwerken. Een gedragswijziging die alleen in code/runtime is verwerkt, wordt niet als compleet beschouwd.
 
 `start_flow()` bewijst alleen dat een flow is gestart; het bewijst niet dat downstream verwerking is voltooid. E2E-validatie moet daarom eindigen op aantoonbare runtime/readback-evidence.
 
@@ -285,4 +314,5 @@ De huidige gereconcilieerde baseline heeft nog expliciete verbeterpunten:
 3. legacy/rollback/validation-flow cleanup dependency-by-dependency uitvoeren;
 4. verdere WW/Tesla runtime-validatie uitvoeren waar de acceptatiecriteria dat vereisen;
 5. Victron-integratie pas promoveren van SHADOW wanneer hardware/commissioning gereed en gevalideerd is;
-6. Pi-migratie gefaseerd uitvoeren vanuit de gereconcilieerde 2026-09-04 runtime-baseline, zonder parallelle physical-writer ownership te introduceren.
+6. Pi-migratie gefaseerd uitvoeren vanuit de gereconcilieerde 2026-09-04 runtime-baseline, zonder parallelle physical-writer ownership te introduceren;
+7. Pi Tesla deadline-planning pas toevoegen na verdere shadow-validatie van opportunity- en availability-semantiek.
