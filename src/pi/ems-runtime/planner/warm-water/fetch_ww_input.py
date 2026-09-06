@@ -4,7 +4,9 @@ import json
 import os
 import subprocess
 import time
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 HOMEY_PROJECT = Path("/home/jeroen/ems-homey-adapter")
 HOMEY_CLI = HOMEY_PROJECT / "node_modules/.bin/homey"
@@ -14,7 +16,7 @@ NODE_PATH = "/opt/node-v24.20.0/bin"
 VARIABLE_ID = "39c7c169-34d7-4e14-a27b-520aca255032"
 
 OUTPUT = Path("/home/jeroen/ems/data/ww-input.json")
-MAX_STALE_SECONDS = 2 * 60 * 60
+TZ = ZoneInfo("Europe/Amsterdam")
 
 env = os.environ.copy()
 env["PATH"] = NODE_PATH + ":" + env.get("PATH", "")
@@ -40,16 +42,20 @@ if r.returncode != 0:
 
     if is_rate_limit:
         if OUTPUT.exists():
-            age_seconds = time.time() - OUTPUT.stat().st_mtime
-            if age_seconds <= MAX_STALE_SECONDS:
+            mtime = OUTPUT.stat().st_mtime
+            age_seconds = time.time() - mtime
+            output_day = datetime.fromtimestamp(mtime, tz=TZ).date()
+            today = datetime.now(TZ).date()
+
+            if output_day == today:
                 print(
-                    "WARN: Homey rate limit; reusing last WW input "
+                    "WARN: Homey rate limit; reusing today's WW input "
                     f"(age={age_seconds / 60:.0f} min)"
                 )
                 raise SystemExit(0)
 
         raise SystemExit(
-            "FAIL: Homey rate limit and no WW input newer than 2 hours"
+            "FAIL: Homey rate limit and no WW input from today"
         )
 
     raise SystemExit(f"FAIL: Homey read: {msg[:300]}")
