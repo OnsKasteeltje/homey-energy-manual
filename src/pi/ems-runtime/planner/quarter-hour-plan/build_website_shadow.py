@@ -15,11 +15,14 @@ slots = src.get("slots", [])
 if len(slots) != 96:
     raise SystemExit(f"FAIL: expected 96 Pi planner slots, got {len(slots)}")
 
+
 def parse_utc(ts):
     return datetime.fromisoformat(ts.replace("Z", "+00:00"))
 
+
 def iso_ms(dt):
     return dt.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
 
 actions = []
 
@@ -30,6 +33,7 @@ for i, s in enumerate(slots):
 
     net = int(round(s.get("netBeforeFlexW") or 0))
     ww_w = int(round(s.get("wwPlanW") or 0))
+    ev_w = int(round(s.get("evPlanW") or 0))
 
     actions.append({
         "i": i,
@@ -50,19 +54,26 @@ for i, s in enumerate(slots):
             "pv": "PI_ARRAY_GEOMETRY_FORECAST"
         },
         "battery": "HOLD",
-        "tesla": "HOLD",
+        "tesla": "RUN" if ev_w > 0 else "HOLD",
         "warmWater": "RUN" if ww_w > 0 else "HOLD",
         "targets": {
-            "evTargetW": 0,
+            "evTargetW": ev_w,
             "wwTargetW": ww_w,
             "batteryTargetW": 0
+        },
+        "teslaPlan": {
+            "mode": "OPPORTUNITY" if ev_w > 0 else "HOLD",
+            "reason": s.get("evAllocationReason"),
+            "availableForecast": bool(s.get("teslaAvailableForecast")),
+            "expectedHome": bool(s.get("teslaExpectedHome")),
+            "connectedNow": bool(s.get("teslaConnectedNow")),
         }
     })
 
 generated = iso_ms(datetime.now(timezone.utc))
 
 plan = {
-    "schema": "EMS_PI_ENERGY_PLAN_24H_V0.1",
+    "schema": "EMS_PI_ENERGY_PLAN_24H_V0.2",
     "generatedAt": generated,
     "controlMode": "SHADOW",
     "readOnly": True,
@@ -78,7 +89,8 @@ plan = {
         "forecastQuality": {
             "baseLoad": "PI_HISTORY_MODEL",
             "pv": "PI_ARRAY_GEOMETRY_FORECAST",
-            "quatt": "PI_QUATT_FORECAST"
+            "quatt": "PI_QUATT_FORECAST",
+            "tesla": "PI_WEEKLY_PRESENCE_PLUS_LIVE_CONNECTED"
         }
     },
     "plan": {
@@ -90,7 +102,7 @@ plan = {
 }
 
 payload = {
-    "schema": "EMS_PI_PLANNER_SHADOW_PUBLISH_V0.1",
+    "schema": "EMS_PI_PLANNER_SHADOW_PUBLISH_V0.2",
     "publishedAt": generated,
     "observabilityOnly": True,
     "controlImpact": "NONE",
@@ -105,6 +117,7 @@ tmp = OUTPUT.with_suffix(".tmp")
 tmp.write_text(json.dumps(payload, indent=2) + "\n")
 tmp.replace(OUTPUT)
 
-print("PASS: Pi website shadow built")
-print("slots :", len(actions))
-print("output:", OUTPUT)
+print("PASS: Pi website shadow v0.2 built")
+print("slots       :", len(actions))
+print("Tesla slots :", sum(1 for x in actions if x["tesla"] == "RUN"))
+print("output      :", OUTPUT)
