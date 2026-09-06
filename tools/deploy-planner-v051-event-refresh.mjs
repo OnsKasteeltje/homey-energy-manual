@@ -98,6 +98,15 @@ if(!p.includes("EM2_ENERGY_PLAN_24H_V0.5.1")){
     "teslaAllocationPolicy,teslaMaxA:maxA,teslaMaxPowerW:maxPowerW,teslaRequiredSlots:requiredDeadlineSlots,teslaAllocatedSlots:teslaDeadlineRanked.length,teslaUnallocatedKWh:Number(teslaUnallocatedKWh.toFixed(3)),teslaDeadlineCatchUp:deadlineCatchUp,wwObligation",
     'Planner status evidence'
   );
+  // WW v0.5.1: reserve best partial-PV slots on current day; defer only remaining grid energy.
+  if(!p.includes("PV_PARTIAL_RESERVED")){
+    p=replaceOne(p,
+      "const isCurrentDay=meta.dayRelation==='CURRENT_DAY';const mayDefer=isCurrentDay&&!meta.catchupRequired&&deadlineSlackSlots>WW_DEADLINE_SAFETY_SLOTS;if(mayDefer){deferredGridEnergyKWh=remain;}else{deadlineFallbackArmed=true;for(const s of rankWWMarginal(rest)){",
+      "const isCurrentDay=meta.dayRelation==='CURRENT_DAY';const mayDefer=isCurrentDay&&!meta.catchupRequired&&deadlineSlackSlots>WW_DEADLINE_SAFETY_SLOTS;if(mayDefer){const pvPartial=rankWWMarginal(rest).filter(s=>wwMetrics(s).pvCoverageW>0);for(const s of pvPartial){if(remain<=1e-6)break;take(s,'PV_PARTIAL_RESERVED');}if(remain>1e-6)deferredGridEnergyKWh=remain;}else{deadlineFallbackArmed=true;for(const s of rankWWMarginal(rest)){",
+      'Planner WW partial-PV reservation'
+    );
+  }
+
   p=p.replaceAll('READY_SHADOW_V0.5.0','READY_SHADOW_V0.5.1');
   p=p.replaceAll('Homey-EMS-Planner-v0.5.0','Homey-EMS-Planner-v0.5.1');
 }
