@@ -38,6 +38,22 @@ Contract-/prijscontext · Tesla/WW-verplichtingen · PV-context
 
 De Energy Manager ligt niet in het fysieke stroompad. Installatieveiligheid, lokale apparaatbeveiligingen en Easee Equalizer blijven hoger in de hiërarchie.
 
+### 1.1 EMS-prioriteiten en harde randvoorwaarden
+
+**Comfort en veiligheid zijn geen afzonderlijke laagste prioriteit of losse verbruiker.** Zij zijn harde randvoorwaarden voor alle Core- en Planner-beslissingen en staan altijd boven economische optimalisatie.
+
+Harde randvoorwaarden omvatten onder andere veilige en stabiele werking, minimumcomfort (zoals warm water en essentiële verbruikers), technische vermogenslimieten, SoC-reserves en begrenzing van schadelijke schakelfrequenties.
+
+Binnen deze randvoorwaarden geldt de functionele prioriteitsvolgorde:
+
+1. **Basisverbruik (altijd)** — essentiële en niet-flexibele verbruikers; comfort en veiligheid zijn hierin geborgd.
+2. **Warm water** — minimumcomfort, minimumtemperatuur en (dag)deadline garanderen.
+3. **Tesla laden** — gewenst SoC op de opgegeven vertrektijd/deadline garanderen, binnen ingestelde SoC-grenzen.
+4. **Eigen PV optimaal benutten** — flexibel verbruik waar mogelijk naar eigen PV-productie verschuiven.
+5. **Grid-import minimaliseren** — netimport minimaliseren voor zover prioriteiten 1–4 en alle harde randvoorwaarden dit toelaten.
+
+Economische optimalisatie mag nooit een comfort-, veiligheids- of technische constraint schenden. Deze prioriteiten beschrijven de beleidsvolgorde; bestaande lokale beveiligingen en de veiligheidshiërarchie uit sectie 14 blijven autoritatief.
+
 ## 2. Core en Homey-belasting
 
 De actuele Core is `EM v2 | 00 Core Tick | v0.11i PINNED SOURCE` en draait iedere vijf minuten plus handmatige start. De exacte runtime staat in `src/homey/core/core-v0.11i.live-homey.js`.
