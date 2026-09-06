@@ -13,6 +13,7 @@ PV_NOMINAL_W = 8000
 PV_SCALE_W_PER_WM2 = PV_NOMINAL_W / 1000
 
 OUTPUT = Path("/home/jeroen/ems/data/pv-forecast.json")
+AXIS = Path("/home/jeroen/ems/data/planner-axis.json")
 
 params = {
     "latitude": LAT,
@@ -43,16 +44,24 @@ radiation = quarter.get("shortwave_radiation", [])
 if not times or len(times) != len(radiation):
     raise RuntimeError("Invalid Open-Meteo 15-minute response")
 
-now = datetime.now(timezone.utc)
-slot_start_ts = int(now.timestamp() // 900 * 900)
+with AXIS.open() as f:
+    axis = json.load(f)
+
+axis_slots = axis.get("slots", [])
+if len(axis_slots) != 96:
+    raise RuntimeError(
+        f"Invalid planner axis: expected 96 slots, got {len(axis_slots)}"
+    )
+
+axis_set = set(axis_slots)
 
 slots = []
 
 for ts, irr in zip(times, radiation):
     dt = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc)
-    epoch = int(dt.timestamp())
+    start = dt.isoformat().replace("+00:00", "Z")
 
-    if epoch < slot_start_ts:
+    if start not in axis_set:
         continue
 
     if len(slots) >= 96:

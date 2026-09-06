@@ -8,6 +8,7 @@ QUATT_FILE = Path("/home/jeroen/ems/data/quatt-forecast.json")
 BASE_FILE = Path("/home/jeroen/ems/data/base-load-forecast.json")
 WW_FILE = Path("/home/jeroen/ems/data/ww-plan.json")
 PRICE_FILE = Path("/home/jeroen/ems/data/price-forecast.json")
+AXIS_FILE = Path("/home/jeroen/ems/data/planner-axis.json")
 OUTPUT = Path("/home/jeroen/ems/data/shadow-load-plan.json")
 
 def load(path):
@@ -39,12 +40,37 @@ quatt = load(QUATT_FILE)
 base = load(BASE_FILE)
 ww = load(WW_FILE)
 price = load(PRICE_FILE)
+axis = load(AXIS_FILE)
 
 pv_map = {timestamp(s): s for s in pv.get("slots", [])}
 q_map = {timestamp(s): s for s in quatt.get("slots", [])}
 b_map = {timestamp(s): s for s in base.get("slots", [])}
 ww_map = {timestamp(s): s for s in ww.get("slots", [])}
 price_map = {timestamp(s): s for s in price.get("slots", [])}
+
+axis_slots = axis.get("slots", [])
+if len(axis_slots) != 96:
+    raise SystemExit(
+        f"FAIL: planner axis expected 96 slots, got {len(axis_slots)}"
+    )
+
+sources = {
+    "PV": pv_map,
+    "Quatt": q_map,
+    "Base": b_map,
+    "WW": ww_map,
+    "Price": price_map,
+}
+
+for name, source_map in sources.items():
+    source_slots = sorted(source_map)
+    if source_slots != sorted(axis_slots):
+        missing = sorted(set(axis_slots) - set(source_slots))
+        extra = sorted(set(source_slots) - set(axis_slots))
+        raise SystemExit(
+            f"FAIL: {name} axis mismatch; "
+            f"missing={missing[:3]} extra={extra[:3]}"
+        )
 
 common = sorted(
     set(pv_map)

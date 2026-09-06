@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 User=jeroen
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/axis/build_planner_axis.py
 ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/weather-forecast/fetch_weather_forecast.py
 ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/datastore/import_weather_forecast.py
 ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/quatt-forecast/build_quatt_forecast.py

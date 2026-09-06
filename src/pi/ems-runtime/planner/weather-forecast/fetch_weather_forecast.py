@@ -14,6 +14,7 @@ STEP_SECONDS = 15 * 60
 MAX_SLOTS = 96
 
 OUTPUT = Path("/home/jeroen/ems/data/weather-forecast.json")
+AXIS = Path("/home/jeroen/ems/data/planner-axis.json")
 
 BASE_PARAMS = {
     "latitude": LAT,
@@ -35,11 +36,6 @@ BASE_PARAMS = {
     "forecast_minutely_15": 104,
     "timezone": "UTC",
 }
-
-
-def floor_quarter(dt):
-    ts = int(dt.timestamp())
-    return ts - (ts % STEP_SECONDS)
 
 
 def fetch_weather():
@@ -144,7 +140,16 @@ def main():
     gti_goodwe4200 = fetch_gti(135, 30)
     gti_solaredge = fetch_gti(135, 25)
 
-    now_q = floor_quarter(datetime.now(timezone.utc))
+    with AXIS.open() as f:
+        axis = json.load(f)
+
+    axis_slots = axis.get("slots", [])
+    if len(axis_slots) != MAX_SLOTS:
+        raise RuntimeError(
+            f"Invalid planner axis: expected {MAX_SLOTS} slots, got {len(axis_slots)}"
+        )
+
+    axis_set = set(axis_slots)
 
     slots = []
 
@@ -156,11 +161,12 @@ def main():
         except Exception:
             continue
 
-        if int(dt.timestamp()) < now_q:
+        start = dt.isoformat().replace("+00:00", "Z")
+        if start not in axis_set:
             continue
 
         slot = {
-            "start": dt.isoformat().replace("+00:00", "Z")
+            "start": start
         }
 
         valid = True

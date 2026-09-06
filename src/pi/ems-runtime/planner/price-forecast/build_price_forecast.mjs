@@ -5,6 +5,7 @@ import { normalizeEnergyZeroRest } from './price-source-normalizer-v0.1.mjs';
 
 const API = 'https://public.api.energyzero.nl/public/v1/prices';
 const OUTPUT = '/home/jeroen/ems/data/price-forecast.json';
+const AXIS = '/home/jeroen/ems/data/planner-axis.json';
 const TIME_ZONE = 'Europe/Amsterdam';
 
 function localDate(offsetDays = 0) {
@@ -82,14 +83,43 @@ async function main() {
   const tomorrow = localDate(1);
 
   const todayData = await fetchDate(today);
-  const tomorrowData = await fetchDate(tomorrow);
 
-  const now = Date.now();
+  let tomorrowData = { slots: [] };
+  try {
+    tomorrowData = await fetchDate(tomorrow);
+  } catch (err) {
+    console.warn(`Tomorrow prices unavailable: ${err.message}`);
+  }
 
-  const slots = [...todayData.slots, ...tomorrowData.slots]
-    .filter(slot => Date.parse(slot.end) > now)
-    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
-    .slice(0, 96);
+  const axis = JSON.parse(await fs.readFile(AXIS, 'utf8'));
+  const axisSlots = axis.slots ?? [];
+
+  if (axisSlots.length !== 96) {
+    throw new Error(`Invalid planner axis: expected 96 slots, got ${axisSlots.length}`);
+  }
+
+  const priceMap = new Map(
+    [...todayData.slots, ...tomorrowData.slots]
+      .map(slot => [slot.start, slot])
+  );
+
+  const slots = axisSlots.map(start => {
+    const slot = priceMap.get(start);
+    if (slot) {
+      return slot;
+    }
+
+    const end = new Date(Date.parse(start) + 15 * 60 * 1000)
+      .toISOString()
+      .replace('.000Z', 'Z');
+
+    return {
+      start,
+      end,
+      marketPriceEurPerKwh: null,
+      priceAvailable: false
+    };
+  });
 
   if (slots.length === 0) {
     throw new Error('No usable EnergyZero slots available');
