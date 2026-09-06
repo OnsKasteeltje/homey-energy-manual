@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -20,6 +20,7 @@ EV_START_MIN_A = 7
 EV_RUN_MIN_A = 6
 EV_MAX_A = 16
 EV_START_MIN_W = EV_START_MIN_A * EV_W_PER_A
+LIVE_CONNECTED_HORIZON_H = 2
 
 
 def load(path):
@@ -87,6 +88,8 @@ energy_state = load(ENERGY_STATE_FILE) if ENERGY_STATE_FILE.exists() else {}
 tesla_state = energy_state.get("tesla") or {}
 tesla_connected_now = tesla_state.get("connected") is True
 tesla_charging_now = tesla_state.get("charging") is True
+now_utc = datetime.now(timezone.utc)
+live_connected_until = now_utc + timedelta(hours=LIVE_CONNECTED_HORIZON_H)
 
 pv_map = {timestamp(s): s for s in pv.get("slots", [])}
 q_map = {timestamp(s): s for s in quatt.get("slots", [])}
@@ -150,12 +153,27 @@ for ts in common:
     net_before = non_controllable - pv_w
     surplus_before = max(0.0, -net_before)
 
-    local_dt = parse_utc(ts).astimezone(TZ)
+    slot_dt = parse_utc(ts)
+    local_dt = slot_dt.astimezone(TZ)
     expected_home = expected_tesla_home(local_dt)
 
-    # Current connected state is authoritative for the current home window.
-    # For future slots, the normal weekly presence pattern is only a forecast.
-    tesla_available = tesla_connected_now or expected_home
+    # Live connected status is authoritative only for the near-term horizon.
+    # Beyond that, use the weekly presence forecast so a Sunday connection
+    # cannot incorrectly make the Tesla available all Monday afternoon.
+    live_connected_override = (
+        tesla_connected_now
+        and slot_dt >= now_utc - timedelta(minutes=15)
+        and slot_dt <= live_connected_until
+    )
+    if live_connected_override:
+        tesla_available = True
+        availability_source = "LIVE_CONNECTED_NEAR_TERM"
+    elif expected_home:
+        tesla_available = True
+        availability_source = "WEEKLY_HOME_FORECAST"
+    else:
+        tesla_available = False
+        availability_source = "NOT_AVAILABLE"
 
     ev_w = 0
     ev_reason = "NOT_AVAILABLE"
@@ -185,8 +203,10 @@ for ts in common:
         "gridImportBeforeFlexW": round(max(0.0, net_before)),
         "gridExportBeforeFlexW": round(surplus_before),
         "teslaAvailableForecast": tesla_available,
+        "teslaAvailabilitySource": availability_source,
         "teslaExpectedHome": expected_home,
         "teslaConnectedNow": tesla_connected_now,
+        "teslaLiveConnectedOverride": live_connected_override,
         "evPlanW": round(ev_w),
         "evAllocationReason": ev_reason,
         "netAfterEVW": round(net_after_ev),
@@ -201,7 +221,7 @@ for ts in common:
     })
 
 payload = {
-    "schema": "EMS_PI_SHADOW_LOAD_PLAN_V0.5",
+    "schema": "EMS_PI_SHADOW_LOAD_PLAN_V0.6",
     "mode": "shadow",
     "control_writes": False,
     "composition": {
@@ -212,12 +232,13 @@ payload = {
         "quattControl": "OBSERVE_ONLY_FORECAST",
         "wwControl": "SHADOW_PLAN_ONLY",
         "teslaControl": "SHADOW_OPPORTUNITY_ONLY",
-        "teslaAvailabilityPolicy": "CONNECTED_NOW_OR_NORMAL_WEEKLY_HOME_FORECAST",
+        "teslaAvailabilityPolicy": "LIVE_CONNECTED_2H_THEN_NORMAL_WEEKLY_HOME_FORECAST",
         "teslaOpportunityPolicy": "PV_SURPLUS_START7_RUN6_MAX16",
     },
     "tesla": {
         "connectedNow": tesla_connected_now,
         "chargingNow": tesla_charging_now,
+        "liveConnectedHorizonHours": LIVE_CONNECTED_HORIZON_H,
         "startMinA": EV_START_MIN_A,
         "runMinA": EV_RUN_MIN_A,
         "maxA": EV_MAX_A,
@@ -248,12 +269,13 @@ exp_before = energy("gridExportBeforeFlexW")
 imp_after = energy("gridImportAfterFlexW")
 exp_after = energy("gridExportAfterFlexW")
 
-print("PASS: shadow load plan v0.5 built")
+print("PASS: shadow load plan v0.6 built")
 print("slots                    :", len(slots))
 print("base load kWh            :", round(base_kwh, 2))
 print("Quatt kWh                :", round(quatt_kwh, 2))
 print("PV kWh                   :", round(pv_kwh, 2))
 print("Tesla opportunity kWh    :", round(ev_kwh, 2))
+print("Tesla opportunity slots  :", sum(1 for x in slots if x["evPlanW"] > 0))
 print("WW planned kWh           :", round(ww_kwh, 2))
 print("grid import before flex  :", round(imp_before, 2))
 print("grid export before flex  :", round(exp_before, 2))
