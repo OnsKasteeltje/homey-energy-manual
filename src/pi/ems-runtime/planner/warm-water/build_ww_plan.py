@@ -185,8 +185,7 @@ for date_key, day_slots in sorted(by_date.items()):
             slack_slots = max(0, len(rest) - required_slots)
 
             may_defer = (
-                is_today
-                and not catchup
+                not catchup
                 and slack_slots > WW_DEADLINE_SAFETY_SLOTS
             )
 
