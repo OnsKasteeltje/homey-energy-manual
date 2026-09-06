@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 
 HOMEY_PROJECT = Path("/home/jeroen/ems-homey-adapter")
@@ -13,6 +14,7 @@ NODE_PATH = "/opt/node-v24.20.0/bin"
 VARIABLE_ID = "39c7c169-34d7-4e14-a27b-520aca255032"
 
 OUTPUT = Path("/home/jeroen/ems/data/ww-input.json")
+MAX_STALE_SECONDS = 2 * 60 * 60
 
 env = os.environ.copy()
 env["PATH"] = NODE_PATH + ":" + env.get("PATH", "")
@@ -34,8 +36,22 @@ r = subprocess.run(
 
 if r.returncode != 0:
     msg = (r.stderr or r.stdout).strip()
-    if "429" in msg:
-        raise SystemExit("FAIL: Homey rate limit (429); stopped")
+    is_rate_limit = "429" in msg or "too many requests" in msg.lower()
+
+    if is_rate_limit:
+        if OUTPUT.exists():
+            age_seconds = time.time() - OUTPUT.stat().st_mtime
+            if age_seconds <= MAX_STALE_SECONDS:
+                print(
+                    "WARN: Homey rate limit; reusing last WW input "
+                    f"(age={age_seconds / 60:.0f} min)"
+                )
+                raise SystemExit(0)
+
+        raise SystemExit(
+            "FAIL: Homey rate limit and no WW input newer than 2 hours"
+        )
+
     raise SystemExit(f"FAIL: Homey read: {msg[:300]}")
 
 variable = json.loads(r.stdout)
