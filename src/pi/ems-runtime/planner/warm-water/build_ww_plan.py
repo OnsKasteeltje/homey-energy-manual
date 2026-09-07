@@ -16,11 +16,15 @@ TZ = ZoneInfo("Europe/Amsterdam")
 BOILER_W = 1900
 WW_DAILY_FALLBACK_MIN = 240
 WW_DEADLINE_HOUR = 19
+WW_FALLBACK_HOUR = 16
 WW_DEADLINE_SAFETY_SLOTS = 2
+WW_MIN_RUN_SLOTS = 2
 WW_SLOT_ENERGY_KWH = BOILER_W / 1000 * 0.25
+
 
 def load(path):
     return json.loads(path.read_text())
+
 
 def ts(slot):
     return (
@@ -29,17 +33,25 @@ def ts(slot):
         or slot.get("startAt")
     )
 
+
+def parse_utc(timestamp):
+    return datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+
+
 def pv_power(slot):
     for key in ("pvForecastW", "pv_forecast_w", "power_w", "forecast_w"):
         if slot.get(key) is not None:
             return float(slot[key])
     raise ValueError("PV power field missing")
 
+
+def local_dt(timestamp):
+    return parse_utc(timestamp).astimezone(TZ)
+
+
 def local_date(timestamp):
-    dt = datetime.fromisoformat(
-        timestamp.replace("Z", "+00:00")
-    ).astimezone(TZ)
-    return dt.date().isoformat()
+    return local_dt(timestamp).date().isoformat()
+
 
 def deadline_utc(date_key):
     y, m, d = map(int, date_key.split("-"))
@@ -47,6 +59,7 @@ def deadline_utc(date_key):
         y, m, d, WW_DEADLINE_HOUR, 0, 0, tzinfo=TZ
     )
     return dt.astimezone(timezone.utc)
+
 
 ww_doc = load(WW_INPUT)
 pv_doc = load(PV_FILE)
@@ -88,6 +101,7 @@ for timestamp in common:
 
 today_local = datetime.now(TZ).date().isoformat()
 
+
 def metrics(slot):
     surplus = max(
         0.0,
@@ -96,6 +110,57 @@ def metrics(slot):
     pv_coverage = min(BOILER_W, surplus)
     marginal_import = max(0.0, BOILER_W - surplus)
     return surplus, pv_coverage, marginal_import
+
+
+def is_consecutive(a, b):
+    return (
+        parse_utc(b["slot_start_utc"]) -
+        parse_utc(a["slot_start_utc"])
+    ).total_seconds() == 15 * 60
+
+
+def choose_pv_blocks(candidates, required_slots):
+    """Choose best non-overlapping 30-minute blocks with any PV coverage."""
+    blocks = []
+
+    for i in range(len(candidates) - 1):
+        a = candidates[i]
+        b = candidates[i + 1]
+        if not is_consecutive(a, b):
+            continue
+
+        a_pv = metrics(a)[1]
+        b_pv = metrics(b)[1]
+        score = a_pv + b_pv
+
+        if score <= 0:
+            continue
+
+        blocks.append({
+            "indices": (i, i + 1),
+            "score": score,
+            "start": a["slot_start_utc"],
+        })
+
+    blocks.sort(key=lambda x: (-x["score"], x["start"]))
+
+    selected = set()
+    for block in blocks:
+        if required_slots - len(selected) < WW_MIN_RUN_SLOTS:
+            break
+
+        i, j = block["indices"]
+        if i in selected or j in selected:
+            continue
+
+        selected.add(i)
+        selected.add(j)
+
+        if len(selected) >= required_slots:
+            break
+
+    return selected
+
 
 by_date = {}
 
@@ -128,94 +193,83 @@ for date_key, day_slots in sorted(by_date.items()):
 
     candidates = [
         s for s in day_slots
-        if datetime.fromisoformat(
-            s["slot_start_utc"].replace("Z", "+00:00")
-        ) < deadline
+        if parse_utc(s["slot_start_utc"]) < deadline
     ]
 
     need_kwh = remaining_min / 60 * BOILER_W / 1000
-    remain = need_kwh
-    chosen = []
+    required_slots = int(
+        need_kwh / WW_SLOT_ENERGY_KWH + 0.999999
+    )
+    chosen_indices = set()
 
-    if not goal_reached and remain > 0:
-        full_pv = []
-        partial = []
+    if not goal_reached and required_slots > 0:
+        # Phase 1: PV-first. Any predicted PV surplus is valuable, but
+        # discretionary starts are planned in 30-minute blocks to avoid ping-pong.
+        chosen_indices = choose_pv_blocks(candidates, required_slots)
 
-        for s in candidates:
-            surplus, pv_cov, marginal = metrics(s)
-            item = (s, surplus, pv_cov, marginal)
+        remaining_slots = max(0, required_slots - len(chosen_indices))
 
-            if marginal == 0:
-                full_pv.append(item)
-            else:
-                partial.append(item)
-
-        full_pv.sort(
-            key=lambda x: (-x[2], x[0]["slot_start_utc"])
-        )
-
-        for s, surplus, pv_cov, marginal in full_pv:
-            if remain <= 1e-9:
-                break
-
-            alloc = min(WW_SLOT_ENERGY_KWH, remain)
-
-            chosen.append({
-                "slot_start_utc": s["slot_start_utc"],
-                "wwPlanW": BOILER_W,
-                "allocatedKWh": round(alloc, 3),
-                "pvCoverageW": round(pv_cov),
-                "gridRequiredW": round(marginal),
-                "allocationReason": "PV_SURPLUS_FULL",
-            })
-
-            remain -= alloc
-
-        if remain > 1e-9:
-            used = {x["slot_start_utc"] for x in chosen}
-            rest = [
-                x for x in partial
-                if x[0]["slot_start_utc"] not in used
+        if remaining_slots > 0:
+            unchosen = [
+                (i, s) for i, s in enumerate(candidates)
+                if i not in chosen_indices
             ]
 
-            required_slots = int(
-                remain / WW_SLOT_ENERGY_KWH + 0.999999
+            after_1600 = [
+                (i, s) for i, s in unchosen
+                if local_dt(s["slot_start_utc"]).hour >= WW_FALLBACK_HOUR
+            ]
+
+            # Normal fallback is only after 16:00. If waiting until 16:00
+            # would make the 19:00 deadline impossible, extend the fallback
+            # window earlier just enough to preserve comfort.
+            fallback_pool = (
+                after_1600
+                if len(after_1600) >= remaining_slots and not catchup
+                else unchosen
             )
 
-            slack_slots = max(0, len(rest) - required_slots)
-
-            may_defer = (
-                not catchup
-                and slack_slots > WW_DEADLINE_SAFETY_SLOTS
+            fallback_pool.sort(
+                key=lambda x: x[1]["slot_start_utc"],
+                reverse=True
             )
 
-            if not may_defer:
-                rest.sort(
-                    key=lambda x: (
-                        x[3],
-                        x[0]["slot_start_utc"]
-                    )
-                )
+            for i, _ in fallback_pool[:remaining_slots]:
+                chosen_indices.add(i)
 
-                for s, surplus, pv_cov, marginal in rest:
-                    if remain <= 1e-9:
-                        break
+    remain_kwh = need_kwh
+    chosen = []
 
-                    alloc = min(WW_SLOT_ENERGY_KWH, remain)
+    for i, s in enumerate(candidates):
+        if i not in chosen_indices:
+            continue
 
-                    chosen.append({
-                        "slot_start_utc": s["slot_start_utc"],
-                        "wwPlanW": BOILER_W,
-                        "allocatedKWh": round(alloc, 3),
-                        "pvCoverageW": round(pv_cov),
-                        "gridRequiredW": round(marginal),
-                        "allocationReason":
-                            "PV_PARTIAL_FALLBACK"
-                            if pv_cov > 0
-                            else "DEADLINE_FALLBACK",
-                    })
+        surplus, pv_cov, marginal = metrics(s)
+        dt_local = local_dt(s["slot_start_utc"])
 
-                    remain -= alloc
+        if pv_cov > 0:
+            reason = (
+                "PV_SURPLUS_FULL"
+                if marginal == 0
+                else "PV_PARTIAL_OPTIMIZED"
+            )
+        elif dt_local.hour >= WW_FALLBACK_HOUR:
+            reason = "DEADLINE_FALLBACK"
+        else:
+            reason = "SAFETY_EARLY_FALLBACK"
+
+        alloc = min(WW_SLOT_ENERGY_KWH, remain_kwh)
+
+        chosen.append({
+            "slot_start_utc": s["slot_start_utc"],
+            "wwPlanW": BOILER_W,
+            "allocatedKWh": round(alloc, 3),
+            "pvCoverageW": round(pv_cov),
+            "gridRequiredW": round(marginal),
+            "allocationReason": reason,
+        })
+
+        remain_kwh = max(0.0, remain_kwh - alloc)
 
     chosen_map = {
         x["slot_start_utc"]: x for x in chosen
@@ -244,16 +298,18 @@ for date_key, day_slots in sorted(by_date.items()):
         "allocatedEnergyKWh": round(
             sum(x["allocatedKWh"] for x in chosen), 3
         ),
-        "unallocatedEnergyKWh": round(max(0.0, remain), 3),
+        "unallocatedEnergyKWh": round(max(0.0, remain_kwh), 3),
         "catchupRequired": catchup,
+        "fallbackNotBeforeLocal": "16:00",
         "deadlineLocal": "19:00",
+        "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
         "allocatedSlots": len(chosen),
     })
 
 plan_slots.sort(key=lambda x: x["slot_start_utc"])
 
 payload = {
-    "schema": "EMS_PI_WW_PLAN_V0.2",
+    "schema": "EMS_PI_WW_PLAN_V0.3",
     "mode": "shadow",
     "control_writes": False,
     "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -261,7 +317,9 @@ payload = {
         "pv + quatt + quatt-free-base",
     "boilerPowerW": BOILER_W,
     "dailyFallbackMin": WW_DAILY_FALLBACK_MIN,
+    "fallbackNotBeforeLocal": "16:00",
     "deadlineLocal": "19:00",
+    "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
     "slot_count": len(plan_slots),
     "dailyPlans": daily,
     "slots": plan_slots,
@@ -273,7 +331,7 @@ tmp.write_text(
 )
 tmp.replace(OUTPUT)
 
-print("PASS: WW plan v0.2 built")
+print("PASS: WW plan v0.3 built")
 print("slots:", len(plan_slots))
 
 for d in daily:
