@@ -14,6 +14,7 @@ ADVISOR = Path("/home/jeroen/ems/runtime/planner/warm-water/seasonal_source_advi
 OUTPUT = Path("/home/jeroen/ems/data/ww-seasonal-advisor.json")
 NOTIFY_STATE = Path("/home/jeroen/ems/data/ww-seasonal-notify-state.json")
 MODE_VARIABLE_NAME = "WW_Boilermodus"
+MODE_VARIABLE_ID = "f9d885a4-fca2-4aea-a5a9-a5c05da90835"
 
 
 def run_homey(args):
@@ -33,16 +34,23 @@ def run_homey(args):
 
 
 def current_mode():
-    raw = run_homey(["api", "logic", "get-variables", "--json"])
-    variables = json.loads(raw)
-    if isinstance(variables, dict):
-        variables = list(variables.values())
+    raw = run_homey([
+        "api", "logic", "get-variable",
+        "--id", MODE_VARIABLE_ID,
+        "--json",
+    ])
+    variable = json.loads(raw)
+    if not isinstance(variable, dict):
+        raise RuntimeError(f"Unexpected Homey response for {MODE_VARIABLE_NAME!r}")
 
-    match = next((v for v in variables if v.get("name") == MODE_VARIABLE_NAME), None)
-    if not match:
-        raise RuntimeError(f"Homey logic variable {MODE_VARIABLE_NAME!r} not found")
+    returned_name = variable.get("name")
+    if returned_name and returned_name != MODE_VARIABLE_NAME:
+        raise RuntimeError(
+            f"Homey variable id {MODE_VARIABLE_ID} resolved to {returned_name!r}, "
+            f"expected {MODE_VARIABLE_NAME!r}"
+        )
 
-    value = match.get("value")
+    value = variable.get("value")
     if isinstance(value, bool):
         return "BOILER" if value else "CV"
 
