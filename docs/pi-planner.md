@@ -8,7 +8,7 @@ The Pi planner builds a 96 × 15-minute horizon from PV forecast, Quatt forecast
 
 Current implementation:
 
-- `src/pi/ems-runtime/planner/warm-water/build_ww_plan.py` — `EMS_PI_WW_PLAN_V0.5`;
+- `src/pi/ems-runtime/planner/warm-water/build_ww_plan.py` — `EMS_PI_WW_PLAN_V0.6`;
 - `src/pi/ems-runtime/planner/quarter-hour-plan/build_shadow_load_plan.py` — `EMS_PI_SHADOW_LOAD_PLAN_V0.6`;
 - `src/pi/ems-runtime/planner/quarter-hour-plan/build_website_shadow.py` — `EMS_PI_ENERGY_PLAN_24H_V0.2` / `EMS_PI_PLANNER_SHADOW_PUBLISH_V0.2`.
 
@@ -59,32 +59,35 @@ Opportunity charging is based on forecast PV surplus after non-controllable load
 
 Opportunity charging is not intended to create discretionary grid import. If the planner produces additional import solely because of an opportunity allocation, that is a planning defect to investigate rather than intended policy.
 
-### Warm-water policy v0.5 — PV first, 30-minute average threshold, comfort guaranteed
+### Warm-water policy v0.6 — contiguous PV windows, low start frequency, comfort guaranteed
 
-The electric boiler is treated as a flexible thermal buffer whose first objective is to absorb local PV that would otherwise be exported.
+The electric boiler is treated as a flexible thermal buffer whose first objective is to absorb local PV that would otherwise be exported, without creating unnecessary start/stop behaviour for small forecast fragments.
 
 For every day in the 24-hour horizon where the warm-water goal has not already been reached:
 
 - the nominal requirement remains 240 minutes / 7.6 kWh at 1.9 kW, with a local deadline of **19:00**;
-- partial PV coverage remains useful, but a discretionary PV-driven start is only accepted when the **average useful PV contribution across the complete 30-minute run is at least 250 W**;
-- the threshold is evaluated over the two consecutive quarter-hours together. An individual quarter-hour may therefore be below 250 W as long as the complete 30-minute block still averages at least 250 W;
-- PV-assisted blocks are ranked by total PV coverage, so the planner prefers the blocks with the lowest marginal grid import and the highest self-consumption;
-- discretionary PV starts are planned in blocks of at least **30 minutes** (two quarter-hours) to prevent boiler ping-pong on short forecast fluctuations;
-- weak PV fragments that do not provide at least 250 W average contribution across a 30-minute run do not justify an early boiler start;
+- partial PV coverage remains useful; the planner does not require the full 1.9 kW boiler load to be covered by PV;
+- the planner first detects **contiguous windows of positive forecast export** rather than scoring isolated 30-minute blocks independently;
+- a PV-driven start is only justified when such a contiguous window contains at least **0.10 kWh** of forecast export energy and spans at least **30 minutes**;
+- eligible PV windows are preferred by average useful PV coverage, with total captured PV as the secondary criterion. This means a strong afternoon export window naturally outranks a weaker morning window, independent of clock time;
+- once a qualifying PV window is selected, the boiler remains planned on through that contiguous export window instead of repeatedly switching every 30 minutes. If the remaining daily warm-water requirement is shorter than the window, the strongest contiguous sub-run is selected;
+- the minimum discretionary run remains **30 minutes** (two quarter-hours);
 - normal pure-grid fallback is not planned before **16:00**;
 - from 16:00 onward, any remaining requirement is scheduled so the 19:00 comfort deadline is met;
 - if waiting until 16:00 would leave too few quarter-hours to finish before 19:00, the fallback window is extended earlier only as far as needed to preserve the deadline. This safety rule intentionally overrides the normal 16:00 boundary;
 - if today's goal is already reached, no further mandatory warm-water run is planned for today.
 
-The website output exposes the selected slots through `wwTargetW=1900` / `warmWater=RUN`. Allocation reasons distinguish `PV_SURPLUS_FULL`, `PV_PARTIAL_OPTIMIZED`, `DEADLINE_FALLBACK` and `SAFETY_EARLY_FALLBACK`. The planner payload exposes `minPvBlockAverageCoverageW=250` so the active block threshold is observable.
+The website output exposes selected slots through `wwTargetW=1900` / `warmWater=RUN`. Allocation reasons distinguish `PV_SURPLUS_FULL`, `PV_PARTIAL_OPTIMIZED`, `DEADLINE_FALLBACK` and `SAFETY_EARLY_FALLBACK`. All slots selected as part of a qualifying PV window remain labelled as PV-assisted, including low-coverage continuation quarters within that same contiguous run.
+
+The planner payload exposes `minPvWindowEnergyKWh=0.10`, `pvWindowPolicy=CONTIGUOUS_POSITIVE_EXPORT` and the per-day count `eligiblePvWindows` so the active policy remains observable.
 
 This remains shadow planning only; it does not alter Homey physical-control ownership.
 
-## 5. Validation evidence — 2026-09-06
+## 5. Validation evidence — 2026-09-06 / 2026-09-07
 
-The first v0.5 implementation incorrectly treated `connectedNow=true` as availability for the entire 24-hour horizon. This caused nine Tesla opportunity slots / 9.83 kWh to be planned for the following Monday despite the normal Monday departure pattern.
+The first Tesla v0.5 implementation incorrectly treated `connectedNow=true` as availability for the entire 24-hour horizon. This caused nine Tesla opportunity slots / 9.83 kWh to be planned for the following Monday despite the normal Monday departure pattern.
 
-v0.6 limits the live connected override to two hours and then falls back to the weekly forecast. After deployment on Sunday 2026-09-06 at approximately 21:09 CEST, the planner reported:
+Tesla planner v0.6 limits the live connected override to two hours and then falls back to the weekly forecast. After deployment on Sunday 2026-09-06 at approximately 21:09 CEST, the planner reported:
 
 ```text
 PASS: shadow load plan v0.6 built
@@ -94,9 +97,9 @@ grid import before flex  : 5.3
 grid import after flex   : 5.3
 ```
 
-The website shadow builder also reported `Tesla slots : 0`. This is the expected Sunday-evening → Monday-evening result when no explicit deadline is active.
+On 2026-09-07 the warm-water forecast for 2026-09-08 showed 0.47 kWh of forecast export spread mainly across a continuous morning period from approximately 08:45 through 11:45, with individual quarter-hour export values below 250 W. That evidence showed that fixed per-slot or fixed 30-minute average power thresholds can discard a useful continuous self-consumption opportunity. Warm-water v0.6 therefore evaluates export energy over the complete contiguous window instead.
 
-The Homey planner may temporarily show a different Tesla window because Homey and Pi do not yet use identical future-availability semantics. This difference is expected while Pi functionality is being validated in shadow mode.
+The Homey planner may temporarily show different warm-water or Tesla windows because Homey and Pi do not yet use identical future-planning semantics. This difference is expected while Pi functionality is being validated in shadow mode.
 
 ## 6. Website forecast presentation — 2026-09-07
 
@@ -115,7 +118,8 @@ The existing `Geplande tijdsvakken` section remains unchanged.
 
 ## 7. Open items
 
-- Validate warm-water v0.5 against the next-day horizon and confirm that useful PV export is absorbed again without reintroducing trivial early starts.
+- Validate warm-water v0.6 against the 2026-09-08 horizon and confirm that the main continuous morning export window is absorbed as one planned run, while the very small isolated fragments remain ignored and the remaining requirement falls back toward 16:00–19:00.
+- Validate the same logic on a future day with a strong afternoon export window and confirm that the stronger afternoon period receives priority over weaker earlier periods.
 - Add explicit Tesla deadline planning as a separate mode with higher priority than opportunity planning.
 - Validate a Thursday/Friday horizon where the weekly model predicts the Tesla to be home and confirm that PV opportunity slots appear.
 - Continue comparing Homey planner and Pi planner outputs before any migration of physical control ownership.
