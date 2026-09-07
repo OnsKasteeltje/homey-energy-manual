@@ -19,6 +19,7 @@ WW_DEADLINE_HOUR = 19
 WW_FALLBACK_HOUR = 16
 WW_DEADLINE_SAFETY_SLOTS = 2
 WW_MIN_RUN_SLOTS = 2
+WW_MIN_PV_COVERAGE_W = 500
 WW_SLOT_ENERGY_KWH = BOILER_W / 1000 * 0.25
 
 
@@ -120,7 +121,7 @@ def is_consecutive(a, b):
 
 
 def choose_pv_blocks(candidates, required_slots):
-    """Choose best non-overlapping 30-minute blocks with any PV coverage."""
+    """Choose best non-overlapping 30-minute blocks with meaningful PV coverage."""
     blocks = []
 
     for i in range(len(candidates) - 1):
@@ -133,7 +134,10 @@ def choose_pv_blocks(candidates, required_slots):
         b_pv = metrics(b)[1]
         score = a_pv + b_pv
 
-        if score <= 0:
+        # A discretionary PV-driven boiler start must have at least 500 W
+        # useful PV coverage in both consecutive quarter-hours. This avoids
+        # nearly pure-grid starts for a trivial amount of self-consumption.
+        if min(a_pv, b_pv) < WW_MIN_PV_COVERAGE_W:
             continue
 
         blocks.append({
@@ -203,8 +207,9 @@ for date_key, day_slots in sorted(by_date.items()):
     chosen_indices = set()
 
     if not goal_reached and required_slots > 0:
-        # Phase 1: PV-first. Any predicted PV surplus is valuable, but
-        # discretionary starts are planned in 30-minute blocks to avoid ping-pong.
+        # Phase 1: PV-first. Partial PV coverage is valuable, but a
+        # discretionary start is only accepted when both quarter-hours in the
+        # 30-minute block have at least the minimum useful PV contribution.
         chosen_indices = choose_pv_blocks(candidates, required_slots)
 
         remaining_slots = max(0, required_slots - len(chosen_indices))
@@ -247,7 +252,7 @@ for date_key, day_slots in sorted(by_date.items()):
         surplus, pv_cov, marginal = metrics(s)
         dt_local = local_dt(s["slot_start_utc"])
 
-        if pv_cov > 0:
+        if pv_cov >= WW_MIN_PV_COVERAGE_W:
             reason = (
                 "PV_SURPLUS_FULL"
                 if marginal == 0
@@ -303,13 +308,14 @@ for date_key, day_slots in sorted(by_date.items()):
         "fallbackNotBeforeLocal": "16:00",
         "deadlineLocal": "19:00",
         "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
+        "minPvCoverageW": WW_MIN_PV_COVERAGE_W,
         "allocatedSlots": len(chosen),
     })
 
 plan_slots.sort(key=lambda x: x["slot_start_utc"])
 
 payload = {
-    "schema": "EMS_PI_WW_PLAN_V0.3",
+    "schema": "EMS_PI_WW_PLAN_V0.4",
     "mode": "shadow",
     "control_writes": False,
     "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -320,6 +326,7 @@ payload = {
     "fallbackNotBeforeLocal": "16:00",
     "deadlineLocal": "19:00",
     "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
+    "minPvCoverageW": WW_MIN_PV_COVERAGE_W,
     "slot_count": len(plan_slots),
     "dailyPlans": daily,
     "slots": plan_slots,
@@ -331,7 +338,7 @@ tmp.write_text(
 )
 tmp.replace(OUTPUT)
 
-print("PASS: WW plan v0.3 built")
+print("PASS: WW plan v0.4 built")
 print("slots:", len(plan_slots))
 
 for d in daily:
