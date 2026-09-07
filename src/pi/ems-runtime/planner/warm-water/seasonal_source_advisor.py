@@ -4,11 +4,15 @@
 Read-only economic advisor. It never controls Homey or physical devices.
 It values the last 14 complete local days from the Pi SQLite history and
 compares a 1.9 kW electric-boiler counterfactual with CV hot-water heat.
+
+Reference hot-water demand is deliberately independent of the 14-day
+economic window: it is derived from recent measured boiler-use days across
+a longer retention horizon so the advisor can still recommend switching
+back to boiler after a prolonged CV season.
 """
 
 import argparse
 import json
-import math
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -34,6 +38,9 @@ GAS_USABLE_KWH_PER_M3 = 9.77
 WINDOW_START = (9, 30)
 WINDOW_END = (19, 0)
 FRESHNESS_HOURS = 36
+REFERENCE_LOOKBACK_DAYS = 90
+REFERENCE_MAX_BOILER_DAYS = 30
+MIN_REFERENCE_BOILER_KWH = 0.5
 
 
 def load_json(path, default=None):
@@ -191,20 +198,26 @@ def evaluate(db_path, contracts_path, state_path, mode, now=None):
     now_local = now.astimezone(TZ)
     as_of = now_local.date() - timedelta(days=1)
     window_start = as_of - timedelta(days=WINDOW_DAYS - 1)
+    reference_start = as_of - timedelta(days=REFERENCE_LOOKBACK_DAYS - 1)
     contracts = load_json(contracts_path)
     prior = load_json(state_path, {})
 
     con = sqlite3.connect(db_path)
     try:
         by_day = {}
-        observed_inputs = []
         for i in range(WINDOW_DAYS):
             d = window_start + timedelta(days=i)
-            slots = fetch_slots(con, d)
-            by_day[d] = slots
+            by_day[d] = fetch_slots(con, d)
+
+        reference_days = []
+        for i in range(REFERENCE_LOOKBACK_DAYS):
+            d = reference_start + timedelta(days=i)
+            slots = by_day.get(d)
+            if slots is None:
+                slots = fetch_slots(con, d)
             kwh = day_boiler_input_kwh(slots)
-            if kwh is not None and kwh >= 0.5:
-                observed_inputs.append(kwh)
+            if kwh is not None and kwh >= MIN_REFERENCE_BOILER_KWH:
+                reference_days.append((d, kwh))
     finally:
         con.close()
 
@@ -228,6 +241,9 @@ def evaluate(db_path, contracts_path, state_path, mode, now=None):
             "freshnessHours": FRESHNESS_HOURS,
             "boilerSimulationWindow": "09:30-19:00",
             "boilerExpectedW": int(BOILER_W),
+            "referenceLookbackDays": REFERENCE_LOOKBACK_DAYS,
+            "referenceMaxBoilerDays": REFERENCE_MAX_BOILER_DAYS,
+            "minReferenceBoilerKWh": MIN_REFERENCE_BOILER_KWH,
         },
         "safety": {"deviceReads": False, "deviceWrites": False, "automaticSourceSwitch": False},
     }
@@ -243,18 +259,24 @@ def evaluate(db_path, contracts_path, state_path, mode, now=None):
         })
         return base
 
-    if len(observed_inputs) < MIN_VALID_DAYS:
+    if not reference_days:
         base.update({
-            "status": "WARMUP_INSUFFICIENT_HISTORY",
+            "status": "WARMUP_NO_REFERENCE_DEMAND",
             "advice": "KEEP_CURRENT",
             "candidate": "KEEP_CURRENT",
-            "reason": f"{len(observed_inputs)}/{MIN_VALID_DAYS} measured boiler days in 14-day window",
+            "reason": f"no measured boiler day >= {MIN_REFERENCE_BOILER_KWH:.1f} kWh in {REFERENCE_LOOKBACK_DAYS}-day reference window",
             "confirmation": {"streakDays": 0, "requiredDays": CONFIRM_DAYS, "confirmed": False},
-            "analysis": {"asOfDate": as_of.isoformat(), "validDays": len(observed_inputs)},
+            "analysis": {
+                "asOfDate": as_of.isoformat(),
+                "referenceWindowStartDate": reference_start.isoformat(),
+                "referenceBoilerDays": 0,
+            },
         })
         return base
 
-    reference_input = median(observed_inputs)
+    selected_reference_days = reference_days[-REFERENCE_MAX_BOILER_DAYS:]
+    reference_input = median(kwh for _, kwh in selected_reference_days)
+
     simulations = []
     for d, slots in by_day.items():
         sim = simulate_day(d, slots, reference_input, contract_for(d, contracts))
@@ -268,7 +290,14 @@ def evaluate(db_path, contracts_path, state_path, mode, now=None):
             "candidate": "KEEP_CURRENT",
             "reason": f"{len(simulations)}/{MIN_VALID_DAYS} valid counterfactual days in 14-day window",
             "confirmation": {"streakDays": 0, "requiredDays": CONFIRM_DAYS, "confirmed": False},
-            "analysis": {"asOfDate": as_of.isoformat(), "validDays": len(simulations), "referenceBoilerInputKWh": round(reference_input, 3)},
+            "analysis": {
+                "asOfDate": as_of.isoformat(),
+                "windowStartDate": window_start.isoformat(),
+                "validDays": len(simulations),
+                "referenceBoilerInputKWh": round(reference_input, 3),
+                "referenceBoilerDays": len(selected_reference_days),
+                "referenceWindowStartDate": reference_start.isoformat(),
+            },
         })
         return base
 
@@ -302,6 +331,9 @@ def evaluate(db_path, contracts_path, state_path, mode, now=None):
             "validDays": len(simulations),
             "minValidDays": MIN_VALID_DAYS,
             "referenceBoilerInputKWh": round(reference_input, 3),
+            "referenceBoilerDays": len(selected_reference_days),
+            "referenceWindowStartDate": reference_start.isoformat(),
+            "referenceLastBoilerDate": selected_reference_days[-1][0].isoformat(),
             "boilerCostEurPerUsableKWh": round(boiler_cost, 5),
             "cvCostEurPerUsableKWh": round(cv_cost, 5),
             "deltaBoilerMinusCv": round(boiler_cost - cv_cost, 5),
