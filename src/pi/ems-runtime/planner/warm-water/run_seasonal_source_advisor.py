@@ -1,53 +1,55 @@
 #!/usr/bin/env python3
-
 import json
 import os
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
+from urllib.request import urlopen
 
 HOMEY_PROJECT = Path("/home/jeroen/ems-homey-adapter")
 HOMEY_CLI = HOMEY_PROJECT / "node_modules/.bin/homey"
-NODE_PATH = "/opt/node-v24.20.0/bin"
+NODE_BIN = "/opt/node-v24.20.0/bin"
+MODE_VARIABLE_ID = "f9d885a4-fca2-4aea-a5a9-a5c05da90835"
+MODE_VARIABLE_NAME = "WW_Boilermodus"
+
 ADVISOR = Path("/home/jeroen/ems/runtime/planner/warm-water/seasonal_source_advisor.py")
 OUTPUT = Path("/home/jeroen/ems/data/ww-seasonal-advisor.json")
 NOTIFY_STATE = Path("/home/jeroen/ems/data/ww-seasonal-notify-state.json")
-MODE_VARIABLE_NAME = "WW_Boilermodus"
-MODE_VARIABLE_ID = "f9d885a4-fca2-4aea-a5a9-a5c05da90835"
+
+# Homey Pro (2023-2026) local webhook endpoint.
+# Keep the IP outside the code so deployment can use the Homey's reserved LAN address.
+HOMEY_WEBHOOK_BASE = os.environ.get("HOMEY_WEBHOOK_BASE", "").rstrip("/")
+HOMEY_WEBHOOK_EVENT = "ww_seasonal_advice"
 
 
 def run_homey(args):
     env = os.environ.copy()
-    env["PATH"] = NODE_PATH + ":" + env.get("PATH", "")
-    r = subprocess.run(
-        [str(HOMEY_CLI)] + args,
-        cwd=HOMEY_PROJECT,
+    env["PATH"] = f"{NODE_BIN}:{env.get('PATH', '')}"
+    proc = subprocess.run(
+        [str(HOMEY_CLI), *args],
+        cwd=str(HOMEY_PROJECT),
         env=env,
         text=True,
         capture_output=True,
+        check=False,
     )
-    if r.returncode != 0:
-        msg = (r.stderr or r.stdout).strip()
-        raise RuntimeError(msg[:800])
-    return r.stdout
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or f"homey exit {proc.returncode}")
+    return proc.stdout
 
 
-def current_mode():
+def resolve_current_mode():
     raw = run_homey([
         "api", "logic", "get-variable",
         "--id", MODE_VARIABLE_ID,
         "--json",
     ])
     variable = json.loads(raw)
-    if not isinstance(variable, dict):
-        raise RuntimeError(f"Unexpected Homey response for {MODE_VARIABLE_NAME!r}")
-
-    returned_name = variable.get("name")
-    if returned_name and returned_name != MODE_VARIABLE_NAME:
+    if variable.get("name") and variable.get("name") != MODE_VARIABLE_NAME:
         raise RuntimeError(
-            f"Homey variable id {MODE_VARIABLE_ID} resolved to {returned_name!r}, "
-            f"expected {MODE_VARIABLE_NAME!r}"
+            f"logic variable ID mismatch: expected {MODE_VARIABLE_NAME}, got {variable.get('name')}"
         )
 
     value = variable.get("value")
@@ -59,105 +61,122 @@ def current_mode():
         return "BOILER"
     if normalized in {"nee", "no", "false", "0", "cv", "uit", "off"}:
         return "CV"
+    raise RuntimeError(f"unsupported {MODE_VARIABLE_NAME} value: {value!r}")
 
-    raise RuntimeError(f"Unsupported {MODE_VARIABLE_NAME} value: {value!r}")
 
-
-def load_json(path):
+def load_json(path, default):
     try:
         return json.loads(path.read_text())
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+    except FileNotFoundError:
+        return default
 
 
-def save_json(path, value):
+def save_json_atomic(path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(value, separators=(",", ":")) + "\n")
+    tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
     tmp.replace(path)
 
 
-def send_notification(advice, result):
-    analysis = result.get("analysis", {})
-    boiler = analysis.get("boilerCostEurPerUsableKWh")
-    cv = analysis.get("cvCostEurPerUsableKWh")
+def target_mode_for_advice(advice):
+    if advice == "ADVISE_SWITCH_TO_CV":
+        return "CV"
+    if advice == "ADVISE_SWITCH_TO_BOILER":
+        return "BOILER"
+    return None
+
+
+def build_notification_message(payload, target):
+    analysis = payload.get("analysis") or {}
+    reason = payload.get("reason") or "economische vergelijking"
     pv_share = analysis.get("pvOpportunityShare")
-    target = "CV" if advice == "ADVISE_SWITCH_TO_CV" else "elektrische boiler"
-
-    parts = [f"Warmwateradvies: schakel handmatig naar {target}."]
-    if isinstance(boiler, (int, float)) and isinstance(cv, (int, float)):
-        parts.append(f"Boiler €{boiler:.3f} vs CV €{cv:.3f} per bruikbare kWh.")
+    extra = ""
     if isinstance(pv_share, (int, float)):
-        parts.append(f"PV-opportunity {pv_share * 100:.0f}%.")
-    parts.append("WW_Boilermodus is niet automatisch gewijzigd.")
-    message = " ".join(parts)
-
-    run_homey([
-        "api", "notifications", "create-notification",
-        "--excerpt", message,
-        "--json",
-    ])
-    return message
+        extra = f" Gemeten PV-opportunity aandeel {pv_share * 100:.1f}%."
+    return (
+        f"Warmwater seizoensadvies: schakel handmatig naar {target}. "
+        f"{reason}.{extra} WW_Boilermodus is niet automatisch gewijzigd."
+    )
 
 
-def maybe_notify(mode):
-    result = load_json(OUTPUT)
-    if result.get("status") != "OK":
-        print(f"notification: skipped status={result.get('status')}")
+def send_homey_webhook(message):
+    if not HOMEY_WEBHOOK_BASE:
+        raise RuntimeError(
+            "HOMEY_WEBHOOK_BASE is not configured; set it to the local Homey base URL, "
+            "for example http://192.168.1.50"
+        )
+    url = (
+        f"{HOMEY_WEBHOOK_BASE}/webhook"
+        f"?event={quote(HOMEY_WEBHOOK_EVENT, safe='')}"
+        f"&tag={quote(message, safe='')}"
+    )
+    with urlopen(url, timeout=10) as response:
+        status = getattr(response, "status", 200)
+        if status < 200 or status >= 300:
+            raise RuntimeError(f"Homey webhook returned HTTP {status}")
+
+
+def maybe_notify(payload, current_mode):
+    if payload.get("status") != "OK":
+        print(f"notification: skipped status={payload.get('status')}")
         return
 
-    advice = result.get("advice")
-    state = load_json(NOTIFY_STATE)
-    last = state.get("lastNotifiedAdvice")
-
-    # Once the user has manually followed the previous advice, clear the claim
-    # so a future reverse-season switch can be notified once.
-    if (last == "ADVISE_SWITCH_TO_CV" and mode == "CV") or (
-        last == "ADVISE_SWITCH_TO_BOILER" and mode == "BOILER"
-    ):
-        last = None
-        state = {}
-        save_json(NOTIFY_STATE, state)
-
-    if advice not in {"ADVISE_SWITCH_TO_CV", "ADVISE_SWITCH_TO_BOILER"}:
-        print("notification: no confirmed switch advice")
-        return
-    if last == advice:
-        print(f"notification: already sent for {advice}")
+    advice = payload.get("advice")
+    target = target_mode_for_advice(advice)
+    if not target:
+        print(f"notification: skipped advice={advice}")
         return
 
-    message = send_notification(advice, result)
-    save_json(NOTIFY_STATE, {
+    state = load_json(NOTIFY_STATE, {})
+    last_advice = state.get("lastNotifiedAdvice")
+
+    # Once the user has acted on the previous advice, allow a future advice cycle.
+    previous_target = target_mode_for_advice(last_advice)
+    if previous_target and current_mode == previous_target:
+        last_advice = None
+        state["lastNotifiedAdvice"] = None
+        save_json_atomic(NOTIFY_STATE, state)
+
+    if advice == last_advice:
+        print(f"notification: skipped duplicate advice={advice}")
+        return
+
+    message = build_notification_message(payload, target)
+    send_homey_webhook(message)
+
+    state.update({
         "lastNotifiedAdvice": advice,
-        "lastNotifiedAt": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        "message": message,
+        "lastNotifiedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "targetMode": target,
+        "transport": "HOMEY_LOCAL_WEBHOOK",
+        "event": HOMEY_WEBHOOK_EVENT,
     })
-    print(f"notification: sent {advice}")
+    save_json_atomic(NOTIFY_STATE, state)
+    print(f"notification: sent webhook event={HOMEY_WEBHOOK_EVENT} target={target}")
 
 
 def main():
     try:
-        mode = current_mode()
+        current_mode = resolve_current_mode()
     except Exception as exc:
         print(f"FAIL: cannot resolve current WW mode from Homey: {exc}", file=sys.stderr)
         return 2
 
-    print(f"WW current mode: {mode}")
-    result = subprocess.run([
-        "/usr/bin/python3",
-        str(ADVISOR),
-        "--mode",
-        mode,
-    ])
-    if result.returncode != 0:
-        return result.returncode
+    print(f"WW current mode: {current_mode}")
+
+    proc = subprocess.run(
+        [sys.executable, str(ADVISOR), "--mode", current_mode],
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return proc.returncode
 
     try:
-        maybe_notify(mode)
+        payload = json.loads(OUTPUT.read_text())
+        maybe_notify(payload, current_mode)
     except Exception as exc:
-        # Advisor result remains valid even if the notification transport fails.
-        # Do not claim the advice as notified on failure.
-        print(f"FAIL: Homey notification failed: {exc}", file=sys.stderr)
+        print(f"FAIL: notification handling failed: {exc}", file=sys.stderr)
         return 3
 
     return 0
