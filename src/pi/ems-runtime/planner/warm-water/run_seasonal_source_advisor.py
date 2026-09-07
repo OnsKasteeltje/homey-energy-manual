@@ -166,7 +166,6 @@ def main():
 
     proc = subprocess.run(
         [sys.executable, str(ADVISOR), "--mode", current_mode],
-        text=True,
         check=False,
     )
     if proc.returncode != 0:
