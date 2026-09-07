@@ -1,0 +1,47 @@
+{
+  "schema": "EMS_WW_SEASONAL_CONTRACTS_V0.1",
+  "currency": "EUR",
+  "notes": [
+    "Only marginal energy costs belong in source selection; fixed daily/monthly charges are excluded.",
+    "During saldering periods, exported PV is conservatively valued at the applicable import tariff. This avoids treating PV as free while kWh can still offset imported electricity.",
+    "The current-contract feed-in figure of -0.15000 EUR/kWh is retained as metadata only because its exact marginal interaction with saldering is not yet proven; it is not used by the advisor.",
+    "From 2027-01-01 ENGIE export opportunity value is feed-in remuneration minus feed-in cost: 0.12205 - 0.11666 = 0.00539 EUR/kWh."
+  ],
+  "periods": [
+    {
+      "id": "CURRENT_PRE_ENGIE",
+      "from": "1900-01-01",
+      "through": "2026-10-09",
+      "electricity_import_normal_eur_kwh": 0.23790,
+      "electricity_import_offpeak_eur_kwh": 0.23548,
+      "gas_eur_m3": 1.19265,
+      "saldering": true,
+      "pv_opportunity_method": "IMPORT_TARIFF",
+      "feed_in_metadata_eur_kwh": -0.15000
+    },
+    {
+      "id": "ENGIE_SALDERING_2026",
+      "from": "2026-10-10",
+      "through": "2026-12-31",
+      "electricity_import_normal_eur_kwh": 0.25853,
+      "electricity_import_offpeak_eur_kwh": 0.25853,
+      "gas_eur_m3": 1.52483,
+      "saldering": true,
+      "pv_opportunity_method": "IMPORT_TARIFF",
+      "feed_in_cost_eur_kwh": 0.11666
+    },
+    {
+      "id": "ENGIE_POST_SALDERING",
+      "from": "2027-01-01",
+      "through": "2029-10-10",
+      "electricity_import_normal_eur_kwh": 0.25853,
+      "electricity_import_offpeak_eur_kwh": 0.25853,
+      "gas_eur_m3": 1.52483,
+      "saldering": false,
+      "pv_opportunity_method": "NET_EXPORT_VALUE",
+      "feed_in_remuneration_eur_kwh": 0.12205,
+      "feed_in_cost_eur_kwh": 0.11666,
+      "net_export_value_eur_kwh": 0.00539
+    }
+  ]
+}
