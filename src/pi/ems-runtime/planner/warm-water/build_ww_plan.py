@@ -17,9 +17,8 @@ BOILER_W = 1900
 WW_DAILY_FALLBACK_MIN = 240
 WW_DEADLINE_HOUR = 19
 WW_FALLBACK_HOUR = 16
-WW_DEADLINE_SAFETY_SLOTS = 2
 WW_MIN_RUN_SLOTS = 2
-WW_MIN_PV_BLOCK_AVG_W = 250
+WW_MIN_PV_WINDOW_KWH = 0.10
 WW_SLOT_ENERGY_KWH = BOILER_W / 1000 * 0.25
 
 
@@ -120,52 +119,90 @@ def is_consecutive(a, b):
     ).total_seconds() == 15 * 60
 
 
-def choose_pv_blocks(candidates, required_slots):
-    """Choose best non-overlapping 30-minute blocks with meaningful average PV coverage."""
-    blocks = []
+def find_pv_windows(candidates):
+    """Return contiguous positive-export windows that justify a boiler start."""
+    windows = []
+    current = []
 
-    for i in range(len(candidates) - 1):
-        a = candidates[i]
-        b = candidates[i + 1]
-        if not is_consecutive(a, b):
-            continue
+    def finish(indices):
+        if len(indices) < WW_MIN_RUN_SLOTS:
+            return
 
-        a_pv = metrics(a)[1]
-        b_pv = metrics(b)[1]
-        score = a_pv + b_pv
-        avg_pv = score / WW_MIN_RUN_SLOTS
+        pv_sum_w = sum(metrics(candidates[i])[1] for i in indices)
+        pv_energy_kwh = pv_sum_w * 0.25 / 1000
+        if pv_energy_kwh < WW_MIN_PV_WINDOW_KWH:
+            return
 
-        # A discretionary PV-driven boiler start must contribute at least
-        # 250 W on average across the complete 30-minute run. This filters
-        # trivial PV fragments without requiring every individual quarter-hour
-        # to exceed the threshold.
-        if avg_pv < WW_MIN_PV_BLOCK_AVG_W:
-            continue
-
-        blocks.append({
-            "indices": (i, i + 1),
-            "score": score,
-            "start": a["slot_start_utc"],
+        windows.append({
+            "indices": tuple(indices),
+            "pvSumW": pv_sum_w,
+            "pvEnergyKWh": pv_energy_kwh,
+            "avgPvW": pv_sum_w / len(indices),
+            "start": candidates[indices[0]]["slot_start_utc"],
         })
 
-    blocks.sort(key=lambda x: (-x["score"], x["start"]))
-
-    selected = set()
-    for block in blocks:
-        if required_slots - len(selected) < WW_MIN_RUN_SLOTS:
-            break
-
-        i, j = block["indices"]
-        if i in selected or j in selected:
+    for i, slot in enumerate(candidates):
+        pv_cov = metrics(slot)[1]
+        if pv_cov <= 0:
+            finish(current)
+            current = []
             continue
 
-        selected.add(i)
-        selected.add(j)
+        if current and not is_consecutive(candidates[current[-1]], slot):
+            finish(current)
+            current = []
+
+        current.append(i)
+
+    finish(current)
+
+    # Prefer the strongest PV period first. Total PV is the second-order
+    # criterion so broad high-export windows naturally outrank weak fragments.
+    windows.sort(
+        key=lambda x: (-x["avgPvW"], -x["pvEnergyKWh"], x["start"])
+    )
+    return windows
+
+
+def best_subrun(indices, candidates, length):
+    """Pick the strongest consecutive subrun of a longer PV window."""
+    best = None
+
+    for pos in range(0, len(indices) - length + 1):
+        run = indices[pos:pos + length]
+        score = sum(metrics(candidates[i])[1] for i in run)
+        start = candidates[run[0]]["slot_start_utc"]
+        key = (score, -parse_utc(start).timestamp())
+
+        if best is None or key > best[0]:
+            best = (key, run)
+
+    return tuple(best[1]) if best else tuple()
+
+
+def choose_pv_windows(candidates, required_slots):
+    """Choose contiguous PV runs, minimizing starts while preferring strong PV."""
+    selected = set()
+    windows = find_pv_windows(candidates)
+
+    for window in windows:
+        remaining = required_slots - len(selected)
+        if remaining < WW_MIN_RUN_SLOTS:
+            break
+
+        indices = window["indices"]
+
+        if len(indices) <= remaining:
+            run = indices
+        else:
+            run = best_subrun(indices, candidates, remaining)
+
+        selected.update(run)
 
         if len(selected) >= required_slots:
             break
 
-    return selected
+    return selected, windows
 
 
 by_date = {}
@@ -208,12 +245,16 @@ for date_key, day_slots in sorted(by_date.items()):
     )
     chosen_indices = set()
     pv_chosen_indices = set()
+    eligible_pv_windows = []
 
     if not goal_reached and required_slots > 0:
-        # Phase 1: PV-first. Partial PV coverage is valuable, but a
-        # discretionary start is accepted only when the complete 30-minute
-        # block has enough average useful PV contribution.
-        chosen_indices = choose_pv_blocks(candidates, required_slots)
+        # Phase 1: PV-first. A start is justified by useful export energy over
+        # a contiguous window, not by a single quarter-hour threshold. Once a
+        # qualifying window is selected, keep the boiler running through that
+        # contiguous PV window (or the strongest subrun if demand is smaller).
+        chosen_indices, eligible_pv_windows = choose_pv_windows(
+            candidates, required_slots
+        )
         pv_chosen_indices = set(chosen_indices)
 
         remaining_slots = max(0, required_slots - len(chosen_indices))
@@ -312,14 +353,15 @@ for date_key, day_slots in sorted(by_date.items()):
         "fallbackNotBeforeLocal": "16:00",
         "deadlineLocal": "19:00",
         "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
-        "minPvBlockAverageCoverageW": WW_MIN_PV_BLOCK_AVG_W,
+        "minPvWindowEnergyKWh": WW_MIN_PV_WINDOW_KWH,
+        "eligiblePvWindows": len(eligible_pv_windows),
         "allocatedSlots": len(chosen),
     })
 
 plan_slots.sort(key=lambda x: x["slot_start_utc"])
 
 payload = {
-    "schema": "EMS_PI_WW_PLAN_V0.5",
+    "schema": "EMS_PI_WW_PLAN_V0.6",
     "mode": "shadow",
     "control_writes": False,
     "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -330,7 +372,8 @@ payload = {
     "fallbackNotBeforeLocal": "16:00",
     "deadlineLocal": "19:00",
     "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
-    "minPvBlockAverageCoverageW": WW_MIN_PV_BLOCK_AVG_W,
+    "minPvWindowEnergyKWh": WW_MIN_PV_WINDOW_KWH,
+    "pvWindowPolicy": "CONTIGUOUS_POSITIVE_EXPORT",
     "slot_count": len(plan_slots),
     "dailyPlans": daily,
     "slots": plan_slots,
@@ -342,7 +385,7 @@ tmp.write_text(
 )
 tmp.replace(OUTPUT)
 
-print("PASS: WW plan v0.5 built")
+print("PASS: WW plan v0.6 built")
 print("slots:", len(plan_slots))
 
 for d in daily:
@@ -351,5 +394,6 @@ for d in daily:
         "goalReached=", d["goalReached"],
         "required=", d["requiredEnergyKWh"],
         "allocated=", d["allocatedEnergyKWh"],
+        "pvWindows=", d["eligiblePvWindows"],
         "slots=", d["allocatedSlots"],
     )
