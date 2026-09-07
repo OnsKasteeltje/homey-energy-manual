@@ -76,13 +76,28 @@ The website shadow builder also reported `Tesla slots : 0`. This is the expected
 
 The Homey planner may temporarily show a different Tesla window because Homey and Pi do not yet use identical future-availability semantics. This difference is expected while Pi functionality is being validated in shadow mode.
 
-## 6. Open items
+## 6. Website forecast presentation — 2026-09-07
+
+The Planner page adds a frontend-only interactive presentation layer through `docs/javascripts/planner-forecast-interactive-v1.0.0.js`. The planner JSON, allocation logic and physical-control behaviour are not changed.
+
+Presentation rules:
+
+- every Homey/Pi planner renders its **own** 96-slot / 24-hour axis, derived from that planner's first forecast slot; the UI no longer stretches both forecasts onto one shared min/max axis when their generation times differ;
+- base load is rendered as a continuous grey line with a subtle filled area so low overnight loads remain visible next to multi-kW PV peaks;
+- PV remains yellow, expected import is blue and expected export is green below the zero line;
+- one genuine power scale is used for the whole chart; 0.5 kW and 1.0 kW reference lines are visual aids only and do not alter values;
+- desktop pointer hover shows a vertical selection marker and exact quarter-hour values; touch devices use tap to pin/unpin the same detail card;
+- the detail card reports local timestamp, base load, PV, import, export and net import/export from the published planner fields. Visual minimum sizes never replace the numeric source values.
+
+The existing `Geplande tijdsvakken` section remains unchanged.
+
+## 7. Open items
 
 - Add explicit Tesla deadline planning as a separate mode with higher priority than opportunity planning.
 - Validate a Thursday/Friday horizon where the weekly model predicts the Tesla to be home and confirm that PV opportunity slots appear.
 - Continue comparing Homey planner and Pi planner outputs before any migration of physical control ownership.
 - Refine PV forecasting with historical per-array/shading correction; optimistic PV forecasts directly affect EV opportunity quality.
 
-## 7. Documentation rule
+## 8. Documentation rule
 
 For this project, every functional, architectural or operational change must update the relevant project documentation in the same change set. Code-only behavioural changes are not considered complete.

@@ -23,9 +23,11 @@ markdown_extensions:
       permalink: true
 
 # Assetversies worden tijdens de build gesynchroniseerd vanuit frontend-version.txt.
-# De Planner-pagina is bewust self-contained en heeft geen aparte lifecycle/decorator-scripts nodig.
+# De Planner-pagina bevat de basisweergave inline; deze kleine progressive-enhancement
+# voegt de interactieve forecastweergave toe zonder plannerdata of control logic te wijzigen.
 extra_javascript:
   - javascripts/frontend-bundle-__FRONTEND_VERSION__.js
+  - javascripts/planner-forecast-interactive-v1.0.0.js
 
 extra_css:
   - stylesheets/frontend-bundle-__FRONTEND_VERSION__.css
