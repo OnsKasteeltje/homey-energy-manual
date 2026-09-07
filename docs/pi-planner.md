@@ -8,6 +8,7 @@ The Pi planner builds a 96 × 15-minute horizon from PV forecast, Quatt forecast
 
 Current implementation:
 
+- `src/pi/ems-runtime/planner/warm-water/build_ww_plan.py` — `EMS_PI_WW_PLAN_V0.3`;
 - `src/pi/ems-runtime/planner/quarter-hour-plan/build_shadow_load_plan.py` — `EMS_PI_SHADOW_LOAD_PLAN_V0.6`;
 - `src/pi/ems-runtime/planner/quarter-hour-plan/build_website_shadow.py` — `EMS_PI_ENERGY_PLAN_24H_V0.2` / `EMS_PI_PLANNER_SHADOW_PUBLISH_V0.2`.
 
@@ -58,6 +59,25 @@ Opportunity charging is based on forecast PV surplus after non-controllable load
 
 Opportunity charging is not intended to create discretionary grid import. If the planner produces additional import solely because of an opportunity allocation, that is a planning defect to investigate rather than intended policy.
 
+### Warm-water policy v0.3 — PV first, comfort guaranteed
+
+The electric boiler is treated as a flexible thermal buffer whose first objective is to absorb local PV that would otherwise be exported.
+
+For every day in the 24-hour horizon where the warm-water goal has not already been reached:
+
+- the nominal requirement remains 240 minutes / 7.6 kWh at 1.9 kW, with a local deadline of **19:00**;
+- any predicted PV surplus is valuable, including partial coverage below the full 1.9 kW boiler load;
+- PV-assisted slots are selected first, ranked by total PV coverage, so the planner minimizes marginal grid import while maximizing self-consumption;
+- discretionary PV starts are planned in blocks of at least **30 minutes** (two quarter-hours) to prevent boiler ping-pong on short forecast fluctuations;
+- normal pure-grid fallback is not planned before **16:00**;
+- from 16:00 onward, any remaining requirement is scheduled so the 19:00 comfort deadline is met;
+- if waiting until 16:00 would leave too few quarter-hours to finish before 19:00, the fallback window is extended earlier only as far as needed to preserve the deadline. This safety rule intentionally overrides the normal 16:00 boundary;
+- if today's goal is already reached, no further mandatory warm-water run is planned for today.
+
+The website output exposes the selected slots through `wwTargetW=1900` / `warmWater=RUN`. Allocation reasons distinguish `PV_SURPLUS_FULL`, `PV_PARTIAL_OPTIMIZED`, `DEADLINE_FALLBACK` and `SAFETY_EARLY_FALLBACK`.
+
+This remains shadow planning only; it does not alter Homey physical-control ownership.
+
 ## 5. Validation evidence — 2026-09-06
 
 The first v0.5 implementation incorrectly treated `connectedNow=true` as availability for the entire 24-hour horizon. This caused nine Tesla opportunity slots / 9.83 kWh to be planned for the following Monday despite the normal Monday departure pattern.
@@ -93,10 +113,11 @@ The existing `Geplande tijdsvakken` section remains unchanged.
 
 ## 7. Open items
 
+- Validate warm-water v0.3 against the next-day horizon and confirm that PV-assisted boiler blocks plus any required late fallback appear on the website.
 - Add explicit Tesla deadline planning as a separate mode with higher priority than opportunity planning.
 - Validate a Thursday/Friday horizon where the weekly model predicts the Tesla to be home and confirm that PV opportunity slots appear.
 - Continue comparing Homey planner and Pi planner outputs before any migration of physical control ownership.
-- Refine PV forecasting with historical per-array/shading correction; optimistic PV forecasts directly affect EV opportunity quality.
+- Refine PV forecasting with historical per-array/shading correction; optimistic PV forecasts directly affect EV and warm-water opportunity quality.
 
 ## 8. Documentation rule
 
