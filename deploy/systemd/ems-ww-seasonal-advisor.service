@@ -1,0 +1,9 @@
+[Unit]
+Description=EMS WW Seasonal Source Advisor
+After=network-online.target ems-day-history.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/warm-water/run_seasonal_source_advisor.py
