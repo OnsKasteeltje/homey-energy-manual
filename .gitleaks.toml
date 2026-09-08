@@ -3,8 +3,19 @@ title = "EMS repository Gitleaks configuration"
 [extend]
 useDefault = true
 
-[[allowlists]]
-description = "Known Homey Logic variable ID that stores the runtime GitHub token; this UUID is an identifier, not a credential"
-targetRules = ["generic-api-key"]
-regexTarget = "line"
-regexes = ['''(?i)token[^\n]{0,40}235cfe0f-5760-48b9-9349-a33be47d04d1''']
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "Reviewed historical false positives: Homey Logic variable ID for GH_Status_Token, not credential material"
+  commits = [
+    "d7eb1872c503dca977fd2f9561267fff7f2f7865",
+    "1731ae37f9c209ebefe63eef9884fcb62a5352f0",
+    "4106e4f039d0afe1f35f579df9df6c99890f0a28",
+    "f20ff7c414ad33519706dc50b1918b2aab0fc53a",
+    "8584d6894d717d04c11c1e4518e6faffa2da81b5",
+    "0e8dd2624450589d374819091392df3bdf2e9f12",
+    "c0cdcd3fff2af23a44365e89c6d03e0c2e3feb63",
+    "12b494ceb69383369471c923721c75d1ca3cf4f5",
+    "f82418826ccad2d380053efe054f10b74ee06aa7"
+  ]
