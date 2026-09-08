@@ -92,7 +92,26 @@ jobs:
           curl -fsSLo /tmp/gitleaks.tar.gz \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
-          /tmp/gitleaks git . --redact --no-banner
+          set +e
+          /tmp/gitleaks git . --redact --no-banner --report-format json --report-path /tmp/gitleaks.json
+          rc=$?
+          set -e
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path('/tmp/gitleaks.json')
+          findings = json.loads(p.read_text()) if p.exists() else []
+          print(f'Gitleaks candidate findings: {len(findings)}')
+          for f in findings:
+              print(
+                  f"rule={f.get('RuleID','?')} "
+                  f"file={f.get('File','?')} "
+                  f"line={f.get('StartLine','?')} "
+                  f"commit={str(f.get('Commit','?'))[:12]}"
+              )
+          PY
+          exit "$rc"
 
   workflow-hygiene:
     name: GitHub Actions hygiene baseline
