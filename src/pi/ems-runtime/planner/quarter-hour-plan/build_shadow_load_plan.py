@@ -81,7 +81,7 @@ pv = load(PV_FILE)
 quatt = load(QUATT_FILE)
 base = load(BASE_FILE)
 ww = load(WW_FILE)
-price = load(PRICE_FILE)
+price = load(PRICE_FILE) if PRICE_FILE.exists() else {"slots": []}
 axis = load(AXIS_FILE)
 energy_state = load(ENERGY_STATE_FILE) if ENERGY_STATE_FILE.exists() else {}
 
@@ -103,12 +103,14 @@ if len(axis_slots) != 96:
         f"FAIL: planner axis expected 96 slots, got {len(axis_slots)}"
     )
 
+# Energy-balance sources are hard requirements. Price is reference-only for the
+# current FIXED contract and must therefore never block the planner on an axis
+# rollover; missing price slots are rendered as null until the price feed catches up.
 sources = {
     "PV": pv_map,
     "Quatt": q_map,
     "Base": b_map,
     "WW": ww_map,
-    "Price": price_map,
 }
 
 for name, source_map in sources.items():
@@ -126,12 +128,19 @@ common = sorted(
     & set(q_map)
     & set(b_map)
     & set(ww_map)
-    & set(price_map)
 )
 
 if len(common) != 96:
     raise SystemExit(
-        f"FAIL: expected 96 aligned slots, got {len(common)}"
+        f"FAIL: expected 96 aligned energy slots, got {len(common)}"
+    )
+
+price_missing = sorted(set(axis_slots) - set(price_map))
+price_extra = sorted(set(price_map) - set(axis_slots))
+if price_missing or price_extra:
+    print(
+        "WARN: Price axis mismatch ignored for FIXED contract; "
+        f"missing={price_missing[:3]} extra={price_extra[:3]}"
     )
 
 slots = []
@@ -142,7 +151,7 @@ for ts in common:
     q = q_map[ts]
     b = b_map[ts]
     w = ww_map[ts]
-    pr = price_map[ts]
+    pr = price_map.get(ts) or {}
 
     pv_w = max(0.0, pv_power(p))
     quatt_w = max(0.0, float(q.get("quattForecastW") or 0))
@@ -157,9 +166,6 @@ for ts in common:
     local_dt = slot_dt.astimezone(TZ)
     expected_home = expected_tesla_home(local_dt)
 
-    # Live connected status is authoritative only for the near-term horizon.
-    # Beyond that, use the weekly presence forecast so a Sunday connection
-    # cannot incorrectly make the Tesla available all Monday afternoon.
     live_connected_override = (
         tesla_connected_now
         and slot_dt >= now_utc - timedelta(minutes=15)
@@ -221,7 +227,7 @@ for ts in common:
     })
 
 payload = {
-    "schema": "EMS_PI_SHADOW_LOAD_PLAN_V0.6",
+    "schema": "EMS_PI_SHADOW_LOAD_PLAN_V0.6.1",
     "mode": "shadow",
     "control_writes": False,
     "composition": {
@@ -234,6 +240,7 @@ payload = {
         "teslaControl": "SHADOW_OPPORTUNITY_ONLY",
         "teslaAvailabilityPolicy": "LIVE_CONNECTED_2H_THEN_NORMAL_WEEKLY_HOME_FORECAST",
         "teslaOpportunityPolicy": "PV_SURPLUS_START7_RUN6_MAX16",
+        "pricePolicy": "REFERENCE_ONLY_FAIL_SOFT_FOR_FIXED_CONTRACT",
     },
     "tesla": {
         "connectedNow": tesla_connected_now,
@@ -244,6 +251,11 @@ payload = {
         "maxA": EV_MAX_A,
         "wattsPerAmp": EV_W_PER_A,
         "deadlinePlanningIncluded": False,
+    },
+    "price": {
+        "referenceOnly": True,
+        "missingAxisSlots": len(price_missing),
+        "extraAxisSlots": len(price_extra),
     },
     "slot_count": len(slots),
     "slots": slots,
@@ -269,7 +281,7 @@ exp_before = energy("gridExportBeforeFlexW")
 imp_after = energy("gridImportAfterFlexW")
 exp_after = energy("gridExportAfterFlexW")
 
-print("PASS: shadow load plan v0.6 built")
+print("PASS: shadow load plan v0.6.1 built")
 print("slots                    :", len(slots))
 print("base load kWh            :", round(base_kwh, 2))
 print("Quatt kWh                :", round(quatt_kwh, 2))
@@ -281,4 +293,5 @@ print("grid import before flex  :", round(imp_before, 2))
 print("grid export before flex  :", round(exp_before, 2))
 print("grid import after flex   :", round(imp_after, 2))
 print("grid export after flex   :", round(exp_after, 2))
+print("price missing slots      :", len(price_missing))
 print("output                   :", OUTPUT)
