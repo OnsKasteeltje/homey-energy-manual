@@ -1,0 +1,24 @@
+{
+  "schema": "EMS_CONTRACT_POLICY_V1.0",
+  "productionContractMode": "FIXED",
+  "productionContractId": "ENGIE_3Y_2026_2029",
+  "productionSupplier": "ENGIE",
+  "dynamicPricing": {
+    "enabledForProduction": false,
+    "allowedUses": ["SHADOW", "ANALYSIS", "REPLAY"],
+    "automaticFallbackAllowed": false
+  },
+  "safety": {
+    "failClosed": true,
+    "fixedModeMustIgnoreDynamicPrices": true,
+    "contractModeMustPrecedePriceSourceSelection": true,
+    "missingOrInvalidFixedContractAction": "CONTRACT_CONFIG_ERROR",
+    "automaticContractModeSwitchAllowed": false
+  },
+  "notes": [
+    "Production EMS decisions are pinned to the fixed ENGIE three-year contract.",
+    "Dynamic market prices may be collected for shadow analysis, replay and future evaluation only.",
+    "Availability or changes of dynamic prices must never change a production decision while productionContractMode is FIXED.",
+    "A future switch to DYNAMIC requires an explicit configuration change and validation; it must never happen automatically."
+  ]
+}
