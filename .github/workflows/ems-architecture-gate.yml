@@ -1,0 +1,45 @@
+name: EMS Architecture Gate
+
+on:
+  pull_request:
+    paths:
+      - 'src/pi/ems-runtime/**'
+      - 'deploy/systemd/**'
+      - 'scripts/deploy_ems_pi.sh'
+      - 'scripts/ems_architecture_gate.sh'
+      - 'docs/architecture/CURRENT-EMS-STATE.md'
+      - '.github/workflows/ems-architecture-gate.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/pi/ems-runtime/**'
+      - 'deploy/systemd/**'
+      - 'scripts/deploy_ems_pi.sh'
+      - 'scripts/ems_architecture_gate.sh'
+      - 'docs/architecture/CURRENT-EMS-STATE.md'
+      - '.github/workflows/ems-architecture-gate.yml'
+
+jobs:
+  architecture-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine comparison base
+        id: base
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "ref=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            BEFORE="${{ github.event.before }}"
+            if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
+              BEFORE="$(git rev-parse HEAD^)"
+            fi
+            echo "ref=$BEFORE" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run EMS architecture gate
+        run: bash scripts/ems_architecture_gate.sh "${{ steps.base.outputs.ref }}"
