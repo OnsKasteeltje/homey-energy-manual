@@ -256,7 +256,7 @@ Architecture-sensitive paths currently include Pi runtime source, systemd deploy
 
 GitHub Actions runs the same gate for relevant pull requests and pushes to `main` through `.github/workflows/ems-architecture-gate.yml`.
 
-The Pi deployment script runs the gate **before backup/copy/deployment**. It stores the commit of each successful deployment in:
+The Pi deployment script invokes the gate explicitly through `bash` and runs it **before backup/copy/deployment**. It stores the commit of each successful deployment in:
 
 `/home/jeroen/ems/data/deployed-git-commit`
 
