@@ -206,7 +206,7 @@ Website JSON is a publication artifact, not the historical source of truth.
 
 Changes should follow the project pattern:
 
-**read/inspect → minimal change → shadow/test → validate → deploy → monitor**.
+**read/inspect → minimal change → update architecture → shadow/test → validate → architecture gate → deploy → monitor**.
 
 Available base-load diagnostics include:
 
@@ -243,7 +243,30 @@ For every accepted change affecting any of the following, update this file in th
 
 Dated architecture/baseline `.md` files remain historical evidence. They do **not** override this document.
 
-## 14. Sync check
+## 14. Architecture enforcement gate
+
+The documentation rule is technically enforced by `scripts/ems_architecture_gate.sh`.
+
+The gate has two responsibilities:
+
+1. validate critical machine and documentation invariants, including the active FIXED/ENGIE contract policy, dynamic-pricing production prohibition, fail-closed behavior and presence of the corresponding canonical architecture rules;
+2. when supplied with a base commit, compare the complete release range and refuse a release when architecture-sensitive files changed without a matching update to this document.
+
+Architecture-sensitive paths currently include Pi runtime source, systemd deployment definitions, the Pi deployment script and the architecture gate itself.
+
+GitHub Actions runs the same gate for relevant pull requests and pushes to `main` through `.github/workflows/ems-architecture-gate.yml`.
+
+The Pi deployment script runs the gate **before backup/copy/deployment**. It stores the commit of each successful deployment in:
+
+`/home/jeroen/ems/data/deployed-git-commit`
+
+Future deployments compare the candidate release against that last actually deployed commit, so multiple Git commits are evaluated as one release range. This avoids both false passes and false failures caused by checking only `HEAD^`.
+
+The first deployment after introduction of this marker performs invariant validation and initializes the marker; release-range enforcement applies from the next deployment onward.
+
+A failed architecture gate is a hard deployment stop. Bypassing the gate is not part of the normal EMS deployment process.
+
+## 15. Sync check
 
 A clean Pi repository is synchronized with GitHub when:
 
