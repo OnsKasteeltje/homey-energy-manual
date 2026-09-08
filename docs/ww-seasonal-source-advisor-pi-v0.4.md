@@ -12,7 +12,7 @@ The advisor is read-only and advisory. Source switching remains manual; it never
 
 - systemd service: `ems-ww-seasonal-advisor.service`
 - systemd timer: `ems-ww-seasonal-advisor.timer`
-- cadence: daily at 20:30 Europe/Amsterdam
+- cadence: daily at 00:05 Europe/Amsterdam, so the just-completed local day is immediately eligible for `completeDaysOnly` analysis
 - runtime: `/home/jeroen/ems/runtime/planner/warm-water/run_seasonal_source_advisor.py`
 - canonical history: `/home/jeroen/ems/data/ems-history.sqlite`
 - output: `/home/jeroen/ems/data/ww-seasonal-advisor.json`
@@ -55,6 +55,6 @@ The webhook path was manually validated on 2026-09-07 with a successful mobile p
 
 On 2026-09-07 the production systemd service completed successfully with Homey mode `BOILER`. The advisor reported `WARMUP_INSUFFICIENT_HISTORY` with 6/7 valid counterfactual days, reference boiler input 5.733 kWh and 10 reference boiler days. No notification was sent, as intended.
 
-The timer was then enabled successfully. Its first scheduled production run after cutover is 2026-09-08 at 20:30 CEST.
+The timer was enabled successfully. It originally ran daily at 20:30 CEST; on 2026-09-08 the schedule was moved to 00:05 local time so a completed calendar day is incorporated without nearly a full-day delay.
 
 The previous Homey v0.3 Seasonal Source Advisor was subsequently disabled manually. The Homey webhook push Flow remains enabled.
