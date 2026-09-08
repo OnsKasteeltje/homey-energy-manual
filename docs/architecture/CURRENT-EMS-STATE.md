@@ -2,11 +2,11 @@
 
 > **Canonical current-state document** for the Raspberry Pi / Homey EMS.
 >
-> This file describes the intended **current operational architecture and logic**. When a change to Pi runtime, GitHub deployment, planner logic, Tesla control, warm-water control, datastore, systemd orchestration, or the Homey/Pi responsibility split is accepted, **this document must be updated in the same change**.
+> This file describes the intended **current operational architecture and logic**. When a change to Pi runtime, GitHub deployment, planner logic, Tesla control, warm-water control, datastore, systemd orchestration, contract/economic policy, or the Homey/Pi responsibility split is accepted, **this document must be updated in the same change**.
 >
 > Dated baseline documents are historical snapshots and are not authoritative for current state.
 
-**Status date:** 2026-09-06  
+**Status date:** 2026-09-08  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
 
@@ -19,6 +19,7 @@
 - JSON files under `/home/jeroen/ems/data/` and `docs/data/` are derived inputs/outputs, caches or website publication artifacts; they are not parallel historical databases.
 - Old immutable GitHub day archives are bootstrap/import sources only and must not become a permanent planner datastore.
 - Homey remains the smart-home execution layer; the Pi performs forecasting, planning, history processing and shadow planning.
+- Machine-enforced contract policy is version-controlled in `src/pi/ems-runtime/planner/contract-policy.json`; human-readable architecture remains canonical in this document.
 
 ## 2. End-to-end process
 
@@ -101,6 +102,8 @@ The Pi chain uses:
 
 The resulting WW plan feeds the combined shadow load plan.
 
+The seasonal WW source advisor on the Pi evaluates BOILER versus CV economically over a rolling 14-day window using measured history and contract-effective marginal costs. It remains `PURE_SHADOW`, read-only and manual-switch-only until explicitly migrated further.
+
 ## 6. Tesla EV
 
 Tesla charging is treated as a controllable flexible load and is removed from historical base load.
@@ -141,7 +144,34 @@ Website representation:
 
 `planner/quarter-hour-plan/build_website_shadow.py`
 
-## 8. Planner systemd chain
+## 8. Energy contract and economic policy
+
+The production EMS is currently tied to the user's fixed three-year ENGIE contract. The machine-readable policy is `planner/contract-policy.json` and currently requires:
+
+- `productionContractMode = FIXED`;
+- `productionContractId = ENGIE_3Y_2026_2029`;
+- `productionSupplier = ENGIE`;
+- dynamic pricing is **disabled for production**;
+- dynamic market-price data may be used only for `SHADOW`, `ANALYSIS` or `REPLAY` while FIXED is active;
+- automatic fallback from fixed-contract economics to dynamic pricing is forbidden;
+- automatic switching between FIXED and DYNAMIC contract modes is forbidden;
+- missing, inconsistent or invalid fixed-contract configuration must **fail closed** with `CONTRACT_CONFIG_ERROR` rather than silently choose another pricing model.
+
+Architectural ordering rule:
+
+**contract mode → permitted economic model → permitted price source → planner objective/decision**
+
+Price-source availability must never decide the contract mode. In particular, merely having fresh EnergyZero or other dynamic prices available must not alter a production decision while `productionContractMode == FIXED`.
+
+Required regression invariant:
+
+> While production contract mode is FIXED, arbitrary changes to dynamic market-price input must not change any production planner decision.
+
+A future move to a dynamic contract is therefore an explicit configuration and architecture change. It requires validation of the dynamic price source, supplier economics, planner behavior and fail-safe path before `productionContractMode` may be changed to `DYNAMIC`.
+
+Any planner or optimizer that makes an economic production decision must consume or enforce the central contract policy before selecting tariff/price inputs. No component may implement an independent implicit contract-mode fallback.
+
+## 9. Planner systemd chain
 
 `ems-pv-forecast.service` is a `Type=oneshot` service. `inactive (dead)` after a successful run is therefore normal.
 
@@ -159,7 +189,7 @@ Every step must complete successfully before the next starts.
 
 **Deployment consistency rule:** the installed systemd unit on the Pi must be compared with the version-controlled unit when changing this chain. Any locally present publication step must either be version-controlled or explicitly documented; silent local divergence is not acceptable.
 
-## 9. Pi Planner / website
+## 10. Pi Planner / website
 
 The Pi Planner is currently a **shadow** representation. It displays the 24-hour forecast and planned WW/Tesla windows without making the Pi an uncontrolled second actuator.
 
@@ -172,7 +202,7 @@ The forecast combines:
 
 Website JSON is a publication artifact, not the historical source of truth.
 
-## 10. Monitoring and validation
+## 11. Monitoring and validation
 
 Changes should follow the project pattern:
 
@@ -185,7 +215,7 @@ Available base-load diagnostics include:
 
 Model changes should be retained only when supported by sufficient history and validation, not because one current-day graph looks preferable.
 
-## 11. Future battery boundary
+## 12. Future battery boundary
 
 The tentative battery architecture is Victron AC-coupled. The battery system is not yet a committed operational part of the EMS.
 
@@ -193,7 +223,7 @@ When introduced, Victron/DESS should remain the primary real-time battery optimi
 
 Battery ROI analysis should use residual PV export after flexible-load optimisation as an important baseline.
 
-## 12. Documentation rule — mandatory
+## 13. Documentation rule — mandatory
 
 This document is the canonical answer to **“what is the EMS/Pi doing now?”**.
 
@@ -203,6 +233,7 @@ For every accepted change affecting any of the following, update this file in th
 - SQLite/datastore policy or schema relevant to EMS operation;
 - systemd services/timers and execution order;
 - planner inputs, priorities, algorithms or outputs;
+- energy-contract mode, tariff/economic policy or price-source selection;
 - WW logic;
 - Tesla logic;
 - Homey/Pi responsibility boundary;
@@ -212,7 +243,7 @@ For every accepted change affecting any of the following, update this file in th
 
 Dated architecture/baseline `.md` files remain historical evidence. They do **not** override this document.
 
-## 13. Sync check
+## 14. Sync check
 
 A clean Pi repository is synchronized with GitHub when:
 
