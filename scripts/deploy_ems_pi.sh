@@ -6,6 +6,7 @@ RUNTIME="/home/jeroen/ems/runtime"
 SOURCE="$REPO/src/pi/ems-runtime"
 SYSTEMD="$REPO/deploy/systemd"
 BACKUP_ROOT="/home/jeroen/ems/backup"
+DEPLOY_MARKER="/home/jeroen/ems/data/deployed-git-commit"
 
 if [[ "$(id -u)" -ne 0 ]]; then
     echo "ERROR: run with sudo"
@@ -22,9 +23,27 @@ if [[ -n "$(git -C "$REPO" status --porcelain)" ]]; then
     exit 1
 fi
 
+BASE_REF=""
+if [[ -s "$DEPLOY_MARKER" ]]; then
+    BASE_REF="$(tr -d '[:space:]' < "$DEPLOY_MARKER")"
+    if ! git -C "$REPO" rev-parse --verify "$BASE_REF^{commit}" >/dev/null 2>&1; then
+        echo "ERROR: deployment marker does not contain a valid commit: $BASE_REF"
+        exit 1
+    fi
+else
+    echo "NOTE: no deployment marker yet; architecture release-range check starts after this deployment."
+fi
+
+echo "=== ARCHITECTURE GATE ==="
+if [[ -n "$BASE_REF" ]]; then
+    "$REPO/scripts/ems_architecture_gate.sh" "$BASE_REF"
+else
+    "$REPO/scripts/ems_architecture_gate.sh"
+fi
+
+echo
 BACKUP="$BACKUP_ROOT/runtime-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$BACKUP"
-
 echo "=== BACKUP ==="
 echo "Creating: $BACKUP"
 
@@ -60,7 +79,6 @@ echo "PASS: runtime contains no unmanaged source files"
 
 echo
 echo "=== DEPLOY RUNTIME SOURCE ==="
-
 rsync -a --delete \
     --exclude='data/' \
     --exclude='logs/' \
@@ -72,22 +90,23 @@ rsync -a --delete \
 
 echo
 echo "=== DEPLOY SYSTEMD ==="
-
 cp -a "$SYSTEMD/"* /etc/systemd/system/
 
 echo
 echo "=== VALIDATE ==="
-
 "$REPO/scripts/ems_pi_drift_check.sh"
 
 echo
 echo "=== SYSTEMD RELOAD ==="
-
 systemctl daemon-reload
+
+mkdir -p "$(dirname "$DEPLOY_MARKER")"
+git -C "$REPO" rev-parse HEAD > "$DEPLOY_MARKER"
 
 echo
 echo "=== DEPLOYMENT COMPLETE ==="
 echo "Release commit: $(git -C "$REPO" rev-parse --short HEAD)"
 echo "Backup: $BACKUP"
+echo "Deployment marker: $(cat "$DEPLOY_MARKER")"
 echo
 echo "NOTE: Services were NOT restarted by this script."
