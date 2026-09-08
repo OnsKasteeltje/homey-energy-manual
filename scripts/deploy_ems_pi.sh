@@ -36,9 +36,9 @@ fi
 
 echo "=== ARCHITECTURE GATE ==="
 if [[ -n "$BASE_REF" ]]; then
-    "$REPO/scripts/ems_architecture_gate.sh" "$BASE_REF"
+    bash "$REPO/scripts/ems_architecture_gate.sh" "$BASE_REF"
 else
-    "$REPO/scripts/ems_architecture_gate.sh"
+    bash "$REPO/scripts/ems_architecture_gate.sh"
 fi
 
 echo
