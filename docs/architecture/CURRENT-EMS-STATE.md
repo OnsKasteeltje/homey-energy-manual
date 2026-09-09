@@ -94,8 +94,9 @@ Current planning principles:
 - satisfy the required daily heating/comfort target and deadline;
 - preferentially place flexible heating in periods with useful PV/export-reduction opportunity;
 - treat WW priority as a **reservation of required comfort energy**, not as a requirement to consume one monolithic boiler block before other flexible loads may use PV;
-- when a qualifying PV/export window is broader than the required WW runtime **and EV opportunity is relevant in that window**, use the shoulders of that window where minimum boiler-run constraints allow it, so the strongest central PV/export capacity can remain available for the higher-power EV load;
-- when EV opportunity is not relevant, WW keeps the strongest qualifying PV subrun rather than creating extra grid import merely to preserve an unused PV peak;
+- when a qualifying PV/export window is broader than the required WW runtime **and the Tesla is physically connected to the charger at planning time**, use the shoulders of that window where minimum boiler-run constraints allow it, so the strongest central PV/export capacity can remain available for the higher-power EV load;
+- a weekly or expected-home Tesla forecast is informational only and must **not** cause WW to move to the shoulders;
+- when the Tesla is not physically connected, WW keeps the strongest qualifying PV subrun rather than creating extra grid import merely to preserve an unused PV peak;
 - separate WW runs must respect the minimum runtime; when a safe shoulder split cannot satisfy that constraint, use a strongest contiguous WW subrun instead;
 - do not schedule unnecessary repeat heating once the daily goal has been reached;
 - include planned WW consumption in the combined quarter-hour load plan so it is not double-counted as base load;
@@ -122,15 +123,21 @@ Opportunity charging uses PV/export remaining **after required WW comfort reserv
 
 Current shadow-planning rules:
 
+- EV opportunity planning is enabled only when the Tesla is **physically connected now** according to the current live energy state; the weekly expected-home forecast remains informational and may not by itself schedule opportunity charging;
 - stable minimum charging is modelled at **3×6 A**, approximately 4.14 kW using the current 690 W/A planning conversion;
 - **3×7 A is only a short actuator kickstart** to establish charging reliably. It is not an economic or PV-opportunity threshold and need not persist for a full planner slot; Homey/Easee may reduce to 6 A after the kickstart;
-- an EV opportunity window must contain at least **30 minutes** of contiguous positive residual PV export while the Tesla is expected/known to be available;
+- an EV opportunity window must contain at least **30 minutes** of contiguous positive residual PV export while the Tesla is connected;
 - over the complete qualified window, residual PV must cover at least **50% of the energy required by stable 6 A charging**;
-- inside such a qualified window, the planner may deliberately plan `PV_MIXED_OPPORTUNITY`: 6 A charging may continue even when instantaneous PV export is below 4.14 kW, with limited grid import filling the difference;
+- qualified windows are classified as `PURE_PV` at at least 100% 6 A PV coverage, `SECONDARY` at 75–100%, and `FALLBACK_MIXED` at 50–75%;
+- the planner applies `BEST_PV_WINDOWS_FIRST`: earlier weaker windows are not automatically consumed merely because they exceed the 50% floor;
+- an earlier weaker window is deferred when later **higher-class** windows have enough 6 A PV-capture capacity to replace the PV opportunity of that earlier window;
+- when later better windows do **not** have enough replacement capacity, the weaker earlier window remains eligible so useful autumn/winter PV is not discarded;
+- this future-better-capacity guard is intentionally based on forecast PV-capture capacity because opportunity charging does not yet have a separate day-energy/SOC budget in this Pi shadow planner;
+- inside a selected mixed window, the planner may deliberately plan `PV_MIXED_OPPORTUNITY`: 6 A charging may continue even when instantaneous PV export is below 4.14 kW, with limited grid import filling the difference;
 - when residual PV supports more than 6 A, planned current may rise in whole-amp steps up to the configured maximum;
 - opportunity charging must never consume PV capacity already reserved for required WW comfort.
 
-This window qualification deliberately replaces the old `PV_SURPLUS_START7_RUN6_MAX16` planning rule. Real-time control still must avoid excessive start/stop/current flapping and respect charger, vehicle and household electrical limits.
+This window qualification replaces the old `PV_SURPLUS_START7_RUN6_MAX16` planning rule. Real-time control still must avoid excessive start/stop/current flapping and respect charger, vehicle and household electrical limits.
 
 ### Deadline charging
 
@@ -154,14 +161,16 @@ Primary principles:
 2. reserve and satisfy required WW/household comfort loads and their deadlines;
 3. satisfy explicit EV deadline requirements;
 4. optimize the placement of flexible WW and EV demand across the PV/export curve rather than interpreting priority as strict chronological block consumption;
-5. preserve the central PV peak for EV only when EV opportunity is relevant; otherwise WW remains optimized for its own strongest PV capture;
+5. preserve the central PV peak for EV only when the Tesla is physically connected; expected-home/week forecasts alone must not alter WW placement;
 6. evaluate EV opportunity only against **residual export after WW reservation**;
-7. allow limited grid mixing for EV opportunity only inside a qualified residual-PV window, currently at least 30 minutes and at least 50% PV coverage at stable 6 A;
-8. minimise unnecessary grid import/export without allowing optimisation to violate requirements;
-9. keep planning deterministic and explainable;
-10. keep control writes separate from shadow evaluation until a behavior is validated.
+7. qualify EV opportunity windows at currently at least 30 minutes and at least 50% PV coverage at stable 6 A;
+8. prefer later higher-quality PV windows over earlier mixed-import windows whenever their forecast 6 A PV-capture capacity can replace the earlier opportunity;
+9. use weaker mixed windows only when better future windows are insufficient, preventing avoidable import while preserving otherwise stranded autumn/winter PV;
+10. minimise unnecessary grid import/export without allowing optimisation to violate requirements;
+11. keep planning deterministic and explainable;
+12. keep control writes separate from shadow evaluation until a behavior is validated.
 
-The intended bell-curve behaviour is therefore conditional: when EV opportunity is relevant, WW comfort may occupy suitable shoulder periods while the stronger central export period remains available for the higher minimum-power EV load. Without relevant EV opportunity, WW simply uses the strongest suitable PV period. This is an optimisation beneath the WW comfort guarantee, not a reversal of WW priority.
+The intended bell-curve behaviour is therefore conditional: when the Tesla is actually connected, WW comfort may occupy suitable shoulder periods while the stronger central export period remains available for the higher minimum-power EV load. Without a connected Tesla, WW simply uses the strongest suitable PV period. This is an optimisation beneath the WW comfort guarantee, not a reversal of WW priority.
 
 Current relevant builder:
 
