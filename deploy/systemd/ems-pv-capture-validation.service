@@ -1,0 +1,10 @@
+[Unit]
+Description=EMS daily PV self-consumption capture validation
+After=network-online.target ems-day-history.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/dynamic-plan/validate_pv_capture.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/publisher/publish_pv_capture_validation.py
