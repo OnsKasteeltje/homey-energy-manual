@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -21,7 +21,6 @@ WW_FALLBACK_HOUR = 16
 WW_MIN_RUN_SLOTS = 2
 WW_MIN_PV_WINDOW_KWH = 0.10
 WW_SLOT_ENERGY_KWH = BOILER_W / 1000 * 0.25
-LIVE_CONNECTED_HORIZON_H = 2
 
 
 def load(path):
@@ -57,17 +56,6 @@ def deadline_utc(date_key):
     return dt.astimezone(timezone.utc)
 
 
-def expected_tesla_home(local_timestamp):
-    wd = local_timestamp.weekday()  # Mon=0 .. Sun=6
-    if wd in (4, 5, 6):
-        return True
-    if wd == 3 and local_timestamp.hour >= 18:
-        return True
-    if wd == 0 and local_timestamp.hour < 8:
-        return True
-    return False
-
-
 ww_doc = load(WW_INPUT)
 pv_doc = load(PV_FILE)
 quatt_doc = load(QUATT_FILE)
@@ -77,8 +65,6 @@ ww = ww_doc["warmWater"]
 
 tesla_state = energy_state.get("tesla") or {}
 tesla_connected_now = tesla_state.get("connected") is True
-now_utc = datetime.now(timezone.utc)
-live_connected_until = now_utc + timedelta(hours=LIVE_CONNECTED_HORIZON_H)
 
 pv_map = {ts(s): s for s in pv_doc.get("slots", [])}
 q_map = {ts(s): s for s in quatt_doc.get("slots", [])}
@@ -94,17 +80,12 @@ for timestamp in common:
     quatt_w = max(0.0, float(q_map[timestamp].get("quattForecastW") or 0))
     base_w = max(0.0, float(b_map[timestamp].get("baseLoadForecastW") or 0))
     net_before = base_w + quatt_w - pv_w
-    slot_dt = parse_utc(timestamp)
-    live_connected = (
-        tesla_connected_now
-        and slot_dt >= now_utc - timedelta(minutes=15)
-        and slot_dt <= live_connected_until
-    )
-    tesla_relevant = live_connected or expected_tesla_home(slot_dt.astimezone(TZ))
     source_slots.append({
         "slot_start_utc": timestamp,
         "gridExportBeforeFlexW": max(0.0, -net_before),
-        "teslaOpportunityRelevant": tesla_relevant,
+        # Peak preservation is allowed only when the vehicle is physically
+        # connected now. The weekly home forecast must never move WW.
+        "teslaOpportunityRelevant": tesla_connected_now,
     })
 
 today_local = datetime.now(TZ).date().isoformat()
@@ -141,9 +122,7 @@ def find_pv_windows(candidates):
             "pvEnergyKWh": pv_energy_kwh,
             "avgPvW": pv_sum_w / len(indices),
             "start": candidates[indices[0]]["slot_start_utc"],
-            "teslaOpportunityRelevant": any(
-                candidates[i].get("teslaOpportunityRelevant") is True for i in indices
-            ),
+            "teslaOpportunityRelevant": tesla_connected_now,
         })
 
     for i, slot in enumerate(candidates):
@@ -182,10 +161,8 @@ def shoulder_subruns(indices, candidates, length):
     if length < 2 * WW_MIN_RUN_SLOTS:
         return best_subrun(indices, candidates, length)
 
-    left_len = length // 2
-    right_len = length - left_len
-    left_len = max(WW_MIN_RUN_SLOTS, left_len)
-    right_len = max(WW_MIN_RUN_SLOTS, right_len)
+    left_len = max(WW_MIN_RUN_SLOTS, length // 2)
+    right_len = max(WW_MIN_RUN_SLOTS, length - left_len)
 
     while left_len + right_len > length:
         if right_len > left_len and right_len > WW_MIN_RUN_SLOTS:
@@ -210,7 +187,7 @@ def shoulder_subruns(indices, candidates, length):
 
 
 def choose_pv_windows(candidates, required_slots):
-    """Reserve WW first; preserve PV peak for EV only when EV opportunity is relevant."""
+    """Reserve WW first; preserve the PV peak only for a connected Tesla."""
     selected = set()
     windows = find_pv_windows(candidates)
 
@@ -221,7 +198,7 @@ def choose_pv_windows(candidates, required_slots):
         indices = window["indices"]
         if len(indices) <= remaining:
             run = indices
-        elif window["teslaOpportunityRelevant"]:
+        elif tesla_connected_now:
             run = shoulder_subruns(indices, candidates, remaining)
         else:
             run = best_subrun(indices, candidates, remaining)
@@ -247,11 +224,17 @@ for date_key, day_slots in sorted(by_date.items()):
 
     if is_today:
         goal_reached = ww.get("goalReachedToday") is True or ww.get("goalReached") is True
-        remaining_min = 0 if goal_reached else max(0, int(ww.get("remainingFallbackMin") or 0))
+        remaining_min = (
+            0 if goal_reached
+            else max(0, int(ww.get("remainingFallbackMin") or 0))
+        )
         catchup = ww.get("catchupRequired") is True
 
     deadline = deadline_utc(date_key)
-    candidates = [s for s in day_slots if parse_utc(s["slot_start_utc"]) < deadline]
+    candidates = [
+        s for s in day_slots
+        if parse_utc(s["slot_start_utc"]) < deadline
+    ]
     need_kwh = remaining_min / 60 * BOILER_W / 1000
     required_slots = int(need_kwh / WW_SLOT_ENERGY_KWH + 0.999999)
     chosen_indices = set()
@@ -259,12 +242,17 @@ for date_key, day_slots in sorted(by_date.items()):
     eligible_pv_windows = []
 
     if not goal_reached and required_slots > 0:
-        chosen_indices, eligible_pv_windows = choose_pv_windows(candidates, required_slots)
+        chosen_indices, eligible_pv_windows = choose_pv_windows(
+            candidates, required_slots
+        )
         pv_chosen_indices = set(chosen_indices)
         remaining_slots = max(0, required_slots - len(chosen_indices))
 
         if remaining_slots > 0:
-            unchosen = [(i, s) for i, s in enumerate(candidates) if i not in chosen_indices]
+            unchosen = [
+                (i, s) for i, s in enumerate(candidates)
+                if i not in chosen_indices
+            ]
             after_1600 = [
                 (i, s) for i, s in unchosen
                 if local_dt(s["slot_start_utc"]).hour >= WW_FALLBACK_HOUR
@@ -274,7 +262,9 @@ for date_key, day_slots in sorted(by_date.items()):
                 if len(after_1600) >= remaining_slots and not catchup
                 else unchosen
             )
-            fallback_pool.sort(key=lambda x: x[1]["slot_start_utc"], reverse=True)
+            fallback_pool.sort(
+                key=lambda x: x[1]["slot_start_utc"], reverse=True
+            )
             for i, _ in fallback_pool[:remaining_slots]:
                 chosen_indices.add(i)
 
@@ -284,14 +274,21 @@ for date_key, day_slots in sorted(by_date.items()):
     for i, s in enumerate(candidates):
         if i not in chosen_indices:
             continue
-        surplus, pv_cov, marginal = metrics(s)
+
+        _, pv_cov, marginal = metrics(s)
         dt_local = local_dt(s["slot_start_utc"])
+
         if i in pv_chosen_indices:
-            reason = "PV_SURPLUS_FULL" if marginal == 0 else "PV_PARTIAL_OPTIMIZED"
+            reason = (
+                "PV_SURPLUS_FULL"
+                if marginal == 0
+                else "PV_PARTIAL_OPTIMIZED"
+            )
         elif dt_local.hour >= WW_FALLBACK_HOUR:
             reason = "DEADLINE_FALLBACK"
         else:
             reason = "SAFETY_EARLY_FALLBACK"
+
         alloc = min(WW_SLOT_ENERGY_KWH, remain_kwh)
         chosen.append({
             "slot_start_utc": s["slot_start_utc"],
@@ -323,7 +320,9 @@ for date_key, day_slots in sorted(by_date.items()):
         "goalReached": goal_reached,
         "remainingFallbackMin": remaining_min,
         "requiredEnergyKWh": round(need_kwh, 3),
-        "allocatedEnergyKWh": round(sum(x["allocatedKWh"] for x in chosen), 3),
+        "allocatedEnergyKWh": round(
+            sum(x["allocatedKWh"] for x in chosen), 3
+        ),
         "unallocatedEnergyKWh": round(max(0.0, remain_kwh), 3),
         "catchupRequired": catchup,
         "fallbackNotBeforeLocal": "16:00",
@@ -331,8 +330,8 @@ for date_key, day_slots in sorted(by_date.items()):
         "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
         "minPvWindowEnergyKWh": WW_MIN_PV_WINDOW_KWH,
         "eligiblePvWindows": len(eligible_pv_windows),
-        "evRelevantPvWindows": sum(
-            1 for x in eligible_pv_windows if x["teslaOpportunityRelevant"]
+        "evRelevantPvWindows": (
+            len(eligible_pv_windows) if tesla_connected_now else 0
         ),
         "allocatedSlots": len(chosen),
     })
@@ -340,7 +339,7 @@ for date_key, day_slots in sorted(by_date.items()):
 plan_slots.sort(key=lambda x: x["slot_start_utc"])
 
 payload = {
-    "schema": "EMS_PI_WW_PLAN_V0.6",
+    "schema": "EMS_PI_WW_PLAN_V0.6.1",
     "mode": "shadow",
     "control_writes": False,
     "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -351,9 +350,10 @@ payload = {
     "deadlineLocal": "19:00",
     "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
     "minPvWindowEnergyKWh": WW_MIN_PV_WINDOW_KWH,
-    "pvWindowPolicy": "STRONGEST_SUBRUN_UNLESS_EV_RELEVANT_THEN_SHOULDERS",
+    "pvWindowPolicy": "STRONGEST_SUBRUN_UNLESS_TESLA_CONNECTED_THEN_SHOULDERS",
     "flexPriority": "WW_COMFORT_RESERVED_BEFORE_EV_OPPORTUNITY",
-    "teslaPeakPreservation": "ONLY_WHEN_EV_OPPORTUNITY_RELEVANT",
+    "teslaPeakPreservation": "LIVE_CONNECTED_CURRENT_STATE_ONLY",
+    "teslaConnectedNow": tesla_connected_now,
     "slot_count": len(plan_slots),
     "dailyPlans": daily,
     "slots": plan_slots,
@@ -363,7 +363,7 @@ tmp = OUTPUT.with_suffix(".tmp")
 tmp.write_text(json.dumps(payload, separators=(",", ":")) + "\n")
 tmp.replace(OUTPUT)
 
-print("PASS: WW plan v0.6 built")
+print("PASS: WW plan v0.6.1 built")
 print("slots:", len(plan_slots))
 for d in daily:
     print(
