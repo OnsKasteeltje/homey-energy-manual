@@ -94,7 +94,8 @@ Current planning principles:
 - satisfy the required daily heating/comfort target and deadline;
 - preferentially place flexible heating in periods with useful PV/export-reduction opportunity;
 - treat WW priority as a **reservation of required comfort energy**, not as a requirement to consume one monolithic boiler block before other flexible loads may use PV;
-- when a qualifying PV/export window is broader than the required WW runtime, use the shoulders of that window where minimum boiler-run constraints allow it, so the strongest central PV/export capacity can remain available for higher-power EV opportunity charging;
+- when a qualifying PV/export window is broader than the required WW runtime **and EV opportunity is relevant in that window**, use the shoulders of that window where minimum boiler-run constraints allow it, so the strongest central PV/export capacity can remain available for the higher-power EV load;
+- when EV opportunity is not relevant, WW keeps the strongest qualifying PV subrun rather than creating extra grid import merely to preserve an unused PV peak;
 - separate WW runs must respect the minimum runtime; when a safe shoulder split cannot satisfy that constraint, use a strongest contiguous WW subrun instead;
 - do not schedule unnecessary repeat heating once the daily goal has been reached;
 - include planned WW consumption in the combined quarter-hour load plan so it is not double-counted as base load;
@@ -153,13 +154,14 @@ Primary principles:
 2. reserve and satisfy required WW/household comfort loads and their deadlines;
 3. satisfy explicit EV deadline requirements;
 4. optimize the placement of flexible WW and EV demand across the PV/export curve rather than interpreting priority as strict chronological block consumption;
-5. evaluate EV opportunity only against **residual export after WW reservation**;
-6. allow limited grid mixing for EV opportunity only inside a qualified residual-PV window, currently at least 30 minutes and at least 50% PV coverage at stable 6 A;
-7. minimise unnecessary grid import/export without allowing optimisation to violate requirements;
-8. keep planning deterministic and explainable;
-9. keep control writes separate from shadow evaluation until a behavior is validated.
+5. preserve the central PV peak for EV only when EV opportunity is relevant; otherwise WW remains optimized for its own strongest PV capture;
+6. evaluate EV opportunity only against **residual export after WW reservation**;
+7. allow limited grid mixing for EV opportunity only inside a qualified residual-PV window, currently at least 30 minutes and at least 50% PV coverage at stable 6 A;
+8. minimise unnecessary grid import/export without allowing optimisation to violate requirements;
+9. keep planning deterministic and explainable;
+10. keep control writes separate from shadow evaluation until a behavior is validated.
 
-The intended bell-curve behaviour is therefore: WW comfort may occupy suitable shoulder periods, while the stronger central export period can remain available for the higher minimum-power EV load. This is an optimisation beneath the WW comfort guarantee, not a reversal of WW priority.
+The intended bell-curve behaviour is therefore conditional: when EV opportunity is relevant, WW comfort may occupy suitable shoulder periods while the stronger central export period remains available for the higher minimum-power EV load. Without relevant EV opportunity, WW simply uses the strongest suitable PV period. This is an optimisation beneath the WW comfort guarantee, not a reversal of WW priority.
 
 Current relevant builder:
 
