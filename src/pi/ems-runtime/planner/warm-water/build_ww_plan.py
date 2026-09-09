@@ -55,9 +55,7 @@ def local_date(timestamp):
 
 def deadline_utc(date_key):
     y, m, d = map(int, date_key.split("-"))
-    dt = datetime(
-        y, m, d, WW_DEADLINE_HOUR, 0, 0, tzinfo=TZ
-    )
+    dt = datetime(y, m, d, WW_DEADLINE_HOUR, 0, 0, tzinfo=TZ)
     return dt.astimezone(timezone.utc)
 
 
@@ -65,35 +63,22 @@ ww_doc = load(WW_INPUT)
 pv_doc = load(PV_FILE)
 quatt_doc = load(QUATT_FILE)
 base_doc = load(BASE_FILE)
-
 ww = ww_doc["warmWater"]
 
 pv_map = {ts(s): s for s in pv_doc.get("slots", [])}
 q_map = {ts(s): s for s in quatt_doc.get("slots", [])}
 b_map = {ts(s): s for s in base_doc.get("slots", [])}
-
 common = sorted(set(pv_map) & set(q_map) & set(b_map))
 
 if len(common) != 96:
-    raise SystemExit(
-        f"FAIL: expected 96 aligned forecast slots, got {len(common)}"
-    )
+    raise SystemExit(f"FAIL: expected 96 aligned forecast slots, got {len(common)}")
 
 source_slots = []
-
 for timestamp in common:
     pv_w = max(0.0, pv_power(pv_map[timestamp]))
-    quatt_w = max(
-        0.0,
-        float(q_map[timestamp].get("quattForecastW") or 0)
-    )
-    base_w = max(
-        0.0,
-        float(b_map[timestamp].get("baseLoadForecastW") or 0)
-    )
-
+    quatt_w = max(0.0, float(q_map[timestamp].get("quattForecastW") or 0))
+    base_w = max(0.0, float(b_map[timestamp].get("baseLoadForecastW") or 0))
     net_before = base_w + quatt_w - pv_w
-
     source_slots.append({
         "slot_start_utc": timestamp,
         "gridExportBeforeFlexW": max(0.0, -net_before),
@@ -103,10 +88,7 @@ today_local = datetime.now(TZ).date().isoformat()
 
 
 def metrics(slot):
-    surplus = max(
-        0.0,
-        float(slot.get("gridExportBeforeFlexW") or 0)
-    )
+    surplus = max(0.0, float(slot.get("gridExportBeforeFlexW") or 0))
     pv_coverage = min(BOILER_W, surplus)
     marginal_import = max(0.0, BOILER_W - surplus)
     return surplus, pv_coverage, marginal_import
@@ -114,8 +96,7 @@ def metrics(slot):
 
 def is_consecutive(a, b):
     return (
-        parse_utc(b["slot_start_utc"]) -
-        parse_utc(a["slot_start_utc"])
+        parse_utc(b["slot_start_utc"]) - parse_utc(a["slot_start_utc"])
     ).total_seconds() == 15 * 60
 
 
@@ -127,12 +108,10 @@ def find_pv_windows(candidates):
     def finish(indices):
         if len(indices) < WW_MIN_RUN_SLOTS:
             return
-
         pv_sum_w = sum(metrics(candidates[i])[1] for i in indices)
         pv_energy_kwh = pv_sum_w * 0.25 / 1000
         if pv_energy_kwh < WW_MIN_PV_WINDOW_KWH:
             return
-
         windows.append({
             "indices": tuple(indices),
             "pvSumW": pv_sum_w,
@@ -147,41 +126,70 @@ def find_pv_windows(candidates):
             finish(current)
             current = []
             continue
-
         if current and not is_consecutive(candidates[current[-1]], slot):
             finish(current)
             current = []
-
         current.append(i)
-
     finish(current)
 
-    # Prefer the strongest PV period first. Total PV is the second-order
-    # criterion so broad high-export windows naturally outrank weak fragments.
-    windows.sort(
-        key=lambda x: (-x["avgPvW"], -x["pvEnergyKWh"], x["start"])
-    )
+    windows.sort(key=lambda x: (-x["avgPvW"], -x["pvEnergyKWh"], x["start"]))
     return windows
 
 
 def best_subrun(indices, candidates, length):
-    """Pick the strongest consecutive subrun of a longer PV window."""
+    """Pick the strongest consecutive subrun when a split would create short runs."""
     best = None
-
     for pos in range(0, len(indices) - length + 1):
         run = indices[pos:pos + length]
         score = sum(metrics(candidates[i])[1] for i in run)
         start = candidates[run[0]]["slot_start_utc"]
         key = (score, -parse_utc(start).timestamp())
-
         if best is None or key > best[0]:
             best = (key, run)
-
     return tuple(best[1]) if best else tuple()
 
 
+def shoulder_subruns(indices, candidates, length):
+    """Use both shoulders of a broad PV window where minimum run lengths allow it.
+
+    WW comfort is reserved first, but the strongest middle of a bell-shaped export
+    window is deliberately left available for higher-power EV opportunity charging.
+    Each WW shoulder remains at least WW_MIN_RUN_SLOTS long.
+    """
+    if length >= len(indices):
+        return tuple(indices)
+    if length < 2 * WW_MIN_RUN_SLOTS:
+        return best_subrun(indices, candidates, length)
+
+    left_len = length // 2
+    right_len = length - left_len
+    left_len = max(WW_MIN_RUN_SLOTS, left_len)
+    right_len = max(WW_MIN_RUN_SLOTS, right_len)
+
+    while left_len + right_len > length:
+        if right_len > left_len and right_len > WW_MIN_RUN_SLOTS:
+            right_len -= 1
+        elif left_len > WW_MIN_RUN_SLOTS:
+            left_len -= 1
+        else:
+            return best_subrun(indices, candidates, length)
+
+    if length % 2:
+        left_score = sum(metrics(candidates[i])[1] for i in indices[:left_len + 1])
+        right_score = sum(metrics(candidates[i])[1] for i in indices[-(right_len + 1):])
+        if left_score > right_score and right_len > WW_MIN_RUN_SLOTS:
+            left_len += 1
+            right_len -= 1
+        elif right_score > left_score and left_len > WW_MIN_RUN_SLOTS:
+            right_len += 1
+            left_len -= 1
+
+    run = list(indices[:left_len]) + list(indices[-right_len:])
+    return tuple(dict.fromkeys(run))
+
+
 def choose_pv_windows(candidates, required_slots):
-    """Choose contiguous PV runs, minimizing starts while preferring strong PV."""
+    """Reserve WW comfort in PV windows while preserving strong central EV headroom."""
     selected = set()
     windows = find_pv_windows(candidates)
 
@@ -189,16 +197,12 @@ def choose_pv_windows(candidates, required_slots):
         remaining = required_slots - len(selected)
         if remaining < WW_MIN_RUN_SLOTS:
             break
-
         indices = window["indices"]
-
         if len(indices) <= remaining:
             run = indices
         else:
-            run = best_subrun(indices, candidates, remaining)
-
+            run = shoulder_subruns(indices, candidates, remaining)
         selected.update(run)
-
         if len(selected) >= required_slots:
             break
 
@@ -206,84 +210,48 @@ def choose_pv_windows(candidates, required_slots):
 
 
 by_date = {}
-
 for s in source_slots:
-    d = local_date(s["slot_start_utc"])
-    by_date.setdefault(d, []).append(s)
+    by_date.setdefault(local_date(s["slot_start_utc"]), []).append(s)
 
 plan_slots = []
 daily = []
 
 for date_key, day_slots in sorted(by_date.items()):
     is_today = date_key == today_local
-
     goal_reached = False
     remaining_min = WW_DAILY_FALLBACK_MIN
     catchup = False
 
     if is_today:
-        goal_reached = (
-            ww.get("goalReachedToday") is True
-            or ww.get("goalReached") is True
-        )
-        remaining_min = (
-            0 if goal_reached
-            else max(0, int(ww.get("remainingFallbackMin") or 0))
-        )
+        goal_reached = ww.get("goalReachedToday") is True or ww.get("goalReached") is True
+        remaining_min = 0 if goal_reached else max(0, int(ww.get("remainingFallbackMin") or 0))
         catchup = ww.get("catchupRequired") is True
 
     deadline = deadline_utc(date_key)
-
-    candidates = [
-        s for s in day_slots
-        if parse_utc(s["slot_start_utc"]) < deadline
-    ]
-
+    candidates = [s for s in day_slots if parse_utc(s["slot_start_utc"]) < deadline]
     need_kwh = remaining_min / 60 * BOILER_W / 1000
-    required_slots = int(
-        need_kwh / WW_SLOT_ENERGY_KWH + 0.999999
-    )
+    required_slots = int(need_kwh / WW_SLOT_ENERGY_KWH + 0.999999)
     chosen_indices = set()
     pv_chosen_indices = set()
     eligible_pv_windows = []
 
     if not goal_reached and required_slots > 0:
-        # Phase 1: PV-first. A start is justified by useful export energy over
-        # a contiguous window, not by a single quarter-hour threshold. Once a
-        # qualifying window is selected, keep the boiler running through that
-        # contiguous PV window (or the strongest subrun if demand is smaller).
-        chosen_indices, eligible_pv_windows = choose_pv_windows(
-            candidates, required_slots
-        )
+        chosen_indices, eligible_pv_windows = choose_pv_windows(candidates, required_slots)
         pv_chosen_indices = set(chosen_indices)
-
         remaining_slots = max(0, required_slots - len(chosen_indices))
 
         if remaining_slots > 0:
-            unchosen = [
-                (i, s) for i, s in enumerate(candidates)
-                if i not in chosen_indices
-            ]
-
+            unchosen = [(i, s) for i, s in enumerate(candidates) if i not in chosen_indices]
             after_1600 = [
                 (i, s) for i, s in unchosen
                 if local_dt(s["slot_start_utc"]).hour >= WW_FALLBACK_HOUR
             ]
-
-            # Normal fallback is only after 16:00. If waiting until 16:00
-            # would make the 19:00 deadline impossible, extend the fallback
-            # window earlier just enough to preserve comfort.
             fallback_pool = (
                 after_1600
                 if len(after_1600) >= remaining_slots and not catchup
                 else unchosen
             )
-
-            fallback_pool.sort(
-                key=lambda x: x[1]["slot_start_utc"],
-                reverse=True
-            )
-
+            fallback_pool.sort(key=lambda x: x[1]["slot_start_utc"], reverse=True)
             for i, _ in fallback_pool[:remaining_slots]:
                 chosen_indices.add(i)
 
@@ -293,23 +261,15 @@ for date_key, day_slots in sorted(by_date.items()):
     for i, s in enumerate(candidates):
         if i not in chosen_indices:
             continue
-
         surplus, pv_cov, marginal = metrics(s)
         dt_local = local_dt(s["slot_start_utc"])
-
         if i in pv_chosen_indices:
-            reason = (
-                "PV_SURPLUS_FULL"
-                if marginal == 0
-                else "PV_PARTIAL_OPTIMIZED"
-            )
+            reason = "PV_SURPLUS_FULL" if marginal == 0 else "PV_PARTIAL_OPTIMIZED"
         elif dt_local.hour >= WW_FALLBACK_HOUR:
             reason = "DEADLINE_FALLBACK"
         else:
             reason = "SAFETY_EARLY_FALLBACK"
-
         alloc = min(WW_SLOT_ENERGY_KWH, remain_kwh)
-
         chosen.append({
             "slot_start_utc": s["slot_start_utc"],
             "wwPlanW": BOILER_W,
@@ -318,16 +278,11 @@ for date_key, day_slots in sorted(by_date.items()):
             "gridRequiredW": round(marginal),
             "allocationReason": reason,
         })
-
         remain_kwh = max(0.0, remain_kwh - alloc)
 
-    chosen_map = {
-        x["slot_start_utc"]: x for x in chosen
-    }
-
+    chosen_map = {x["slot_start_utc"]: x for x in chosen}
     for s in day_slots:
         c = chosen_map.get(s["slot_start_utc"])
-
         if c:
             plan_slots.append(c)
         else:
@@ -345,9 +300,7 @@ for date_key, day_slots in sorted(by_date.items()):
         "goalReached": goal_reached,
         "remainingFallbackMin": remaining_min,
         "requiredEnergyKWh": round(need_kwh, 3),
-        "allocatedEnergyKWh": round(
-            sum(x["allocatedKWh"] for x in chosen), 3
-        ),
+        "allocatedEnergyKWh": round(sum(x["allocatedKWh"] for x in chosen), 3),
         "unallocatedEnergyKWh": round(max(0.0, remain_kwh), 3),
         "catchupRequired": catchup,
         "fallbackNotBeforeLocal": "16:00",
@@ -365,29 +318,26 @@ payload = {
     "mode": "shadow",
     "control_writes": False,
     "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-    "sourceForecast":
-        "pv + quatt + quatt-free-base",
+    "sourceForecast": "pv + quatt + quatt-free-base",
     "boilerPowerW": BOILER_W,
     "dailyFallbackMin": WW_DAILY_FALLBACK_MIN,
     "fallbackNotBeforeLocal": "16:00",
     "deadlineLocal": "19:00",
     "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
     "minPvWindowEnergyKWh": WW_MIN_PV_WINDOW_KWH,
-    "pvWindowPolicy": "CONTIGUOUS_POSITIVE_EXPORT",
+    "pvWindowPolicy": "CONTIGUOUS_POSITIVE_EXPORT_SHOULDERS_FIRST",
+    "flexPriority": "WW_COMFORT_RESERVED_BEFORE_EV_OPPORTUNITY",
     "slot_count": len(plan_slots),
     "dailyPlans": daily,
     "slots": plan_slots,
 }
 
 tmp = OUTPUT.with_suffix(".tmp")
-tmp.write_text(
-    json.dumps(payload, separators=(",", ":")) + "\n"
-)
+tmp.write_text(json.dumps(payload, separators=(",", ":")) + "\n")
 tmp.replace(OUTPUT)
 
 print("PASS: WW plan v0.6 built")
 print("slots:", len(plan_slots))
-
 for d in daily:
     print(
         d["date"],
