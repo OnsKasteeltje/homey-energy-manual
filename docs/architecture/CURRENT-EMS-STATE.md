@@ -86,13 +86,16 @@ The model remains in a learning/shadow phase while history depth grows. The init
 
 ## 5. Warm water (WW)
 
-Warm water is a flexible load, but comfort/safety requirements take precedence over energy optimisation.
+Warm water is a flexible load, but comfort/safety requirements take precedence over energy optimisation and over EV opportunity charging.
 
 Current planning principles:
 
 - determine current WW/boiler state and requirement;
 - satisfy the required daily heating/comfort target and deadline;
 - preferentially place flexible heating in periods with useful PV/export-reduction opportunity;
+- treat WW priority as a **reservation of required comfort energy**, not as a requirement to consume one monolithic boiler block before other flexible loads may use PV;
+- when a qualifying PV/export window is broader than the required WW runtime, use the shoulders of that window where minimum boiler-run constraints allow it, so the strongest central PV/export capacity can remain available for higher-power EV opportunity charging;
+- separate WW runs must respect the minimum runtime; when a safe shoulder split cannot satisfy that constraint, use a strongest contiguous WW subrun instead;
 - do not schedule unnecessary repeat heating once the daily goal has been reached;
 - include planned WW consumption in the combined quarter-hour load plan so it is not double-counted as base load;
 - Homey remains responsible for the actual device actuation and runtime safety logic.
@@ -102,7 +105,7 @@ The Pi chain uses:
 - `warm-water/fetch_ww_input.py`
 - `warm-water/build_ww_plan.py`
 
-The resulting WW plan feeds the combined shadow load plan.
+The resulting WW plan feeds the combined shadow load plan. The combined planner must treat this WW plan as higher-priority reserved comfort demand before evaluating EV opportunity headroom.
 
 The seasonal WW source advisor on the Pi evaluates BOILER versus CV economically over a rolling 14-day window using measured history and contract-effective marginal costs. It remains `PURE_SHADOW`, read-only and manual-switch-only until explicitly migrated further.
 
@@ -114,11 +117,27 @@ Two planning/control intents remain distinct:
 
 ### Opportunity charging
 
-Use available PV/export opportunity where practical. Real-time control must avoid excessive start/stop/current flapping and respect charger, vehicle and household electrical limits.
+Opportunity charging uses PV/export remaining **after required WW comfort reservation**. It is no longer gated by an instantaneous 7 A start threshold.
+
+Current shadow-planning rules:
+
+- stable minimum charging is modelled at **3×6 A**, approximately 4.14 kW using the current 690 W/A planning conversion;
+- **3×7 A is only a short actuator kickstart** to establish charging reliably. It is not an economic or PV-opportunity threshold and need not persist for a full planner slot; Homey/Easee may reduce to 6 A after the kickstart;
+- an EV opportunity window must contain at least **30 minutes** of contiguous positive residual PV export while the Tesla is expected/known to be available;
+- over the complete qualified window, residual PV must cover at least **50% of the energy required by stable 6 A charging**;
+- inside such a qualified window, the planner may deliberately plan `PV_MIXED_OPPORTUNITY`: 6 A charging may continue even when instantaneous PV export is below 4.14 kW, with limited grid import filling the difference;
+- when residual PV supports more than 6 A, planned current may rise in whole-amp steps up to the configured maximum;
+- opportunity charging must never consume PV capacity already reserved for required WW comfort.
+
+This window qualification deliberately replaces the old `PV_SURPLUS_START7_RUN6_MAX16` planning rule. Real-time control still must avoid excessive start/stop/current flapping and respect charger, vehicle and household electrical limits.
 
 ### Deadline charging
 
-When the user supplies a required SOC/energy target and departure/deadline, meeting that requirement takes priority over opportunistic optimisation. The planner may schedule charging outside PV opportunity when required to meet the deadline.
+When the user supplies a required SOC/energy target and departure/deadline, meeting that requirement takes priority over opportunistic optimisation. The planner should use PV opportunity while sufficient time slack remains, but once the remaining required charge can no longer safely fit inside the remaining opportunity windows, the missing charging time becomes mandatory and grid/PV mixed charging is permitted as required to meet the deadline.
+
+Deadline planning therefore remains logically separate from opportunity qualification: opportunity may optimize *when* to use PV, but it may never cause an explicit EV deadline to be missed.
+
+The current `build_shadow_load_plan.py` implementation contains the dynamic opportunity-window policy but still reports `deadlinePlanningIncluded = false`; integration of the existing deadline requirement into this Pi shadow builder remains a separate migration step. Existing Homey/Easee deadline control authority is not removed by this change.
 
 After a deadline requirement is satisfied/expired, control returns to normal opportunity policy.
 
@@ -131,12 +150,16 @@ The combined planning chain uses PV forecast, base-load forecast, WW plan and Te
 Primary principles:
 
 1. preserve hard safety/device limits;
-2. satisfy required household/comfort loads;
+2. reserve and satisfy required WW/household comfort loads and their deadlines;
 3. satisfy explicit EV deadline requirements;
-4. move flexible WW/EV demand toward otherwise exported PV where possible;
-5. minimise unnecessary grid import/export without allowing optimisation to violate requirements;
-6. keep planning deterministic and explainable;
-7. keep control writes separate from shadow evaluation until a behavior is validated.
+4. optimize the placement of flexible WW and EV demand across the PV/export curve rather than interpreting priority as strict chronological block consumption;
+5. evaluate EV opportunity only against **residual export after WW reservation**;
+6. allow limited grid mixing for EV opportunity only inside a qualified residual-PV window, currently at least 30 minutes and at least 50% PV coverage at stable 6 A;
+7. minimise unnecessary grid import/export without allowing optimisation to violate requirements;
+8. keep planning deterministic and explainable;
+9. keep control writes separate from shadow evaluation until a behavior is validated.
+
+The intended bell-curve behaviour is therefore: WW comfort may occupy suitable shoulder periods, while the stronger central export period can remain available for the higher minimum-power EV load. This is an optimisation beneath the WW comfort guarantee, not a reversal of WW priority.
 
 Current relevant builder:
 
