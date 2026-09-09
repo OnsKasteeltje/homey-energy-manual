@@ -40,6 +40,8 @@ flowchart TD
     HC --> H
     DB --> BT[Backtest / evaluation]
     BT -. learning .-> B
+    DB --> PVC[Daily PV-capture validation]
+    PVC --> PUB[GitHub website validation artifacts]
 ```
 
 ## 3. Historical data and base load
@@ -187,6 +189,14 @@ Current intended order:
 
 Every step must complete successfully before the next starts.
 
+A separate daily read-only validation chain is defined by `ems-pv-capture-validation.service` and `ems-pv-capture-validation.timer`. The timer is scheduled for 00:20 local system time. The service:
+
+1. runs `planner/dynamic-plan/validate_pv_capture.py` against measured SQLite history, targeting the previous local day by default;
+2. writes `/home/jeroen/ems/data/pv-capture-validation.json` and maintains `/home/jeroen/ems/data/pv-capture-history.json` with up to 90 days of validation history;
+3. runs `publisher/publish_pv_capture_validation.py` to publish the derived validation artifacts to `docs/data/` for website/analysis use.
+
+This validation chain is observational only. It must not perform Homey/device writes, alter planner decisions, or create a second real-time control loop.
+
 **Deployment consistency rule:** the installed systemd unit on the Pi must be compared with the version-controlled unit when changing this chain. Any locally present publication step must either be version-controlled or explicitly documented; silent local divergence is not acceptable.
 
 ## 10. Pi Planner / website
@@ -202,6 +212,8 @@ The forecast combines:
 
 Website JSON is a publication artifact, not the historical source of truth.
 
+The daily PV-capture validation JSON published under `docs/data/` is likewise a derived read-only evaluation artifact. It may be visualised on the website, but it is not an input that may directly actuate devices.
+
 ## 11. Monitoring and validation
 
 Changes should follow the project pattern:
@@ -213,6 +225,21 @@ Available base-load diagnostics include:
 - `compare_base_load_forecasts.py` — current-vs-generic A/B comparison;
 - `backtest_base_load_forecasts.py` — strict walk-forward historical evaluation.
 
+Daily PV self-consumption evaluation is performed by `planner/dynamic-plan/validate_pv_capture.py`. It is measurement-based and control-independent. It reconstructs PV production, grid import/export, household consumption and Tesla/boiler flexible load from aligned SQLite measurements and reports:
+
+- measured PV production and grid import/export;
+- direct PV self-use;
+- PV self-consumption rate;
+- flexible PV capture in kWh and as a share of the estimated pre-flex export opportunity;
+- Tesla and boiler contributions to flexible PV capture;
+- measured residual export as `batteryRelevantResidualExportKWh`.
+
+The validation uses a transparent counterfactual: estimated pre-flex export equals measured export plus flexible PV energy actually absorbed by Tesla/boiler. It does **not** claim to replay or prove historical planner recommendations. Planner recommendation replay/snapshot validation, if introduced later, is a separate capability.
+
+A validation day is classified `GOOD` only when at least 20 hours of usable measured intervals are integrated; otherwise it is `PARTIAL`.
+
+Residual measured export after flexible-load use is the relevant empirical starting point for future battery-opportunity/ROI analysis. The battery purchase decision remains separate and uncommitted.
+
 Model changes should be retained only when supported by sufficient history and validation, not because one current-day graph looks preferable.
 
 ## 12. Future battery boundary
@@ -221,7 +248,7 @@ The tentative battery architecture is Victron AC-coupled. The battery system is 
 
 When introduced, Victron/DESS should remain the primary real-time battery optimiser. Pi/Homey should provide load/forecast context and policy constraints rather than run a competing battery optimiser.
 
-Battery ROI analysis should use residual PV export after flexible-load optimisation as an important baseline.
+Battery ROI analysis should use residual PV export after flexible-load optimisation as an important baseline. The daily PV-capture validator's `batteryRelevantResidualExportKWh` is intended to provide that measured baseline once sufficient representative history is available.
 
 ## 13. Documentation rule — mandatory
 
