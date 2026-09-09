@@ -15,7 +15,25 @@ OUTPUT = Path("/home/jeroen/ems/data/ww-plan.json")
 TZ = ZoneInfo("Europe/Amsterdam")
 
 BOILER_W = 1900
-WW_DAILY_FALLBACK_MIN = 240
+# Future-day expected WW demand used for PV reservation.
+# This is deliberately separate from the physical/safety ceiling.
+# Initial value is based on observed complete-day history (~5.86 kWh/day).
+WW_EXPECTED_DAILY_KWH = 6.0
+
+WW_EXPECTED_DAILY_KWH_BY_WEEKDAY = {
+    0: 5.8,  # Monday
+    1: 4.5,  # Tuesday
+    2: 6.3,  # Wednesday
+    3: 7.0,  # Thursday
+    4: 5.9,  # Friday
+    5: 7.7,  # Saturday
+    6: 7.7,  # Sunday
+}
+
+# Legacy maximum planned fallback duration.
+# 240 min × 1.9 kW = 7.6 kWh is NOT a physical daily-energy ceiling;
+# observed historical daily boiler energy can be materially higher.
+WW_SAFETY_MAX_MIN = 240
 WW_DEADLINE_HOUR = 19
 WW_FALLBACK_HOUR = 16
 WW_MIN_RUN_SLOTS = 2
@@ -219,7 +237,12 @@ daily = []
 for date_key, day_slots in sorted(by_date.items()):
     is_today = date_key == today_local
     goal_reached = False
-    remaining_min = WW_DAILY_FALLBACK_MIN
+    # Future days use expected energy demand, not the safety ceiling.
+    remaining_min = None
+    need_kwh = WW_EXPECTED_DAILY_KWH
+
+    local_date = datetime.fromisoformat(date_key).date()
+    weekday_expected_kwh = WW_EXPECTED_DAILY_KWH_BY_WEEKDAY[local_date.weekday()]
     catchup = False
 
     if is_today:
@@ -229,13 +252,13 @@ for date_key, day_slots in sorted(by_date.items()):
             else max(0, int(ww.get("remainingFallbackMin") or 0))
         )
         catchup = ww.get("catchupRequired") is True
+        need_kwh = remaining_min / 60 * BOILER_W / 1000
 
     deadline = deadline_utc(date_key)
     candidates = [
         s for s in day_slots
         if parse_utc(s["slot_start_utc"]) < deadline
     ]
-    need_kwh = remaining_min / 60 * BOILER_W / 1000
     required_slots = int(need_kwh / WW_SLOT_ENERGY_KWH + 0.999999)
     chosen_indices = set()
     pv_chosen_indices = set()
@@ -320,6 +343,8 @@ for date_key, day_slots in sorted(by_date.items()):
         "goalReached": goal_reached,
         "remainingFallbackMin": remaining_min,
         "requiredEnergyKWh": round(need_kwh, 3),
+        "expectedDailyEnergyShadowKWh": round(weekday_expected_kwh, 3),
+        "expectedDailyEnergyShadowSource": "WEEKDAY_MEDIAN_SQLITE_V0.2",
         "allocatedEnergyKWh": round(
             sum(x["allocatedKWh"] for x in chosen), 3
         ),
@@ -345,7 +370,8 @@ payload = {
     "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     "sourceForecast": "pv + quatt + quatt-free-base",
     "boilerPowerW": BOILER_W,
-    "dailyFallbackMin": WW_DAILY_FALLBACK_MIN,
+    "dailyFallbackMin": WW_SAFETY_MAX_MIN,
+        "expectedDailyEnergyKWh": WW_EXPECTED_DAILY_KWH,
     "fallbackNotBeforeLocal": "16:00",
     "deadlineLocal": "19:00",
     "minRunMinutes": WW_MIN_RUN_SLOTS * 15,

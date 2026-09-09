@@ -133,3 +133,52 @@ Een handmatige `start_flow()` bevestigt dat een Homey-flow gestart is, niet dat 
 - Lokale installatie- en apparaatveiligheid staat altijd boven EMS-optimalisatie.
 
 > **Laatste E2E-status 23 augustus 2026:** bronselector in beide richtingen gevalideerd; systeem staat bevestigd terug op **Boiler**.
+## Pi historical hot-water demand model
+
+The Pi stores hot-water boiler observations in the canonical SQLite history database:
+
+`/home/jeroen/ems/data/ems-history.sqlite`
+
+The processing chain is:
+
+`Homey Insights → measurements → measurements_15m → daily_energy_history`
+
+Daily boiler energy is reconstructed resolution-aware. Where source intervals overlap,
+the finest available resolution is used. Homey weekly aggregates are deliberately
+excluded from daily reconstruction; source data up to six-hour resolution may be used
+for daily totals and long-term demand analysis.
+
+`daily_energy_history` records, among other fields:
+
+- local calendar date
+- daily energy in kWh
+- coverage percentage
+- finest source resolution used
+- coarsest source resolution used
+- quality (`complete`, `usable`, or `partial`)
+
+The validated complete-day history currently supports the following weekday median
+hot-water energy demand model:
+
+| Day | Median |
+| --- | ---: |
+| Monday | 5.8 kWh |
+| Tuesday | 4.5 kWh |
+| Wednesday | 6.3 kWh |
+| Thursday | 7.0 kWh |
+| Friday | 5.9 kWh |
+| Saturday | 7.7 kWh |
+| Sunday | 7.7 kWh |
+
+These values are currently used as a **shadow forecast only** under source
+`WEEKDAY_MEDIAN_SQLITE_V0.2`.
+
+Production planning remains based on `WW_EXPECTED_DAILY_KWH = 6.0 kWh` until the
+weekday model has been validated against actual boiler consumption and PV utilisation.
+
+WW forecast snapshots are persisted in SQLite table `forecast_ww_daily`, allowing
+forecast-versus-actual backtesting.
+
+The 240-minute planner fallback corresponds to approximately 7.6 kWh at the nominal
+1.9 kW boiler load. It is a planning/fallback parameter and must not be interpreted
+as a physical maximum daily boiler-energy consumption.
