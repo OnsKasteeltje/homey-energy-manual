@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -9,6 +9,7 @@ WW_INPUT = Path("/home/jeroen/ems/data/ww-input.json")
 PV_FILE = Path("/home/jeroen/ems/data/pv-forecast.json")
 QUATT_FILE = Path("/home/jeroen/ems/data/quatt-forecast.json")
 BASE_FILE = Path("/home/jeroen/ems/data/base-load-forecast.json")
+ENERGY_STATE_FILE = Path("/home/jeroen/ems/repo/homey-energy-manual/docs/data/energy-state-v2.json")
 OUTPUT = Path("/home/jeroen/ems/data/ww-plan.json")
 
 TZ = ZoneInfo("Europe/Amsterdam")
@@ -20,6 +21,7 @@ WW_FALLBACK_HOUR = 16
 WW_MIN_RUN_SLOTS = 2
 WW_MIN_PV_WINDOW_KWH = 0.10
 WW_SLOT_ENERGY_KWH = BOILER_W / 1000 * 0.25
+LIVE_CONNECTED_HORIZON_H = 2
 
 
 def load(path):
@@ -27,11 +29,7 @@ def load(path):
 
 
 def ts(slot):
-    return (
-        slot.get("slot_start_utc")
-        or slot.get("start")
-        or slot.get("startAt")
-    )
+    return slot.get("slot_start_utc") or slot.get("start") or slot.get("startAt")
 
 
 def parse_utc(timestamp):
@@ -59,11 +57,28 @@ def deadline_utc(date_key):
     return dt.astimezone(timezone.utc)
 
 
+def expected_tesla_home(local_timestamp):
+    wd = local_timestamp.weekday()  # Mon=0 .. Sun=6
+    if wd in (4, 5, 6):
+        return True
+    if wd == 3 and local_timestamp.hour >= 18:
+        return True
+    if wd == 0 and local_timestamp.hour < 8:
+        return True
+    return False
+
+
 ww_doc = load(WW_INPUT)
 pv_doc = load(PV_FILE)
 quatt_doc = load(QUATT_FILE)
 base_doc = load(BASE_FILE)
+energy_state = load(ENERGY_STATE_FILE) if ENERGY_STATE_FILE.exists() else {}
 ww = ww_doc["warmWater"]
+
+tesla_state = energy_state.get("tesla") or {}
+tesla_connected_now = tesla_state.get("connected") is True
+now_utc = datetime.now(timezone.utc)
+live_connected_until = now_utc + timedelta(hours=LIVE_CONNECTED_HORIZON_H)
 
 pv_map = {ts(s): s for s in pv_doc.get("slots", [])}
 q_map = {ts(s): s for s in quatt_doc.get("slots", [])}
@@ -79,9 +94,17 @@ for timestamp in common:
     quatt_w = max(0.0, float(q_map[timestamp].get("quattForecastW") or 0))
     base_w = max(0.0, float(b_map[timestamp].get("baseLoadForecastW") or 0))
     net_before = base_w + quatt_w - pv_w
+    slot_dt = parse_utc(timestamp)
+    live_connected = (
+        tesla_connected_now
+        and slot_dt >= now_utc - timedelta(minutes=15)
+        and slot_dt <= live_connected_until
+    )
+    tesla_relevant = live_connected or expected_tesla_home(slot_dt.astimezone(TZ))
     source_slots.append({
         "slot_start_utc": timestamp,
         "gridExportBeforeFlexW": max(0.0, -net_before),
+        "teslaOpportunityRelevant": tesla_relevant,
     })
 
 today_local = datetime.now(TZ).date().isoformat()
@@ -118,6 +141,9 @@ def find_pv_windows(candidates):
             "pvEnergyKWh": pv_energy_kwh,
             "avgPvW": pv_sum_w / len(indices),
             "start": candidates[indices[0]]["slot_start_utc"],
+            "teslaOpportunityRelevant": any(
+                candidates[i].get("teslaOpportunityRelevant") is True for i in indices
+            ),
         })
 
     for i, slot in enumerate(candidates):
@@ -137,7 +163,7 @@ def find_pv_windows(candidates):
 
 
 def best_subrun(indices, candidates, length):
-    """Pick the strongest consecutive subrun when a split would create short runs."""
+    """Pick the strongest consecutive WW subrun."""
     best = None
     for pos in range(0, len(indices) - length + 1):
         run = indices[pos:pos + length]
@@ -150,12 +176,7 @@ def best_subrun(indices, candidates, length):
 
 
 def shoulder_subruns(indices, candidates, length):
-    """Use both shoulders of a broad PV window where minimum run lengths allow it.
-
-    WW comfort is reserved first, but the strongest middle of a bell-shaped export
-    window is deliberately left available for higher-power EV opportunity charging.
-    Each WW shoulder remains at least WW_MIN_RUN_SLOTS long.
-    """
+    """Use both PV-window shoulders while preserving minimum WW run lengths."""
     if length >= len(indices):
         return tuple(indices)
     if length < 2 * WW_MIN_RUN_SLOTS:
@@ -189,7 +210,7 @@ def shoulder_subruns(indices, candidates, length):
 
 
 def choose_pv_windows(candidates, required_slots):
-    """Reserve WW comfort in PV windows while preserving strong central EV headroom."""
+    """Reserve WW first; preserve PV peak for EV only when EV opportunity is relevant."""
     selected = set()
     windows = find_pv_windows(candidates)
 
@@ -200,8 +221,10 @@ def choose_pv_windows(candidates, required_slots):
         indices = window["indices"]
         if len(indices) <= remaining:
             run = indices
-        else:
+        elif window["teslaOpportunityRelevant"]:
             run = shoulder_subruns(indices, candidates, remaining)
+        else:
+            run = best_subrun(indices, candidates, remaining)
         selected.update(run)
         if len(selected) >= required_slots:
             break
@@ -308,6 +331,9 @@ for date_key, day_slots in sorted(by_date.items()):
         "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
         "minPvWindowEnergyKWh": WW_MIN_PV_WINDOW_KWH,
         "eligiblePvWindows": len(eligible_pv_windows),
+        "evRelevantPvWindows": sum(
+            1 for x in eligible_pv_windows if x["teslaOpportunityRelevant"]
+        ),
         "allocatedSlots": len(chosen),
     })
 
@@ -325,8 +351,9 @@ payload = {
     "deadlineLocal": "19:00",
     "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
     "minPvWindowEnergyKWh": WW_MIN_PV_WINDOW_KWH,
-    "pvWindowPolicy": "CONTIGUOUS_POSITIVE_EXPORT_SHOULDERS_FIRST",
+    "pvWindowPolicy": "STRONGEST_SUBRUN_UNLESS_EV_RELEVANT_THEN_SHOULDERS",
     "flexPriority": "WW_COMFORT_RESERVED_BEFORE_EV_OPPORTUNITY",
+    "teslaPeakPreservation": "ONLY_WHEN_EV_OPPORTUNITY_RELEVANT",
     "slot_count": len(plan_slots),
     "dailyPlans": daily,
     "slots": plan_slots,
@@ -345,5 +372,6 @@ for d in daily:
         "required=", d["requiredEnergyKWh"],
         "allocated=", d["allocatedEnergyKWh"],
         "pvWindows=", d["eligiblePvWindows"],
+        "evRelevant=", d["evRelevantPvWindows"],
         "slots=", d["allocatedSlots"],
     )
