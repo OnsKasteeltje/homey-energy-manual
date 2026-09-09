@@ -36,6 +36,20 @@ The confidence state stores only the previous 24-hour PV forecast and one smooth
 - Existing WW and quarter-hour planners remain unchanged and provide the comparison baseline.
 - Before any future control use, replay validation must prove comfort feasibility, minimum-run behaviour, PV capture improvement, and bounded extra grid import.
 
+## Daily PV-capture validation
+
+`validate_pv_capture.py` evaluates each completed local day from the control-independent 5-minute measurement history in `ems-history.sqlite`. It is analysis-only and never writes to Homey or a physical device.
+
+It publishes these primary KPIs:
+
+- `pvSelfConsumptionRate`: measured PV used directly in the house divided by measured PV production;
+- `flexiblePvCaptureRate`: PV absorbed by Tesla + boiler divided by the counterfactual pre-flex export (`measured export + PV-fed flexible load`);
+- `batteryRelevantResidualExportKWh`: measured export remaining after all actual household and flexible-load consumption. This is the starting point for battery ROI analysis.
+
+The validator also records Tesla and boiler PV capture separately, input coverage, and the exact calculation method. Results are retained for 90 days in `/home/jeroen/ems/data/pv-capture-history.json` and the latest completed day in `/home/jeroen/ems/data/pv-capture-validation.json`.
+
+`ems-pv-capture-validation.timer` runs daily at 00:20 and publishes both JSON files to `docs/data/` for website/review use.
+
 ## Output
 
 Runtime output:
