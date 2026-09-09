@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -22,7 +22,9 @@ EV_MAX_A = 16
 EV_RUN_MIN_W = EV_RUN_MIN_A * EV_W_PER_A
 EV_MIN_WINDOW_SLOTS = 2
 EV_MIN_WINDOW_PV_COVERAGE = 0.50
-LIVE_CONNECTED_HORIZON_H = 2
+EV_SECONDARY_COVERAGE = 0.75
+EV_PURE_COVERAGE = 1.00
+SLOT_H = 0.25
 
 
 def load(path):
@@ -48,8 +50,8 @@ def pv_power(slot):
 
 
 def expected_tesla_home(local_dt):
-    # Normal weekly presence forecast only; never a hard control gate.
-    # Thu evening through Mon morning is the normal home window.
+    # Informational weekly presence forecast only. Opportunity allocation itself
+    # is gated by the actual live-connected state.
     wd = local_dt.weekday()  # Mon=0 .. Sun=6
     if wd in (4, 5, 6):
         return True
@@ -61,17 +63,25 @@ def expected_tesla_home(local_dt):
 
 
 def is_consecutive(a, b):
-    return (parse_utc(b["slot_start_utc"]) - parse_utc(a["slot_start_utc"])).total_seconds() == 15 * 60
+    return (
+        parse_utc(b["slot_start_utc"]) - parse_utc(a["slot_start_utc"])
+    ).total_seconds() == 15 * 60
+
+
+def opportunity_class(coverage):
+    if coverage >= EV_PURE_COVERAGE:
+        return "PURE_PV"
+    if coverage >= EV_SECONDARY_COVERAGE:
+        return "SECONDARY"
+    return "FALLBACK_MIXED"
 
 
 def qualify_ev_windows(candidates):
-    """Qualify contiguous residual-PV windows after WW comfort reservation.
+    """Find contiguous residual-PV windows after WW comfort reservation.
 
-    The 7 A start current is intentionally not an economic/planner threshold. It is
-    a short actuator kickstart. Stable planning uses 6 A. A mixed opportunity
-    window is allowed when at least two contiguous quarter-hours are available and
-    PV supplies at least 50% of the energy that 6 A charging would consume over the
-    complete window.
+    Stable planning uses 6 A. The 7 A value is only an actuator kickstart.
+    A window must last at least 30 minutes and provide at least 50% of 6 A
+    charging energy from residual PV over the complete window.
     """
     windows = []
     current = []
@@ -79,21 +89,33 @@ def qualify_ev_windows(candidates):
     def finish(indices):
         if len(indices) < EV_MIN_WINDOW_SLOTS:
             return
-        pv_energy_proxy = sum(candidates[i]["evResidualExportW"] for i in indices)
-        min_ev_energy_proxy = EV_RUN_MIN_W * len(indices)
-        coverage = pv_energy_proxy / min_ev_energy_proxy if min_ev_energy_proxy else 0.0
-        if coverage < EV_MIN_WINDOW_PV_COVERAGE:
+
+        residual_sum_w = sum(candidates[i]["evResidualExportW"] for i in indices)
+        min_ev_sum_w = EV_RUN_MIN_W * len(indices)
+        raw_coverage = residual_sum_w / min_ev_sum_w if min_ev_sum_w else 0.0
+        if raw_coverage < EV_MIN_WINDOW_PV_COVERAGE:
             return
+
+        pv_capture_kwh = sum(
+            min(float(candidates[i]["evResidualExportW"]), EV_RUN_MIN_W)
+            for i in indices
+        ) * SLOT_H / 1000
+        min_ev_energy_kwh = EV_RUN_MIN_W * len(indices) * SLOT_H / 1000
+
         windows.append({
             "indices": tuple(indices),
-            "coverage": min(1.0, coverage),
-            "avgResidualExportW": pv_energy_proxy / len(indices),
+            "coverage": raw_coverage,
+            "displayCoverage": min(1.0, raw_coverage),
+            "class": opportunity_class(raw_coverage),
+            "pvCaptureKWhAt6A": pv_capture_kwh,
+            "minEvEnergyKWh": min_ev_energy_kwh,
+            "avgResidualExportW": residual_sum_w / len(indices),
             "start": candidates[indices[0]]["slot_start_utc"],
             "end": candidates[indices[-1]]["slot_start_utc"],
         })
 
     for i, slot in enumerate(candidates):
-        eligible = slot["teslaAvailableForecast"] and slot["evResidualExportW"] > 0
+        eligible = slot["teslaOpportunityConnected"] and slot["evResidualExportW"] > 0
         if not eligible:
             finish(current)
             current = []
@@ -106,8 +128,42 @@ def qualify_ev_windows(candidates):
     return windows
 
 
+def apply_best_windows_first(windows):
+    """Suppress weaker early windows when later better PV can replace them.
+
+    There is no opportunity-energy/SOC budget yet, so the planner uses PV capture
+    capacity as the conservative substitution budget. An earlier weaker window is
+    deferred only when later higher-class windows can capture at least the same PV
+    energy at the stable 6 A operating point. If later better capacity is smaller,
+    the weaker window remains eligible so autumn/winter PV is not discarded.
+    """
+    class_rank = {"FALLBACK_MIXED": 1, "SECONDARY": 2, "PURE_PV": 3}
+
+    for pos, window in enumerate(windows):
+        later_better = [
+            x for x in windows[pos + 1:]
+            if class_rank[x["class"]] > class_rank[window["class"]]
+        ]
+        future_better_kwh = sum(x["pvCaptureKWhAt6A"] for x in later_better)
+        window["futureBetterPvCaptureKWh"] = future_better_kwh
+        window["selected"] = (
+            window["class"] == "PURE_PV"
+            or future_better_kwh + 1e-9 < window["pvCaptureKWhAt6A"]
+        )
+        if window["selected"]:
+            window["selectionReason"] = (
+                "BEST_PV_WINDOW"
+                if window["class"] == "PURE_PV"
+                else "FUTURE_BETTER_CAPACITY_INSUFFICIENT"
+            )
+        else:
+            window["selectionReason"] = "DEFERRED_TO_LATER_BETTER_PV"
+
+    return windows
+
+
 def ev_target_from_residual(residual_w):
-    """Plan stable charging at >=6 A; allow grid mixing only in a qualified window."""
+    """Plan stable charging at >=6 A inside a selected opportunity window."""
     amps_from_pv = int(max(0.0, residual_w) // EV_W_PER_A)
     amps = max(EV_RUN_MIN_A, amps_from_pv)
     amps = min(EV_MAX_A, amps)
@@ -125,8 +181,6 @@ energy_state = load(ENERGY_STATE_FILE) if ENERGY_STATE_FILE.exists() else {}
 tesla_state = energy_state.get("tesla") or {}
 tesla_connected_now = tesla_state.get("connected") is True
 tesla_charging_now = tesla_state.get("charging") is True
-now_utc = datetime.now(timezone.utc)
-live_connected_until = now_utc + timedelta(hours=LIVE_CONNECTED_HORIZON_H)
 
 pv_map = {timestamp(s): s for s in pv.get("slots", [])}
 q_map = {timestamp(s): s for s in quatt.get("slots", [])}
@@ -160,8 +214,9 @@ if price_missing or price_extra:
         f"missing={price_missing[:3]} extra={price_extra[:3]}"
     )
 
-# First pass: reserve WW/comfort and compute the PV export that remains available
-# to lower-priority EV opportunity charging.
+# First pass: WW/comfort is already reserved. Compute residual PV available to
+# lower-priority EV opportunity charging. Actual connection gates opportunity;
+# the weekly home forecast is retained as informational metadata only.
 slots = []
 for ts in common:
     p = pv_map[ts]
@@ -183,20 +238,12 @@ for ts in common:
     slot_dt = parse_utc(ts)
     local_dt = slot_dt.astimezone(TZ)
     expected_home = expected_tesla_home(local_dt)
-    live_connected_override = (
-        tesla_connected_now
-        and slot_dt >= now_utc - timedelta(minutes=15)
-        and slot_dt <= live_connected_until
+    tesla_available = tesla_connected_now
+    availability_source = (
+        "LIVE_CONNECTED_CURRENT_STATE"
+        if tesla_connected_now
+        else "NOT_CONNECTED"
     )
-    if live_connected_override:
-        tesla_available = True
-        availability_source = "LIVE_CONNECTED_NEAR_TERM"
-    elif expected_home:
-        tesla_available = True
-        availability_source = "WEEKLY_HOME_FORECAST"
-    else:
-        tesla_available = False
-        availability_source = "NOT_AVAILABLE"
 
     slots.append({
         "slot_start_utc": ts,
@@ -216,34 +263,55 @@ for ts in common:
         "gridExportAfterWWW": round(residual_after_ww),
         "evResidualExportW": round(residual_after_ww),
         "teslaAvailableForecast": tesla_available,
+        "teslaOpportunityConnected": tesla_connected_now,
         "teslaAvailabilitySource": availability_source,
         "teslaExpectedHome": expected_home,
         "teslaConnectedNow": tesla_connected_now,
-        "teslaLiveConnectedOverride": live_connected_override,
         "price_eur_kwh": pr.get("marketPriceEurPerKwh"),
     })
 
-qualified_windows = qualify_ev_windows(slots)
-qualified_by_index = {}
+qualified_windows = apply_best_windows_first(qualify_ev_windows(slots))
+selected_by_index = {}
+all_by_index = {}
 for window_id, window in enumerate(qualified_windows, start=1):
+    window["id"] = window_id
     for i in window["indices"]:
-        qualified_by_index[i] = (window_id, window)
+        all_by_index[i] = window
+        if window["selected"]:
+            selected_by_index[i] = window
 
-# Second pass: allocate EV opportunity only inside qualified residual-PV windows.
+# Second pass: only selected windows receive EV opportunity allocation.
 for i, slot in enumerate(slots):
     ev_w = 0
-    ev_reason = "NOT_AVAILABLE" if not slot["teslaAvailableForecast"] else "NO_QUALIFIED_PV_WINDOW"
+    ev_reason = (
+        "NOT_CONNECTED"
+        if not slot["teslaOpportunityConnected"]
+        else "NO_QUALIFIED_PV_WINDOW"
+    )
     window_id = None
     window_coverage = None
+    window_class = None
+    selection_reason = None
+    future_better_kwh = None
 
-    if i in qualified_by_index:
-        window_id, window = qualified_by_index[i]
-        window_coverage = window["coverage"]
-        ev_w = ev_target_from_residual(slot["evResidualExportW"])
-        if slot["evResidualExportW"] >= ev_w:
-            ev_reason = "PV_EXPORT_OPPORTUNITY"
+    window = all_by_index.get(i)
+    if window is not None:
+        window_id = window["id"]
+        window_coverage = window["displayCoverage"]
+        window_class = window["class"]
+        selection_reason = window["selectionReason"]
+        future_better_kwh = window["futureBetterPvCaptureKWh"]
+
+        if i in selected_by_index:
+            ev_w = ev_target_from_residual(slot["evResidualExportW"])
+            if slot["evResidualExportW"] >= ev_w:
+                ev_reason = "PV_EXPORT_OPPORTUNITY"
+            elif window["class"] == "SECONDARY":
+                ev_reason = "PV_SECONDARY_OPPORTUNITY"
+            else:
+                ev_reason = "PV_MIXED_OPPORTUNITY"
         else:
-            ev_reason = "PV_MIXED_OPPORTUNITY"
+            ev_reason = "DEFERRED_TO_LATER_BETTER_PV"
 
     non_controllable = float(slot["totalNonControllableLoadW"])
     pv_w = float(slot["pvForecastW"])
@@ -256,8 +324,13 @@ for i, slot in enumerate(slots):
         "evPlanA": round(ev_w / EV_W_PER_A) if ev_w else 0,
         "evAllocationReason": ev_reason,
         "evOpportunityWindowId": window_id,
+        "evOpportunityWindowClass": window_class,
+        "evOpportunityWindowSelectionReason": selection_reason,
         "evOpportunityWindowPvCoverage": (
             round(window_coverage, 3) if window_coverage is not None else None
+        ),
+        "evFutureBetterPvCaptureKWh": (
+            round(future_better_kwh, 3) if future_better_kwh is not None else None
         ),
         "netAfterEVW": round(net_after_ev),
         "gridImportAfterEVW": round(max(0.0, net_after_ev)),
@@ -268,7 +341,7 @@ for i, slot in enumerate(slots):
     })
 
 payload = {
-    "schema": "EMS_PI_SHADOW_LOAD_PLAN_V0.6.1",
+    "schema": "EMS_PI_SHADOW_LOAD_PLAN_V0.7",
     "mode": "shadow",
     "control_writes": False,
     "composition": {
@@ -281,8 +354,9 @@ payload = {
         "quattControl": "OBSERVE_ONLY_FORECAST",
         "wwControl": "SHADOW_PLAN_ONLY",
         "teslaControl": "SHADOW_OPPORTUNITY_ONLY",
-        "teslaAvailabilityPolicy": "LIVE_CONNECTED_2H_THEN_NORMAL_WEEKLY_HOME_FORECAST",
-        "teslaOpportunityPolicy": "RESIDUAL_PV_WINDOW_AFTER_WW_MIN30M_MIN50PCT_AT_RUN6A",
+        "teslaAvailabilityPolicy": "LIVE_CONNECTED_CURRENT_STATE_ONLY;WEEKLY_FORECAST_INFORMATIONAL",
+        "teslaOpportunityPolicy": "BEST_PV_WINDOWS_FIRST_AFTER_WW_MIN30M_MIN50PCT_AT_RUN6A",
+        "teslaWeakWindowGuard": "DEFER_IF_LATER_HIGHER_CLASS_PV_CAPTURE_CAN_REPLACE_WINDOW",
         "teslaKickstartPolicy": "7A_ACTUATOR_KICKSTART_ONLY_NOT_PLANNER_THRESHOLD",
         "teslaDeadlinePolicy": "SEPARATE_HIGHER_PRIORITY_REQUIREMENT_NOT_INCLUDED_IN_THIS_SHADOW_BUILDER",
         "pricePolicy": "REFERENCE_ONLY_FAIL_SOFT_FOR_FIXED_CONTRACT",
@@ -290,7 +364,6 @@ payload = {
     "tesla": {
         "connectedNow": tesla_connected_now,
         "chargingNow": tesla_charging_now,
-        "liveConnectedHorizonHours": LIVE_CONNECTED_HORIZON_H,
         "kickstartA": EV_KICKSTART_A,
         "kickstartPlannerThreshold": False,
         "runMinA": EV_RUN_MIN_A,
@@ -298,9 +371,26 @@ payload = {
         "wattsPerAmp": EV_W_PER_A,
         "minOpportunityWindowMinutes": EV_MIN_WINDOW_SLOTS * 15,
         "minOpportunityWindowPvCoverage": EV_MIN_WINDOW_PV_COVERAGE,
+        "secondaryCoverageThreshold": EV_SECONDARY_COVERAGE,
+        "purePvCoverageThreshold": EV_PURE_COVERAGE,
         "qualifiedOpportunityWindows": len(qualified_windows),
+        "selectedOpportunityWindows": sum(1 for x in qualified_windows if x["selected"]),
         "deadlinePlanningIncluded": False,
     },
+    "evOpportunityWindows": [
+        {
+            "id": x["id"],
+            "start": x["start"],
+            "end": x["end"],
+            "class": x["class"],
+            "pvCoverage": round(x["displayCoverage"], 3),
+            "pvCaptureKWhAt6A": round(x["pvCaptureKWhAt6A"], 3),
+            "futureBetterPvCaptureKWh": round(x["futureBetterPvCaptureKWh"], 3),
+            "selected": x["selected"],
+            "selectionReason": x["selectionReason"],
+        }
+        for x in qualified_windows
+    ],
     "price": {
         "referenceOnly": True,
         "missingAxisSlots": len(price_missing),
@@ -314,10 +404,10 @@ tmp = OUTPUT.with_suffix(".tmp")
 tmp.write_text(json.dumps(payload, separators=(",", ":")) + "\n")
 tmp.replace(OUTPUT)
 
-step_h = 0.25
 
 def energy(field):
-    return sum(x[field] for x in slots) * step_h / 1000
+    return sum(x[field] for x in slots) * SLOT_H / 1000
+
 
 base_kwh = energy("baseLoadForecastW")
 quatt_kwh = energy("quattForecastW")
@@ -329,14 +419,15 @@ exp_before = energy("gridExportBeforeFlexW")
 imp_after = energy("gridImportAfterFlexW")
 exp_after = energy("gridExportAfterFlexW")
 
-print("PASS: shadow load plan v0.6.1 built")
+print("PASS: shadow load plan v0.7 built")
 print("slots                    :", len(slots))
 print("base load kWh            :", round(base_kwh, 2))
 print("Quatt kWh                :", round(quatt_kwh, 2))
 print("PV kWh                   :", round(pv_kwh, 2))
 print("Tesla opportunity kWh    :", round(ev_kwh, 2))
 print("Tesla opportunity slots  :", sum(1 for x in slots if x["evPlanW"] > 0))
-print("Tesla opportunity windows:", len(qualified_windows))
+print("Tesla qualified windows  :", len(qualified_windows))
+print("Tesla selected windows   :", sum(1 for x in qualified_windows if x["selected"]))
 print("WW planned kWh           :", round(ww_kwh, 2))
 print("grid import before flex  :", round(imp_before, 2))
 print("grid export before flex  :", round(exp_before, 2))
