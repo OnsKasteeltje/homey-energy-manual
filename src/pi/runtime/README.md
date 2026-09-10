@@ -1,68 +1,60 @@
-# HEMS Pi shadow runtime v0.1
+# HEMS Pi runtime
 
-Status: **PREPARED / NOT DEPLOYED / SHADOW_READ_ONLY / NO PHYSICAL WRITES**
+Status: **DEPLOYED / SHADOW_READ_ONLY / NO PHYSICAL PLANNER WRITES**
 
-This is the first executable Raspberry Pi runtime skeleton. It is intentionally narrow: it proves process lifecycle, configuration, structured logging, local health reporting and one live read-only price-source path while reusing the existing source-managed price normalizer and selector under `src/homey/context/`.
+The Raspberry Pi 5 now hosts active EMS read-only/shadow services, including forecast acquisition, history/data preparation and planner execution. Physical actuator ownership has not been transferred to the Pi planner.
 
-## What v0.1 does
+## Operational source-of-truth
 
-- Requires Node.js 20 or newer.
-- Reads `config.json`, or falls back to `config.example.json` for preparation/testing.
-- Fetches EnergyZero public quarter-hour prices.
-- Keeps the complete EnergyZero stream returned for the requested date so the selector can validate the real forward horizon.
-- Normalizes it through `price-source-normalizer-v0.1.mjs`.
-- Runs `price-source-selector-v0.1.mjs` in shadow mode.
-- Emits structured JSON logs to stdout.
-- Exposes local-only `GET /health` and `GET /state` on `127.0.0.1:8787` by default.
-- Runs every 15 minutes by default, or once with `npm run once`.
+For planner components already migrated to the Pi, `/home/jeroen/ems/runtime/planner/...` is the operational source of truth.
 
-## What v0.1 deliberately does not do
+Planner changes are made and tested on the Pi first. After a successful shadow/smoke validation, the accepted source is synchronized to GitHub under `src/pi/ems-runtime/planner/...` and committed. A `git pull` into `/home/jeroen/ems/repo/homey-energy-manual` does not by itself deploy planner code into the active runtime directory.
 
-- No Homey Logic writes.
-- No device writes.
-- No EV or WW actuator ownership.
-- No Victron control.
-- No DESS replacement logic.
-- No Planner execution yet.
-- No PBTH live read from the Pi yet. PBTH remains disabled until a read-only Pi-side bridge/input contract has been designed and validated.
+GitHub remains the versioned repository, audit trail, documentation source and publication destination for generated observability snapshots.
 
-The runtime contains a hard guard that refuses to run if any write flag in the configuration is enabled.
+## Current runtime responsibilities
 
-## First Pi smoke sequence
+The Pi currently provides, among other read-only/shadow responsibilities:
 
-After the Pi is installed and the repository is checked out:
+- weather, price and PV forecast acquisition;
+- base-load/history preparation;
+- warm-water planning inputs and shadow planning;
+- quarter-hour Planner shadow execution;
+- Dynamic Pi Planner shadow execution;
+- publication of Planner snapshots to `docs/data/`;
+- local status/observability services.
 
-```bash
-cd src/pi/runtime
-cp config.example.json config.json
-npm run check
-npm run once
+The Dynamic Pi Planner remains `PURE_SHADOW`: it produces plans and observability output but performs no physical device writes.
+
+## Safety boundaries
+
+- No Pi planner actuator ownership yet.
+- No direct EV or WW physical writes from the Pi planner.
+- Exactly one automatic writer may own each physical actuator during any future cutover.
+- Easee Equalizer remains the independent hard EV load-balancing layer.
+- Quatt remains observe-only unless separately validated control is introduced.
+- Victron/DESS remains the intended primary future battery optimizer.
+- Planner cutover requires explicit validation, rollback and ownership transfer.
+
+## Runtime versus repository
+
+There are two distinct trees on the Pi:
+
+```text
+/home/jeroen/ems/runtime/...                    active runtime
+/home/jeroen/ems/repo/homey-energy-manual/...  Git checkout
 ```
 
-Expected result: JSON log records with `RUNTIME_STARTED` and `PRICE_SHADOW_CYCLE`. A normal evening run should select `ENERGYZERO_PUBLIC_REST` when the returned stream reaches at least 24 hours beyond the current instant. `NO_ELIGIBLE_SOURCE` is a valid fail-safe outcome when that horizon is not available; it is evidence to investigate, not permission to relax the safety rules.
+They must not be treated as automatically synchronized. Planner deployment and repository synchronization are explicit operations.
 
-For service mode:
+The repository copies under `src/pi/ems-runtime/...` represent the last accepted/versioned Pi runtime state. Generated snapshots under `docs/data/` are runtime observability artifacts, not executable planner source.
 
-```bash
-npm start
-```
+## Service model
 
-Then from the Pi itself:
+The installed Pi uses native systemd services/timers for the operational EMS chain. In particular, `ems-pv-forecast.service` is a oneshot pipeline that runs forecast/model/planner builders and publishes the resulting shadow planner snapshots.
 
-```bash
-curl http://127.0.0.1:8787/health
-```
+A service being `inactive (dead)` after a successful run is normal for a `Type=oneshot` service. Success is determined by the individual process exit codes and the final `Finished ...` status.
 
-## Packaging decision remains open
+## Current validation state
 
-This skeleton does not decide Docker versus native Node/systemd. The runtime is dependency-free and can support either packaging model. A systemd unit should only be added/promoted after the actual Pi filesystem location, runtime user, restart behavior, log retention and deployment procedure are fixed.
-
-## Next implementation gate
-
-The next useful step is not actuator migration. It is:
-
-1. run this skeleton on the actual Pi;
-2. record a clean one-shot and restart smoke;
-3. add a read-only PBTH bridge/input contract or an equivalent independent source;
-4. perform Pi-vs-current-runtime A/B price/context parity;
-5. only then wire Planner v0.4.7 semantics into Pi shadow execution.
+The Dynamic Pi Planner is running in shadow mode and publishing a 96-slot / 24-hour plan. Current EV opportunity logic uses PV windows rather than the legacy fixed instantaneous start threshold. Physical cutover remains a separate future step and must not be inferred from successful shadow publication.
