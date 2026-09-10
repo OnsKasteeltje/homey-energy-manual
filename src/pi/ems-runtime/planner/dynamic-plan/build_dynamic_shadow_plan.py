@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 
-"""Build the first rolling-horizon Dynamic Pi Planner in PURE_SHADOW.
+"""Build the rolling-horizon Dynamic Pi Planner in PURE_SHADOW.
 
 Design goals:
 - maximize expected PV self-consumption over the rolling 24 h horizon;
 - preserve WW comfort as a hard constraint (ON_TEMP/fallback need before 19:00);
-- allow WW to use the PV flanks and Tesla to absorb the high PV peak;
-- combine forecast with live P1 export instead of using a fixed PV threshold;
+- allow WW to use PV flanks and Tesla to absorb residual PV opportunities;
+- use dynamic EV PV-window qualification instead of a fixed per-slot threshold;
+- combine forecast with live P1 export;
 - attach a compact confidence score to every slot;
 - never perform physical writes.
 
-This is deliberately a shadow planner. It runs beside the existing WW and
-quarter-hour planners so its decisions can be replayed and compared before any
-control migration.
+This planner runs beside the existing planners so decisions can be replayed and
+compared before any control migration.
 """
 
 import json
@@ -42,12 +42,15 @@ WW_DEADLINE_HOUR = 19
 WW_MIN_RUN_SLOTS = 2
 
 EV_W_PER_A = 690
-EV_START_MIN_A = 7
+EV_KICKSTART_A = 7
 EV_RUN_MIN_A = 6
 EV_MAX_A = 16
-LIVE_CONNECTED_HORIZON_H = 2
+EV_RUN_MIN_W = EV_RUN_MIN_A * EV_W_PER_A
+EV_MIN_WINDOW_SLOTS = 2
+EV_MIN_WINDOW_PV_COVERAGE = 0.50
+EV_SECONDARY_COVERAGE = 0.75
+EV_PURE_COVERAGE = 1.00
 
-# Confidence deliberately uses only three compact signals.
 W_CONSISTENCY = 0.40
 W_CLOUD_STABILITY = 0.30
 W_LOCAL_ACCURACY = 0.30
@@ -85,6 +88,7 @@ def pv_power(slot):
 
 
 def expected_tesla_home(local_dt):
+    """Informational weekly presence forecast; never an opportunity control gate."""
     wd = local_dt.weekday()  # Mon=0 .. Sun=6
     if wd in (4, 5, 6):
         return True
@@ -95,12 +99,105 @@ def expected_tesla_home(local_dt):
     return False
 
 
-def ev_target(surplus_w, already_running=False):
-    min_a = EV_RUN_MIN_A if already_running else EV_START_MIN_A
-    if surplus_w < min_a * EV_W_PER_A:
-        return 0
-    amps = min(EV_MAX_A, int(surplus_w // EV_W_PER_A))
-    return amps * EV_W_PER_A if amps >= min_a else 0
+def is_consecutive(a, b):
+    return (
+        parse_utc(b["slot_start_utc"]) - parse_utc(a["slot_start_utc"])
+    ).total_seconds() == SLOT_MIN * 60
+
+
+def opportunity_class(coverage):
+    if coverage >= EV_PURE_COVERAGE:
+        return "PURE_PV"
+    if coverage >= EV_SECONDARY_COVERAGE:
+        return "SECONDARY"
+    return "FALLBACK_MIXED"
+
+
+def qualify_ev_windows(candidates):
+    """Find contiguous residual-PV windows after WW comfort reservation.
+
+    Stable planning uses 6 A. 7 A is actuator kickstart only, not a planner
+    threshold. A window must last >=30 min and provide >=50% of the energy
+    required for stable 6 A charging over the complete window.
+    """
+    windows = []
+    current = []
+
+    def finish(indices):
+        if len(indices) < EV_MIN_WINDOW_SLOTS:
+            return
+
+        residual_sum_w = sum(candidates[i]["evResidualExportW"] for i in indices)
+        min_ev_sum_w = EV_RUN_MIN_W * len(indices)
+        raw_coverage = residual_sum_w / min_ev_sum_w if min_ev_sum_w else 0.0
+        if raw_coverage < EV_MIN_WINDOW_PV_COVERAGE:
+            return
+
+        pv_capture_kwh = sum(
+            min(float(candidates[i]["evResidualExportW"]), EV_RUN_MIN_W)
+            for i in indices
+        ) * SLOT_H / 1000
+        min_ev_energy_kwh = EV_RUN_MIN_W * len(indices) * SLOT_H / 1000
+
+        windows.append({
+            "indices": tuple(indices),
+            "coverage": raw_coverage,
+            "displayCoverage": min(1.0, raw_coverage),
+            "class": opportunity_class(raw_coverage),
+            "pvCaptureKWhAt6A": pv_capture_kwh,
+            "minEvEnergyKWh": min_ev_energy_kwh,
+            "avgResidualExportW": residual_sum_w / len(indices),
+            "start": candidates[indices[0]]["slot_start_utc"],
+            "end": candidates[indices[-1]]["slot_start_utc"],
+        })
+
+    for i, slot in enumerate(candidates):
+        eligible = slot["teslaOpportunityConnected"] and slot["evResidualExportW"] > 0
+        if not eligible:
+            finish(current)
+            current = []
+            continue
+        if current and not is_consecutive(candidates[current[-1]], slot):
+            finish(current)
+            current = []
+        current.append(i)
+    finish(current)
+    return windows
+
+
+def apply_best_windows_first(windows):
+    """Prefer stronger later PV windows without discarding irreplaceable PV capture."""
+    class_rank = {"FALLBACK_MIXED": 1, "SECONDARY": 2, "PURE_PV": 3}
+
+    for pos, window in enumerate(windows):
+        later_better = [
+            x for x in windows[pos + 1:]
+            if class_rank[x["class"]] > class_rank[window["class"]]
+        ]
+        future_better_kwh = sum(x["pvCaptureKWhAt6A"] for x in later_better)
+        window["futureBetterPvCaptureKWh"] = future_better_kwh
+        window["selected"] = (
+            window["class"] == "PURE_PV"
+            or future_better_kwh + 1e-9 < window["pvCaptureKWhAt6A"]
+        )
+        if window["selected"]:
+            window["selectionReason"] = (
+                "BEST_PV_WINDOW"
+                if window["class"] == "PURE_PV"
+                else "FUTURE_BETTER_CAPACITY_INSUFFICIENT"
+            )
+        else:
+            window["selectionReason"] = "DEFERRED_TO_LATER_BETTER_PV"
+
+    return windows
+
+
+def ev_target_from_residual(residual_w):
+    """Plan stable charging at >=6 A inside a qualified opportunity window."""
+    amps_from_pv = int(max(0.0, residual_w) // EV_W_PER_A)
+    amps = max(EV_RUN_MIN_A, amps_from_pv)
+    amps = min(EV_MAX_A, amps)
+    return amps * EV_W_PER_A
 
 
 def deadline_utc(date_key):
@@ -120,8 +217,6 @@ def cloud_stability(weather_slots, index):
     mean = sum(values) / len(values)
     variance = sum((x - mean) ** 2 for x in values) / len(values)
     std = math.sqrt(variance)
-    # A stable cloud field (clear OR overcast) is predictable. 35 pct standard
-    # deviation maps to roughly zero stability; this is a smooth score, not a gate.
     return clamp(1.0 - std / 35.0)
 
 
@@ -135,11 +230,6 @@ def forecast_consistency(ts, current_pv_w, previous_map):
 
 
 def recent_local_accuracy(now_utc, pv_map, energy_state, confidence_state):
-    """Compare the latest site PV measurement with the nearest forecast slot.
-
-    The smoothed score persists between runs. This intentionally avoids storing
-    a large meteorological history: one rolling accuracy value is enough for v0.1.
-    """
     previous = float(confidence_state.get("recentLocalAccuracy") or 0.70)
     pv_state = energy_state.get("pv") or {}
     actual = pv_state.get("total_w")
@@ -163,27 +253,29 @@ def recent_local_accuracy(now_utc, pv_map, energy_state, confidence_state):
 
 
 def horizon_factor(slot_dt, now_utc):
-    """Only a mild horizon prior; weather predictability remains dominant."""
     hours = max(0.0, (slot_dt - now_utc).total_seconds() / 3600)
     return 1.0 - 0.08 * min(1.0, hours / 24.0)
 
 
-def realtime_corrected_export(forecast_export_w, confidence, slot_dt, now_utc, actual_export_w):
+def realtime_corrected_export(
+    forecast_export_w, confidence, slot_dt, now_utc, actual_export_w
+):
     """Blend live P1 into the near horizon; influence decays smoothly over 2 h."""
     hours = max(0.0, (slot_dt - now_utc).total_seconds() / 3600)
     if hours > 2.0:
         return forecast_export_w, 0.0
     recency = 1.0 - hours / 2.0
-    live_weight = clamp((1.0 - confidence) * recency + 0.35 * recency, 0.0, 0.85)
-    corrected = (1.0 - live_weight) * forecast_export_w + live_weight * actual_export_w
+    live_weight = clamp(
+        (1.0 - confidence) * recency + 0.35 * recency, 0.0, 0.85
+    )
+    corrected = (
+        (1.0 - live_weight) * forecast_export_w + live_weight * actual_export_w
+    )
     return max(0.0, corrected), live_weight
 
 
 def enforce_min_run(selected, candidates, scores, required_slots):
-    """Prefer runs of >=30 min without ever making WW infeasible.
-
-    This is a soft cleanup after energy allocation, not a PV threshold.
-    """
+    """Prefer WW runs of >=30 min without ever making WW infeasible."""
     if not selected or required_slots < WW_MIN_RUN_SLOTS:
         return selected
 
@@ -204,13 +296,16 @@ def enforce_min_run(selected, candidates, scores, required_slots):
 
     singles = [r[0] for r in runs if len(r) == 1]
     for single in singles:
-        neighbours = [x for x in (single - 1, single + 1) if 0 <= x < len(candidates)]
-        neighbours = [x for x in neighbours if x not in selected]
+        neighbours = [
+            x for x in (single - 1, single + 1)
+            if 0 <= x < len(candidates) and x not in selected
+        ]
         if not neighbours:
             continue
         best_add = max(neighbours, key=lambda x: scores[x])
-        # Swap out the weakest selected slot elsewhere so total WW energy is fixed.
-        removable = [x for x in selected if x != single and abs(x - single) > 1]
+        removable = [
+            x for x in selected if x != single and abs(x - single) > 1
+        ]
         if not removable:
             continue
         worst_remove = min(removable, key=lambda x: scores[x])
@@ -239,9 +334,14 @@ def main():
     b_map = {stamp(x): x for x in base_doc.get("slots", [])}
     weather_map = {stamp(x): x for x in weather_doc.get("slots", [])}
 
-    common = [x for x in axis_slots if x in pv_map and x in q_map and x in b_map and x in weather_map]
+    common = [
+        x for x in axis_slots
+        if x in pv_map and x in q_map and x in b_map and x in weather_map
+    ]
     if len(common) != 96:
-        raise SystemExit(f"FAIL: dynamic planner aligned slots={len(common)}, expected 96")
+        raise SystemExit(
+            f"FAIL: dynamic planner aligned slots={len(common)}, expected 96"
+        )
 
     now_utc = datetime.now(timezone.utc)
     today_local = now_utc.astimezone(TZ).date().isoformat()
@@ -249,13 +349,14 @@ def main():
     actual_export_w = max(0.0, float(grid.get("export_w") or 0))
 
     previous_pv = confidence_state.get("previousPvForecast") or {}
-    local_accuracy = recent_local_accuracy(now_utc, pv_map, energy_state, confidence_state)
+    local_accuracy = recent_local_accuracy(
+        now_utc, pv_map, energy_state, confidence_state
+    )
     weather_slots = [weather_map[x] for x in common]
 
     tesla_state = energy_state.get("tesla") or {}
     tesla_connected_now = tesla_state.get("connected") is True
     tesla_charging_now = tesla_state.get("charging") is True
-    live_connected_until = now_utc + timedelta(hours=LIVE_CONNECTED_HORIZON_H)
 
     raw_slots = []
     for i, ts in enumerate(common):
@@ -270,7 +371,11 @@ def main():
         consistency = forecast_consistency(ts, pv_w, previous_pv)
         stability = cloud_stability(weather_slots, i)
         confidence = clamp(
-            (W_CONSISTENCY * consistency + W_CLOUD_STABILITY * stability + W_LOCAL_ACCURACY * local_accuracy)
+            (
+                W_CONSISTENCY * consistency
+                + W_CLOUD_STABILITY * stability
+                + W_LOCAL_ACCURACY * local_accuracy
+            )
             * horizon_factor(slot_dt, now_utc)
         )
         corrected_export, live_weight = realtime_corrected_export(
@@ -278,8 +383,6 @@ def main():
         )
 
         expected_home = expected_tesla_home(local_dt)
-        live_override = tesla_connected_now and now_utc - timedelta(minutes=15) <= slot_dt <= live_connected_until
-        tesla_available = live_override or expected_home
 
         raw_slots.append({
             "slot_start_utc": ts,
@@ -297,12 +400,14 @@ def main():
                 "horizonFactor": round(horizon_factor(slot_dt, now_utc), 3),
                 "liveP1Weight": round(live_weight, 3),
             },
-            "teslaAvailableForecast": tesla_available,
+            "teslaAvailableForecast": tesla_connected_now,
+            "teslaOpportunityConnected": tesla_connected_now,
             "teslaAvailabilitySource": (
-                "LIVE_CONNECTED_NEAR_TERM" if live_override
-                else "WEEKLY_HOME_FORECAST" if expected_home
-                else "NOT_AVAILABLE"
+                "LIVE_CONNECTED_CURRENT_STATE"
+                if tesla_connected_now else "NOT_CONNECTED"
             ),
+            "teslaExpectedHome": expected_home,
+            "teslaConnectedNow": tesla_connected_now,
         })
 
     ww = ww_doc.get("warmWater") or {}
@@ -317,38 +422,60 @@ def main():
         remaining_min = WW_FALLBACK_MIN
         catchup = False
         if date_key == today_local:
-            goal_reached = ww.get("goalReachedToday") is True or ww.get("goalReached") is True
-            remaining_min = 0 if goal_reached else max(0, int(ww.get("remainingFallbackMin") or 0))
+            goal_reached = (
+                ww.get("goalReachedToday") is True
+                or ww.get("goalReached") is True
+            )
+            remaining_min = (
+                0 if goal_reached
+                else max(0, int(ww.get("remainingFallbackMin") or 0))
+            )
             catchup = ww.get("catchupRequired") is True
 
         deadline = deadline_utc(date_key)
-        candidates = [s for s in day_slots if parse_utc(s["slot_start_utc"]) < deadline and parse_utc(s["slot_start_utc"]) >= now_utc - timedelta(minutes=15)]
-        required_slots = int(math.ceil(remaining_min / SLOT_MIN)) if not goal_reached else 0
+        candidates = [
+            s for s in day_slots
+            if parse_utc(s["slot_start_utc"]) < deadline
+            and parse_utc(s["slot_start_utc"]) >= now_utc - timedelta(minutes=15)
+        ]
+        required_slots = (
+            int(math.ceil(remaining_min / SLOT_MIN)) if not goal_reached else 0
+        )
         required_slots = min(required_slots, len(candidates))
 
-        # Joint-allocation score: WW likes useful PV, but deliberately gives the
-        # very high export peak to Tesla when Tesla is available and WW comfort
-        # can still be met in other slots. There is no fixed PV start threshold.
+        max_export = max(
+            (float(s["correctedExportBeforeFlexW"]) for s in candidates),
+            default=0.0,
+        )
         scores = []
-        for s in candidates:
+        for pos, s in enumerate(candidates):
             export_w = float(s["correctedExportBeforeFlexW"])
             ww_capture = min(BOILER_W, export_w)
             confidence = float(s["confidence"])
-            peak_for_tesla = s["teslaAvailableForecast"] and export_w >= EV_START_MIN_A * EV_W_PER_A
-            tesla_peak_penalty = min(BOILER_W, max(0.0, export_w - BOILER_W)) if peak_for_tesla else 0.0
-            urgency = 0.0
-            if candidates:
-                position = candidates.index(s) / max(1, len(candidates) - 1)
-                urgency = 350.0 * position * (1.0 if catchup else 0.35)
-            score = ww_capture * (0.65 + 0.35 * confidence) - 0.55 * tesla_peak_penalty + urgency
+            peak_share = (export_w / max_export) if max_export > 0 else 0.0
+            tesla_peak_penalty = (
+                min(BOILER_W, export_w) * peak_share
+                if tesla_connected_now else 0.0
+            )
+            position = pos / max(1, len(candidates) - 1)
+            urgency = 350.0 * position * (1.0 if catchup else 0.35)
+            score = (
+                ww_capture * (0.65 + 0.35 * confidence)
+                - 0.55 * tesla_peak_penalty
+                + urgency
+            )
             scores.append(score)
 
-        ranked = sorted(range(len(candidates)), key=lambda i: (scores[i], candidates[i]["slot_start_utc"]), reverse=True)
+        ranked = sorted(
+            range(len(candidates)),
+            key=lambda i: (scores[i], candidates[i]["slot_start_utc"]),
+            reverse=True,
+        )
         selected = set(ranked[:required_slots])
-        selected = enforce_min_run(selected, candidates, scores, required_slots)
+        selected = enforce_min_run(
+            selected, candidates, scores, required_slots
+        )
 
-        # Comfort is the hard constraint: if enough slots exist, exactly the
-        # required count is reserved for WW before the deadline.
         if len(selected) < required_slots:
             for i in ranked:
                 selected.add(i)
@@ -369,39 +496,89 @@ def main():
             "allocationPolicy": "DYNAMIC_PV_CAPTURE_WITH_TESLA_PEAK_SHAPING",
         })
 
-    # Second pass: Tesla receives the remaining peak after WW allocation.
-    slots = []
-    ev_running = tesla_charging_now
     for s in raw_slots:
         ww_w = BOILER_W if s["slot_start_utc"] in ww_selected_ts else 0
-        export_w = float(s["correctedExportBeforeFlexW"])
-        remaining_export = max(0.0, export_w - ww_w)
-        ev_w = 0
-        ev_reason = "NOT_AVAILABLE"
-        if s["teslaAvailableForecast"]:
-            ev_w = ev_target(remaining_export, ev_running)
-            if ev_w > 0:
-                ev_reason = "DYNAMIC_PV_PEAK_ABSORBER"
-                ev_running = True
-            else:
-                ev_reason = "NO_ECONOMIC_PV_HEADROOM"
-                ev_running = False
-        else:
-            ev_running = False
+        residual_after_ww = max(
+            0.0, float(s["correctedExportBeforeFlexW"]) - ww_w
+        )
+        s["wwPlanW"] = ww_w
+        s["wwAllocationReason"] = (
+            "DYNAMIC_COMFORT_PV_SLOT" if ww_w else "HOLD"
+        )
+        s["evResidualExportW"] = round(residual_after_ww)
 
-        net_after = float(s["baseLoadForecastW"]) + float(s["quattForecastW"]) + ww_w + ev_w - float(s["pvForecastW"])
+    qualified_windows = apply_best_windows_first(qualify_ev_windows(raw_slots))
+    selected_by_index = {}
+    all_by_index = {}
+    for window_id, window in enumerate(qualified_windows, start=1):
+        window["id"] = window_id
+        for i in window["indices"]:
+            all_by_index[i] = window
+            if window["selected"]:
+                selected_by_index[i] = window
+
+    slots = []
+    for i, s in enumerate(raw_slots):
+        ev_w = 0
+        ev_reason = (
+            "NOT_CONNECTED"
+            if not s["teslaOpportunityConnected"]
+            else "NO_QUALIFIED_PV_WINDOW"
+        )
+        window_id = None
+        window_coverage = None
+        window_class = None
+        selection_reason = None
+        future_better_kwh = None
+
+        window = all_by_index.get(i)
+        if window is not None:
+            window_id = window["id"]
+            window_coverage = window["displayCoverage"]
+            window_class = window["class"]
+            selection_reason = window["selectionReason"]
+            future_better_kwh = window["futureBetterPvCaptureKWh"]
+
+            if i in selected_by_index:
+                ev_w = ev_target_from_residual(s["evResidualExportW"])
+                if s["evResidualExportW"] >= ev_w:
+                    ev_reason = "DYNAMIC_PV_PEAK_ABSORBER"
+                elif window["class"] == "SECONDARY":
+                    ev_reason = "DYNAMIC_PV_SECONDARY_OPPORTUNITY"
+                else:
+                    ev_reason = "DYNAMIC_PV_MIXED_OPPORTUNITY"
+            else:
+                ev_reason = "DEFERRED_TO_LATER_BETTER_PV"
+
+        net_after = (
+            float(s["baseLoadForecastW"])
+            + float(s["quattForecastW"])
+            + float(s["wwPlanW"])
+            + ev_w
+            - float(s["pvForecastW"])
+        )
         slots.append({
             **s,
-            "wwPlanW": ww_w,
-            "wwAllocationReason": "DYNAMIC_COMFORT_PV_SLOT" if ww_w else "HOLD",
-            "evPlanW": ev_w,
+            "evPlanW": round(ev_w),
+            "evPlanA": round(ev_w / EV_W_PER_A) if ev_w else 0,
             "evAllocationReason": ev_reason,
+            "evOpportunityWindowId": window_id,
+            "evOpportunityWindowClass": window_class,
+            "evOpportunityWindowSelectionReason": selection_reason,
+            "evOpportunityWindowPvCoverage": (
+                round(window_coverage, 3)
+                if window_coverage is not None else None
+            ),
+            "evFutureBetterPvCaptureKWh": (
+                round(future_better_kwh, 3)
+                if future_better_kwh is not None else None
+            ),
             "gridImportAfterFlexW": round(max(0.0, net_after)),
             "gridExportAfterFlexW": round(max(0.0, -net_after)),
         })
 
     payload = {
-        "schema": "EMS_PI_DYNAMIC_SHADOW_PLAN_V0.1",
+        "schema": "EMS_PI_DYNAMIC_SHADOW_PLAN_V0.2",
         "generated_at": now_utc.isoformat().replace("+00:00", "Z"),
         "mode": "PURE_SHADOW",
         "readOnly": True,
@@ -413,16 +590,47 @@ def main():
             "wwMinRunMinutes": WW_MIN_RUN_SLOTS * SLOT_MIN,
             "teslaRole": "SECONDARY_FLEX_LOAD_WHEN_WW_COMFORT_REMAINS_FEASIBLE",
             "fixedPvStartThresholdW": None,
+            "evOpportunityWindowMinMinutes": EV_MIN_WINDOW_SLOTS * SLOT_MIN,
+            "evOpportunityMinPvCoverage": EV_MIN_WINDOW_PV_COVERAGE,
+            "evStableRunA": EV_RUN_MIN_A,
+            "evKickstartA": EV_KICKSTART_A,
             "realtimeP1Correction": True,
         },
         "confidenceModel": {
-            "signals": ["forecastConsistency", "cloudStability", "recentLocalAccuracy"],
+            "signals": [
+                "forecastConsistency", "cloudStability", "recentLocalAccuracy"
+            ],
             "weights": {
                 "forecastConsistency": W_CONSISTENCY,
                 "cloudStability": W_CLOUD_STABILITY,
                 "recentLocalAccuracy": W_LOCAL_ACCURACY,
             },
             "horizonPolicy": "MILD_PRIOR_ONLY_MAX_8_PERCENT_24H",
+        },
+        "tesla": {
+            "connectedNow": tesla_connected_now,
+            "chargingNow": tesla_charging_now,
+            "availabilityPolicy": (
+                "LIVE_CONNECTED_CURRENT_STATE_ONLY;"
+                "WEEKLY_FORECAST_INFORMATIONAL"
+            ),
+            "opportunityPolicy": (
+                "BEST_PV_WINDOWS_FIRST_AFTER_WW_"
+                "MIN30M_MIN50PCT_AT_RUN6A"
+            ),
+            "qualifiedWindows": [
+                {
+                    "id": w["id"],
+                    "start": w["start"],
+                    "end": w["end"],
+                    "class": w["class"],
+                    "pvCoverage": round(w["displayCoverage"], 3),
+                    "selected": w["selected"],
+                    "selectionReason": w["selectionReason"],
+                    "pvCaptureKWhAt6A": round(w["pvCaptureKWhAt6A"], 3),
+                }
+                for w in qualified_windows
+            ],
         },
         "realtime": {
             "actualP1ExportW": round(actual_export_w),
@@ -442,21 +650,30 @@ def main():
         "schema": "EMS_PI_DYNAMIC_CONFIDENCE_STATE_V0.1",
         "updatedAt": now_utc.isoformat().replace("+00:00", "Z"),
         "recentLocalAccuracy": round(local_accuracy, 4),
-        "previousPvForecast": {ts: round(pv_power(pv_map[ts])) for ts in common},
+        "previousPvForecast": {
+            ts: round(pv_power(pv_map[ts])) for ts in common
+        },
     }
     tmp_state = CONFIDENCE_STATE.with_suffix(".tmp")
     tmp_state.write_text(json.dumps(state_payload, separators=(",", ":")) + "\n")
     tmp_state.replace(CONFIDENCE_STATE)
 
-    before_export_kwh = sum(float(x["correctedExportBeforeFlexW"]) for x in slots) * SLOT_H / 1000
-    after_export_kwh = sum(float(x["gridExportAfterFlexW"]) for x in slots) * SLOT_H / 1000
+    before_export_kwh = (
+        sum(float(x["correctedExportBeforeFlexW"]) for x in slots)
+        * SLOT_H / 1000
+    )
+    after_export_kwh = (
+        sum(float(x["gridExportAfterFlexW"]) for x in slots)
+        * SLOT_H / 1000
+    )
     ww_kwh = sum(float(x["wwPlanW"]) for x in slots) * SLOT_H / 1000
     ev_kwh = sum(float(x["evPlanW"]) for x in slots) * SLOT_H / 1000
 
-    print("PASS: dynamic shadow planner v0.1 built")
+    print("PASS: dynamic shadow planner v0.2 built")
     print("slots                    :", len(slots))
     print("WW planned kWh           :", round(ww_kwh, 2))
     print("Tesla planned kWh        :", round(ev_kwh, 2))
+    print("qualified EV windows     :", len(qualified_windows))
     print("corrected export before  :", round(before_export_kwh, 2))
     print("forecast export after    :", round(after_export_kwh, 2))
     print("recent local accuracy    :", round(local_accuracy, 3))
