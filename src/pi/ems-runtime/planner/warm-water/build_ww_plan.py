@@ -237,12 +237,16 @@ daily = []
 for date_key, day_slots in sorted(by_date.items()):
     is_today = date_key == today_local
     goal_reached = False
-    # Future days use expected energy demand, not the safety ceiling.
+    # Future days use the validated weekday demand model.
+    # The historic fixed 6.0 kWh value remains the explicit fail-safe fallback.
     remaining_min = None
-    need_kwh = WW_EXPECTED_DAILY_KWH
 
     local_date = datetime.fromisoformat(date_key).date()
-    weekday_expected_kwh = WW_EXPECTED_DAILY_KWH_BY_WEEKDAY[local_date.weekday()]
+    weekday_expected_kwh = WW_EXPECTED_DAILY_KWH_BY_WEEKDAY.get(
+        local_date.weekday(),
+        WW_EXPECTED_DAILY_KWH,
+    )
+    need_kwh = weekday_expected_kwh
     catchup = False
 
     if is_today:
@@ -343,6 +347,9 @@ for date_key, day_slots in sorted(by_date.items()):
         "goalReached": goal_reached,
         "remainingFallbackMin": remaining_min,
         "requiredEnergyKWh": round(need_kwh, 3),
+        "expectedDailyEnergyKWh": round(weekday_expected_kwh, 3),
+        "expectedDailyEnergySource": "WEEKDAY_MEDIAN_SQLITE_V0.2",
+        "expectedDailyEnergyFallbackKWh": WW_EXPECTED_DAILY_KWH,
         "expectedDailyEnergyShadowKWh": round(weekday_expected_kwh, 3),
         "expectedDailyEnergyShadowSource": "WEEKDAY_MEDIAN_SQLITE_V0.2",
         "allocatedEnergyKWh": round(
@@ -364,14 +371,15 @@ for date_key, day_slots in sorted(by_date.items()):
 plan_slots.sort(key=lambda x: x["slot_start_utc"])
 
 payload = {
-    "schema": "EMS_PI_WW_PLAN_V0.6.1",
+    "schema": "EMS_PI_WW_PLAN_V0.7.0",
     "mode": "shadow",
     "control_writes": False,
     "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     "sourceForecast": "pv + quatt + quatt-free-base",
     "boilerPowerW": BOILER_W,
     "dailyFallbackMin": WW_SAFETY_MAX_MIN,
-        "expectedDailyEnergyKWh": WW_EXPECTED_DAILY_KWH,
+    "expectedDailyEnergyFallbackKWh": WW_EXPECTED_DAILY_KWH,
+    "expectedDailyEnergyProductionSource": "WEEKDAY_MEDIAN_SQLITE_V0.2",
     "fallbackNotBeforeLocal": "16:00",
     "deadlineLocal": "19:00",
     "minRunMinutes": WW_MIN_RUN_SLOTS * 15,
@@ -389,7 +397,7 @@ tmp = OUTPUT.with_suffix(".tmp")
 tmp.write_text(json.dumps(payload, separators=(",", ":")) + "\n")
 tmp.replace(OUTPUT)
 
-print("PASS: WW plan v0.6.1 built")
+print("PASS: WW plan v0.7.0 built")
 print("slots:", len(plan_slots))
 for d in daily:
     print(

@@ -170,11 +170,33 @@ hot-water energy demand model:
 | Saturday | 7.7 kWh |
 | Sunday | 7.7 kWh |
 
-These values are currently used as a **shadow forecast only** under source
+These values are used under source
 `WEEKDAY_MEDIAN_SQLITE_V0.2`.
 
-Production planning remains based on `WW_EXPECTED_DAILY_KWH = 6.0 kWh` until the
-weekday model has been validated against actual boiler consumption and PV utilisation.
+The weekday model was promoted to the production demand model on 10 September 2026
+after a 92-day historical backtest against complete daily boiler-energy observations.
+
+Backtest result:
+
+| Model | MAE | Bias |
+| --- | ---: | ---: |
+| Fixed 6.0 kWh/day | 2.417 kWh | -0.605 kWh |
+| Weekday median V0.2 | 2.166 kWh | -0.239 kWh |
+
+The weekday model reduced mean absolute error by **10.4%** and materially reduced
+systematic underestimation.
+
+For future-day planning, `requiredEnergyKWh` is therefore based on the weekday value.
+`WW_EXPECTED_DAILY_KWH = 6.0 kWh` remains an explicit fail-safe fallback if the
+weekday lookup is unavailable or invalid.
+
+For the current day, actual warm-water runtime state remains authoritative:
+`remainingFallbackMin`, `goalReachedToday`, and the existing comfort/deadline/safety
+logic can override the future-day demand forecast.
+
+This promotion changes the production demand model only. It does **not** enable
+physical device control: the Pi WW planner remains in `mode = shadow` with
+`control_writes = false`.
 
 WW forecast snapshots are persisted in SQLite table `forecast_ww_daily`, allowing
 forecast-versus-actual backtesting.

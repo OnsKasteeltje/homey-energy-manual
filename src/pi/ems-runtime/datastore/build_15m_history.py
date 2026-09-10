@@ -67,6 +67,14 @@ def main():
     written = 0
 
     for (slot, device_id, metric_id, metric_key), samples in buckets.items():
+        # Multiple Homey Insights resolutions can overlap.
+        # For each 15-minute bucket, only the finest resolution wins.
+        finest_resolution = min(resolution for _, resolution in samples)
+        samples = [
+            (value, resolution)
+            for value, resolution in samples
+            if resolution == finest_resolution
+        ]
         values = [v for v, _ in samples]
 
         avg = sum(values) / len(values)
