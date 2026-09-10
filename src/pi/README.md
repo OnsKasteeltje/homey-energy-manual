@@ -1,7 +1,7 @@
 # Raspberry Pi EMS migration preparation
 
 Status: **PREPARED / NOT DEPLOYED / NO PHYSICAL WRITES**  
-Last sync: 2026-09-01  
+Last sync: 2026-09-10  
 GitHub sync anchor observed during preparation: `ef50e0d4981380f65f1c82bc9a4a5106a151fbde`
 
 ## Purpose
@@ -9,6 +9,20 @@ GitHub sync anchor observed during preparation: `ef50e0d4981380f65f1c82bc9a4a510
 This directory is the migration boundary for moving suitable HEMS runtime responsibilities from Homey to the Raspberry Pi 5 without changing the current physical-control ownership prematurely.
 
 The migration is code-first: the current GitHub sources under `src/homey/` remain authoritative for logic and schemas until a component has been explicitly ported, replay-tested, shadow-validated and cut over. The Pi must not reimplement a second independent planner, price model or actuator policy.
+
+## Operational planner source-of-truth rule — 2026-09-10
+
+For planner components that have been migrated to the Pi, the **active Pi runtime is the operational source of truth**.
+
+- Planner logic is developed and changed first under `/home/jeroen/ems/runtime/planner/...` on the Pi.
+- The changed Pi planner is syntax/smoke tested and run in `PURE_SHADOW` before it is considered accepted.
+- Only after a successful Pi test is the accepted planner source synchronized back to GitHub under `src/pi/ems-runtime/planner/...` and committed.
+- GitHub remains the versioned repository, audit trail, documentation source and publication target; it must not be used to introduce a planner-code change ahead of the Pi runtime.
+- Generated planner snapshots under `docs/data/` are observability artifacts and do not make GitHub the planner execution source.
+- A repository checkout update (`git pull`) does not deploy planner code into `/home/jeroen/ems/runtime`; deployment/synchronization must be explicit.
+- Runtime/systemd definitions in GitHub must be treated as deployment manifests and checked against the installed Pi units before claiming runtime parity.
+
+This rule prevents silent drift between repository code and the planner that is actually executing on the Pi.
 
 ## Current architecture to preserve
 
