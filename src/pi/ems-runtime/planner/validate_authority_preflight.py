@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-import argparse, json, sys
+import argparse, json, subprocess, sys
 from pathlib import Path
 from datetime import datetime, timezone
 
 
 def load(path):
     return json.loads(Path(path).read_text())
+
+
+def load_git_json(repo, git_ref, path):
+    out = subprocess.check_output(
+        ["git", "-C", repo, "show", f"{git_ref}:{path}"],
+        text=True,
+    )
+    return json.loads(out)
 
 
 def iso_age_seconds(value):
@@ -57,17 +65,22 @@ def main():
     ap = argparse.ArgumentParser(description="Read-only preflight for Homey -> Pi planner authority cutover.")
     ap.add_argument("--authority", default="/home/jeroen/ems/runtime/planner/control-authority.json")
     ap.add_argument("--selector", default="/home/jeroen/ems/runtime/planner/authority-selector-policy.json")
-    ap.add_argument("--pi-plan", default="/home/jeroen/ems/repo/homey-energy-manual/docs/data/energy-planner-shadow-dynamic.json")
-    ap.add_argument("--ev-status", default="/home/jeroen/ems/repo/homey-energy-manual/docs/data/ev-control-status.json")
+    ap.add_argument("--repo", default="/home/jeroen/ems/repo/homey-energy-manual")
+    ap.add_argument("--git-ref", default="origin/main")
+    ap.add_argument("--pi-plan-git-path", default="docs/data/energy-planner-shadow-dynamic.json")
+    ap.add_argument("--ev-status-git-path", default="docs/data/ev-control-status.json")
     ap.add_argument("--max-plan-age-sec", type=int, default=1200)
     args = ap.parse_args()
 
     failures = []
     authority = load(args.authority)
     selector = load(args.selector)
-    plan_doc = load(args.pi_plan)
-    ev = load(args.ev_status)
+    plan_doc = load_git_json(args.repo, args.git_ref, args.pi_plan_git_path)
+    ev = load_git_json(args.repo, args.git_ref, args.ev_status_git_path)
     wrapper, plan = unwrap_dynamic_plan(plan_doc)
+
+    print(f"SOURCE planner={args.git_ref}:{args.pi_plan_git_path}")
+    print(f"SOURCE ev={args.git_ref}:{args.ev_status_git_path}")
 
     check(authority.get("plannerOwner") == "HOMEY", "authority_homey",
           f"plannerOwner={authority.get('plannerOwner')}", failures)
@@ -117,6 +130,8 @@ def main():
 
     check(ev.get("coherent") is True, "ev_chain_coherent",
           f"coherent={ev.get('coherent')}", failures)
+    check(ev.get("deviceHealth", {}).get("controlSafe") is True, "ev_device_health_safe",
+          f"status={ev.get('deviceHealth', {}).get('status')}, reason={ev.get('deviceHealth', {}).get('reason')}", failures)
     check(ev.get("gate", {}).get("status") == "PASS", "ev_gate_pass",
           f"gate={ev.get('gate', {}).get('status')}", failures)
     check(ev.get("actuator", {}).get("live") is True, "ev_actuator_live",
