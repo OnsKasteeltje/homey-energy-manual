@@ -2,16 +2,21 @@
 
 """Publish the current hardened Pi planner slot to Homey EM2_Power_Intent.
 
-The Pi remains the sole planner authority. Homey remains executor/safety only.
+The Pi is the sole planner authority. Homey remains executor/safety only.
 This process never writes devices directly; it updates the existing
-EM2_POWER_INTENT_V0.2 compatibility bus so the validated Homey adapters/gates
-and actuators can execute the Pi decision.
+EM2_POWER_INTENT_V0.2 compatibility bus so validated Homey adapters/gates and
+actuators can execute the Pi decision.
+
+Homey API use is deliberately minimal: one state-revision read per run and a
+write only when the semantic command or source revision changed. Rate limits
+are retried with bounded backoff; all other failures remain fail-closed.
 """
 
 import json
 import os
 import subprocess
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -22,21 +27,36 @@ CONTROL_URL = "http://127.0.0.1:3100/control/current"
 STATE_VAR_ID = "8e1efbb0-7999-494c-9429-7d274afacd79"
 INTENT_VAR_ID = "04b57041-dd7f-41f7-a00a-f023afb1ccee"
 TMP = Path("/home/jeroen/ems/data/pi-power-intent-update.json")
+CACHE = Path("/home/jeroen/ems/data/pi-power-intent-publish-cache.json")
+RATE_LIMIT_DELAYS = (15, 30, 60)
 
 
-def homey(args):
+def run_homey(args):
     env = os.environ.copy()
     env["PATH"] = NODE_PATH + ":" + env.get("PATH", "")
-    r = subprocess.run(
+    return subprocess.run(
         [str(HOMEY_CLI)] + args,
         cwd=HOMEY_PROJECT,
         env=env,
         text=True,
         capture_output=True,
     )
-    if r.returncode != 0:
-        raise RuntimeError((r.stderr or r.stdout).strip()[:1200])
-    return r.stdout
+
+
+def homey(args):
+    """Run one Homey CLI request with bounded retry only for rate limiting."""
+    attempts = len(RATE_LIMIT_DELAYS) + 1
+    for attempt in range(attempts):
+        r = run_homey(args)
+        if r.returncode == 0:
+            return r.stdout
+        message = (r.stderr or r.stdout).strip()
+        if "Too many requests" not in message or attempt >= len(RATE_LIMIT_DELAYS):
+            raise RuntimeError(message[:1200])
+        delay = RATE_LIMIT_DELAYS[attempt]
+        print(f"WARN: Homey rate limited; retry in {delay}s", file=sys.stderr)
+        time.sleep(delay)
+    raise RuntimeError("Homey request failed after retries")
 
 
 def read_homey_variable(var_id):
@@ -68,13 +88,21 @@ def parse_json(value):
         return None
 
 
-def main():
-    state_var = read_homey_variable(STATE_VAR_ID)
-    state = parse_json(state_var.get("value")) or {}
-    revision = state.get("revision")
-    if revision is None:
-        raise SystemExit("FAIL_CLOSED: Homey state revision missing")
+def load_cache():
+    try:
+        return json.loads(CACHE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
 
+
+def save_cache(payload):
+    CACHE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = CACHE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, separators=(",", ":")) + "\n", encoding="utf-8")
+    tmp.replace(CACHE)
+
+
+def main():
     try:
         cmd = fetch_control()
     except Exception as exc:
@@ -99,9 +127,34 @@ def main():
     if not isinstance(ww_on, bool):
         raise SystemExit("FAIL_CLOSED: WW target_on invalid")
 
+    # One Homey read supplies the current EM2_State revision required by the
+    # existing downstream exact-revision adapter/gate safety contract.
+    state_var = read_homey_variable(STATE_VAR_ID)
+    state = parse_json(state_var.get("value")) or {}
+    revision = state.get("revision")
+    if revision is None:
+        raise SystemExit("FAIL_CLOSED: Homey state revision missing")
+
+    semantic = {
+        "sourceRevision": revision,
+        "plannerGeneratedAt": cmd.get("plannerGeneratedAt"),
+        "commandValidUntil": cmd.get("validUntil"),
+        "evW": ev_w,
+        "wwOn": ww_on,
+    }
+    semantic_key = json.dumps(semantic, separators=(",", ":"), sort_keys=True)
+    cache = load_cache()
+    if cache.get("semanticKey") == semantic_key:
+        print("PASS: Pi control intent unchanged; Homey write suppressed")
+        print("revision:", revision)
+        print("evTargetW:", ev_w)
+        print("wwTargetOn:", ww_on)
+        print("validUntil:", cmd.get("validUntil"))
+        return 0
+
     out = {
         "schema": "EM2_POWER_INTENT_V0.2",
-        "policyRevision": "PI_DYNAMIC_PLANNER_PUSH_V1.0",
+        "policyRevision": "PI_DYNAMIC_PLANNER_PUSH_V1.1",
         "engineVersion": "PI_DYNAMIC_PLANNER_V0.3_LIVE_PUSH",
         "generatedAt": cmd.get("generatedAt"),
         "sourceRevision": revision,
@@ -110,17 +163,8 @@ def main():
         "deviceWrites": False,
         "valid": True,
         "status": "OK",
-        "inputSemanticKey": json.dumps({
-            "stateRevision": revision,
-            "plannerGeneratedAt": cmd.get("plannerGeneratedAt"),
-            "commandValidUntil": cmd.get("validUntil"),
-            "evW": ev_w,
-            "wwOn": ww_on,
-        }, separators=(",", ":"), sort_keys=True),
-        "inputRevisions": {
-            "state": revision,
-            "planner": cmd.get("plannerGeneratedAt"),
-        },
+        "inputSemanticKey": semantic_key,
+        "inputRevisions": {"state": revision, "planner": cmd.get("plannerGeneratedAt")},
         "policyProjection": {
             "plannerOwner": "PI",
             "executor": "HOMEY",
@@ -155,13 +199,10 @@ def main():
         },
     }
 
-    current = read_homey_variable(INTENT_VAR_ID)
     value = json.dumps(out, separators=(",", ":"))
-    if current.get("value") == value:
-        print("PASS: Pi control intent unchanged")
-        return 0
-
     publish_homey_value(INTENT_VAR_ID, value)
+    save_cache({"semanticKey": semantic_key, "publishedAt": cmd.get("generatedAt")})
+
     print("PASS: Pi control intent published to Homey")
     print("revision:", revision)
     print("evTargetW:", ev_w)
