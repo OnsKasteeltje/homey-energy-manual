@@ -29,7 +29,12 @@ while IFS= read -r rel; do
         echo "DRIFT:   $rel"
         FAIL=1
     fi
-done < <(cd "$SOURCE" && find . -type f -printf '%P\n' | sort)
+done < <(
+    cd "$SOURCE" && find . -type f \
+        -not -path '*/__pycache__/*' \
+        -not -name '*.pyc' \
+        -printf '%P\n' | sort
+)
 
 echo
 echo "=== SYSTEMD FILES ==="
