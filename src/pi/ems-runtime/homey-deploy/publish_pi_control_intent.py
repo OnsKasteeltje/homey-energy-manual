@@ -8,8 +8,10 @@ EM2_POWER_INTENT_V0.2 compatibility bus so validated Homey adapters/gates and
 actuators can execute the Pi decision.
 
 Homey API use is deliberately minimal: one state-revision read per run and a
-write only when the semantic command or source revision changed. Rate limits
-are retried with bounded backoff; all other failures remain fail-closed.
+write only when the actuator-relevant semantic command or source revision
+changed. Planner refresh timestamps are metadata, not command semantics.
+Rate limits are retried with bounded backoff; all other failures remain
+fail-closed.
 """
 
 import json
@@ -135,10 +137,13 @@ def main():
     if revision is None:
         raise SystemExit("FAIL_CLOSED: Homey state revision missing")
 
+    # Only actuator-relevant semantics belong in the idempotency key.
+    # Planner generatedAt/validUntil change during routine refreshes and must
+    # not cause redundant Homey writes when revision and physical targets are
+    # unchanged. Fresh/stale planner validation is already enforced by the Pi
+    # /control/current endpoint before this point.
     semantic = {
         "sourceRevision": revision,
-        "plannerGeneratedAt": cmd.get("plannerGeneratedAt"),
-        "commandValidUntil": cmd.get("validUntil"),
         "evW": ev_w,
         "wwOn": ww_on,
     }
@@ -154,7 +159,7 @@ def main():
 
     out = {
         "schema": "EM2_POWER_INTENT_V0.2",
-        "policyRevision": "PI_DYNAMIC_PLANNER_PUSH_V1.1",
+        "policyRevision": "PI_DYNAMIC_PLANNER_PUSH_V1.2",
         "engineVersion": "PI_DYNAMIC_PLANNER_V0.3_LIVE_PUSH",
         "generatedAt": cmd.get("generatedAt"),
         "sourceRevision": revision,
@@ -170,6 +175,7 @@ def main():
             "executor": "HOMEY",
             "contractMode": "FIXED",
             "contractId": "ENGIE_3Y_2026_2029",
+            "plannerGeneratedAt": cmd.get("plannerGeneratedAt"),
             "commandValidUntil": cmd.get("validUntil"),
             "slot": cmd.get("slot"),
         },
@@ -201,7 +207,12 @@ def main():
 
     value = json.dumps(out, separators=(",", ":"))
     publish_homey_value(INTENT_VAR_ID, value)
-    save_cache({"semanticKey": semantic_key, "publishedAt": cmd.get("generatedAt")})
+    save_cache({
+        "semanticKey": semantic_key,
+        "publishedAt": cmd.get("generatedAt"),
+        "plannerGeneratedAt": cmd.get("plannerGeneratedAt"),
+        "validUntil": cmd.get("validUntil"),
+    })
 
     print("PASS: Pi control intent published to Homey")
     print("revision:", revision)
