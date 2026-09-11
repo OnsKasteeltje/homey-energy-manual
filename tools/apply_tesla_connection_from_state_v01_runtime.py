@@ -5,7 +5,7 @@ TARGET = Path('/home/jeroen/ems/runtime/datastore/store_tesla_connection_from_st
 SERVICE = Path('/etc/systemd/system/ems-pv-forecast.service')
 STAGED = Path('/tmp/ems-pv-forecast.service.tesla-state-history-v01')
 
-script = r'''#!/usr/bin/env python3
+script = r"""#!/usr/bin/env python3
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -82,7 +82,7 @@ try:
     print('homeyExtraReads: 0')
 finally:
     con.close()
-'''
+"""
 
 TARGET.parent.mkdir(parents=True, exist_ok=True)
 TARGET.write_text(script)
