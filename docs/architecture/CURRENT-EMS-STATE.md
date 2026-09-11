@@ -6,7 +6,7 @@
 >
 > Dated baseline documents are historical snapshots and are not authoritative for current state.
 
-**Status date:** 2026-09-09  
+**Status date:** 2026-09-11  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
 
@@ -34,15 +34,18 @@ flowchart TD
     WW[Warm-water input / state] --> WWP[Warm-water plan]
     WWP --> P
     T[Tesla state / deadline / flexibility] --> P
-    P --> S[Shadow load plan]
-    S --> WEB[Pi Planner website shadow]
-    P -. planned intent .-> HC[Homey control/execution]
+    P --> S[Quarter-hour shadow plan]
+    S --> D[Hardened dynamic shadow planner v0.3]
+    D --> WEB[Pi Planner website shadow]
+    D -. future validated intent .-> HC[Homey control/execution]
     HC --> H
     DB --> BT[Backtest / evaluation]
     BT -. learning .-> B
     DB --> PVC[Daily PV-capture validation]
     PVC --> PUB[GitHub website validation artifacts]
 ```
+
+The hardened dynamic planner remains `PURE_SHADOW`, `readOnly = true` and `control_writes = false`. It is the current candidate for future Pi planning authority, but it is not production control authority yet.
 
 ## 3. Historical data and base load
 
@@ -119,7 +122,7 @@ Two planning/control intents remain distinct:
 
 ### Opportunity charging
 
-Opportunity charging uses PV/export remaining **after required WW comfort reservation**. It is no longer gated by an instantaneous 7 A start threshold.
+Opportunity charging uses PV/export remaining **after required WW comfort reservation**.
 
 Current shadow-planning rules:
 
@@ -129,56 +132,72 @@ Current shadow-planning rules:
 - an EV opportunity window must contain at least **30 minutes** of contiguous positive residual PV export while the Tesla is connected;
 - over the complete qualified window, residual PV must cover at least **50% of the energy required by stable 6 A charging**;
 - qualified windows are classified as `PURE_PV` at at least 100% 6 A PV coverage, `SECONDARY` at 75–100%, and `FALLBACK_MIXED` at 50–75%;
-- the planner applies `BEST_PV_WINDOWS_FIRST`: earlier weaker windows are not automatically consumed merely because they exceed the 50% floor;
-- an earlier weaker window is deferred when later **higher-class** windows have enough 6 A PV-capture capacity to replace the PV opportunity of that earlier window;
-- when later better windows do **not** have enough replacement capacity, the weaker earlier window remains eligible so useful autumn/winter PV is not discarded;
-- this future-better-capacity guard is intentionally based on forecast PV-capture capacity because opportunity charging does not yet have a separate day-energy/SOC budget in this Pi shadow planner;
-- inside a selected mixed window, the planner may deliberately plan `PV_MIXED_OPPORTUNITY`: 6 A charging may continue even when instantaneous PV export is below 4.14 kW, with limited grid import filling the difference;
+- the planner applies `BEST_PV_WINDOWS_FIRST`;
+- inside a selected mixed window, the planner may deliberately plan `PV_MIXED_OPPORTUNITY`, with limited grid import filling the difference;
 - when residual PV supports more than 6 A, planned current may rise in whole-amp steps up to the configured maximum;
 - opportunity charging must never consume PV capacity already reserved for required WW comfort.
 
-This window qualification replaces the old `PV_SURPLUS_START7_RUN6_MAX16` planning rule. Real-time control still must avoid excessive start/stop/current flapping and respect charger, vehicle and household electrical limits.
+Real-time control still must avoid excessive start/stop/current flapping and respect charger, vehicle and household electrical limits.
 
 ### Deadline charging
 
-When the user supplies a required SOC/energy target and departure/deadline, meeting that requirement takes priority over opportunistic optimisation. The planner should use PV opportunity while sufficient time slack remains, but once the remaining required charge can no longer safely fit inside the remaining opportunity windows, the missing charging time becomes mandatory and grid/PV mixed charging is permitted as required to meet the deadline.
+When the user supplies a required SOC/energy target and departure/deadline, meeting that requirement takes priority over opportunistic optimisation.
 
-Deadline planning therefore remains logically separate from opportunity qualification: opportunity may optimize *when* to use PV, but it may never cause an explicit EV deadline to be missed.
+The hardened dynamic planner now consumes the available Tesla deadline state, including deadline activation, deadline timestamp and remaining required energy. It evaluates deadline feasibility separately from opportunity charging and may schedule grid/PV mixed charging where required to preserve an explicit deadline.
 
-The current `build_shadow_load_plan.py` implementation contains the dynamic opportunity-window policy but still reports `deadlinePlanningIncluded = false`; integration of the existing deadline requirement into this Pi shadow builder remains a separate migration step. Existing Homey/Easee deadline control authority is not removed by this change.
+An active deadline is therefore a hard planning requirement in the hardened dynamic candidate. `validate_cutover_gate.py` rejects a plan when an active Tesla deadline is not feasible.
+
+The existing quarter-hour `build_shadow_load_plan.py` remains the baseline opportunity planner and may still report `deadlinePlanningIncluded = false`; deadline production authority therefore has **not** moved away from the existing Homey/Easee control path. This difference is intentional during validation of the hardened dynamic candidate.
 
 After a deadline requirement is satisfied/expired, control returns to normal opportunity policy.
 
 Homey/Easee performs physical charging control; the Pi planner supplies planning context/intent rather than creating a second competing real-time charger controller.
 
-## 7. Combined quarter-hour planner
+## 7. Combined quarter-hour and hardened dynamic planning
 
-The combined planning chain uses PV forecast, base-load forecast, WW plan and Tesla flexibility to estimate household import/export and allocate controllable loads.
+The planning chain uses PV forecast, base-load forecast, WW plan and Tesla flexibility to estimate household import/export and allocate controllable loads.
 
 Primary principles:
 
 1. preserve hard safety/device limits;
 2. reserve and satisfy required WW/household comfort loads and their deadlines;
 3. satisfy explicit EV deadline requirements;
-4. optimize the placement of flexible WW and EV demand across the PV/export curve rather than interpreting priority as strict chronological block consumption;
-5. preserve the central PV peak for EV only when the Tesla is physically connected; expected-home/week forecasts alone must not alter WW placement;
-6. evaluate EV opportunity only against **residual export after WW reservation**;
-7. qualify EV opportunity windows at currently at least 30 minutes and at least 50% PV coverage at stable 6 A;
-8. prefer later higher-quality PV windows over earlier mixed-import windows whenever their forecast 6 A PV-capture capacity can replace the earlier opportunity;
-9. use weaker mixed windows only when better future windows are insufficient, preventing avoidable import while preserving otherwise stranded autumn/winter PV;
-10. minimise unnecessary grid import/export without allowing optimisation to violate requirements;
-11. keep planning deterministic and explainable;
-12. keep control writes separate from shadow evaluation until a behavior is validated.
+4. optimize placement of flexible WW and EV demand across the PV/export curve;
+5. preserve the central PV peak for EV only when the Tesla is physically connected;
+6. evaluate EV opportunity only against residual export after WW reservation;
+7. minimise unnecessary grid import/export without allowing optimisation to violate requirements;
+8. keep planning deterministic and explainable;
+9. keep control writes separate from shadow evaluation until validated.
 
-The intended bell-curve behaviour is therefore conditional: when the Tesla is actually connected, WW comfort may occupy suitable shoulder periods while the stronger central export period remains available for the higher minimum-power EV load. Without a connected Tesla, WW simply uses the strongest suitable PV period. This is an optimisation beneath the WW comfort guarantee, not a reversal of WW priority.
-
-Current relevant builder:
+Baseline builder:
 
 `planner/quarter-hour-plan/build_shadow_load_plan.py`
 
+Current hardened dynamic candidate:
+
+`planner/dynamic-plan/build_hardened_dynamic_shadow_plan.py`
+
+The hardened output schema is currently `EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3`. It wraps/enforces production-readiness safeguards around the dynamic planning result while remaining read-only.
+
+Required safeguards include:
+
+- exactly 96 aligned quarter-hour slots;
+- central contract-policy enforcement before any production-economic interpretation;
+- `productionContractMode = FIXED` and `productionContractId = ENGIE_3Y_2026_2029`;
+- dynamic-price data excluded from production decisions while FIXED is active;
+- fail-closed input freshness checks;
+- explicit `validUntil` plan expiry;
+- `plannerOwner = PI` metadata;
+- explicit executor contract metadata;
+- stale-plan rejection requirement;
+- WW comfort feasibility;
+- Tesla deadline feasibility when active;
+- `mode = PURE_SHADOW`, `readOnly = true`, `control_writes = false` until cutover validation is complete.
+
 Website representation:
 
-`planner/quarter-hour-plan/build_website_shadow.py`
+- `planner/quarter-hour-plan/build_website_shadow.py`
+- `planner/dynamic-plan/build_dynamic_website_shadow.py`
 
 ## 8. Energy contract and economic policy
 
@@ -218,10 +237,17 @@ Current intended order:
 3. `build_base_load_forecast.py`
 4. `fetch_ww_input.py`
 5. `build_ww_plan.py`
-6. `build_shadow_load_plan.py`
-7. `build_website_shadow.py`
+6. `import_ww_forecast.py`
+7. `build_shadow_load_plan.py`
+8. `build_hardened_dynamic_shadow_plan.py`
+9. `build_website_shadow.py`
+10. `build_dynamic_website_shadow.py`
+11. `publish_planner_shadow.py`
+12. `publish_dynamic_planner_shadow.py`
 
-Every step must complete successfully before the next starts.
+Every step must complete successfully before the next starts. The hardened dynamic planner is therefore generated automatically by the regular PV forecast chain after deployment; it does not require a second scheduler.
+
+The hardened planner is still shadow-only. Merely adding it to the systemd chain does not authorize device writes or disable the existing Homey planner.
 
 A separate daily read-only validation chain is defined by `ems-pv-capture-validation.service` and `ems-pv-capture-validation.timer`. The timer is scheduled for 00:20 local system time. The service:
 
@@ -235,20 +261,20 @@ This validation chain is observational only. It must not perform Homey/device wr
 
 ## 10. Pi Planner / website
 
-The Pi Planner is currently a **shadow** representation. It displays the 24-hour forecast and planned WW/Tesla windows without making the Pi an uncontrolled second actuator.
+The Pi Planner is currently a **shadow** representation. It displays forecast and planned WW/Tesla windows without making the Pi an uncontrolled second actuator.
 
-The forecast combines:
+Two planner views may coexist during validation:
 
-- predicted base load;
-- PV production forecast;
-- expected grid import/export;
-- flexible-load plans.
+- the existing Pi/Homey-comparison shadow representation;
+- the hardened dynamic Pi shadow candidate.
+
+The forecast combines predicted base load, PV production forecast, expected grid import/export and flexible-load plans.
 
 Website JSON is a publication artifact, not the historical source of truth.
 
 The daily PV-capture validation JSON published under `docs/data/` is likewise a derived read-only evaluation artifact. It may be visualised on the website, but it is not an input that may directly actuate devices.
 
-## 11. Monitoring and validation
+## 11. Monitoring, cutover gate and validation
 
 Changes should follow the project pattern:
 
@@ -259,20 +285,34 @@ Available base-load diagnostics include:
 - `compare_base_load_forecasts.py` — current-vs-generic A/B comparison;
 - `backtest_base_load_forecasts.py` — strict walk-forward historical evaluation.
 
-Daily PV self-consumption evaluation is performed by `planner/dynamic-plan/validate_pv_capture.py`. It is measurement-based and control-independent. It reconstructs PV production, grid import/export, household consumption and Tesla/boiler flexible load from aligned SQLite measurements and reports:
+Daily PV self-consumption evaluation is performed by `planner/dynamic-plan/validate_pv_capture.py`. It is measurement-based and control-independent.
 
-- measured PV production and grid import/export;
-- direct PV self-use;
-- PV self-consumption rate;
-- flexible PV capture in kWh and as a share of the estimated pre-flex export opportunity;
-- Tesla and boiler contributions to flexible PV capture;
-- measured residual export as `batteryRelevantResidualExportKWh`.
+The hardened planner also has a structural read-only cutover gate:
 
-The validation uses a transparent counterfactual: estimated pre-flex export equals measured export plus flexible PV energy actually absorbed by Tesla/boiler. It does **not** claim to replay or prove historical planner recommendations. Planner recommendation replay/snapshot validation, if introduced later, is a separate capability.
+`planner/dynamic-plan/validate_cutover_gate.py`
 
-A validation day is classified `GOOD` only when at least 20 hours of usable measured intervals are integrated; otherwise it is `PARTIAL`.
+A structural PASS requires at least:
 
-Residual measured export after flexible-load use is the relevant empirical starting point for future battery-opportunity/ROI analysis. The battery purchase decision remains separate and uncommitted.
+- schema `EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3`;
+- `PURE_SHADOW`, read-only and `control_writes = false`;
+- `plannerOwner = PI`;
+- an unexpired `validUntil`;
+- FIXED contract mode with `ENGIE_3Y_2026_2029`;
+- no dynamic pricing used for production;
+- no automatic contract switch;
+- complete/fresh fail-closed planner inputs;
+- exactly 96 aligned slots;
+- WW comfort feasibility for planned days;
+- Tesla deadline feasibility when active;
+- executor execution still disabled and stale-plan rejection required.
+
+A PASS from this structural gate is **necessary but not sufficient** for production cutover. Multi-day shadow/replay evidence and behavioral comparison remain required before Homey planning authority may be disabled or Pi control writes enabled.
+
+The Homey planner therefore remains enabled during this validation phase.
+
+Daily PV-capture validation reconstructs PV production, grid import/export, household consumption and Tesla/boiler flexible load from aligned SQLite measurements and reports measured PV production and grid import/export, direct PV self-use, PV self-consumption rate, flexible PV capture, Tesla/boiler contributions and residual export.
+
+The measurement validator does not by itself prove historical planner recommendations. Planner recommendation replay/snapshot validation is a separate cutover-evidence requirement.
 
 Model changes should be retained only when supported by sufficient history and validation, not because one current-day graph looks preferable.
 
@@ -317,13 +357,11 @@ Architecture-sensitive paths currently include Pi runtime source, systemd deploy
 
 GitHub Actions runs the same gate for relevant pull requests and pushes to `main` through `.github/workflows/ems-architecture-gate.yml`.
 
-The Pi deployment script invokes the gate explicitly through `bash` (`bash "$REPO/scripts/ems_architecture_gate.sh" ...`) and runs it **before backup/copy/deployment**. This explicit shell invocation avoids depending on the executable bit of the gate script while preserving a hard deployment stop on any gate failure. It stores the commit of each successful deployment in:
+The Pi deployment script invokes the gate explicitly through `bash` and runs it **before backup/copy/deployment**. It stores the commit of each successful deployment in:
 
 `/home/jeroen/ems/data/deployed-git-commit`
 
-Future deployments compare the candidate release against that last actually deployed commit, so multiple Git commits are evaluated as one release range. This avoids both false passes and false failures caused by checking only `HEAD^`.
-
-The first deployment after introduction of this marker performs invariant validation and initializes the marker; release-range enforcement applies from the next deployment onward.
+Future deployments compare the candidate release against that last actually deployed commit, so multiple Git commits are evaluated as one release range.
 
 A failed architecture gate is a hard deployment stop. Bypassing the gate is not part of the normal EMS deployment process.
 
