@@ -27,6 +27,8 @@ Forecasts + history + live state + contract policy
                     ↓
           Pi current control command
                     ↓
+       Pi → Homey intent publisher
+                    ↓
          Homey executor / safety layer
                     ↓
             EV / boiler actuators
@@ -156,6 +158,22 @@ Homey execution:
 - preserves local safety and manual source-mode controls.
 
 ## 8. Homey/Pi cutover boundary
+
+Production intent is pushed from the Pi to the existing Homey compatibility bus by:
+
+`homey-deploy/publish_pi_control_intent.py`
+
+The script:
+
+- reads the local Pi `/control/current` endpoint;
+- reads the current Homey state revision through the established Homey CLI installation on the Pi;
+- validates PI ownership and FIXED ENGIE control metadata;
+- maps the current Pi command to `EM2_POWER_INTENT_V0.2`;
+- updates only the Homey Logic `EM2_Power_Intent` variable;
+- performs no device writes itself;
+- relies on the existing Homey EV/WW adapters, gates and actuators for physical execution and local safety.
+
+It is scheduled by `ems-pi-control-publish.timer` at one-minute cadence. If the Pi control endpoint is stale/invalid or Homey state revision is unavailable, the publisher fails closed and does not create a competing fallback planner.
 
 After live cutover, legacy Homey planner/decision flows that independently decide WW or Tesla scheduling must be disabled.
 
