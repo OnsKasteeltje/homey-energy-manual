@@ -15,6 +15,7 @@ WW = Path('/home/jeroen/ems/data/ww-plan.json')
 OUTPUT = Path('/home/jeroen/ems/data/tesla-multiday-strategy.json')
 
 SLOT_SECONDS = 15 * 60
+DEFAULT_MAX_AC_CHARGE_POWER_W = 11000.0
 
 
 def load_json(path, required=False):
@@ -163,6 +164,59 @@ def build_horizon_budget(now_utc, departure_at, pv_doc, base_doc, ww_doc):
     }
 
 
+def build_shadow_feasibility(now_utc, departure_at, remaining_need_kwh, max_charge_power_w):
+    result = {
+        'status': 'WAITING_FOR_REQUIRED_INPUTS',
+        'maxAcChargePowerW': round(max_charge_power_w, 1) if max_charge_power_w else None,
+        'maxAcChargePowerSource': 'TESLA_MODEL3_RWD_3PH_16A_NOMINAL',
+        'remainingNeedKWh': remaining_need_kwh,
+        'hoursUntilDeparture': None,
+        'requiredFullPowerHours': None,
+        'slackHoursAtMaxPower': None,
+        'latestFullPowerStartShadowUtc': None,
+        'latestFullPowerStartShadowLocal': None,
+        'mustChargeAtMaxNowShadow': None,
+        'latestGuaranteedStart': None,
+        'trustedForControl': False,
+    }
+
+    if departure_at is None or remaining_need_kwh is None or not max_charge_power_w:
+        return result
+
+    departure_utc = departure_at.astimezone(timezone.utc)
+    hours_until_departure = (departure_utc - now_utc).total_seconds() / 3600.0
+    required_hours = remaining_need_kwh / (max_charge_power_w / 1000.0)
+    latest_start = departure_utc - timedelta(hours=required_hours)
+    slack_hours = hours_until_departure - required_hours
+
+    if remaining_need_kwh <= 0.001:
+        status = 'GOAL_REACHED_SHADOW'
+        must_max_now = False
+    elif hours_until_departure <= 0:
+        status = 'DEPARTURE_NOT_IN_FUTURE'
+        must_max_now = True
+    elif slack_hours < 0:
+        status = 'SHADOW_INFEASIBLE_AT_NOMINAL_MAX_POWER'
+        must_max_now = True
+    elif now_utc >= latest_start:
+        status = 'SHADOW_NOMINAL_MAX_POWER_REQUIRED_NOW'
+        must_max_now = True
+    else:
+        status = 'SHADOW_FEASIBLE_AT_NOMINAL_MAX_POWER'
+        must_max_now = False
+
+    result.update({
+        'status': status,
+        'hoursUntilDeparture': round(hours_until_departure, 3),
+        'requiredFullPowerHours': round(required_hours, 3),
+        'slackHoursAtMaxPower': round(slack_hours, 3),
+        'latestFullPowerStartShadowUtc': latest_start.isoformat().replace('+00:00', 'Z'),
+        'latestFullPowerStartShadowLocal': latest_start.astimezone(TZ).isoformat(),
+        'mustChargeAtMaxNowShadow': must_max_now,
+    })
+    return result
+
+
 outlook = load_json(OUTLOOK, required=True)
 state = load_json(STATE, required=True)
 energy_need = load_json(ENERGY_NEED)
@@ -188,6 +242,18 @@ if departure_local:
         departure_at = departure_at.astimezone(TZ)
     except Exception:
         departure_at = None
+
+max_charge_power_w = DEFAULT_MAX_AC_CHARGE_POWER_W
+max_power_source = 'TESLA_MODEL3_RWD_3PH_16A_NOMINAL'
+explicit_max_power = config.get('maxChargePowerW')
+if explicit_max_power is not None:
+    try:
+        candidate = float(explicit_max_power)
+        if candidate > 0:
+            max_charge_power_w = candidate
+            max_power_source = 'EXPLICIT_STRATEGY_CONFIG'
+    except Exception:
+        pass
 
 remaining_need_kwh = None
 need_source = 'UNAVAILABLE'
@@ -229,6 +295,13 @@ for d in outlook.get('daily') or []:
 horizon = build_horizon_budget(now, departure_at, pv, base, ww)
 bounded_flex_kwh = horizon.get('knownCommittedLoadAwarePvKWh') if horizon else None
 bounded_base_residual_kwh = horizon.get('knownBaseResidualPvKWh') if horizon else None
+feasibility = build_shadow_feasibility(
+    now,
+    departure_at,
+    remaining_need_kwh,
+    max_charge_power_w,
+)
+feasibility['maxAcChargePowerSource'] = max_power_source
 
 latest_guaranteed_start = None
 energy_deficit_kwh = None
@@ -268,7 +341,7 @@ else:
             mode = 'WEEKEND_OPPORTUNITY' if energy_deficit_kwh <= 0.001 else 'WEEKEND_CONSTRAINED'
 
 payload = {
-    'schema': 'EMS_PI_TESLA_MULTI_DAY_STRATEGY_V0.3',
+    'schema': 'EMS_PI_TESLA_MULTI_DAY_STRATEGY_V0.4',
     'generatedAt': now.isoformat().replace('+00:00', 'Z'),
     'mode': 'shadow',
     'readOnly': True,
@@ -291,6 +364,8 @@ payload = {
         'energyNeedSessionStartUtc': energy_need.get('sessionStartUtc') if energy_need else None,
         'departureLocal': departure_at.isoformat() if departure_at else None,
         'departureSource': 'EXPLICIT_STRATEGY_CONFIG' if departure_at else 'UNAVAILABLE',
+        'maxAcChargePowerW': round(max_charge_power_w, 1),
+        'maxAcChargePowerSource': max_power_source,
     },
     'energyBudget': {
         'budgetStatus': horizon.get('status') if horizon else 'WAITING_FOR_DEPARTURE_BOUND',
@@ -303,6 +378,7 @@ payload = {
         'energyDeficitAgainstKnownFlexKWh': energy_deficit_kwh,
         'latestGuaranteedStart': latest_guaranteed_start,
     },
+    'feasibility': feasibility,
     'daily': days,
     'semantics': {
         'shadowEstimatorUse': 'Tesla energy-need estimator may populate the strategy energy budget while remaining explicitly untrusted for control.',
@@ -312,9 +388,12 @@ payload = {
         'knownBaseResidualPvKWh': 'Residual PV after base load, integrated only inside now..departure.',
         'energyDeficitAgainstKnownFlexKWh': 'Remaining need minus committed-load-aware PV inside the explicit departure horizon. Null until departure is known.',
         'dailyDisplay': 'Daily rows remain informational and may extend beyond departure; they are never summed into the Tesla departure-bounded energy budget.',
-        'latestGuaranteedStart': 'Intentionally null until a validated max-charge feasibility model is available.',
-        'noStaleDeadlineReuse': 'Homey remaining_kwh/deadline are not reused when deadline_active=false.'
-    }
+        'latestFullPowerStartShadow': 'Theoretical latest time to start continuous nominal-max AC charging to deliver the current remainingNeedKWh by departure. It is a shadow feasibility boundary, not a guarantee or control command.',
+        'latestGuaranteedStart': 'Remains null. A guaranteed control boundary is deliberately not published while remainingNeedKWh is untrusted and AC-to-battery accounting has not been validated.',
+        'maxAcChargePower': 'Defaults to 11.0 kW for the known 3-phase 16 A Tesla/Easee setup and can be overridden by explicit strategy config. It is used only for shadow feasibility.',
+        'energyAccountingCaveat': 'remainingNeedKWh is still a shadow estimate derived from an arrival-SOC prior minus measured AC charging. No charging-efficiency correction is applied yet.',
+        'noStaleDeadlineReuse': 'Homey remaining_kwh/deadline are not reused when deadline_active=false.',
+    },
 }
 
 OUTPUT.parent.mkdir(parents=True, exist_ok=True)
@@ -322,7 +401,7 @@ tmp = OUTPUT.with_suffix('.tmp')
 tmp.write_text(json.dumps(payload, indent=2))
 tmp.replace(OUTPUT)
 
-print('PASS: Tesla multi-day strategy shadow v0.3 built')
+print('PASS: Tesla multi-day strategy shadow v0.4 built')
 print('strategyMode       :', mode)
 print('weekendActive      :', weekend_active)
 print('remainingNeedKWh   :', remaining_need_kwh, 'source=', need_source)
@@ -332,5 +411,9 @@ print('budgetStatus       :', payload['energyBudget']['budgetStatus'])
 print('knownFlexKWh       :', payload['energyBudget']['knownCommittedLoadAwarePvKWh'])
 print('baseResidualKWh    :', payload['energyBudget']['knownBaseResidualPvKWh'])
 print('energyDeficitKWh   :', energy_deficit_kwh)
-print('latestStart        :', latest_guaranteed_start)
+print('feasibilityStatus  :', feasibility['status'])
+print('requiredMaxHours   :', feasibility['requiredFullPowerHours'])
+print('latestShadowStart  :', feasibility['latestFullPowerStartShadowLocal'])
+print('mustMaxNowShadow   :', feasibility['mustChargeAtMaxNowShadow'])
+print('latestGuaranteed   :', latest_guaranteed_start)
 print('output             :', OUTPUT)
