@@ -10,244 +10,197 @@
 
 ## 1. Source of truth
 
-- GitHub `main` is the version-controlled source for Pi runtime code, deployment definitions and architecture documentation.
+- GitHub `main` is authoritative for Pi runtime source, deployment definitions and architecture documentation.
 - Deployed runtime: `/home/jeroen/ems/runtime/`.
-- Pi checkout: `/home/jeroen/ems/repo/homey-energy-manual`.
+- Pi repository checkout: `/home/jeroen/ems/repo/homey-energy-manual`.
 - SQLite `/home/jeroen/ems/data/ems-history.sqlite` is the single operational historical database.
-- JSON under `/home/jeroen/ems/data/` and `docs/data/` is derived input/output/publication data, not a parallel historical database.
-- Homey remains the smart-home execution and local safety layer.
-- The Pi performs forecasting, history processing and planning.
-- Contract policy is machine-enforced by `planner/contract-policy.json`.
-- Control ownership is machine-declared by `planner/control-authority.json`.
+- JSON under `/home/jeroen/ems/data/` and `docs/data/` is derived state, cache or publication output.
 
-## 2. Operational architecture
+## 2. Control architecture
 
-```mermaid
-flowchart TD
-    H[Homey realtime state] --> I[Pi inputs/history]
-    I --> DB[(SQLite)]
-    DB --> B[Base-load forecast]
-    PV[PV forecast] --> DP[Dynamic Pi planner v0.3]
-    B --> DP
-    Q[Quatt forecast] --> DP
-    WW[Warm-water state/requirement] --> DP
-    EV[Tesla state/deadline] --> DP
-    CP[FIXED ENGIE contract policy] --> DP
-    DP --> CE[Pi current-slot control endpoint]
-    CE --> PI[EM2 Power Intent bridge]
-    PI --> EA[Homey EV adapter/gate]
-    PI --> WA[Homey WW adapter/gate]
-    EA --> EVA[Easee/Tesla actuator]
-    WA --> WWA[Boiler actuator]
+The intended production responsibility split is:
+
+```text
+Forecasts + history + live state + contract policy
+                    ↓
+        Pi hardened dynamic planner
+                    ↓
+          Pi current control command
+                    ↓
+         Homey executor / safety layer
+                    ↓
+            EV / boiler actuators
 ```
 
-### Control-authority boundary
+The Pi is the sole planner authority. Homey is the executor and local safety layer; Homey must not run a competing production planner.
 
-The hardened dynamic Pi planner `EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3` remains computationally read-only: `readOnly = true` and `control_writes = false`. It never writes directly to devices.
-
-Production planning authority is granted separately by `planner/control-authority.json`:
+Machine-readable authority is defined in `planner/control-authority.json` and requires:
 
 - `plannerOwner = PI`;
 - `executor = HOMEY`;
 - `executionEnabled = true`;
 - `legacyHomeyPlannerAuthority = false`;
-- `manualCutoverAuthorized = true`.
+- fixed ENGIE production contract;
+- fail-closed behavior on stale, invalid or incoherent plans.
 
-This means the Pi is the **sole planning authority** for EV and warm-water actuator intents, while Homey remains the executor/safety layer. The read-only planner output is translated to the existing guarded `EM2_POWER_INTENT_V0.2` actuator bus. Existing Homey adapters, validation gates, live-enable switches, device-health checks and physical writers remain in place.
+The planner itself remains read-only with respect to devices. Physical writes remain isolated in Homey actuator flows.
 
-The operator explicitly requested this cutover on 2026-09-11 after the hardened planner structural gate passed. Multi-day replay evidence is no longer a prerequisite for this manually authorized cutover, but replay/measurement validation remains required for subsequent tuning and confidence assessment.
+## 3. Contract policy
 
-## 3. Historical data and base load
+The production EMS is tied to the fixed three-year ENGIE contract.
 
-The recurring history chain imports Homey measurements into SQLite. Relevant channels include P1/grid, three PV inverters, Tesla, boiler, Quatt, washer and dryer activity.
-
-`planner/base-load/build_clean_base_history.py` reconstructs household load from P1 + PV and removes Tesla, boiler and Quatt. Flexible/high residual loads are filtered before the base-load learning model is built.
-
-Current base-load forecast model: `EMS_PI_BASE_LOAD_FORECAST_V0.2`.
-
-- Data before 2025-04-01 is excluded because Quatt installation is a structural break.
-- Forecast resolution is 15 minutes.
-- The model uses quarter/weekday/day-type seasonal medians with fallbacks.
-- Seasonal window is currently ±28 days.
-
-## 4. Warm water
-
-Warm water is flexible but comfort/deadline requirements have priority over optimisation.
-
-Current planning principles:
-
-- determine current WW state and remaining requirement;
-- preserve the daily comfort target and hard 19:00 deadline;
-- prefer PV/export-reduction periods;
-- respect minimum-run constraints;
-- do not reheat unnecessarily after `goalReachedToday`;
-- reserve WW comfort energy before optional EV opportunity use;
-- permit PV-shoulder placement where this preserves stronger central PV for a physically connected EV without endangering WW feasibility.
-
-Homey remains the sole physical boiler writer through the existing WW adapter/gate/actuator chain. Under Pi planning authority, the requested current-slot WW state originates only from the dynamic Pi plan.
-
-The seasonal BOILER-vs-CV advisor remains a separate read-only/manual-switch function and is not a competing real-time planner.
-
-## 5. Tesla EV
-
-Tesla charging remains split into opportunity and deadline behavior.
-
-### Opportunity
-
-- Stable minimum charging is 3×6 A (~4.14 kW).
-- 3×7 A is an actuator kick-start, not an economic threshold.
-- Opportunity windows require at least 30 minutes and at least 50% PV coverage at stable 6 A.
-- Better PV windows are preferred while useful weaker windows may still be used when stronger future capacity is insufficient.
-- EV opportunity never consumes PV reserved for required WW comfort.
-
-### Deadline
-
-An explicit Tesla deadline/SOC/remaining-energy requirement is a hard planner constraint. The hardened planner may use PV first and allow grid/PV mixed charging where necessary to preserve the deadline.
-
-The existing Homey EV adapter/gate/actuator remains responsible for phase/current translation, 6/7 A start/run semantics, charger health, freshness, session resume/start and fail-closed writes. Under Pi planning authority the numeric EV target originates only from the Pi current-slot command.
-
-## 6. Hardened dynamic planner
-
-Current authoritative planner builder:
-
-`planner/dynamic-plan/build_hardened_dynamic_shadow_plan.py`
-
-Output schema:
-
-`EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3`
-
-The planner requires:
-
-- exactly 96 aligned quarter-hour slots;
-- central contract-policy enforcement;
-- FIXED `ENGIE_3Y_2026_2029` contract;
-- dynamic-price exclusion from production decisions while FIXED;
-- fail-closed input freshness;
-- `validUntil` expiry;
-- `plannerOwner = PI`;
-- WW comfort feasibility;
-- Tesla deadline feasibility when active.
-
-The underlying planner stays read-only. Physical execution authority is externalised to `control-authority.json` rather than enabling direct Pi device writes.
-
-## 7. Current-slot control endpoint
-
-`status-api/server.py` exposes:
-
-- `/health` — operational health and control-authority status;
-- `/control/current` — the single validated current-slot command consumed by the Homey executor bridge.
-
-`/control/current` returns a command only when all of the following are valid:
-
-- control policy schema and PI/HOMEY ownership;
-- `executionEnabled = true`;
-- `legacyHomeyPlannerAuthority = false`;
-- FIXED ENGIE contract identity;
-- hardened plan schema;
-- Pi planner ownership/read-only boundary;
-- fresh inputs;
-- unexpired plan `validUntil`;
-- a matching current 15-minute slot.
-
-Otherwise the endpoint returns fail-closed status and zero/off targets. The endpoint does not itself perform a device write.
-
-## 8. Energy contract policy
-
-Production remains tied to the fixed three-year ENGIE contract:
+Required invariants:
 
 - `productionContractMode = FIXED`;
 - `productionContractId = ENGIE_3Y_2026_2029`;
 - `productionSupplier = ENGIE`;
 - dynamic pricing is **disabled for production**;
-- dynamic market prices may only be used for `SHADOW`, `ANALYSIS` or `REPLAY`;
-- automatic fixed→dynamic fallback is forbidden;
+- dynamic prices may only be used for shadow, analysis or replay while FIXED is active;
+- automatic fallback to dynamic pricing is forbidden;
 - automatic contract-mode switching is forbidden;
-- missing/inconsistent configuration must fail closed.
+- missing or inconsistent configuration must **fail closed**.
 
-Ordering invariant:
+Ordering rule:
 
 **contract mode → permitted economic model → permitted price source → planner decision**
 
-A future dynamic-contract switch requires an explicit configuration/architecture change and validation.
+## 4. Pi planning chain
 
-## 9. Systemd planner chain
+The regular `ems-pv-forecast.service` chain builds the planning inputs and plans in this order:
+
+1. PV forecast;
+2. clean base-load history;
+3. base-load forecast;
+4. warm-water input;
+5. warm-water plan;
+6. WW forecast import;
+7. quarter-hour shadow plan;
+8. hardened dynamic planner v0.3;
+9. website shadow representations;
+10. publication artifacts.
 
 `ems-pv-forecast.service` is `Type=oneshot`; `inactive (dead)` after a successful run is normal.
 
-Current order:
+The hardened dynamic plan schema is `EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3` and includes:
 
-1. `fetch_pv_forecast.py`
-2. `build_clean_base_history.py`
-3. `build_base_load_forecast.py`
-4. `fetch_ww_input.py`
-5. `build_ww_plan.py`
-6. `import_ww_forecast.py`
-7. `build_shadow_load_plan.py`
-8. `build_hardened_dynamic_shadow_plan.py`
-9. `build_website_shadow.py`
-10. `build_dynamic_website_shadow.py`
-11. `publish_planner_shadow.py`
-12. `publish_dynamic_planner_shadow.py`
+- 96 quarter-hour slots;
+- `plannerOwner = PI`;
+- fixed ENGIE contract metadata;
+- input freshness checks;
+- `validUntil`;
+- WW comfort feasibility;
+- Tesla deadline feasibility when active;
+- fail-closed execution metadata.
 
-Every step must succeed before the next runs.
+## 5. Current control endpoint
 
-## 10. Homey responsibility after cutover
+The Pi status API exposes:
 
-Homey remains enabled for:
+`GET /control/current`
 
-- realtime state acquisition;
-- Core/state aggregation required by adapters and revision guards;
-- EV deadline input capture;
-- device-health checks;
-- EV and WW power adapters;
-- validation gates;
-- live-enable/kill switches;
-- anti-flapping/session behavior;
-- physical Easee/Tesla and boiler writes;
-- safety-only flows that do not create competing optimisation/planning authority.
+A successful response uses schema `EMS_PI_CONTROL_COMMAND_V0.1` and contains only the command for the quarter-hour slot containing the current UTC time.
 
-Legacy Homey planner/decision flows that calculate competing EV/WW schedules or planner decisions must be disabled after the Pi control endpoint and Pi→Power-Intent bridge are verified. They may remain stored in Homey for rollback/reference but must not be enabled as planning authority.
+Current-slot semantics are authoritative and deterministic:
 
-## 11. Website and observability
+- slot start comes from `slot_start_utc`;
+- slot end is `slot_end_utc` when explicitly present;
+- for planner versions that omit `slot_end_utc`, the executor bridge derives slot end as exactly `slot_start_utc + 15 minutes`;
+- a slot is current when `start <= now < end`;
+- command validity is bounded by both planner `validUntil` and slot end.
 
-The existing Pi and dynamic planner website artifacts remain observability/publication outputs. Website JSON is not a control input. The authoritative live input is the locally validated Pi current-slot endpoint.
+The endpoint must fail closed with zero/off targets when any of the following is invalid:
 
-Historical/replay/PV-capture validation remains observational and is used to evaluate quality after cutover.
+- control-authority policy;
+- planner schema or ownership;
+- fixed-contract invariant;
+- planner input freshness;
+- planner `validUntil`;
+- current-slot resolution.
 
-## 12. Fail-closed and rollback policy
+A fail-closed response must never be interpreted as permission to run an opportunistic actuator action.
 
-Fail closed:
+## 6. Tesla
 
-- stale/invalid Pi plan → EV target 0 W and WW target OFF at the bridge boundary where state/revision guards permit;
-- invalid contract policy → no Pi command;
-- unknown planner schema → no Pi command;
-- missing current slot → no Pi command;
-- downstream Homey adapter/gate mismatch → existing actuator fail-closed behavior applies.
+Tesla charging remains split into planning and execution.
 
-Rollback is deliberate, never dual-control. To roll back, first disable the Pi Power-Intent bridge/control authority, then explicitly re-enable the selected Homey planner authority. Pi and Homey planners must never simultaneously own actuator planning.
+Pi planning:
 
-## 13. Battery boundary
+- opportunity charging uses residual PV after WW reservation;
+- stable minimum is modelled at 3×6 A;
+- 3×7 A is an actuator kickstart, not an economic threshold;
+- opportunity windows require at least 30 minutes and at least 50% PV coverage at stable 6 A;
+- explicit deadline charging is a hard requirement and may use grid energy when necessary to meet the deadline.
 
-The future battery architecture remains Victron AC-coupled. Victron/DESS is intended to remain the primary real-time battery optimiser. Pi/Homey may provide forecasts/policy but must not compete with DESS for battery dispatch.
+Homey execution:
 
-## 14. Architecture enforcement
+- validates `EM2_POWER_INTENT_V0.2` through EV adapter and validation gate;
+- enforces freshness, schema, revision and charger-health constraints;
+- controls Easee session start/resume and current;
+- fails closed to 0 A on invalid/stale control input.
 
-`scripts/ems_architecture_gate.sh` validates critical contract/document invariants and ensures architecture-sensitive changes include this canonical document in the same release range.
+## 7. Warm water
 
-The deployment script invokes the gate before copying runtime/systemd files and stores the last successfully deployed Git commit in:
+WW comfort is a hard constraint above optimization.
 
-`/home/jeroen/ems/data/deployed-git-commit`
+Pi planning:
 
-A failed architecture gate is a hard deployment stop.
+- schedules remaining required heating before the hard 19:00 deadline;
+- prefers useful PV periods;
+- may use shoulders of a PV window when a connected Tesla can better absorb the central peak;
+- does not schedule unnecessary repeat heating after the daily goal is reached.
 
-## 15. Sync and deployment
+Homey execution:
 
-Repository sync alone does not prove runtime/systemd sync. Production-sensitive changes use the normal deployment path:
+- remains the sole boiler physical writer;
+- validates adapter/gate/freshness/mode before a physical write;
+- preserves local safety and manual source-mode controls.
 
-```bash
-cd /home/jeroen/ems/repo/homey-energy-manual
-git pull --ff-only
-sudo ./scripts/deploy_ems_pi.sh
-```
+## 8. Homey/Pi cutover boundary
 
-After deployment, changed long-running services such as `ems-status-api.service` must be restarted explicitly because the deployment script intentionally does not restart services.
+After live cutover, legacy Homey planner/decision flows that independently decide WW or Tesla scheduling must be disabled.
+
+The following classes remain enabled:
+
+- state/input aggregation needed by Pi;
+- device-health and validation gates;
+- EV/WW adapters;
+- EV/WW actuator flows;
+- monitoring, history and diagnostics;
+- local hard safety/failsafe flows that do not compete as planners.
+
+The architecture must never run Pi planning authority and Homey planning authority simultaneously for the same actuator.
+
+## 9. Monitoring and validation
+
+Deployment pattern:
+
+**inspect → minimal change → update architecture → architecture gate → deploy → validate → monitor**
+
+The deployment script:
+
+- runs the architecture gate;
+- backs up runtime;
+- deploys version-controlled runtime and systemd units;
+- runs drift validation;
+- reloads systemd;
+- writes the deployed Git commit marker;
+- does not restart services automatically.
+
+`validate_cutover_gate.py` remains a structural planner validation tool. Live control additionally requires a valid `/control/current` response and a coherent Homey executor bridge.
+
+## 10. Battery boundary
+
+The planned battery architecture is Victron AC-coupled. When commissioned, Victron/DESS remains the primary real-time battery optimizer. Pi/Homey may provide forecasts, load intent and policy constraints but must not create a competing real-time battery optimizer.
+
+## 11. Architecture enforcement
+
+`scripts/ems_architecture_gate.sh` enforces at least:
+
+- valid fixed-contract invariants;
+- presence of this canonical architecture document;
+- documentation of FIXED mode;
+- dynamic-production prohibition;
+- fail-closed behavior;
+- same-release documentation updates for architecture-sensitive runtime/systemd/deployment changes.
+
+A failed architecture gate is a hard deployment stop and must not be bypassed in normal operation.
