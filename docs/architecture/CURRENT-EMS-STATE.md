@@ -169,14 +169,16 @@ The publisher:
 - performs one Homey read per run to obtain the current `EM2_State` revision required by the downstream exact-revision safety contract;
 - validates PI ownership and FIXED ENGIE control metadata;
 - maps the current Pi command to `EM2_POWER_INTENT_V0.2`;
-- suppresses the Homey write when the semantic command plus source revision is unchanged;
+- defines write idempotency only from actuator-relevant semantics: `sourceRevision`, EV target W and WW target state;
+- treats planner `generatedAt` / `validUntil` as validation and metadata, not as reasons for a duplicate Homey write when the physical command is unchanged;
+- suppresses the Homey write when source revision and actuator targets are unchanged;
 - writes only the Homey Logic `EM2_Power_Intent` variable when an update is required;
 - performs no device writes itself;
 - uses bounded retry/backoff only for Homey `Too many requests` responses;
 - fails closed on any non-rate-limit Homey error or unavailable Pi control command;
 - relies on the existing Homey EV/WW adapters, gates and actuators for physical execution and local safety.
 
-It is scheduled by `ems-pi-control-publish.timer` at one-minute cadence. The one-minute timer is intentionally more frequent than the 15-minute planner slot so a newly generated slot is propagated promptly, while semantic no-op suppression minimizes Homey writes. If Homey is temporarily rate limited, retries are delayed and bounded; the publisher never introduces a competing planner fallback.
+It is scheduled by `ems-pi-control-publish.timer` at one-minute cadence. The one-minute timer is intentionally more frequent than the 15-minute planner slot so a new target is noticed promptly; semantic no-op suppression means routine planner timestamp refreshes do not create Homey writes. A write is expected only when the Homey source revision changes or an EV/WW actuator target changes. If Homey is temporarily rate limited, retries are delayed and bounded; the publisher never introduces a competing planner fallback.
 
 After live cutover, legacy Homey planner/decision flows that independently decide WW or Tesla scheduling must be disabled.
 
