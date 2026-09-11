@@ -8,12 +8,13 @@ def load(path):
     return json.loads(Path(path).read_text())
 
 
-def load_git_json(repo, git_ref, path):
-    out = subprocess.check_output(
-        ["git", "-C", repo, "show", f"{git_ref}:{path}"],
-        text=True,
-    )
-    return json.loads(out)
+def load_source(spec):
+    """Load JSON from a filesystem path or git ref:path spec."""
+    if ":" in spec and not spec.startswith("/"):
+        ref, path = spec.split(":", 1)
+        raw = subprocess.check_output(["git", "show", f"{ref}:{path}"], text=True)
+        return json.loads(raw)
+    return load(spec)
 
 
 def iso_age_seconds(value):
@@ -37,7 +38,6 @@ def check(ok, name, detail, failures):
 
 
 def unwrap_dynamic_plan(doc):
-    """Return (wrapper, plan) for published dynamic planner JSON or a direct plan JSON."""
     if isinstance(doc, dict) and isinstance(doc.get("plan"), dict):
         candidate = doc["plan"]
         if candidate.get("schema") == "EMS_PI_DYNAMIC_ENERGY_PLAN_24H_V0.1":
@@ -65,22 +65,24 @@ def main():
     ap = argparse.ArgumentParser(description="Read-only preflight for Homey -> Pi planner authority cutover.")
     ap.add_argument("--authority", default="/home/jeroen/ems/runtime/planner/control-authority.json")
     ap.add_argument("--selector", default="/home/jeroen/ems/runtime/planner/authority-selector-policy.json")
-    ap.add_argument("--repo", default="/home/jeroen/ems/repo/homey-energy-manual")
-    ap.add_argument("--git-ref", default="origin/main")
-    ap.add_argument("--pi-plan-git-path", default="docs/data/energy-planner-shadow-dynamic.json")
-    ap.add_argument("--ev-status-git-path", default="docs/data/ev-control-status.json")
+    ap.add_argument("--pi-plan", default="origin/main:docs/data/energy-planner-shadow-dynamic.json")
+    ap.add_argument("--ev-status", default="origin/main:docs/data/ev-control-status.json")
+    ap.add_argument("--energy-state", default="origin/main:docs/data/energy-state-v2.json")
     ap.add_argument("--max-plan-age-sec", type=int, default=1200)
+    ap.add_argument("--max-state-age-sec", type=int, default=1200)
     args = ap.parse_args()
 
     failures = []
     authority = load(args.authority)
     selector = load(args.selector)
-    plan_doc = load_git_json(args.repo, args.git_ref, args.pi_plan_git_path)
-    ev = load_git_json(args.repo, args.git_ref, args.ev_status_git_path)
+    plan_doc = load_source(args.pi_plan)
+    ev = load_source(args.ev_status)
+    state = load_source(args.energy_state)
     wrapper, plan = unwrap_dynamic_plan(plan_doc)
 
-    print(f"SOURCE planner={args.git_ref}:{args.pi_plan_git_path}")
-    print(f"SOURCE ev={args.git_ref}:{args.ev_status_git_path}")
+    print(f"SOURCE planner={args.pi_plan}")
+    print(f"SOURCE ev={args.ev_status}")
+    print(f"SOURCE state={args.energy_state}")
 
     check(authority.get("plannerOwner") == "HOMEY", "authority_homey",
           f"plannerOwner={authority.get('plannerOwner')}", failures)
@@ -130,8 +132,10 @@ def main():
 
     check(ev.get("coherent") is True, "ev_chain_coherent",
           f"coherent={ev.get('coherent')}", failures)
-    check(ev.get("deviceHealth", {}).get("controlSafe") is True, "ev_device_health_safe",
-          f"status={ev.get('deviceHealth', {}).get('status')}, reason={ev.get('deviceHealth', {}).get('reason')}", failures)
+    health = ev.get("deviceHealth", {})
+    health_safe = health.get("status") == "OK" and health.get("controlSafe") is True
+    check(health_safe, "ev_device_health_safe",
+          f"status={health.get('status')}, reason={health.get('reason')}", failures)
     check(ev.get("gate", {}).get("status") == "PASS", "ev_gate_pass",
           f"gate={ev.get('gate', {}).get('status')}", failures)
     check(ev.get("actuator", {}).get("live") is True, "ev_actuator_live",
@@ -140,6 +144,31 @@ def main():
           "safe_zero_ev_start",
           f"targetW={ev.get('targetW')}, requestedA={ev.get('requestedA')}", failures)
 
+    meta = state.get("meta", {}) if isinstance(state, dict) else {}
+    state_generated = meta.get("generated_at") or meta.get("heartbeat_at")
+    state_age = iso_age_seconds(state_generated)
+    check(state_age is not None and state_age <= args.max_state_age_sec,
+          "energy_state_fresh",
+          f"generatedAt={state_generated}, ageSec={None if state_age is None else round(state_age)}", failures)
+
+    hot = state.get("hot_water", {}) if isinstance(state, dict) else {}
+    ww = hot.get("control", {}) if isinstance(hot, dict) else {}
+    state_rev = meta.get("state_revision")
+    ww_rev = ww.get("sourceRevision")
+    check(ww.get("schema") == "EM2_CONTROL_WW_V0.11" and ww_rev == state_rev,
+          "ww_revision_aligned",
+          f"schema={ww.get('schema')}, wwRev={ww_rev}, stateRev={state_rev}", failures)
+    check(ww.get("readOnly") is True and ww.get("safety", {}).get("physicalWritePerformed") is False,
+          "ww_core_shadow_safe",
+          f"readOnly={ww.get('readOnly')}, physicalWritePerformed={ww.get('safety', {}).get('physicalWritePerformed')}", failures)
+    boiler_on = hot.get("boiler_on")
+    boiler_w = hot.get("boiler_power_w")
+    safe_boiler_off = boiler_on is False and isinstance(boiler_w, (int, float)) and boiler_w < 100
+    check(safe_boiler_off, "safe_zero_ww_start",
+          f"boilerOn={boiler_on}, boilerPowerW={boiler_w}", failures)
+    check(ww.get("action") in ("HOLD", "OFF"), "ww_safe_core_action",
+          f"action={ww.get('action')}, priority={ww.get('priority')}", failures)
+
     print()
     if failures:
         print("CUTOVER_PREP: FAIL")
@@ -147,6 +176,7 @@ def main():
         return 2
     print("CUTOVER_PREP: PASS")
     print("No authority was changed. This script is read-only.")
+    print("NOTE: WW checks validate published safe state/revision alignment; live Homey WW gate/actuator status must still be verified before physical cutover.")
     return 0
 
 
