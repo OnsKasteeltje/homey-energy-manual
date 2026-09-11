@@ -2,7 +2,7 @@ import json
 import os
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 HOST = "0.0.0.0"
@@ -17,6 +17,7 @@ DYNAMIC_PLAN_FILE = "/home/jeroen/ems/data/dynamic-shadow-plan.json"
 CONTROL_POLICY_FILE = "/home/jeroen/ems/runtime/planner/control-authority.json"
 
 STALE_AFTER_SECONDS = 25 * 60
+SLOT_MINUTES = 15
 
 
 def git_revision():
@@ -42,6 +43,16 @@ def parse_utc_timestamp(value):
         return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
     except Exception:
         return None
+
+
+def slot_bounds(slot):
+    start = parse_utc_timestamp(slot.get("slot_start_utc"))
+    if start is None:
+        return None, None
+    end = parse_utc_timestamp(slot.get("slot_end_utc"))
+    if end is None:
+        end = start + timedelta(minutes=SLOT_MINUTES)
+    return start, end
 
 
 def forecast_status(path, expected_schema):
@@ -115,17 +126,19 @@ def current_control_command():
         raise ValueError("PLAN_STALE")
 
     current = None
+    current_start = None
+    current_end = None
     for slot in plan.get("slots") or []:
-        start = parse_utc_timestamp(slot.get("slot_start_utc"))
-        end = parse_utc_timestamp(slot.get("slot_end_utc"))
+        start, end = slot_bounds(slot)
         if start is not None and end is not None and start <= now < end:
             current = slot
+            current_start = start
+            current_end = end
             break
     if current is None:
         raise ValueError("NO_CURRENT_SLOT")
 
-    slot_end = parse_utc_timestamp(current.get("slot_end_utc"))
-    command_valid_until = min(valid_until, slot_end)
+    command_valid_until = min(valid_until, current_end)
     ev_w = max(0, int(round(float(current.get("evPlanW") or 0))))
     ww_w = max(0, int(round(float(current.get("wwPlanW") or 0))))
 
@@ -138,7 +151,10 @@ def current_control_command():
         "plannerGeneratedAt": plan.get("generated_at"),
         "executor": "HOMEY",
         "contract": {"mode": "FIXED", "id": "ENGIE_3Y_2026_2029"},
-        "slot": {"start": current.get("slot_start_utc"), "end": current.get("slot_end_utc")},
+        "slot": {
+            "start": current_start.isoformat().replace("+00:00", "Z"),
+            "end": current_end.isoformat().replace("+00:00", "Z")
+        },
         "targets": {
             "ev": {
                 "target_W": ev_w,
