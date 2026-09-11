@@ -1,0 +1,57 @@
+{
+  "schema": "EMS_AUTHORITY_SELECTOR_POLICY_V0.1",
+  "defaultAuthority": "HOMEY",
+  "allowedAuthorities": ["HOMEY", "PI"],
+  "currentAuthority": "HOMEY",
+  "selectorMode": "EXPLICIT_MANUAL_ONLY",
+  "homey": {
+    "producer": "EM v2 | 20 Power Intent | P1 v0.2.4 DUAL-SEMANTIC LOW-LOAD",
+    "mustRemainIntact": true
+  },
+  "pi": {
+    "producer": "EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.1 LAN [DISABLED TEST COPY]",
+    "mustBeSeparateFlow": true,
+    "enabledBeforeAuthoritySwitch": false
+  },
+  "invariants": {
+    "singleActiveIntentProducer": true,
+    "homeySafetyChainRetained": true,
+    "evAdapterRetained": true,
+    "evGateRetained": true,
+    "evActuatorRetained": true,
+    "wwAdapterRetained": true,
+    "wwGateRetained": true,
+    "wwActuatorRetained": true,
+    "noDirectPiDeviceWrites": true,
+    "rollbackWithoutDeploy": true
+  },
+  "preCutover": {
+    "requiredPlannerControlMode": "PURE_SHADOW",
+    "requiredContractMode": "FIXED",
+    "requiredContractId": "ENGIE_3Y_2026_2029",
+    "dynamicPricingProduction": false,
+    "autoContractSwitch": false,
+    "requiredQuarterSlots": 96,
+    "requireFreshInputs": true,
+    "requireEvChainCoherent": true,
+    "requireWwChainHealthy": true,
+    "requireSafeInitialEvTargetW": 0,
+    "requireSafeInitialWwTargetOn": false
+  },
+  "cutoverSequence": [
+    "verify_preflight_gate",
+    "enable_pi_bridge_without_authority",
+    "verify_pi_intent_dry_run",
+    "switch_selector_homey_to_pi",
+    "verify_single_producer",
+    "verify_ev_and_ww_safety_chains",
+    "run_zero_output_smoke_test",
+    "run_small_positive_ev_smoke_test_if_safe"
+  ],
+  "rollbackSequence": [
+    "switch_selector_pi_to_homey",
+    "disable_pi_bridge",
+    "verify_homey_intent_fresh",
+    "verify_ev_and_ww_safety_chains"
+  ]
+}
