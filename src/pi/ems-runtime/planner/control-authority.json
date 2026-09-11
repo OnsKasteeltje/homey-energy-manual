@@ -1,23 +1,38 @@
 {
-  "schema": "EMS_CONTROL_AUTHORITY_V1.0",
-  "plannerOwner": "PI",
-  "plannerSourceSchema": "EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3",
+  "schema": "EMS_CONTROL_AUTHORITY_V1.1",
+  "plannerOwner": "HOMEY",
+  "plannerSourceSchema": "EM2_POWER_INTENT_V0.2",
   "executor": "HOMEY",
   "executionEnabled": true,
-  "legacyHomeyPlannerAuthority": false,
-  "manualCutoverAuthorized": true,
-  "authorizedDate": "2026-09-11",
+  "legacyHomeyPlannerAuthority": true,
+  "manualCutoverAuthorized": false,
+  "cutoverState": "PREPARED_HOMEY",
+  "piBridgeEnabled": false,
+  "homeyProducerEnabled": true,
   "contractMode": "FIXED",
   "contractId": "ENGIE_3Y_2026_2029",
+  "dynamicPricingProduction": false,
+  "autoContractSwitch": false,
   "failClosed": {
     "staleOrInvalidPlan": true,
     "evTargetW": 0,
-    "wwTargetOn": false
+    "wwTargetOn": false,
+    "fallbackPlannerOwner": "HOMEY"
+  },
+  "cutoverRules": {
+    "neverOverwriteHomeyProductionFlow": true,
+    "parallelPiBridgeRequired": true,
+    "singleActiveIntentProducer": true,
+    "selectorDefault": "HOMEY",
+    "rollbackTarget": "HOMEY",
+    "requireExplicitGatePass": true,
+    "requireManualCutoverAction": true
   },
   "notes": [
-    "The Pi dynamic planner is the sole planning authority for actuator intents.",
-    "Homey remains executor and local safety layer only.",
-    "Planner output remains read-only; execution authority is granted by this policy.",
-    "Legacy Homey planner/decision authority must be disabled after the Pi control endpoint is verified."
+    "Current production authority is Homey.",
+    "Pi dynamic planner remains shadow until an explicit controlled cutover.",
+    "The Pi bridge must remain a separate flow and must never replace the Homey production Power Intent flow.",
+    "Homey remains executor and local safety layer before and after cutover.",
+    "Switching authority is a separate controlled action and is not implied by this file."
   ]
 }
