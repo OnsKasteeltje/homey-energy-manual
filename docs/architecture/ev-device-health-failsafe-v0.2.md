@@ -1,66 +1,98 @@
-# EV Device Health Fail-safe v0.2
+# EV Device Health v0.2 — observability-only update
 
-Date: 2026-09-11
+Date: 2026-09-12
 
 ## Purpose
 
-Prevent stale or unavailable Easee/Homey telemetry from being interpreted as a trustworthy `plugged_out` / disconnected EV state.
+`EM2_EV_Telemetry_Health` remains a diagnostic signal for Easee/Homey telemetry quality, but as of 2026-09-12 it is **not a hard control veto** in the EV Adapter Gate.
 
-The control-plane rule is now:
+This document supersedes the earlier 2026-09-11 interpretation in which `CONTROL_UNAVAILABLE` from the health observer automatically blocked every positive EV command.
 
-- fresh and internally consistent Easee telemetry -> normal EV semantics and `CONTROL_AVAILABLE`;
-- unavailable device, stale telemetry, or confirmed P1/Easee contradiction -> `EV_STATUS_UNKNOWN` + `CONTROL_UNAVAILABLE`;
-- `CONTROL_UNAVAILABLE` can never pass the EV Adapter Gate for a positive charging command;
-- the existing EV actuator remains the only physical writer and fail-closes to 0 A when its gate is not PASS;
-- recovery requires fresh device health before the gate can return to PASS.
+## Why the control rule changed
 
-## Homey runtime components
+Live validation showed that the health observer can report `STALE / EASEE_TELEMETRY_STALE` when capability values have simply remained unchanged for more than five minutes, even though:
+
+- the Easee device is still reachable through Homey;
+- the charger is still controllable;
+- the canonical intent, EV adapter and EM2 state are coherent;
+- electrical and translation checks pass.
+
+Therefore the health observer was conflating **unchanged capability timestamps** with **loss of control availability**. Using that signal as a hard gate produced false-positive control vetoes.
+
+## Current Homey runtime components
 
 ### `EM v2 | 82 Safety | EV Device Health v0.2 LIVE-GATE`
 
-- enabled;
-- one targeted Easee device read per run;
-- runs every 2 minutes and on `EM2_State` change;
-- no physical writes;
-- reuses Logic variable `EM2_EV_Telemetry_Health`;
-- checks Homey device availability, newest timestamp across live Easee telemetry capabilities, and the existing P1 three-phase contradiction heuristic;
-- stale threshold: 5 minutes;
-- publishes `EV_STATUS_UNKNOWN / CONTROL_UNAVAILABLE` when unsafe;
-- emits a Homey notification only on unsafe/recovery transitions.
+The existing health observer remains enabled for diagnostics. It:
 
-### `EM v2 | 80 Validation | EV Power Adapter Gate v0.2.4 + HEALTH`
+- performs a targeted Easee device read;
+- runs periodically and on state changes;
+- performs no physical writes;
+- publishes `EM2_EV_Telemetry_Health`;
+- reports fields such as status, reason, normalized EV status, control availability and telemetry age;
+- may still classify stable capability timestamps as `STALE`.
 
-The gate now also consumes `EM2_EV_Telemetry_Health`. PASS requires a fresh health sample with:
+Its current flow name contains the historical term `LIVE-GATE`; that name no longer describes its control impact and should be treated as legacy naming until cleaned up.
 
-- `schema = EM2_EV_DEVICE_HEALTH_V0.2`;
-- `status = OK`;
-- `controlSafe = true`;
-- `controlAvailability = CONTROL_AVAILABLE`.
+### `EM v2 | 80 Validation | EV Power Adapter Gate v0.2.5 OBSERVABILITY-ONLY HEALTH`
 
-Any STALE / UNAVAILABLE / MISMATCH health state makes the gate FAIL. The existing EV actuator then uses its existing fail-closed path; no second Easee writer was added.
+This is the active EV gate.
+
+The gate still reads `EM2_EV_Telemetry_Health`, but only to publish diagnostic context. Health fields are emitted under `deviceHealth` with `observabilityOnly = true`.
+
+Health is **not** part of the decisive PASS/FAIL checks.
+
+Gate PASS is based on the independent control contract, including:
+
+- expected intent/adapter/state schemas;
+- exact source/state revision alignment;
+- valid canonical Power Intent;
+- safe read-only adapter semantics;
+- valid EV state semantics;
+- electrical/current mapping checks;
+- valid command range;
+- fail-closed translation semantics.
+
+A health state such as `STALE`, `UNAVAILABLE` or `CONTROL_UNAVAILABLE` by itself therefore cannot force the v0.2.5 gate to FAIL.
 
 ### `EM v2 | 81 Observability | EV Control Status v0.3 + HEALTH`
 
-`docs/data/ev-control-status.json` now publishes the health state next to Gate and Actuator evidence, including telemetry age, device availability, normalized EV status and control availability.
+`docs/data/ev-control-status.json` publishes the health state next to Gate and Actuator evidence.
 
-## Recovery validation
+The top-level contract is explicit:
 
-Live evidence immediately after deployment showed:
+- `observabilityOnly = true`;
+- `controlImpact = NONE`.
 
-- health `OK / FRESH_TELEMETRY`;
-- normalized EV state `PLUGGED_IN_PAUSED`;
-- `CONTROL_AVAILABLE`;
-- EV Gate PASS and revision coherent;
-- EV target 0 W / requested 0 A;
-- actuator fail-closed target 0 A with `previousA = 0` and no physical write required;
-- live Easee readback: paused, 0 W, target current 0 A.
+Some nested warning text can still reflect the older hard-veto wording. Such wording is diagnostic legacy text and is **not authoritative for control behavior**. The gate status and active v0.2.5 implementation are authoritative.
 
-This validates the recovered-state end condition without intentionally disrupting the Easee app or starting a charging session.
+## Live validation — 2026-09-12
 
-## Safety note
+A controlled Pi end-to-end EV test was performed after changing the gate to observability-only health.
 
-When Homey cannot communicate with the Easee charger, the EMS cannot guarantee that a 0 A command has physically reached the charger. The fail-safe therefore reports control as unavailable rather than claiming the charger has stopped. Once telemetry/control recovers, the normal EV gate and the existing single physical actuator reassert the current policy, including 0 A when charging is not permitted.
+During the successful positive command:
 
-## Remaining architectural cleanup
+- Pi target: 4830 W / 7 A;
+- health observer still reported `STALE / EASEE_TELEMETRY_STALE`;
+- gate: `PASS`;
+- gate health block: `observabilityOnly = true`;
+- actuator: `WRITE_OK_POST_SESSION`;
+- `physicalWritePerformed = true`;
+- Easee: `Charging`;
+- offered/target current: 7 A;
+- measured charging power: approximately 4.9 kW.
 
-`EM2_State.tesla.chargeState` is still the raw Core representation and may contain the last Easee value during an outage. Control consumers must use `EM2_EV_Telemetry_Health` as the authoritative availability guard. A later Core schema revision can embed the normalized device-health fields directly into the canonical State without changing the safety behavior implemented here.
+The later return to Pi target 0 A physically paused the charger again.
+
+Result: **the hard health veto was the blocker; removing health from decisive gate checks restored the intended Pi → Homey → Easee control path while retaining the other safety checks.**
+
+## Safety boundary
+
+This change does not make Easee health irrelevant. It changes how the signal is used.
+
+- Health remains useful for observability, troubleshooting and warning.
+- The EV gate continues to fail closed on incoherent intent/adapter/state revisions, invalid schema, invalid electrical mapping or invalid translation semantics.
+- The EV actuator remains the single physical Easee writer.
+- Invalid/stale canonical control input still fails closed to 0 A.
+
+If future health logic obtains a trustworthy transport-level or command-acknowledgement signal that distinguishes an unreachable charger from merely unchanged values, that signal may be considered for a dedicated safety interlock. The current capability-timestamp heuristic must not be treated as that signal.
