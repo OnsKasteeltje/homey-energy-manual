@@ -394,6 +394,184 @@ def enforce_min_run(selected, candidates, scores, required_slots):
     return selected
 
 
+
+def ww_singleton_count(selected):
+    """Count isolated WW slots; a joint swap may never make this worse."""
+    selected = set(selected)
+    if not selected:
+        return 0
+
+    singles = 0
+    for i in selected:
+        if (i - 1 not in selected) and (i + 1 not in selected):
+            singles += 1
+    return singles
+
+
+def joint_flex_value_for_ww_selection(candidates, selected, not_before_utc):
+    """Evaluate WW + executable qualified EV windows under one common objective.
+
+    Value unit is W-equivalent per 15-minute slot:
+      PV capture - import_penalty * grid import.
+
+    EV value only counts when a profitable contiguous window satisfies the
+    existing >=30 minute qualification rule.
+    """
+    selected = set(selected)
+    probe = []
+    ww_value = 0.0
+
+    for i, slot in enumerate(candidates):
+        export_w = max(
+            0.0, float(slot.get("correctedExportBeforeFlexW") or 0)
+        )
+
+        if i in selected:
+            ww_capture = min(BOILER_W, export_w)
+            ww_import = max(0.0, BOILER_W - export_w)
+            ww_value += (
+                ww_capture - WW_IMPORT_PENALTY * ww_import
+            )
+            residual = max(0.0, export_w - BOILER_W)
+        else:
+            residual = export_w
+
+        ev_w, ev_value = ev_best_option(residual)
+
+        # Never create a new EV opportunity in a slot that has already started.
+        executable = (
+            parse_utc(slot["slot_start_utc"]) >= not_before_utc
+        )
+
+        candidate = dict(slot)
+        candidate["evResidualExportW"] = round(residual)
+        candidate["evMarginalTargetCandidateW"] = (
+            ev_w if executable else 0
+        )
+        candidate["_jointEvMarginalValueW"] = (
+            ev_value if executable else 0.0
+        )
+        probe.append(candidate)
+
+    windows = qualify_ev_windows(probe)
+
+    qualified_indices = set()
+    for window in windows:
+        qualified_indices.update(window["indices"])
+
+    ev_value = sum(
+        float(probe[i]["_jointEvMarginalValueW"])
+        for i in qualified_indices
+    )
+
+    return ww_value + ev_value, windows
+
+
+def optimize_joint_ww_ev_single_swap(
+    candidates,
+    selected,
+    required_slots,
+    now_utc,
+    tesla_connected_now,
+):
+    """Try one WW relocation if it unlocks a better qualified EV window.
+
+    Hard invariants:
+    - same number of WW slots;
+    - only future/not-yet-started slots may move;
+    - never increase isolated WW slots;
+    - existing WW deadline/candidate feasibility remains intact;
+    - accept only a strictly better joint objective.
+    """
+    selected = set(selected)
+
+    result = {
+        "applied": False,
+        "fromSlot": None,
+        "toSlot": None,
+        "deltaWhEquivalent": 0.0,
+        "qualifiedEvWindowsBefore": 0,
+        "qualifiedEvWindowsAfter": 0,
+    }
+
+    if (
+        not tesla_connected_now
+        or required_slots <= 0
+        or not selected
+    ):
+        return selected, result
+
+    base_singletons = ww_singleton_count(selected)
+    base_value, base_windows = joint_flex_value_for_ww_selection(
+        candidates, selected, now_utc
+    )
+    result["qualifiedEvWindowsBefore"] = len(base_windows)
+
+    best = None
+
+    for remove_i in sorted(selected):
+        if parse_utc(candidates[remove_i]["slot_start_utc"]) < now_utc:
+            continue
+
+        for add_i in range(len(candidates)):
+            if add_i in selected:
+                continue
+            if parse_utc(candidates[add_i]["slot_start_utc"]) < now_utc:
+                continue
+
+            trial = set(selected)
+            trial.remove(remove_i)
+            trial.add(add_i)
+
+            if len(trial) != required_slots:
+                continue
+
+            # Do not damage the existing 30-minute WW run preference.
+            if ww_singleton_count(trial) > base_singletons:
+                continue
+
+            value, windows = joint_flex_value_for_ww_selection(
+                candidates, trial, now_utc
+            )
+            delta = value - base_value
+
+            # This post-pass exists specifically to solve the demonstrated
+            # WW-first blind spot: a WW relocation must unlock at least one
+            # additional executable >=30 minute EV opportunity window.
+            # Do not use this pass merely to reshuffle WW for a better WW score.
+            if len(windows) <= len(base_windows):
+                continue
+
+            if delta <= 1e-9:
+                continue
+
+            candidate = (
+                delta,
+                -add_i,  # deterministic tie break: earlier replacement
+                remove_i,
+                add_i,
+                trial,
+                windows,
+            )
+            if best is None or candidate[:2] > best[:2]:
+                best = candidate
+
+    if best is None:
+        return selected, result
+
+    delta, _tie, remove_i, add_i, trial, windows = best
+
+    result.update({
+        "applied": True,
+        "fromSlot": candidates[remove_i]["slot_start_utc"],
+        "toSlot": candidates[add_i]["slot_start_utc"],
+        "deltaWhEquivalent": round(delta * SLOT_H, 1),
+        "qualifiedEvWindowsAfter": len(windows),
+    })
+
+    return trial, result
+
+
 def main():
     pv_doc = load(PV_FILE)
     weather_doc = load(WEATHER_FILE)
@@ -697,6 +875,26 @@ def main():
                 if len(selected) >= required_slots:
                     break
 
+        joint_swap = {
+            "applied": False,
+            "fromSlot": None,
+            "toSlot": None,
+            "deltaWhEquivalent": 0.0,
+            "qualifiedEvWindowsBefore": 0,
+            "qualifiedEvWindowsAfter": 0,
+        }
+
+        # Current-day, live-connected Tesla only. This is deliberately a
+        # small post-ranking optimizer rather than a competing planner.
+        if date_key == today_local and tesla_connected_now:
+            selected, joint_swap = optimize_joint_ww_ev_single_swap(
+                candidates,
+                selected,
+                required_slots,
+                now_utc,
+                tesla_connected_now,
+            )
+
         selected_ts = {
             candidates[i]["slot_start_utc"] for i in selected
         }
@@ -729,6 +927,8 @@ def main():
             ),
             "lookaheadQuattIncluded": False if lookahead_used else True,
             "allocationPolicy": "DYNAMIC_PV_SHOULDER_WITH_EV_OPPORTUNITY_COST",
+            "jointSwapPolicy": "ONE_SLOT_WW_RELOCATION_FOR_QUALIFIED_EV_WINDOW_V0.1",
+            "jointSwap": joint_swap,
         })
 
     for s in raw_slots:
