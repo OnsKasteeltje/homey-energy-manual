@@ -32,7 +32,63 @@
     "THERMAL_PREHEAT",
     "GRID_EXPORT"
   ],
-  "candidateMetrics": [
+  "existingTelemetryToReuse": [
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "electrical_power_w",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "outside_temperature_c",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "hp1_thermal_power_w",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "hp2_thermal_power_w",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "hp1_cop",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "hp2_cop",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "grid_p1",
+      "metric_key": "electrical_power_w",
+      "source": "existing EM2 day-history import",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "tesla",
+      "metric_key": "electrical_power_w",
+      "source": "existing EM2 day-history import",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "boiler",
+      "metric_key": "electrical_power_w",
+      "source": "existing EM2 day-history import",
+      "source_resolution_seconds": 300
+    }
+  ],
+  "candidateNewMetrics": [
     {
       "metric_key": "room_temperature_c",
       "unit": "degC",
@@ -69,40 +125,11 @@
       "required": false
     },
     {
-      "metric_key": "quatt_electrical_power_w",
-      "unit": "W",
-      "value_type": "real",
-      "scope": "heat_source",
-      "required": true
-    },
-    {
-      "metric_key": "quatt_active",
-      "unit": null,
-      "value_type": "boolean",
-      "scope": "heat_source",
-      "required": false
-    },
-    {
       "metric_key": "cv_assist_active",
       "unit": null,
       "value_type": "boolean",
       "scope": "heat_source",
       "required": true
-    },
-    {
-      "metric_key": "outside_temperature_c",
-      "unit": "degC",
-      "value_type": "real",
-      "scope": "weather",
-      "required": true
-    },
-    {
-      "metric_key": "electrical_power_w",
-      "unit": "W",
-      "value_type": "real",
-      "scope": "existing_grid_pv_ev_ww_devices",
-      "required": true,
-      "reuseExistingMetric": true
     },
     {
       "metric_key": "flex_claim_power_w",
@@ -117,11 +144,6 @@
       "pattern": "honeywell_zone:<stable_zone_key>",
       "device_type": "heating_zone",
       "sourceRule": "supported targeted source only; no broad Homey polling"
-    },
-    {
-      "pattern": "quatt",
-      "device_type": "heat_pump",
-      "sourceRule": "prefer direct Quatt telemetry where available"
     },
     {
       "pattern": "cv_boiler",
@@ -188,11 +210,14 @@
   "collectionGuidance": {
     "normalizedThermalTargetSeconds": 60,
     "pollingInstruction": "Do not create a 60-second Homey polling loop solely to satisfy this target.",
+    "existingHomeyInsightsCollector": "hourly run at minute 12, fetching last24Hours at nominal 300 s source resolution",
+    "preferredEvolution": "reuse current history; progressively replace/add targeted inputs with Pi-local/direct sources where practical",
     "retentionTarget": "at_least_one_heating_season",
     "rawTransitionsMustRemainAvailable": true
   },
   "notes": [
-    "Metric/device keys are preparation candidates and must be reconciled with the live canonical registry before runtime migration.",
+    "New metric/device keys are preparation candidates and must be reconciled with the live canonical registry before runtime migration.",
+    "Existing Quatt electrical/outside/thermal/COP metrics must be reused rather than duplicated under thermal-specific names.",
     "This contract adds no tables, services, timers, Homey flows or device writers.",
     "Any future Honeywell write adapter is a separately authorized phase and must never manipulate OpenTherm."
   ]
