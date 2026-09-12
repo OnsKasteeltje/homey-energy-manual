@@ -39,7 +39,23 @@ TZ = ZoneInfo("Europe/Amsterdam")
 SLOT_MIN = 15
 SLOT_H = SLOT_MIN / 60
 BOILER_W = 1900
+
+# Legacy comfort/safety fallback. This is not the normal daily demand target.
 WW_FALLBACK_MIN = 240
+
+# Validated production hot-water demand model.
+WW_EXPECTED_DAILY_KWH = 6.0
+WW_EXPECTED_DAILY_KWH_BY_WEEKDAY = {
+    0: 5.8,  # Monday
+    1: 4.5,  # Tuesday
+    2: 6.3,  # Wednesday
+    3: 7.0,  # Thursday
+    4: 5.9,  # Friday
+    5: 7.7,  # Saturday
+    6: 7.7,  # Sunday
+}
+WW_DEMAND_SOURCE = "WEEKDAY_MEDIAN_SQLITE_V0.2"
+
 WW_DEADLINE_HOUR = 19
 WW_MIN_RUN_SLOTS = 2
 WW_SHOULDER_MIN_COVERAGE = 0.75
@@ -215,6 +231,18 @@ def ev_target_from_residual(residual_w):
 def deadline_utc(date_key):
     y, m, d = map(int, date_key.split("-"))
     return datetime(y, m, d, WW_DEADLINE_HOUR, tzinfo=TZ).astimezone(timezone.utc)
+
+
+def weekday_ww_target(date_key):
+    """Return validated weekday demand and slot-aligned target minutes."""
+    local_date = datetime.fromisoformat(date_key).date()
+    expected_kwh = WW_EXPECTED_DAILY_KWH_BY_WEEKDAY.get(
+        local_date.weekday(),
+        WW_EXPECTED_DAILY_KWH,
+    )
+    slot_kwh = BOILER_W / 1000 * SLOT_H
+    required_slots = int(math.ceil(expected_kwh / slot_kwh))
+    return expected_kwh, required_slots * SLOT_MIN
 
 
 def cloud_stability(weather_slots, index):
@@ -489,19 +517,51 @@ def main():
     ww_selected_ts = set()
     daily = []
     for date_key, day_slots in sorted(by_date.items()):
+        weekday_expected_kwh, weekday_target_min = weekday_ww_target(date_key)
+
         goal_reached = False
-        remaining_min = WW_FALLBACK_MIN
         catchup = False
+
+        # Future days use the validated weekday demand model.
+        # Keep the Homey safety fallback separate from planned demand.
+        remaining_min = weekday_target_min
+        safety_remaining_min = None
+        heating_min_today = 0
+
         if date_key == today_local:
             goal_reached = (
                 ww.get("goalReachedToday") is True
                 or ww.get("goalReached") is True
             )
-            remaining_min = (
-                0 if goal_reached
-                else max(0, int(ww.get("remainingFallbackMin") or 0))
-            )
             catchup = ww.get("catchupRequired") is True
+
+            safety_remaining_min = max(
+                0, int(ww.get("remainingFallbackMin") or 0)
+            )
+
+            # Prefer the directly confirmed heating runtime. If an older
+            # ww-input does not expose it, infer it from the legacy fallback.
+            heating_raw = ww.get("heatingMinToday")
+            if heating_raw is None:
+                heating_min_today = max(
+                    0, WW_FALLBACK_MIN - safety_remaining_min
+                )
+            else:
+                heating_min_today = max(
+                    0, int(round(float(heating_raw)))
+                )
+
+            model_remaining_min = max(
+                0, weekday_target_min - heating_min_today
+            )
+
+            if goal_reached:
+                remaining_min = 0
+            elif catchup:
+                # Comfort/deadline safety overrides the statistical model.
+                remaining_min = safety_remaining_min
+            else:
+                remaining_min = model_remaining_min
 
         deadline = deadline_utc(date_key)
 
@@ -649,7 +709,12 @@ def main():
         daily.append({
             "date": date_key,
             "goalReached": goal_reached,
-            "remainingFallbackMin": remaining_min,
+            "remainingFallbackMin": safety_remaining_min,
+            "expectedDailyEnergyKWh": round(weekday_expected_kwh, 3),
+            "expectedDailyEnergySource": WW_DEMAND_SOURCE,
+            "plannedDemandMin": weekday_target_min,
+            "remainingPlannedDemandMin": remaining_min,
+            "heatingMinToday": heating_min_today,
             "requiredSlots": required_slots,
             "allocatedSlots": len(selected),
             "publishedActionSlots": len(published_ts),
