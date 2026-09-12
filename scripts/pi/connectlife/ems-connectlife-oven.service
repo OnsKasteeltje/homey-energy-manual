@@ -2,6 +2,8 @@
 Description=EMS ConnectLife oven poller
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -12,8 +14,6 @@ EnvironmentFile=/etc/ems/connectlife.env
 ExecStart=/home/jeroen/ems/tools/connectlife-probe/.venv/bin/python /home/jeroen/ems/repo/homey-energy-manual/scripts/pi/connectlife/oven_poll.py --watch --interval 60 --max-failures 3 --output /home/jeroen/ems/runtime/state/oven-state.json
 Restart=on-failure
 RestartSec=30
-StartLimitIntervalSec=600
-StartLimitBurst=5
 
 NoNewPrivileges=true
 PrivateTmp=true
