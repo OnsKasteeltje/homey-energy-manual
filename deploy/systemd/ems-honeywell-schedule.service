@@ -1,0 +1,14 @@
+[Unit]
+Description=EMS Honeywell schedule collector (read-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+WorkingDirectory=/home/jeroen/ems/runtime/tools/honeywell
+ExecStart=/home/jeroen/ems/runtime/tools/honeywell/.venv/bin/python /home/jeroen/ems/runtime/tools/honeywell/collect_honeywell_schedule.py
+TimeoutStartSec=120
+Nice=10
+UMask=0077
+Environment=PYTHONUNBUFFERED=1
