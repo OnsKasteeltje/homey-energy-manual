@@ -1,88 +1,89 @@
 # Current runtime source policy
 
-Status: **normative for current-state software documentation and Pi migration work**.
+Status: **normative for current-state software documentation and Pi migration/cutover work**.
 
 This policy prevents historical Homey preparation, candidate, patch, smoke, rollback and validation material from being interpreted as the current EMS architecture.
 
 ## Authority order
 
-When generating or updating current-state architecture documentation or preparing the Pi EMS migration, use sources in this order:
+For current-state architecture and control documentation, use sources in this order:
 
-1. `docs/architecture/homey-runtime-baseline-2026-09-04.md` for runtime classification and current component ownership.
-2. Exact reconciled live runtime source files named by that baseline.
-3. Current production source files explicitly named by the runtime baseline.
-4. Design/preparation Markdown only for historical rationale or explicitly future work.
+1. `docs/architecture/CURRENT-EMS-STATE.md` for canonical architecture and responsibility split.
+2. `docs/architecture/homey-runtime-baseline-2026-09-12.md` for current Homey planner-authority and EV/WW execution identities.
+3. Exact live Homey flow readback for the named stable Flow IDs when validating runtime behavior.
+4. Current Pi runtime source on GitHub `main` for version-controlled Pi behavior.
+5. Older baselines/design/preparation Markdown only for historical rationale or explicitly future work.
 
-The previous `docs/architecture/homey-runtime-baseline-2026-08-30.md` is historical audit evidence and is no longer the current runtime authority.
+The previous `homey-runtime-baseline-2026-09-04.md` and `homey-runtime-baseline-2026-08-30.md` are historical audit evidence and are no longer current runtime authority for planner ownership or EV/WW flow versions.
 
-If a historical file conflicts with the current runtime baseline or exact live runtime source, the current baseline/live source wins.
+If historical material conflicts with the current canonical state, 2026-09-12 baseline or exact live runtime, the current sources win.
 
-## Core
+## Planner authority
 
-Current live Core is:
+The sole runtime HOMEY↔PI authority selector is Homey Logic variable:
 
-- Flow: `EM v2 | 00 Core Tick | v0.11i PINNED SOURCE`
-- Flow ID: `227f8d3b-7551-46dd-837d-1b8c69add824`
-- Exact source: `src/homey/core/core-v0.11i.live-homey.js`
-- Publication version: `EM2_CORE_STATE_V0.11i`
-- Schema: `2.12`
+`EM2_Planner_Authority`
 
-The old note card in the live Advanced Flow referring to v0.11g / commit `bd4edecc` is stale metadata; the executable HomeyScript action and flow name are authoritative for current runtime identity.
+Current production value after the controlled cutover is `PI`.
 
-Older Core candidate, patch, precheck, regression, smoke and baseline files are historical development evidence unless the current runtime baseline explicitly references a fact from them. They are **not** current Core source.
+The active Pi bridge is:
 
-Current Core documentation must preserve these live facts:
+- Flow ID `8bf53fdb-76f4-47db-8ccb-773ac515f06e`;
+- `EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.2.4 AUTHORITY-GUARD [READY]`.
 
-- five-minute Core cadence;
-- Core performs no physical device writes;
-- Core reads the ten named devices used by the current runtime and still performs one broad `Homey.logic.getVariables()` enumeration per run;
-- `WW_Boilermodus` is a direct safety-critical input;
-- Planner price inputs include contract-price context, contract type and the PBTH price buffer;
-- legacy M7 variables remain fallback context;
-- Quooker Logic data is present in state/diagnostics and `knownMeasuredLoadW`;
-- P1 remains authoritative for flex budget and fails closed when stale;
-- Planner compatibility includes v0.4.9 and v0.5.0 slot contracts;
-- Planner Tesla admission uses projected grid headroom `gridW + 4140 W <= 4000 W` while MUST latest-start catch-up retains precedence;
-- WW goal/thermostat logic includes confirmed-heating and bounded low-power verification;
-- AEG laundry semantics treat explicit idle/ready/finished states as inactive even when retained cycle/time-to-end signals exist.
+The guarded Homey producer is the rollback path when the selector is returned to `HOMEY`.
 
-## Current orchestration/config/context
-
-Current-state documentation must use the 2026-09-04 runtime baseline classifications. In particular:
-
-- Core Snapshot Aggregator v0.2 SHADOW NO-QUOOKER remains an active shadow component.
-- Planner v0.5.0 SHADOW LOW-LOAD is the active planner; exact source is `src/homey/planner/energy-plan-24h-v0.5.0.live-homey.js`.
-- Settings Sync v0.4.1 TARGETED 15-MIN LOW-LOAD is the current config sync; exact source is `src/homey/config/ems-settings-sync-v0.4.1.live-homey.js`.
-- Contract Price Adapter v0.10 FIXED+DYNAMIC LOW-LOAD is the current contract-price bridge.
-- Publisher v1.0.13 CONTROL EVIDENCE LOW-LOAD is the current public-state publisher; exact source is `src/homey/publication/publisher-v1.0.13.live-homey.js`.
-- Planner Shadow publisher v0.4 remains a current publication component.
-
-Older contract/price variants, rollback flows, replaced Tesla flows, TEMP/DONE/ONE-SHOT flows and validation-only flows must never be drawn as current production ownership unless the runtime baseline is updated to promote them.
+`planner/control-authority.json` is configuration/diagnostic context and is not a second live authority gate.
 
 ## Current EV chain
 
-Current EV ownership is:
+Current EV ownership is defined by the 2026-09-12 baseline:
 
-- Power Intent: `EM v2 | 20 Power Intent | P1 v0.2.4 DUAL-SEMANTIC LOW-LOAD`.
-- Shadow adapter: `EM v2 | 60 Adapter | EV Power v0.1.2 MIN7 TARGETED-READ SHADOW`, exact source `src/homey/adapters/ev-power-v0.1.2.live-homey.js`.
-- Validation gate: `EM v2 | 80 Validation | EV Power Adapter Gate v0.2.2 MIN7 TARGETED-READ`, exact source `src/homey/validation/ev-power-adapter-gate-v0.2.2.live-homey.js`.
-- Physical writer: `EM v2 | 60 Actuator | EV Power v0.2.3 MIN7 TARGETED-READ LIVE OWNERSHIP`, exact source `src/homey/actuators/ev-power-v0.2.3.live-homey.js`.
+- Adapter: `EV Power v0.1.4 DEADLINE-CAP OPPORTUNITY16 START7 RUN6`, Flow ID `953e9b18-3576-4557-b940-ed4a64eb2516`.
+- Gate: `EV Power Adapter Gate v0.2.5 OBSERVABILITY-ONLY HEALTH`, Flow ID `ec5e5d34-8205-4cf0-a661-7bf744feb6e0`.
+- Physical writer: `EV Power v0.2.6 START7 RUN6 LIVE + EASEE SESSION`, Flow ID `fea23193-a03f-49dd-9780-7e72ee48747d`.
+- Device health observer: Flow ID `18a99261-421c-4c5f-a771-36a626b7496a`; health is observability-only at the active gate.
+- EV observability: Flow ID `f6edba38-ddf1-45e5-890e-c183aa2055d5`.
 
-The current executable mapping is fixed 3×230 V at 690 W/A with 7 A minimum. Adapter/gate fail closed below that threshold; the actuator accepts 0 A or integer 7–16 A and requires an aligned PASS gate before a non-zero write.
+Older EV v0.1.2 / gate v0.2.2 / actuator v0.2.3 files remain historical until explicitly reconciled or replaced by current exact live source captures.
+
+## Current WW chain
+
+- Adapter: Flow ID `472d0355-3bb9-4a42-be43-114b57822136`, WW Power v0.2.
+- Gate: Flow ID `39c39cc5-12bb-4494-ba45-bad47a656696`, WW Power Adapter Gate v0.2.
+- Physical writer: Flow ID `40d45aeb-174e-4a83-9a42-71ae46065cb4`, Warm Water Actuator v0.9 LIVE.
+
+The Pi plans WW; Homey remains the sole physical boiler writer.
+
+## Current Pi control endpoint
+
+Current version-controlled Pi status API source is:
+
+`src/pi/ems-runtime/status-api/server.py`
+
+The endpoint `/control/current` is a technical readiness/command interface. It validates the Pi plan, fixed ENGIE contract and execution context, but runtime planner authority is enforced by Homey `EM2_Planner_Authority`.
+
+Any branch/runtime copy that still requires `control-authority.json` itself to say `plannerOwner = PI` before readiness is **outdated** relative to current `main`.
 
 ## Diagram rule
 
-Every process diagram labelled as current, live, implemented, production or as-is must be derived from the current runtime baseline plus the corresponding current source. Historical/candidate diagrams must be explicitly labelled historical, candidate, future or validation.
+Every process diagram labelled current, live, implemented, production or as-is must be derived from:
+
+- `CURRENT-EMS-STATE.md`;
+- the 2026-09-12 runtime baseline;
+- exact live flow/source evidence for the component being described.
+
+Historical/candidate diagrams must be explicitly labelled historical, candidate, future or validation.
 
 ## Update rule
 
-Whenever a live Homey component is promoted to a newer version:
+Whenever a live Homey or Pi control component is promoted:
 
-1. capture/reconcile the live runtime;
-2. store the exact live source in GitHub where applicable;
-3. update the current runtime baseline classification and exact source reference;
-4. update this policy if current version, ownership or authority changes;
-5. perform a post-update Homey inventory and GitHub readback;
-6. only then certify Homey/GitHub sync and regenerate current-state documentation or continue Pi migration.
+1. capture/reconcile the exact live runtime;
+2. store or update exact version-controlled source where applicable;
+3. update `CURRENT-EMS-STATE.md` when architecture/ownership changes;
+4. update the dated current runtime baseline when live component identity changes;
+5. perform targeted runtime readback and physical/semantic validation as appropriate;
+6. verify Pi checkout/runtime drift against GitHub `main` before certifying sync.
 
-This policy intentionally allows historical Markdown to remain in Git history/repository for auditability without allowing it to contaminate current-state documentation.
+A clean working tree alone is not proof of sync if the Pi is on a divergent branch.
