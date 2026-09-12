@@ -1,13 +1,13 @@
 {
   "schema": "EM2_EV_CONTROL_STATUS_V0.3",
-  "publishedAt": "2026-09-12T10:50:02.789Z",
+  "publishedAt": "2026-09-12T10:51:04.476Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
-  "revision": 6614,
+  "revision": 6615,
   "targetW": 0,
-  "evStatus": "IDLE",
+  "evStatus": "FAIL_CLOSED_PI_UNAVAILABLE",
   "requestedA": 0,
-  "adapterRevision": 6614,
+  "adapterRevision": 6615,
   "stateRevision": 6615,
   "deviceHealth": {
     "schema": "EM2_EV_DEVICE_HEALTH_V0.2",
@@ -23,30 +23,30 @@
     "warning": "Easee status is niet betrouwbaar; EMS behandelt EV-status als onbekend en blokkeert positieve laadcommando’s."
   },
   "gate": {
-    "status": "PASS",
-    "revision": 6614,
-    "intentRevision": 6614,
-    "stateRevision": 6614,
-    "coreRevision": 6614,
+    "status": "FAIL",
+    "revision": 6615,
+    "intentRevision": 6615,
+    "stateRevision": 6615,
+    "coreRevision": 6615,
     "deviceHealth": {
       "observabilityOnly": true,
       "schema": "EM2_EV_DEVICE_HEALTH_V0.2",
-      "status": "OK",
-      "reason": "FRESH_TELEMETRY",
-      "evStatus": "PLUGGED_IN_PAUSED",
-      "controlAvailability": "CONTROL_AVAILABLE",
-      "sampledAt": "2026-09-12T10:45:01.351Z",
-      "ageSec": 61
+      "status": "STALE",
+      "reason": "EASEE_TELEMETRY_STALE",
+      "evStatus": "EV_STATUS_UNKNOWN",
+      "controlAvailability": "CONTROL_UNAVAILABLE",
+      "sampledAt": "2026-09-12T10:50:00.662Z",
+      "ageSec": 62
     }
   },
   "actuator": {
-    "status": "NOOP_ALREADY_TARGET",
-    "reason": null,
-    "revision": 6614,
+    "status": "LIVE_FAIL_CLOSED",
+    "reason": "ADAPTER_CONTRACT_INVALID",
+    "revision": null,
     "live": true,
     "physicalWritePerformed": false,
     "targetA": 0,
     "previousA": 0
   },
-  "coherent": false
+  "coherent": true
 }
