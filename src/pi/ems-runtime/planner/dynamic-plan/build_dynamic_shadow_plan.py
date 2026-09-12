@@ -228,6 +228,100 @@ def ev_target_from_residual(residual_w):
     return best_w
 
 
+def apply_ev_deadline_constraint(slots, tesla_state, now_utc):
+    """Overlay the hard Tesla deadline on the canonical Pi action plan.
+
+    Normal PV opportunity planning remains untouched before latest-start.
+    At/after latest-start the planner requests the deadline maximum continuously
+    until the deadline. Homey remains the exact-minute executor safety owner.
+    """
+    result = {
+        "active": tesla_state.get("deadline_active") is True,
+        "connected": tesla_state.get("connected") is True,
+        "remainingKWh": round(
+            max(0.0, float(tesla_state.get("remaining_kwh") or 0)),
+            3,
+        ),
+        "deadlineAt": tesla_state.get("deadline_at"),
+        "latestStartAt": tesla_state.get("latest_start_at"),
+        "inferredMaxA": None,
+        "targetW": 0,
+        "appliedSlots": 0,
+        "firstAppliedSlot": None,
+        "lastAppliedSlot": None,
+        "policy": "HARD_DEADLINE_FROM_LATEST_START_V0.1",
+        "executorSafetyOwner": "HOMEY_EXACT_MINUTE_GUARD",
+    }
+
+    if (
+        not result["active"]
+        or not result["connected"]
+        or result["remainingKWh"] <= 0
+    ):
+        return slots, result
+
+    deadline_dt = parse_utc(result["deadlineAt"]) if result["deadlineAt"] else None
+    latest_dt = (
+        parse_utc(result["latestStartAt"])
+        if result["latestStartAt"]
+        else None
+    )
+
+    if (
+        deadline_dt is None
+        or latest_dt is None
+        or deadline_dt <= latest_dt
+        or deadline_dt <= now_utc
+    ):
+        return slots, result
+
+    hours = (deadline_dt - latest_dt).total_seconds() / 3600
+    required_kw = result["remainingKWh"] / hours if hours > 0 else 0
+    inferred_a = int(round(required_kw / (EV_W_PER_A / 1000)))
+    inferred_a = max(EV_RUN_MIN_A, min(EV_MAX_A, inferred_a))
+
+    target_w = inferred_a * EV_W_PER_A
+    result["inferredMaxA"] = inferred_a
+    result["targetW"] = target_w
+
+    force_from = max(now_utc, latest_dt)
+    applied = []
+
+    for slot in slots:
+        start_dt = parse_utc(slot["slot_start_utc"])
+        end_dt = start_dt + timedelta(minutes=SLOT_MIN)
+
+        # Include the currently running quarter if latest-start was crossed
+        # inside that quarter. Homey still owns the exact-minute transition.
+        if end_dt <= force_from or start_dt >= deadline_dt:
+            continue
+
+        if int(slot.get("evPlanW") or 0) < target_w:
+            slot["evPlanW"] = target_w
+            slot["evPlanA"] = inferred_a
+            slot["evAllocationReason"] = "DEADLINE_REQUIRED"
+
+            net_after = (
+                float(slot["baseLoadForecastW"])
+                + float(slot["quattForecastW"])
+                + float(slot["wwPlanW"])
+                + target_w
+                - float(slot["pvForecastW"])
+            )
+            slot["gridImportAfterFlexW"] = round(max(0.0, net_after))
+            slot["gridExportAfterFlexW"] = round(max(0.0, -net_after))
+
+        slot["evDeadlineRequired"] = True
+        applied.append(slot["slot_start_utc"])
+
+    result["appliedSlots"] = len(applied)
+    if applied:
+        result["firstAppliedSlot"] = applied[0]
+        result["lastAppliedSlot"] = applied[-1]
+
+    return slots, result
+
+
 def deadline_utc(date_key):
     y, m, d = map(int, date_key.split("-"))
     return datetime(y, m, d, WW_DEADLINE_HOUR, tzinfo=TZ).astimezone(timezone.utc)
@@ -1021,6 +1115,12 @@ def main():
             "gridExportAfterFlexW": round(max(0.0, -net_after)),
         })
 
+    slots, deadline_plan = apply_ev_deadline_constraint(
+        slots,
+        tesla_state,
+        now_utc,
+    )
+
     payload = {
         "schema": "EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3",
         "generated_at": now_utc.isoformat().replace("+00:00", "Z"),
@@ -1056,6 +1156,8 @@ def main():
             "evStableRunA": EV_RUN_MIN_A,
             "evKickstartA": EV_KICKSTART_A,
             "realtimeP1Correction": True,
+            "evDeadlineHardConstraint": True,
+            "evDeadlineSafetyOwner": "HOMEY_EXECUTOR_EXACT_MINUTE",
         },
         "confidenceModel": {
             "signals": [
@@ -1078,6 +1180,7 @@ def main():
             "opportunityPolicy": (
                 "PROFITABLE_SUBWINDOWS_AFTER_WW_MIN30M_RUN6A_TO16A"
             ),
+            "deadlinePlan": deadline_plan,
             "qualifiedWindows": [
                 {
                     "id": w["id"],
