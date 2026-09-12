@@ -1,0 +1,12 @@
+[Unit]
+Description=Run EMS atomic forecast chain every 15 minutes
+
+[Timer]
+# Single cadence replaces the former :01 weather and :03 PV timers.
+# The complete generation is built sequentially under one oneshot service.
+OnCalendar=*-*-* *:03,18,33,48:00
+Persistent=true
+Unit=ems-forecast-chain.service
+
+[Install]
+WantedBy=timers.target
