@@ -42,11 +42,15 @@ def build_state(device):
         state = "RUNNING"
 
     measured = intval(s.get("Oven_measured_temperature"))
-    setpoint = intval(
-        s.get("Step_pre_bake_set_temperature")
-        if state == "PREHEATING"
-        else s.get("Step_1_set_temperature")
-    )
+
+    # ConnectLife retains the previous program temperature after the oven
+    # becomes idle. Do not expose that stale value as an active EMS setpoint.
+    if state == "IDLE":
+        setpoint = None
+    elif state == "PREHEATING":
+        setpoint = intval(s.get("Step_pre_bake_set_temperature"))
+    else:
+        setpoint = intval(s.get("Step_1_set_temperature"))
 
     return {
         "schema": "EMS_OVEN_STATE_V0.1",
