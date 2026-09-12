@@ -30,6 +30,12 @@ def parse_args():
         help="Polling interval in seconds when --watch is used (default: 60).",
     )
     parser.add_argument(
+        "--max-failures",
+        type=int,
+        default=3,
+        help="Exit after this many consecutive failed polls so systemd can restart the service (default: 3).",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         help="Atomically write the latest EMS oven state to this JSON file.",
@@ -42,9 +48,13 @@ def credentials():
     password = os.environ.get("CONNECTLIFE_PASSWORD")
 
     if not username:
+        if not sys.stdin.isatty():
+            raise ValueError("CONNECTLIFE_USERNAME ontbreekt in niet-interactieve modus.")
         username = input("ConnectLife e-mail: ").strip()
 
     if not password:
+        if not sys.stdin.isatty():
+            raise ValueError("CONNECTLIFE_PASSWORD ontbreekt in niet-interactieve modus.")
         password = getpass.getpass("ConnectLife wachtwoord: ")
 
     if not username or not password:
@@ -90,6 +100,10 @@ async def run():
         print("Polling interval moet minimaal 60 seconden zijn.", file=sys.stderr)
         return 2
 
+    if args.max_failures < 1:
+        print("--max-failures moet minimaal 1 zijn.", file=sys.stderr)
+        return 2
+
     try:
         username, password = credentials()
     except ValueError as exc:
@@ -106,13 +120,24 @@ async def run():
         await poll_once(api, args.output)
         return 0
 
+    failures = 0
+
     while True:
         try:
             await poll_once(api, args.output)
+            failures = 0
         except Exception as exc:
-            # Keep the last valid output file intact; a later integration layer can
-            # mark it stale based on generatedAt instead of consuming partial JSON.
-            print(f"ConnectLife poll mislukt: {exc}", file=sys.stderr, flush=True)
+            failures += 1
+            # Keep the last valid output file intact. Consumers determine staleness
+            # from generatedAt; after repeated failures we exit so systemd performs
+            # a clean restart/login instead of hammering the authentication endpoint.
+            print(
+                f"ConnectLife poll mislukt ({failures}/{args.max_failures}): {exc}",
+                file=sys.stderr,
+                flush=True,
+            )
+            if failures >= args.max_failures:
+                return 4
 
         await asyncio.sleep(args.interval)
 
