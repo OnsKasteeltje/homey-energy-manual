@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -23,15 +23,36 @@ ZONE_MAP = ROOT / "config" / "zone-map.json"
 OUTPUT = ROOT / "output" / "honeywell-state.json"
 
 
-def load_env_file(path: Path) -> None:
+def load_credentials(path: Path) -> tuple[str, str]:
+    """Load the chmod-600 account.env using Bash's own assignment parser.
+
+    account.env is intentionally written with shell-safe escaping (printf %q).
+    Parsing it as plain text would preserve escape backslashes and corrupt some
+    passwords, so decode it exactly as Bash would while returning only the two
+    required values via NUL-delimited stdout.
+    """
     if not path.exists():
         raise SystemExit(f"ERROR: missing credential file: {path}")
-    for raw_line in path.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+    script = (
+        'set -a; source "$1"; '
+        'printf "%s\\0%s\\0" "$HONEYWELL_USERNAME" "$HONEYWELL_PASSWORD"'
+    )
+    result = subprocess.run(
+        ["/bin/bash", "-c", script, "bash", str(path)],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    parts = result.stdout.split(b"\0")
+    if len(parts) < 3:
+        raise SystemExit("ERROR: credential file did not yield username/password")
+
+    username = parts[0].decode().strip()
+    password = parts[1].decode()
+    if not username or not password:
+        raise SystemExit("ERROR: HONEYWELL_USERNAME/PASSWORD not configured")
+    return username, password
 
 
 def jsonable(value: Any) -> Any:
@@ -62,11 +83,7 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 async def main() -> None:
-    load_env_file(ACCOUNT_ENV)
-    username = os.environ.get("HONEYWELL_USERNAME", "").strip()
-    password = os.environ.get("HONEYWELL_PASSWORD", "").strip()
-    if not username or not password:
-        raise SystemExit("ERROR: HONEYWELL_USERNAME/PASSWORD not configured")
+    username, password = load_credentials(ACCOUNT_ENV)
 
     mapping = json.loads(ZONE_MAP.read_text())
     expected_location = str(mapping["location"]["honeywellLocationId"])
