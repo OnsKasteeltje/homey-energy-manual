@@ -18,6 +18,8 @@ CONTROL_POLICY_FILE = "/home/jeroen/ems/runtime/planner/control-authority.json"
 
 STALE_AFTER_SECONDS = 25 * 60
 SLOT_MINUTES = 15
+CONTROL_POLICY_SCHEMA = "EMS_CONTROL_AUTHORITY_V1.1"
+PI_PLAN_SCHEMA = "EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3"
 
 
 def git_revision():
@@ -97,20 +99,26 @@ def ww_plan_status(path):
 
 
 def current_control_command():
+    """Return a valid Pi planner command when the planner is technically ready.
+
+    Runtime authority is deliberately not enforced here. Homey's
+    EM2_Planner_Authority selector is the single cutover gate. This endpoint
+    only answers whether the Pi planner can safely supply a fresh command.
+    """
     now = datetime.now(timezone.utc)
     policy = load_json(CONTROL_POLICY_FILE)
     plan = load_json(DYNAMIC_PLAN_FILE)
 
-    if policy.get("schema") != "EMS_CONTROL_AUTHORITY_V1.0":
+    if policy.get("schema") != CONTROL_POLICY_SCHEMA:
         raise ValueError("CONTROL_POLICY_SCHEMA")
-    if policy.get("plannerOwner") != "PI" or policy.get("executor") != "HOMEY":
-        raise ValueError("CONTROL_AUTHORITY_MISMATCH")
-    if policy.get("executionEnabled") is not True or policy.get("legacyHomeyPlannerAuthority") is not False:
-        raise ValueError("CONTROL_AUTHORITY_NOT_LIVE")
+    if policy.get("executor") != "HOMEY":
+        raise ValueError("CONTROL_EXECUTOR_MISMATCH")
+    if policy.get("executionEnabled") is not True:
+        raise ValueError("CONTROL_EXECUTION_DISABLED")
     if policy.get("contractMode") != "FIXED" or policy.get("contractId") != "ENGIE_3Y_2026_2029":
         raise ValueError("CONTROL_POLICY_CONTRACT_MISMATCH")
 
-    if plan.get("schema") != policy.get("plannerSourceSchema"):
+    if plan.get("schema") != PI_PLAN_SCHEMA:
         raise ValueError("PLAN_SCHEMA_MISMATCH")
     if plan.get("plannerOwner") != "PI" or plan.get("readOnly") is not True or plan.get("control_writes") is not False:
         raise ValueError("PLAN_OWNERSHIP_BOUNDARY")
@@ -144,6 +152,8 @@ def current_control_command():
 
     return {
         "schema": "EMS_PI_CONTROL_COMMAND_V0.1",
+        "status": "READY",
+        "readyForCutover": True,
         "generatedAt": now.isoformat().replace("+00:00", "Z"),
         "validUntil": command_valid_until.isoformat().replace("+00:00", "Z"),
         "plannerOwner": "PI",
@@ -168,11 +178,16 @@ def current_control_command():
             },
             "battery": {"target_W": 0}
         },
+        "authority": {
+            "enforcedBy": "HOMEY_SELECTOR",
+            "piPolicyPlannerOwner": policy.get("plannerOwner"),
+            "piPolicyCutoverState": policy.get("cutoverState")
+        },
         "safety": {
             "failClosed": True,
             "stalePlanRejected": True,
             "plannerDoesNotWriteDevices": True,
-            "legacyHomeyPlannerAuthority": False
+            "singleAuthorityGate": "EM2_Planner_Authority"
         }
     }
 
@@ -196,6 +211,7 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 503, {
                     "schema": "EMS_PI_CONTROL_COMMAND_V0.1",
                     "status": "FAIL_CLOSED",
+                    "readyForCutover": False,
                     "reason": str(exc),
                     "plannerOwner": "PI",
                     "targets": {"ev": {"target_W": 0}, "ww": {"target_on": False}, "battery": {"target_W": 0}}
@@ -214,7 +230,7 @@ class Handler(BaseHTTPRequestHandler):
         overall_status = "ok" if all(x["status"] == "ok" for x in (pv, weather, quatt, ww)) else "degraded"
         try:
             control = current_control_command()
-            control_status = "ok"
+            control_status = "ready"
             control_valid_until = control.get("validUntil")
         except Exception as exc:
             control_status = f"blocked:{exc}"
@@ -223,7 +239,7 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {
             "status": overall_status,
             "service": "ems-status-api",
-            "mode": "pi-live-authority",
+            "mode": "pi-planner-command",
             "control_writes": False,
             "git_revision": git_revision(),
             "uptime_seconds": int(time.time() - START_TIME),
@@ -244,7 +260,7 @@ class Handler(BaseHTTPRequestHandler):
             "ww_plan_generated_at": ww["generated_at"],
             "ww_plan_slot_count": ww["slot_count"],
             "ww_planned_kwh": ww["planned_kwh"],
-            "control_authority": "PI",
+            "control_authority_gate": "HOMEY_SELECTOR",
             "control_endpoint_status": control_status,
             "control_valid_until": control_valid_until
         })
