@@ -42,6 +42,11 @@ BOILER_W = 1900
 WW_FALLBACK_MIN = 240
 WW_DEADLINE_HOUR = 19
 WW_MIN_RUN_SLOTS = 2
+WW_SHOULDER_MIN_COVERAGE = 0.75
+WW_SHOULDER_MAX_IMPORT_W = 500
+WW_SHOULDER_BONUS_W = 350
+WW_IMPORT_PENALTY = 0.75
+WW_EV_OPPORTUNITY_COST_WEIGHT = 1.0
 
 EV_W_PER_A = 690
 EV_KICKSTART_A = 7
@@ -185,8 +190,8 @@ def apply_best_windows_first(windows):
     return windows
 
 
-def ev_target_from_residual(residual_w):
-    """Choose 0 or 6..16 A by marginal PV capture minus grid-import penalty."""
+def ev_best_option(residual_w):
+    """Return best EV target and marginal value for a residual-PV level."""
     residual = max(0.0, float(residual_w))
     best_w = 0
     best_score = 0.0
@@ -198,6 +203,12 @@ def ev_target_from_residual(residual_w):
         if score > best_score + 1e-9:
             best_score = score
             best_w = target_w
+    return best_w, best_score
+
+
+def ev_target_from_residual(residual_w):
+    """Choose 0 or 6..16 A by marginal PV capture minus grid-import penalty."""
+    best_w, _best_score = ev_best_option(residual_w)
     return best_w
 
 
@@ -552,20 +563,34 @@ def main():
         )
         required_slots = min(required_slots, len(candidates))
 
-        max_export = max(
-            (float(s["correctedExportBeforeFlexW"]) for s in candidates),
-            default=0.0,
-        )
         scores = []
         for pos, s in enumerate(candidates):
             export_w = float(s["correctedExportBeforeFlexW"])
             ww_capture = min(BOILER_W, export_w)
+            ww_grid_import = max(0.0, BOILER_W - export_w)
+            ww_pv_coverage = clamp(export_w / BOILER_W) if BOILER_W else 0.0
             confidence = float(s["confidence"])
-            peak_share = (export_w / max_export) if max_export > 0 else 0.0
-            tesla_peak_penalty = (
-                min(BOILER_W, export_w) * peak_share
-                if tesla_connected_now else 0.0
+
+            ev_before_w = 0
+            ev_before_score = 0.0
+            ev_after_score = 0.0
+            if tesla_connected_now:
+                ev_before_w, ev_before_score = ev_best_option(export_w)
+                _ev_after_w, ev_after_score = ev_best_option(
+                    max(0.0, export_w - BOILER_W)
+                )
+            ev_opportunity_cost = max(0.0, ev_before_score - ev_after_score)
+
+            shoulder_eligible = (
+                ww_pv_coverage >= WW_SHOULDER_MIN_COVERAGE
+                and ww_grid_import <= WW_SHOULDER_MAX_IMPORT_W
+                and (not tesla_connected_now or ev_before_w == 0)
             )
+            shoulder_bonus = (
+                WW_SHOULDER_BONUS_W * confidence
+                if shoulder_eligible else 0.0
+            )
+
             position = pos / max(1, len(candidates) - 1)
             urgency = 350.0 * position * (1.0 if catchup else 0.35)
             future_good_slots = sum(
@@ -580,11 +605,21 @@ def main():
             )
             score = (
                 ww_capture * (0.65 + 0.35 * confidence)
-                - 0.55 * tesla_peak_penalty
+                - WW_IMPORT_PENALTY * ww_grid_import
+                - WW_EV_OPPORTUNITY_COST_WEIGHT * ev_opportunity_cost
+                + shoulder_bonus
                 + urgency
                 + economical_start_pressure
             )
             scores.append(score)
+
+            # Persist transparent WW ranking diagnostics for replay/UI analysis.
+            s["wwCandidateScore"] = round(score, 1)
+            s["wwCandidatePvCoverage"] = round(ww_pv_coverage, 3)
+            s["wwCandidateGridImportW"] = round(ww_grid_import)
+            s["wwCandidateEvOpportunityCost"] = round(ev_opportunity_cost, 1)
+            s["wwShoulderEligible"] = shoulder_eligible
+            s["wwShoulderBonus"] = round(shoulder_bonus, 1)
 
         ranked = sorted(
             range(len(candidates)),
@@ -628,7 +663,7 @@ def main():
                 else "24H_ACTION_HORIZON"
             ),
             "lookaheadQuattIncluded": False if lookahead_used else True,
-            "allocationPolicy": "DYNAMIC_PV_CAPTURE_WITH_LATEST_ECONOMICAL_START",
+            "allocationPolicy": "DYNAMIC_PV_SHOULDER_WITH_EV_OPPORTUNITY_COST",
         })
 
     for s in raw_slots:
@@ -637,9 +672,14 @@ def main():
             0.0, float(s["correctedExportBeforeFlexW"]) - ww_w
         )
         s["wwPlanW"] = ww_w
-        s["wwAllocationReason"] = (
-            "DYNAMIC_COMFORT_PV_SLOT" if ww_w else "HOLD"
-        )
+        if ww_w:
+            s["wwAllocationReason"] = (
+                "DYNAMIC_WW_PV_SHOULDER"
+                if s.get("wwShoulderEligible") is True
+                else "DYNAMIC_COMFORT_PV_SLOT"
+            )
+        else:
+            s["wwAllocationReason"] = "HOLD"
         s["evResidualExportW"] = round(residual_after_ww)
         s["evMarginalTargetCandidateW"] = ev_target_from_residual(
             residual_after_ww
@@ -737,6 +777,11 @@ def main():
             "wwComfortHardConstraint": True,
             "wwDeadlineLocal": "19:00",
             "wwMinRunMinutes": WW_MIN_RUN_SLOTS * SLOT_MIN,
+            "wwShoulderMinPvCoverage": WW_SHOULDER_MIN_COVERAGE,
+            "wwShoulderMaxImportW": WW_SHOULDER_MAX_IMPORT_W,
+            "wwShoulderBonusW": WW_SHOULDER_BONUS_W,
+            "wwImportPenalty": WW_IMPORT_PENALTY,
+            "wwEvOpportunityCostWeight": WW_EV_OPPORTUNITY_COST_WEIGHT,
             "teslaRole": "SECONDARY_FLEX_LOAD_WHEN_WW_COMFORT_REMAINS_FEASIBLE",
             "fixedPvStartThresholdW": None,
             "evOpportunityWindowMinMinutes": EV_MIN_WINDOW_SLOTS * SLOT_MIN,
