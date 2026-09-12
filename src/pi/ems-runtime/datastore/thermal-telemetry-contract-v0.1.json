@@ -1,0 +1,224 @@
+{
+  "schema": "EMS_THERMAL_TELEMETRY_CONTRACT_V0.1",
+  "status": "PREPARED_NOT_DEPLOYED",
+  "mode": "PURE_SHADOW",
+  "executeAllowed": false,
+  "physicalWrites": false,
+  "openThermWrites": false,
+  "honeywellWrites": false,
+  "canonicalStore": {
+    "path": "/home/jeroen/ems/data/ems-history.sqlite",
+    "reuseExisting": true,
+    "newPrimaryDatabaseAllowed": false,
+    "requiredExistingConcepts": [
+      "devices",
+      "metrics",
+      "measurements",
+      "quality",
+      "source_resolution_seconds"
+    ]
+  },
+  "ownership": {
+    "comfortAuthority": "HONEYWELL_MULTIZONE",
+    "heatProductionExecutor": "QUATT_VIA_EXISTING_HONEYWELL_OPENTHERM_CHAIN",
+    "optimizer": "PI",
+    "executionSafetyLayer": "HOMEY",
+    "openThermPolicy": "OBSERVE_EXISTING_CHAIN_ONLY"
+  },
+  "priorityOrder": [
+    "HOUSE_BASE",
+    "WW",
+    "TESLA",
+    "THERMAL_PREHEAT",
+    "GRID_EXPORT"
+  ],
+  "existingTelemetryToReuse": [
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "electrical_power_w",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "outside_temperature_c",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "hp1_thermal_power_w",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "hp2_thermal_power_w",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "hp1_cop",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "quatt_cic",
+      "metric_key": "hp2_cop",
+      "source": "existing collect_homey_insights.py",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "grid_p1",
+      "metric_key": "electrical_power_w",
+      "source": "existing EM2 day-history import",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "tesla",
+      "metric_key": "electrical_power_w",
+      "source": "existing EM2 day-history import",
+      "source_resolution_seconds": 300
+    },
+    {
+      "device_key": "boiler",
+      "metric_key": "electrical_power_w",
+      "source": "existing EM2 day-history import",
+      "source_resolution_seconds": 300
+    }
+  ],
+  "candidateNewMetrics": [
+    {
+      "metric_key": "room_temperature_c",
+      "unit": "degC",
+      "value_type": "real",
+      "scope": "per_zone",
+      "required": true
+    },
+    {
+      "metric_key": "room_target_c",
+      "unit": "degC",
+      "value_type": "real",
+      "scope": "per_zone",
+      "required": true
+    },
+    {
+      "metric_key": "next_scheduled_target_c",
+      "unit": "degC",
+      "value_type": "real",
+      "scope": "per_zone",
+      "required": true
+    },
+    {
+      "metric_key": "next_scheduled_target_epoch_s",
+      "unit": "s",
+      "value_type": "real",
+      "scope": "per_zone",
+      "required": true
+    },
+    {
+      "metric_key": "zone_heat_demand",
+      "unit": null,
+      "value_type": "boolean",
+      "scope": "per_zone",
+      "required": false
+    },
+    {
+      "metric_key": "cv_assist_active",
+      "unit": null,
+      "value_type": "boolean",
+      "scope": "heat_source",
+      "required": true
+    },
+    {
+      "metric_key": "flex_claim_power_w",
+      "unit": "W",
+      "value_type": "real",
+      "scope": "ww_ev_thermal",
+      "required": false
+    }
+  ],
+  "candidateDeviceKeys": [
+    {
+      "pattern": "honeywell_zone:<stable_zone_key>",
+      "device_type": "heating_zone",
+      "sourceRule": "supported targeted source only; no broad Homey polling"
+    },
+    {
+      "pattern": "cv_boiler",
+      "device_type": "boiler",
+      "sourceRule": "prefer direct/authoritative assist indication where available"
+    }
+  ],
+  "qualityPolicy": {
+    "acceptedLabels": [
+      "observed",
+      "held",
+      "estimated",
+      "missing"
+    ],
+    "fitDefault": [
+      "observed"
+    ],
+    "heldMayBeUsed": "only when model feature explicitly permits it and source age is retained",
+    "missingAsZero": false,
+    "storeSourceResolution": true,
+    "storeSourceIdentity": true,
+    "storeFreshness": true
+  },
+  "candidateEvents": [
+    "ROOM_SETPOINT_CHANGED",
+    "HONEYWELL_SCHEDULE_TRANSITION",
+    "QUATT_STARTED",
+    "QUATT_STOPPED",
+    "CV_ASSIST_STARTED",
+    "CV_ASSIST_STOPPED",
+    "PV_SURPLUS_STARTED",
+    "PV_SURPLUS_ENDED",
+    "ROOM_TARGET_REACHED"
+  ],
+  "shadowOutput": {
+    "schema": "EMS_THERMAL_PREHEAT_SHADOW_V0.1",
+    "requiredSafetyFields": [
+      "mode",
+      "executeAllowed",
+      "generatedAt",
+      "validUntil",
+      "zone",
+      "currentRoomTemp_C",
+      "currentTarget_C",
+      "nextScheduledTarget_C",
+      "nextScheduledTargetAt",
+      "candidateTarget_C",
+      "residualPvSurplus_W",
+      "quattOnlyProbability",
+      "cvAssistProbability",
+      "reason",
+      "inputRevision",
+      "modelRevision"
+    ],
+    "hardInvariants": [
+      "mode == PURE_SHADOW during T0-T4",
+      "executeAllowed == false during T0-T4",
+      "candidateTarget_C <= nextScheduledTarget_C",
+      "no opportunity when CV assist is active",
+      "no opportunity when required inputs are stale",
+      "no opportunity when higher-priority WW/EV claim consumes residual surplus"
+    ]
+  },
+  "collectionGuidance": {
+    "normalizedThermalTargetSeconds": 60,
+    "pollingInstruction": "Do not create a 60-second Homey polling loop solely to satisfy this target.",
+    "existingHomeyInsightsCollector": "hourly run at minute 12, fetching last24Hours at nominal 300 s source resolution",
+    "preferredEvolution": "reuse current history; progressively replace/add targeted inputs with Pi-local/direct sources where practical",
+    "retentionTarget": "at_least_one_heating_season",
+    "rawTransitionsMustRemainAvailable": true
+  },
+  "notes": [
+    "New metric/device keys are preparation candidates and must be reconciled with the live canonical registry before runtime migration.",
+    "Existing Quatt electrical/outside/thermal/COP metrics must be reused rather than duplicated under thermal-specific names.",
+    "This contract adds no tables, services, timers, Homey flows or device writers.",
+    "Any future Honeywell write adapter is a separately authorized phase and must never manipulate OpenTherm."
+  ]
+}

@@ -1,0 +1,15 @@
+[Unit]
+Description=EMS Honeywell state collector (read-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+WorkingDirectory=/home/jeroen/ems/runtime/tools/honeywell
+ExecStart=/home/jeroen/ems/runtime/tools/honeywell/.venv/bin/python /home/jeroen/ems/runtime/tools/honeywell/collect_honeywell.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/datastore/import_honeywell_state.py
+TimeoutStartSec=60
+Nice=10
+UMask=0077
+Environment=PYTHONUNBUFFERED=1
