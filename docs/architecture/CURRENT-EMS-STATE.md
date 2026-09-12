@@ -126,6 +126,8 @@ The endpoint is a **technical readiness and command endpoint**, not the runtime 
 - planner `validUntil`;
 - current-slot resolution.
 
+The canonical `planner/control-authority.json` schema is `EMS_CONTROL_AUTHORITY_V1.0`; the status API must validate against that same schema. A schema mismatch must fail closed and is treated as a deployment/configuration defect, not as a reason to silently upgrade the policy file.
+
 It does **not** require `planner/control-authority.json` to say `plannerOwner = PI` before it can report Pi readiness. That former dual-gate design created a circular cutover dependency and was removed on 2026-09-12.
 
 Invalid or stale planner input still fails closed with zero/off targets.
