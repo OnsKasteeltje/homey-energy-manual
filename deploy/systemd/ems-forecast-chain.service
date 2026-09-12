@@ -1,0 +1,27 @@
+[Unit]
+Description=EMS atomic 96-slot forecast chain
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+WorkingDirectory=/home/jeroen/ems
+# One service owns the complete generation. No downstream stage may run from a
+# separate timer; strict 96-slot checks in the builders remain authoritative.
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/axis/build_planner_axis.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/weather-forecast/fetch_weather_forecast.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/datastore/import_weather_forecast.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/quatt-forecast/build_quatt_forecast.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/pv-forecast/fetch_pv_forecast.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/base-load/build_clean_base_history.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/base-load/build_base_load_forecast.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/warm-water/fetch_ww_input.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/warm-water/build_ww_plan.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/datastore/import_ww_forecast.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/quarter-hour-plan/build_shadow_load_plan.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/dynamic-plan/build_hardened_dynamic_shadow_plan.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/quarter-hour-plan/build_website_shadow.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/dynamic-plan/build_dynamic_website_shadow.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/publisher/publish_planner_shadow.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/publisher/publish_dynamic_planner_shadow.py
