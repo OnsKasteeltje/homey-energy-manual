@@ -5,18 +5,35 @@ Date: 2026-09-12
 
 ## Purpose
 
-Prepare the EMS to learn whether otherwise-exported PV can be used to preheat rooms with the Quatt before the normal Honeywell Multizone comfort schedule raises the room target.
+Prepare the EMS to learn whether otherwise-exported PV can be used to preheat rooms before the normal Honeywell Multizone comfort schedule raises the room target.
+
+The causal chain starts at **Honeywell**, because Honeywell owns the room schedules, zone temperatures, setpoints and the resulting heating demand for the house. Quatt is downstream: it receives that demand through the existing Honeywell/OpenTherm chain and decides how the heat is produced, potentially with gas-boiler assistance.
 
 This preparation deliberately does **not** implement control. It defines ownership, telemetry, modelling boundaries, safety invariants and the future planner interface so data collection and shadow analysis can be added without creating a second history platform or increasing Homey load unnecessarily.
 
 ## Non-negotiable ownership boundaries
 
-1. **Honeywell Multizone is comfort authority.** It owns zones, normal schedules, room targets and the normal heat-demand semantics.
+1. **Honeywell Multizone is comfort authority and the primary thermal control source.** It owns zones, normal schedules, measured room temperatures, room targets and the normal heat-demand semantics.
 2. **The OpenTherm connection between Honeywell and Quatt is untouched.** The EMS must not intercept, rewrite, spoof or otherwise control OpenTherm messages.
-3. **Quatt remains the heat-production executor.** The EMS observes direct Quatt data where available; it does not introduce an alternative heat-control path.
+3. **Quatt is downstream heat-production telemetry/executor, not the comfort source.** Quatt data is used to explain how a Honeywell demand was fulfilled: heat-pump power, thermal output, COP and any CV/gas assistance.
 4. **The Pi is the optimizer/model host.** Thermal opportunity calculation belongs beside the existing Pi planner and uses the same canonical history and forecasts.
 5. **Homey remains the guarded execution layer.** No new broad Homey polling is part of this preparation.
-6. Any future Honeywell setpoint adjustment requires a separately validated, supported Honeywell interface and an explicit later authorization/cutover. This v0.1 contains no such writer.
+6. Any future preheat action must use a separately validated, supported Honeywell interface. This v0.1 contains no Honeywell writer and no alternative path through Quatt/OpenTherm.
+
+## Correct causal model
+
+The thermal-learning chain is:
+
+`Honeywell zone state/schedule -> Honeywell heat demand -> existing OpenTherm path -> Quatt response -> optional CV assist -> room temperature response`
+
+The EMS should therefore learn from paired input/output evidence:
+
+- **input / cause:** Honeywell zone temperature, Honeywell current target, scheduled target changes and zone demand;
+- **response:** Quatt electrical/thermal power, COP, working state and CV request/flame evidence;
+- **outcome:** subsequent Honeywell-measured room-temperature trajectory;
+- **context:** outside temperature, PV/export, WW/Tesla claims and time of day.
+
+Quatt thermostat fields may be useful corroborating telemetry, but they must not replace Honeywell zone state as the authoritative description of what the house was asked to do.
 
 ## Observed operating behaviour to model
 
@@ -26,7 +43,7 @@ The EMS must therefore learn an operating envelope rather than encode one fixed 
 
 Primary quantity to learn:
 
-`P(CV_ASSIST | zone, target_minus_room_temp, outside_temp, recent_heat_state, time_since_demand, ...)`
+`P(CV_ASSIST | zone, honeywell_target_minus_room_temp, outside_temp, recent_heat_state, time_since_demand, ...)`
 
 A future opportunity is acceptable only when the predicted CV-assist risk is below a validated threshold. The threshold is intentionally not defined in this preparation.
 
@@ -47,22 +64,23 @@ This is an allocation rule, not a new independent realtime optimizer.
 Read-only normalizer. Produces a coherent thermal observation from canonical telemetry.
 
 Responsibilities:
-- normalize room temperature and target per zone;
+- ingest Honeywell room temperature and target per zone as primary comfort/control telemetry;
+- retain Honeywell schedule/next-transition information when available;
 - retain source/freshness/quality metadata;
-- associate direct Quatt power/status and CV-assist evidence;
+- associate downstream Quatt power/status and CV-assist evidence;
 - associate outdoor temperature and net P1 import/export;
 - associate planner claims for WW and EV;
 - never write a setpoint or device capability.
 
 ### 2. thermal-model
 
-Read-only model fitted from historical observations.
+Read-only model fitted from historical Honeywell-driven observations.
 
 First useful outputs:
 - room heating/cooling rate by zone;
 - thermal inertia / loss approximation;
 - expected room temperature at the next Honeywell comfort transition;
-- Quatt-only probability / CV-assist probability for candidate target deltas;
+- Quatt-only probability / CV-assist probability for candidate Honeywell target deltas;
 - confidence and sample support.
 
 A first-order thermal model is sufficient as a baseline:
@@ -76,10 +94,10 @@ The implementation may later use a richer model if replay evidence justifies it,
 PURE_SHADOW candidate generator. It evaluates whether residual PV surplus could be shifted into building thermal mass before an already-scheduled Honeywell comfort increase.
 
 Hard candidate constraints:
-- next Honeywell scheduled target is known and fresh;
+- Honeywell zone state and next scheduled target are known and fresh;
 - candidate target never exceeds that next scheduled target;
 - residual PV surplus is positive after WW/EV claims;
-- Quatt data is fresh enough to support the model;
+- Quatt response telemetry is fresh enough to support the model;
 - no observed CV assist is active;
 - required inputs are not stale/estimated beyond configured tolerances;
 - output has `executeAllowed=false` in shadow phases.
@@ -90,11 +108,11 @@ Hard candidate constraints:
 
 If shadow validation later succeeds, a separate adapter may translate an approved thermal intent into a small, time-limited Honeywell setpoint adjustment through a supported Honeywell interface. It must be independently guarded and revocable.
 
-It may never write or manipulate OpenTherm.
+It may never write or manipulate OpenTherm or issue a direct Quatt heat-demand command.
 
 ## Canonical history: extend, do not duplicate
 
-The Pi already has a canonical SQLite history at `/home/jeroen/ems/data/ems-history.sqlite` with a generic `devices` / `metrics` / `measurements` structure. Existing `import_em2_day_history.py` imports Homey day-history samples into that store and records quality plus source resolution.
+The Pi already has a canonical SQLite history at `/home/jeroen/ems/data/ems-history.sqlite` with a generic `devices` / `metrics` / `measurements` structure. Existing imports/collectors record quality plus source resolution.
 
 Thermal data should use the same store and conventions. Do **not** introduce a second thermal history database as the primary source.
 
@@ -106,20 +124,22 @@ It defines candidate devices, metrics, quality requirements and event semantics 
 
 ## Minimum telemetry needed for learning
 
-Per zone:
-- current room temperature;
+### Honeywell — primary / causal telemetry, per zone
+- measured room temperature;
 - current Honeywell target;
 - next scheduled target;
 - timestamp of next scheduled target;
-- zone heat-demand/active state if available without broad polling.
+- zone heat-demand/active state if exposed;
+- stable zone identity.
 
-Heat production:
-- direct Quatt electrical power where available;
-- Quatt active/status indication;
-- CV/gas-boiler assist indication;
-- preferably a direct signal rather than inference where available.
+### Quatt/CV — downstream response telemetry
+- Quatt electrical power;
+- Quatt thermal power;
+- COP / working mode where useful;
+- heating-response state;
+- CV request and preferably actual flame/assist evidence.
 
-EMS context:
+### EMS context
 - P1 net import/export;
 - aggregate PV production and/or constituent inverter production;
 - outdoor temperature;
@@ -131,10 +151,12 @@ Every measurement used for fitting must retain source, timestamp, resolution and
 
 ## Events
 
-Continuous measurements alone are insufficient for causal analysis around heat-demand transitions. The canonical telemetry layer should also preserve, or derive reproducibly, events such as:
+Continuous measurements alone are insufficient for causal analysis around heat-demand transitions. The canonical telemetry layer should preserve, or derive reproducibly, events such as:
 
-- `ROOM_SETPOINT_CHANGED`
+- `HONEYWELL_ROOM_TARGET_CHANGED`
 - `HONEYWELL_SCHEDULE_TRANSITION`
+- `HONEYWELL_ZONE_DEMAND_STARTED`
+- `HONEYWELL_ZONE_DEMAND_STOPPED`
 - `QUATT_STARTED`
 - `QUATT_STOPPED`
 - `CV_ASSIST_STARTED`
@@ -147,11 +169,11 @@ An event store may be an additive table/file inside the canonical history subsys
 
 ## Suggested sampling and retention
 
-Thermal dynamics are slow compared with P1. For model input a 60-second normalized thermal sample is likely sufficient, while native faster measurements may remain available where already collected.
+Thermal dynamics are slow compared with P1. Five-minute room/Quatt telemetry is sufficient for an initial model provided target transitions are timestamped accurately. Faster native measurements may remain available where already collected.
 
-This is a target, not an instruction to poll Homey every minute. Prefer Pi-local/direct sources or existing compact publications. When a source only exists at lower frequency, store the true source resolution and quality rather than fabricating 60-second observations.
+This is not an instruction to poll Homey every minute. Prefer a direct/supported Honeywell read source, existing compact publications or targeted batched reads. When a source only exists at lower frequency, store the true source resolution and quality rather than fabricating observations.
 
-Retain enough high-resolution history to cover multiple weather regimes. A practical initial target is at least one heating season. Aggregation may be added for long-term reporting, but raw model features around setpoint/Quatt/CV transitions must not be discarded prematurely.
+Retain enough high-resolution history to cover multiple weather regimes. A practical initial target is at least one heating season. Aggregation may be added for long-term reporting, but raw model features around Honeywell setpoint/heat-demand/Quatt/CV transitions must not be discarded prematurely.
 
 ## Shadow recommendation contract
 
@@ -183,7 +205,7 @@ The example values are illustrative only and are not production thresholds.
 ## Fail-closed rules for future phases
 
 A thermal opportunity must resolve to no action when any of the following applies:
-- Honeywell schedule/target is unknown or stale;
+- Honeywell room/schedule/target state is unknown or stale;
 - candidate target would exceed the next scheduled Honeywell comfort target;
 - CV assist is active or its status is unknown when the policy requires confirmation;
 - residual PV is no longer available;
@@ -196,14 +218,14 @@ Loss of telemetry must never create a heating command.
 
 ## Rollout phases
 
-### T0 — telemetry gap analysis
-No control. Confirm which required fields already exist in canonical Pi history and which source adapters are still needed.
+### T0 — Honeywell-first telemetry gap analysis
+No control. First establish the least expensive supported read path for Honeywell zone temperatures, current targets and schedules. Then map downstream Quatt/CV response signals onto the same timeline.
 
 ### T1 — passive collection
-Persist thermal observations/events only. No recommendation and no setpoint write.
+Persist Honeywell zone observations plus Quatt/CV responses/events only. No recommendation and no setpoint write.
 
 ### T2 — model learning
-Fit/replay per-zone thermal response and Quatt-only/CV-assist envelope. No recommendation write to Homey.
+Fit/replay per-zone thermal response and Quatt-only/CV-assist envelope from naturally occurring Honeywell target changes. No recommendation write to Homey.
 
 ### T3 — PURE_SHADOW opportunity replay
 Generate recommendations with `executeAllowed=false`; compare predicted room trajectory, actual evening heat demand, PV export avoided in counterfactual replay, and false-positive CV-assist risk.
@@ -217,18 +239,20 @@ Out of scope until explicitly authorized. Requires a supported Honeywell write i
 ## Validation criteria before any execution discussion
 
 At minimum:
-- sufficient samples per zone and outside-temperature band;
-- repeatable Quatt-only envelope estimates;
+- sufficient Honeywell samples per zone and outside-temperature band;
+- repeatable Quatt-only envelope estimates after Honeywell target changes;
 - explicit false-positive rate for predicted Quatt-only operation;
 - replay shows positive PV self-consumption gain after thermal losses;
 - no hidden increase in gas/CV use in shadow counterfactuals;
 - comfort at normal Honeywell schedule transition is not degraded;
-- all recommendations are explainable from stored inputs and model revision;
+- all recommendations are explainable from stored Honeywell inputs, downstream response and model revision;
 - zero physical writes during T0–T4.
 
 ## Homey-load rule
 
-This preparation intentionally makes no Homey API changes. Future collection should prefer already-published state, existing targeted Insights collection, or direct Pi/device sources. Any new Homey read must be targeted and justified; do not add `getDevices()` / `getVariables()` broad polling loops for thermal modelling.
+This preparation intentionally makes no Homey API changes. The first collection question is now specifically: **what is the lowest-load supported way to read Honeywell zone state?** Prefer direct/supported Honeywell access or existing compact state. If Homey is the only practical source, use narrowly targeted Honeywell reads/batching and do not add broad `getDevices()` / `getVariables()` loops.
+
+Quatt telemetry should be reused from existing collection/publication and should not trigger extra reads merely because thermal modelling is added.
 
 ## Relationship to Pi source-of-truth rule
 
