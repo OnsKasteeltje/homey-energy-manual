@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect EMS Honeywell state every 5 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/5:00
+Persistent=true
+AccuracySec=15s
+Unit=ems-honeywell-state.service
+
+[Install]
+WantedBy=timers.target
