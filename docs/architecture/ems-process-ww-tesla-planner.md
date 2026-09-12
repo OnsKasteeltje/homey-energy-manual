@@ -1,20 +1,19 @@
 # EMS process — Warm Water, Tesla and Planner
 
-Status: project architecture reference  
-Date: 2026-09-06
+Status: current production architecture reference  
+Date: 2026-09-12
 
-This diagram captures the current Pi/Homey EMS process for warm water (WW), Tesla EV charging and the quarter-hour planner. It is intended as the maintainable source-of-truth diagram for the project.
+This diagram captures the current Pi/Homey EMS process for warm water (WW), Tesla EV charging and the quarter-hour planner after the controlled Pi cutover.
 
 ```mermaid
 flowchart TB
-  %% INPUTS
   subgraph I[1. Data & inputs]
     H[Homey real-time\nPV, grid, devices]
     HD[Homey day history\n5-min measurements]
     PVI[PV / weather forecast]
     TI[Tesla\nSoC, connected, deadline, target]
     WI[Warm water\nmode, state, requirement]
-    PR[Tariff / price input\noptional]
+    CP[Fixed ENGIE contract policy]
   end
 
   DB[(SQLite\noperational historical database)]
@@ -23,87 +22,112 @@ flowchart TB
   HD --> DB
   TI --> DB
   WI --> DB
-  PVI --> PF
-  PR --> QP
 
-  %% FORECASTS
   subgraph F[2. Forecasts]
-    PF[PV forecast\n24h / 15-min]
+    PF[PV forecast\n15-min]
     CB[Clean base history\nfrom SQLite]
-    BF[Base-load forecast v0.2\nquarter × day type × season]
-    WWF[WW input / forecast\nflexibility + requirement]
-    TIF[Tesla input\nenergy need + deadline]
+    BF[Base-load forecast]
+    WWF[WW requirement / forecast]
+    TIF[Tesla energy need / deadline]
   end
 
+  PVI --> PF
   DB --> CB --> BF
   WI --> WWF
   TI --> TIF
 
-  %% PLANNER
-  subgraph PL[3. Quarter-hour planner]
-    QP[Combine PV + base load + WW + Tesla\nApply hard constraints and priorities\nBuild 96-slot shadow plan]
+  subgraph PL[3. Pi dynamic planner]
+    QP[Hardened dynamic planner v0.3\n96 action slots / 24h\nmultiday WW lookahead\nfixed ENGIE production policy]
+    CC[/Pi /control/current\ntechnical READY + current command/]
   end
 
   PF --> QP
   BF --> QP
   WWF --> QP
   TIF --> QP
+  CP --> QP
+  QP --> CC
 
-  %% DECISIONS
-  subgraph C[4. Control logic]
-    RT[Current state\nHomey measurements + status]
-    DEC{Plan still valid\nand safe?}
-    WWC[WW control\nmeet comfort/deadline\nprefer PV opportunity]
-    TEC[Tesla control\ndeadline charging first\notherwise PV opportunity]
-    HOLD[Hold / no action\nrespect hysteresis, leases, limits]
+  subgraph A[4. Single authority boundary in Homey]
+    SEL{EM2_Planner_Authority}
+    PIB[PI Dynamic Planner Bridge v1.2.4]
+    HB[Guarded Homey producer\nrollback path]
+    INT[EM2_Power_Intent v0.2]
   end
 
-  QP --> DEC
-  H --> RT --> DEC
-  DEC -->|WW action| WWC
-  DEC -->|Tesla action| TEC
-  DEC -->|No justified change| HOLD
+  CC --> PIB
+  SEL -->|PI| PIB
+  SEL -->|HOMEY| HB
+  PIB --> INT
+  HB --> INT
 
-  %% EXECUTION
-  subgraph E[5. Execution via Homey]
-    WWA[Boiler / warm-water actuator]
-    TEA[Easee / Tesla charging actuator]
+  subgraph E[5. Homey executor / safety layer]
+    EVA[EV Power Adapter v0.1.4\nSTART7 / RUN6]
+    EVG[EV Gate v0.2.5\nhealth observability-only]
+    EVA2[EV Actuator v0.2.6\nEasee session + current]
+    WWA[WW Power Adapter v0.2]
+    WWG[WW Gate v0.2]
+    WWA2[WW Actuator v0.9\nsole boiler writer]
+    EH[Easee Device Health v0.2\nobservability]
   end
 
-  WWC --> WWA
-  TEC --> TEA
+  INT --> EVA --> EVG --> EVA2
+  INT --> WWA --> WWG --> WWA2
+  EH -. diagnostic only .-> EVG
 
-  %% FEEDBACK
-  subgraph M[6. Monitoring & feedback]
+  subgraph D[6. Physical devices]
+    TES[Easee / Tesla]
+    BOI[Boiler]
+  end
+
+  EVA2 --> TES
+  WWA2 --> BOI
+
+  subgraph M[7. Monitoring & feedback]
     LOG[Logging / SQLite history]
-    WEB[Pi Planner website\nforecast + planned windows]
-    EVAL[Compare forecast / plan / reality\nbacktest and improve with more history]
+    EVS[EV control-status evidence]
+    WEB[Pi planner website\nforecast + planned windows]
+    EVAL[Compare forecast / plan / reality]
   end
 
-  WWA --> LOG
-  TEA --> LOG
-  RT --> LOG
+  TES --> LOG
+  BOI --> LOG
+  EVG --> EVS
+  EVA2 --> EVS
   QP --> WEB
-  LOG --> EVAL
-  EVAL --> DB
+  LOG --> EVAL --> DB
 
-  %% PRIORITY NOTES
-  PRI[Priority principles\n1. Safety / hard device limits\n2. WW comfort and required readiness\n3. Tesla explicit deadline / target\n4. Use PV for flexible load\n5. Minimise avoidable grid import/export\n6. No competing battery optimiser]
+  PRI[Priority principles\n1. Safety / hard device limits\n2. WW comfort and readiness\n3. Tesla explicit deadline / target\n4. Maximise useful PV self-consumption\n5. Avoid unnecessary grid import/export\n6. No competing battery optimiser]
   PRI -. governs .-> QP
-  PRI -. governs .-> DEC
 ```
 
 ## Operational principles
 
-- **SQLite is the only operational historical database on the Pi.** GitHub/JSON history is bootstrap or publication output, not a live planner database.
-- **Planner and control are separated.** The planner proposes quarter-hour intent; Homey/runtime control validates the current situation before actuating devices.
-- **WW:** hard comfort/readiness requirements win. Once the daily goal is reached, unnecessary reheating should be avoided; surplus-PV heating is an opportunity, not a comfort violation.
-- **Tesla:** an explicit departure deadline/target SoC is a hard planning requirement. Outside deadline charging, PV-opportunity charging is preferred and anti-flapping/hysteresis remains active.
-- **Base load:** controllable loads and Quatt are removed before forecasting, preventing double counting when WW or Tesla are added back by the planner.
-- **Forecast learning:** base-load forecast v0.2 uses quarter-hour + day type + seasonal analogues with graceful fallback. It remains measurable/backtestable while history accumulates.
-- **Execution is fail-safe and idempotent.** A plan does not itself force a device write; current state, safety limits and leases/hysteresis are checked first.
-- **Future battery:** Victron DESS remains the primary battery optimiser; the Pi planner should expose future household/flexible-load intent, not compete with DESS in real time.
+- **Pi is the active planner authority** while `EM2_Planner_Authority = PI`.
+- **Homey is executor and local safety layer.** The Pi planner does not write devices directly.
+- **There is one authority selector.** `EM2_Planner_Authority` is the sole HOMEY↔PI planner gate; `control-authority.json` is configuration/diagnostic context, not a second cutover gate.
+- **`/control/current` is readiness + command.** It validates the Pi plan and fixed-contract boundary and returns only the current slot command.
+- **SQLite is the operational historical database on the Pi.** JSON/GitHub publication files are derived state or evidence.
+- **WW:** comfort/readiness requirements win. The planner prefers useful PV and avoids unnecessary repeat heating after the daily goal.
+- **Tesla:** deadline/target requirements are hard constraints. Opportunity charging uses residual PV. The active actuator uses START7/RUN6 semantics.
+- **Easee health:** the current capability-timestamp health heuristic is observability-only at EV Gate v0.2.5 and does not independently veto a coherent positive command.
+- **Execution is fail-safe.** EV/WW adapters and gates require coherent schemas/revisions and the actuators remain the only physical writers.
+- **Future battery:** Victron DESS remains the primary real-time battery optimiser; Pi/Homey must not create a competing real-time battery optimiser.
+
+## Validated live command paths — 2026-09-12
+
+Tesla:
+
+`Pi 4830 W / 7 A → PI bridge → Power Intent → EV adapter → Gate PASS → EV actuator → Easee ~4.9 kW`, followed by Pi return to `0 A` and physical pause.
+
+Result: **ON/OFF PASS.**
+
+Warm water:
+
+`Pi WW ON → PI bridge → Power Intent → WW adapter → Gate PASS → WW actuator → boiler ~2.03 kW`, followed by restore to normal Pi target and physical `0 W`.
+
+Result: **ON/OFF PASS.**
 
 ## Data flow summary
 
-`Homey/history → SQLite → clean base history → base-load + PV + WW + Tesla forecasts → 96-slot planner → runtime validation → Homey actuation → logging/website → feedback`
+`Homey/history → SQLite → forecasts/requirements → Pi dynamic planner → /control/current → Homey authority selector + PI bridge → canonical Power Intent → adapters/gates → physical actuators → logging/website/evidence → feedback`
