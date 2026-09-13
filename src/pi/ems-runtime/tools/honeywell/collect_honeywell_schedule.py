@@ -2,8 +2,13 @@
 
 """Read-only Honeywell/Resideo schedule collector.
 
-Intended future cadence: every 6 hours, plus an explicit on-demand refresh when
-needed. Fetches schedules separately from the 5-minute state poller.
+Intended cadence: every 6 hours, plus an explicit on-demand refresh when needed.
+Fetches schedules separately from the 5-minute state poller.
+
+Besides the current/next switchpoint compatibility fields, this collector exposes
+Honeywell's complete weekly zone schedule. That weekly schedule is the canonical
+baseline input for the EMS room-heating planner/visualisation. No schedule writes
+are performed here.
 """
 
 from __future__ import annotations
@@ -55,8 +60,11 @@ async def main() -> None:
                         status = "OK"
                         current = None
                         nxt = None
+                        weekly_schedule = None
                         try:
-                            await zone.get_schedule()
+                            # evohome-async returns a JSON-serialisable list with
+                            # day_of_week + switchpoints (time_of_day/heat_setpoint).
+                            weekly_schedule = await zone.get_schedule()
                             current = zone.this_switchpoint
                             nxt = zone.next_switchpoint
                         except InvalidScheduleError:
@@ -72,6 +80,7 @@ async def main() -> None:
                             "scheduleStatus": status,
                             "currentSwitchpoint": switchpoint(current),
                             "nextSwitchpoint": switchpoint(nxt),
+                            "weeklySchedule": weekly_schedule,
                         }
 
     missing = [zid for zid in zone_map if zid not in found]
@@ -80,7 +89,7 @@ async def main() -> None:
 
     zones = [found[str(m["honeywellZoneId"])] for m in mapping["zones"]]
     payload = {
-        "schema": "EMS_HONEYWELL_SCHEDULE_V0.1",
+        "schema": "EMS_HONEYWELL_SCHEDULE_V0.2",
         "mode": "READ_ONLY",
         "generatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "source": "RESIDEO_EVOHOME_CLOUD",
