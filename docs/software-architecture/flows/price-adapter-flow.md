@@ -1,207 +1,129 @@
 ---
 title: Contract Price Adapter flows
 component: price-adapter
-last_verified: 2026-08-25
+status: active
+architecture_status: implemented-production
+last_verified: 2026-09-13
+source:
+  - docs/architecture/CURRENT-EMS-STATE.md
+  - docs/software-architecture/components/price-adapter.md
 ---
 
 # Contract Price Adapter flows
 
-## Adapter
+## Production contract governance
 
 ```process-model
 {
-  "id": "price-adapter-flow-1",
+  "id": "price-adapter-production-policy",
   "kind": "mermaid-source",
   "declaration": "flowchart TD",
   "lines": [
-    "  A[15 min trigger / manual start] --> B[Read EMS_ContractType]",
-    "  B --> C{FIXED or DYNAMIC?}",
-    "  C -->|invalid| D[Set FIXED]",
-    "  D --> E[Mirror EM2_Contract_Type]",
-    "  C -->|FIXED| E",
-    "  C -->|DYNAMIC| E",
-    "  E --> F{DYNAMIC?}",
-    "  F -->|yes| G[PBTH prices_json next_hours]",
-    "  G --> H[Store temporary JSON buffer]",
-    "  H --> I[Build uniform price context]",
-    "  F -->|no| I",
-    "  I --> J{Contract type}",
-    "  J -->|FIXED| K[Use local configured tariffs only]",
-    "  J -->|DYNAMIC| L[Validate PBTH now + horizon]",
-    "  K --> M[Publish EM2_ContractPrice_Context]",
-    "  L --> M"
+    "  A[Production contract config] --> B{mode = FIXED?}",
+    "  B -->|No| X[Fail closed for production]",
+    "  B -->|Yes| C{contractId = ENGIE_3Y_2026_2029?}",
+    "  C -->|No| X",
+    "  C -->|Yes| D[Permit FIXED production economics]",
+    "  D --> E[Pi planner decision]",
+    "  F[Dynamic price feeds] -. shadow / analysis / replay only .-> G[Non-production evidence]"
   ]
 }
 ```
 
-<!-- GENERATED_MERMAID:price-adapter-flow-1 START -->
+<!-- GENERATED_MERMAID:price-adapter-production-policy START -->
 ```mermaid
 flowchart TD
-  A[15 min trigger / manual start] --> B[Read EMS_ContractType]
-  B --> C{FIXED or DYNAMIC?}
-  C -->|invalid| D[Set FIXED]
-  D --> E[Mirror EM2_Contract_Type]
-  C -->|FIXED| E
-  C -->|DYNAMIC| E
-  E --> F{DYNAMIC?}
-  F -->|yes| G[PBTH prices_json next_hours]
-  G --> H[Store temporary JSON buffer]
-  H --> I[Build uniform price context]
-  F -->|no| I
-  I --> J{Contract type}
-  J -->|FIXED| K[Use local configured tariffs only]
-  J -->|DYNAMIC| L[Validate PBTH now + horizon]
-  K --> M[Publish EM2_ContractPrice_Context]
-  L --> M
+  A[Production contract config] --> B{mode = FIXED?}
+  B -->|No| X[Fail closed for production]
+  B -->|Yes| C{contractId = ENGIE_3Y_2026_2029?}
+  C -->|No| X
+  C -->|Yes| D[Permit FIXED production economics]
+  D --> E[Pi planner decision]
+  F[Dynamic price feeds] -. shadow / analysis / replay only .-> G[Non-production evidence]
 ```
-<!-- GENERATED_MERMAID:price-adapter-flow-1 END -->
+<!-- GENERATED_MERMAID:price-adapter-production-policy END -->
 
-## Price usability
+Automatische fallback of automatische mode-switching naar DYNAMIC is niet toegestaan.
+
+## Homey price context
 
 ```process-model
 {
-  "id": "price-adapter-flow-2",
+  "id": "price-adapter-homey-context",
   "kind": "mermaid-source",
   "declaration": "flowchart TD",
   "lines": [
-    "  A[ContractPrice Context] --> B{age <= 35 min?}",
-    "  B -->|no| X[priceUsable=false]",
-    "  B -->|yes| C{quality GOOD?}",
-    "  C -->|no| X",
-    "  C -->|yes| D{contract}",
-    "  D -->|FIXED| E{horizon STATIC?}",
-    "  D -->|DYNAMIC| F{horizon FULL or INTRADAY?}",
-    "  E -->|yes| G[priceUsable=true]",
-    "  E -->|no| X",
-    "  F -->|yes| G",
-    "  F -->|no| X"
+    "  A[Contract Price Adapter v0.10] --> B[Uniform price/context output]",
+    "  C[FIXED local contract values] --> A",
+    "  D[Dynamic/PBTH data] --> A",
+    "  B --> E{Current production mode FIXED?}",
+    "  E -->|Yes| F[Only FIXED route may influence production]",
+    "  E -->|No / mismatch| G[Fail closed for production]",
+    "  D -. retained for shadow/analysis .-> H[Diagnostics / replay]"
   ]
 }
 ```
 
-<!-- GENERATED_MERMAID:price-adapter-flow-2 START -->
+<!-- GENERATED_MERMAID:price-adapter-homey-context START -->
 ```mermaid
 flowchart TD
-  A[ContractPrice Context] --> B{age <= 35 min?}
-  B -->|no| X[priceUsable=false]
-  B -->|yes| C{quality GOOD?}
-  C -->|no| X
-  C -->|yes| D{contract}
-  D -->|FIXED| E{horizon STATIC?}
-  D -->|DYNAMIC| F{horizon FULL or INTRADAY?}
-  E -->|yes| G[priceUsable=true]
-  E -->|no| X
-  F -->|yes| G
-  F -->|no| X
+  A[Contract Price Adapter v0.10] --> B[Uniform price/context output]
+  C[FIXED local contract values] --> A
+  D[Dynamic/PBTH data] --> A
+  B --> E{Current production mode FIXED?}
+  E -->|Yes| F[Only FIXED route may influence production]
+  E -->|No / mismatch| G[Fail closed for production]
+  D -. retained for shadow/analysis .-> H[Diagnostics / replay]
 ```
-<!-- GENERATED_MERMAID:price-adapter-flow-2 END -->
+<!-- GENERATED_MERMAID:price-adapter-homey-context END -->
 
-## Tesla candidate
+## Pi command contract guard
 
 ```process-model
 {
-  "id": "price-adapter-flow-3",
+  "id": "price-adapter-pi-command-guard",
   "kind": "mermaid-source",
   "declaration": "flowchart TD",
   "lines": [
-    "  A[State + uniform price context] --> B{Deadline catch-up due?}",
-    "  B -->|yes| C[MUST deadline charge]",
-    "  B -->|no| D{Deadline active + remaining?}",
-    "  D -->|yes| E{P1 flex >= 800 W OR usable negative/cheap price}",
-    "  E -->|yes| F[SHOULD charge opportunity]",
-    "  E -->|no| G[HOLD]",
-    "  D -->|no| H{Plugged + flex >= 1500 W?}",
-    "  H -->|yes| I[MAY buffer export]",
-    "  H -->|no| G"
+    "  A[Pi /control/current] --> B{plannerOwner = PI?}",
+    "  B -->|No| X[Reject]",
+    "  B -->|Yes| C{executor = HOMEY?}",
+    "  C -->|No| X",
+    "  C -->|Yes| D{mode FIXED + ENGIE contractId?}",
+    "  D -->|No| X",
+    "  D -->|Yes| E{fresh + current slot valid?}",
+    "  E -->|No| X",
+    "  E -->|Yes| F[READY command]"
   ]
 }
 ```
 
-<!-- GENERATED_MERMAID:price-adapter-flow-3 START -->
+<!-- GENERATED_MERMAID:price-adapter-pi-command-guard START -->
 ```mermaid
 flowchart TD
-  A[State + uniform price context] --> B{Deadline catch-up due?}
-  B -->|yes| C[MUST deadline charge]
-  B -->|no| D{Deadline active + remaining?}
-  D -->|yes| E{P1 flex >= 800 W OR usable negative/cheap price}
-  E -->|yes| F[SHOULD charge opportunity]
-  E -->|no| G[HOLD]
-  D -->|no| H{Plugged + flex >= 1500 W?}
-  H -->|yes| I[MAY buffer export]
-  H -->|no| G
+  A[Pi /control/current] --> B{plannerOwner = PI?}
+  B -->|No| X[Reject]
+  B -->|Yes| C{executor = HOMEY?}
+  C -->|No| X
+  C -->|Yes| D{mode FIXED + ENGIE contractId?}
+  D -->|No| X
+  D -->|Yes| E{fresh + current slot valid?}
+  E -->|No| X
+  E -->|Yes| F[READY command]
 ```
-<!-- GENERATED_MERMAID:price-adapter-flow-3 END -->
+<!-- GENERATED_MERMAID:price-adapter-pi-command-guard END -->
 
-## Warm-water candidate
+De Homey PI Bridge v1.2.6 herhaalt de FIXED/ENGIE-validatie vóór projectie naar `EM2_POWER_INTENT_V0.2`.
 
-```process-model
-{
-  "id": "price-adapter-flow-4",
-  "kind": "mermaid-source",
-  "declaration": "flowchart TD",
-  "lines": [
-    "  A[State + WW state + uniform price context] --> B{Boiler mode selected?}",
-    "  B -->|no| C[MUST OFF/HOLD]",
-    "  B -->|yes| D{Goal reached?}",
-    "  D -->|yes| C",
-    "  D -->|no| E{After 19:00?}",
-    "  E -->|yes| C",
-    "  E -->|no| F{Catch-up required?}",
-    "  F -->|yes| G[MUST ON/HOLD]",
-    "  F -->|no| H{Strong P1 export?}",
-    "  H -->|yes| I[SHOULD BOILER_ON]",
-    "  H -->|no| J{Usable negative/cheap price + import guard?}",
-    "  J -->|yes| I",
-    "  J -->|no| K{PV forecast opportunity?}",
-    "  K -->|yes| I",
-    "  K -->|no| L[HOLD / wait]"
-  ]
-}
-```
+## Tesla en WW impact
 
-<!-- GENERATED_MERMAID:price-adapter-flow-4 START -->
-```mermaid
-flowchart TD
-  A[State + WW state + uniform price context] --> B{Boiler mode selected?}
-  B -->|no| C[MUST OFF/HOLD]
-  B -->|yes| D{Goal reached?}
-  D -->|yes| C
-  D -->|no| E{After 19:00?}
-  E -->|yes| C
-  E -->|no| F{Catch-up required?}
-  F -->|yes| G[MUST ON/HOLD]
-  F -->|no| H{Strong P1 export?}
-  H -->|yes| I[SHOULD BOILER_ON]
-  H -->|no| J{Usable negative/cheap price + import guard?}
-  J -->|yes| I
-  J -->|no| K{PV forecast opportunity?}
-  K -->|yes| I
-  K -->|no| L[HOLD / wait]
-```
-<!-- GENERATED_MERMAID:price-adapter-flow-4 END -->
+Onder het huidige FIXED-contract:
+
+- Tesla opportunity komt uit residual PV, niet uit goedkope/negatieve dynamische prijs;
+- Tesla deadline/MUST mag netenergie gebruiken wanneer noodzakelijk, maar dit is deadline-gedreven en niet prijsarbitrage;
+- WW planning geeft comfort/deadline en bruikbare PV voorrang;
+- dynamische prijsdata kan alleen shadow/analyse/replay beïnvloeden.
 
 ## Boundary
 
-```process-model
-{
-  "id": "price-adapter-flow-5",
-  "kind": "mermaid-source",
-  "declaration": "flowchart LR",
-  "lines": [
-    "  A[PBTH / fixed tariff config] --> B[Uniform Price Context]",
-    "  B --> C[Contract-aware SHADOW candidates]",
-    "  D[P1 / Core State] --> C",
-    "  C -. no physical writes .-> E[Production Tesla / WW controllers]"
-  ]
-}
-```
-
-<!-- GENERATED_MERMAID:price-adapter-flow-5 START -->
-```mermaid
-flowchart LR
-  A[PBTH / fixed tariff config] --> B[Uniform Price Context]
-  B --> C[Contract-aware SHADOW candidates]
-  D[P1 / Core State] --> C
-  C -. no physical writes .-> E[Production Tesla / WW controllers]
-```
-<!-- GENERATED_MERMAID:price-adapter-flow-5 END -->
+Prijscontext en contract-aware candidate logic schrijven geen physical devices. Het bestaan van DYNAMIC-support in adaptercode is geen toestemming om DYNAMIC als productiepolicy te gebruiken.
