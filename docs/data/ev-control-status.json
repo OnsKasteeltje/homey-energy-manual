@@ -1,33 +1,31 @@
 {
   "schema": "EM2_EV_CONTROL_STATUS_V0.4",
-  "publishedAt": "2026-09-13T20:18:09.483Z",
+  "publishedAt": "2026-09-13T20:19:02.909Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
-  "targetW": 0,
-  "evStatus": "FAIL_CLOSED_PI_UNAVAILABLE",
-  "requestedA": 0,
+  "targetW": 11040,
+  "evStatus": "NUMERIC_DEADLINE_TARGET",
+  "requestedA": 16,
   "controlRevision": "",
-  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":false,\"status\":\"PI_BRIDGE_ERROR\",\"evTargetW\":0,\"evStatus\":\"FAIL_CLOSED_PI_UNAVAILABLE\",\"evSource\":\"PI_FAIL_CLOSED\",\"wwTargetOn\":false,\"wwStatus\":\"FAIL_CLOSED_PI_UNAVAILABLE\",\"authority\":\"PI\"}",
-  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":false,\"status\":\"PI_BRIDGE_ERROR\",\"evTargetW\":0,\"evStatus\":\"FAIL_CLOSED_PI_UNAVAILABLE\",\"evSource\":\"PI_FAIL_CLOSED\",\"wwTargetOn\":false,\"wwStatus\":\"FAIL_CLOSED_PI_UNAVAILABLE\",\"authority\":\"PI\"}",
+  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":11040,\"evStatus\":\"NUMERIC_DEADLINE_TARGET\",\"evSource\":\"REMAINING_KWH_OVER_TIME_TO_DEADLINE\",\"wwTargetOn\":false,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":11040,\"evStatus\":\"NUMERIC_DEADLINE_TARGET\",\"evSource\":\"REMAINING_KWH_OVER_TIME_TO_DEADLINE\",\"wwTargetOn\":false,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
   "sourceRevisions": {
-    "intent": 7016,
-    "adapter": 7013,
-    "adapterState": 7014,
-    "core": 7017
+    "intent": 7017,
+    "adapter": 7017,
+    "adapterState": 7017,
+    "core": 7018
   },
   "adapter": {
-    "valid": false,
-    "status": "SEMANTIC_TOKEN_OR_SCHEMA_MISMATCH",
-    "reason": "Power Intent semantic token/schema invalid",
-    "generatedAt": "2026-09-13T20:10:00.809Z",
-    "stateAgeSec": 1,
+    "valid": true,
+    "status": "EXECUTABLE",
+    "reason": "11040 W → 16 A",
+    "generatedAt": "2026-09-13T20:19:00.468Z",
+    "stateAgeSec": 60,
     "intentAgeSec": 0
   },
   "gate": {
-    "status": "FAIL",
-    "errors": [
-      "TRANSLATION"
-    ],
+    "status": "PASS",
+    "errors": [],
     "checks": {
       "schema": true,
       "controlRevisionAligned": true,
@@ -35,26 +33,26 @@
       "coreSafety": true,
       "electrical": true,
       "commandRange": true,
-      "translation": false
+      "translation": true
     },
-    "coreRevision": 7017,
-    "updatedAt": "2026-09-13T20:18:02.395Z"
+    "coreRevision": 7018,
+    "updatedAt": "2026-09-13T20:19:02.445Z"
   },
   "actuator": {
-    "status": "LIVE_FAIL_CLOSED",
-    "reason": "STALE_INPUT",
+    "status": "READY_SESSION_CONTROL",
+    "reason": null,
     "live": true,
-    "physicalWritePerformed": true,
-    "targetA": 0,
-    "previousA": 32,
-    "controlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":false,\"status\":\"PI_BRIDGE_ERROR\",\"evTargetW\":0,\"evStatus\":\"FAIL_CLOSED_PI_UNAVAILABLE\",\"evSource\":\"PI_FAIL_CLOSED\",\"wwTargetOn\":false,\"wwStatus\":\"FAIL_CLOSED_PI_UNAVAILABLE\",\"authority\":\"PI\"}",
-    "coreRevision": 7017
+    "physicalWritePerformed": false,
+    "targetA": 16,
+    "previousA": null,
+    "controlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":11040,\"evStatus\":\"NUMERIC_DEADLINE_TARGET\",\"evSource\":\"REMAINING_KWH_OVER_TIME_TO_DEADLINE\",\"wwTargetOn\":false,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+    "coreRevision": 7018
   },
   "deviceHealth": {
     "status": "OK",
     "reason": "FRESH_TELEMETRY",
-    "chargeState": "plugged_in_charging",
-    "telemetryAgeSec": 10
+    "chargeState": "plugged_in_paused",
+    "telemetryAgeSec": 25
   },
   "coherent": false
 }
