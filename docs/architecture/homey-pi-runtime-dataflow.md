@@ -25,9 +25,11 @@ Canonical chain:
 ```text
 Homey devices / P1 / PV / Easee / boiler / Quatt
                     ↓
-          Homey Core state builder
+          Homey Core v0.11n
                     ↓
-        canonical energy-state v2.12
+            EM2_Public_State
+                    ↓
+EM v2 | 05 Transport | Homey→Pi State Push v0.1
                     ↓
    HTTP POST /state/energy on Pi LAN
      Authorization: Bearer <secret>
@@ -45,7 +47,9 @@ Homey devices / P1 / PV / Easee / boiler / Quatt
 
 - Homey owns acquisition of live device state and construction of the canonical Core state snapshot.
 - The Pi does **not** poll Homey to reconstruct this state.
-- The push must reuse the state object already built by Homey Core and must not cause extra device reads merely for publication.
+- Homey Core publishes the canonical snapshot to `EM2_Public_State`.
+- The dedicated transport flow `EM v2 | 05 Transport | Homey→Pi State Push v0.1` forwards that exact state to the Pi.
+- The transport component performs no device reads, planning decisions or physical writes; it reads only the canonical state and ingest token.
 - The Pi owns validation, persistence and subsequent planner consumption.
 
 ### 2.2 Endpoint
@@ -277,3 +281,28 @@ Required validation order:
 Do not validate successful ingest by making old physical values appear fresh in the production state file. A synthetic payload must use an isolated test target/test harness, or the planner generation chain must be isolated and the production state restored before re-enabling it.
 
 Production planner generation should resume only after a genuinely fresh Homey Core state has been accepted.
+
+
+## 9. Production validation — 2026-09-13
+
+The Homey → Pi state direction is production-validated with genuine Core state:
+
+```text
+Homey Core v0.11n
+  → EM2_Public_State
+  → EM v2 | 05 Transport | Homey→Pi State Push v0.1
+  → POST /state/energy
+  → authenticated ingest accepted
+  → atomic energy-state-v2.json
+  → canonical forecast/planner chain
+  → /control/current READY
+```
+
+The canonical `ems-forecast-chain.timer` is active on its single `:03,:18,:33,:48` cadence. The automatic 19:18 CEST run refreshed PV, weather, Quatt and WW inputs successfully and `/health` returned `ok`.
+
+The status API health contract validates the current planner schemas:
+
+- `EMS_PI_PV_FORECAST_V0.2`
+- `EMS_PI_WW_PLAN_V0.7.0`
+
+Schema drift in observability must not be mistaken for planner failure.

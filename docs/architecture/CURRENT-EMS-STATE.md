@@ -30,9 +30,11 @@ There are two deliberately separate runtime directions.
 ```text
 Homey devices / P1 / PV / Easee / boiler / Quatt
                     ↓
-             Homey Core / state
+        Homey Core v0.11n
                     ↓
-       canonical energy-state v2.12
+            EM2_Public_State
+                    ↓
+EM v2 | 05 Transport | Homey→Pi State Push v0.1
                     ↓
  POST /state/energy over trusted LAN
                     ↓
@@ -171,7 +173,7 @@ Implementation:
 
 Runtime direction:
 
-**Homey Core → authenticated LAN POST → Pi status API → validated atomic local state → Pi planners**.
+**Homey Core v0.11n → `EM2_Public_State` → dedicated Homey transport flow → authenticated LAN POST → Pi status API → validated atomic local state → Pi planners**.
 
 Important invariants:
 
@@ -258,7 +260,7 @@ Warm water:
 
 Result: **Pi → Homey → Tesla and Pi → Homey → boiler both validated end-to-end.**
 
-The Homey → Pi state-ingest endpoint was authenticated and locally validated on 2026-09-13. Full production validation of the state direction requires a genuinely fresh Homey Core state; synthetic freshness must not be used as production evidence.
+The Homey → Pi state direction was validated end-to-end in production on 2026-09-13 using genuinely fresh Homey Core v0.11n state. The dedicated transport flow published `EM2_Public_State` over the LAN to `/state/energy`; the Pi accepted the genuine state and the canonical planner chain subsequently completed successfully. Synthetic freshness must not be used as production evidence.
 
 ## 10. Failure behavior
 
@@ -311,7 +313,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 
 - The hardened planner still contains historical compatibility code in `deadline_requirement()` with a local `max_a = 16`. Current planning authority uses `deadline_max_a` from runtime state, so this fragment is considered cleanup debt rather than the active deadline allocator.
 - WW ownership remains more distributed than EV ownership because Homey still carries substantial realtime WW state/safety policy in addition to Pi strategic planning.
-- The Homey → Pi state publisher still requires completion and end-to-end production validation against the newly deployed authenticated Pi ingest endpoint.
+- PV forecast quality still requires follow-up: successful planner runs can currently contain 96 fallback PV slots and zero historical slots. This is a forecast-quality issue, not a runtime-chain failure.
 
 ## 14. Architecture enforcement
 
