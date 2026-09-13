@@ -1,108 +1,144 @@
 ---
 component: architecture
 title: Softwarearchitectuur Overzicht
-version: 0.2.0
+version: 0.3.0
 status: active
-architecture_status: implemented-shadow
-last_verified: 2026-08-26
+architecture_status: implemented-production
+last_verified: 2026-09-13
 source:
-  - docs/architectuur.md
+  - docs/architecture/CURRENT-EMS-STATE.md
   - docs/software-architecture/components/core.md
   - docs/software-architecture/components/planner-power-intent.md
-  - docs/software-architecture/components/publisher-public-state.md
+  - docs/software-architecture/components/tesla.md
+  - docs/software-architecture/components/boiler.md
 ---
 
 # Softwarearchitectuur Overzicht
 
 ## Doel
 
-Het Home Energy Management System (HEMS) scheidt meten, state, policy, actuator-neutrale vermogensintentie, apparaatvertaling, publiceren en fysiek aansturen. De actuele implementatie is leidend; SHADOW- en planned-functionaliteit wordt expliciet als zodanig gemarkeerd.
+Het Home Energy Management System (HEMS) scheidt meten, state, forecast, planning, actuator-neutrale vermogensintentie, apparaatvertaling, safety gating, publiceren en fysiek aansturen. Dit document beschrijft de actuele productiearchitectuur per 13 september 2026. De actuele implementatie is leidend; SHADOW-, rollback- en planned-functionaliteit wordt expliciet als zodanig gemarkeerd.
 
-## Hoofdketen
+De canonieke actuele-statebeschrijving staat in `docs/architecture/CURRENT-EMS-STATE.md`.
 
-De doelarchitectuur voor flexibele verbruikers is expliciet:
-
-```mermaid
-flowchart TD
-  EMS[EMS policy / Energy Core] --> PI[Power Intent]
-  PI --> EVW[EV_target_W]
-  PI --> WWW[WW_target_W / WW intent]
-  EVW --> EVA[EV Power Adapter]
-  WWW --> WWA[WW Power Adapter]
-  EVA --> EASEE[Easee]
-  WWA --> BOILER[Boiler]
-```
-
-De architectuurgrens is daarmee: **EMS policy bepaalt wat energetisch gewenst is; Power Intent maakt dit actuator-neutraal; apparaatadapters bepalen hoe het doel elektrisch en veilig uitvoerbaar wordt; alleen de expliciete single writer mag uiteindelijk het fysieke device wijzigen.**
-
-De bredere systeemketen blijft:
+## Hoofdketen productie
 
 ```mermaid
 flowchart TD
-  DEV[Homey devices / P1 / PV / Easee / Boiler / Quatt] --> CORE[Energy Core v2 / EMS policy]
-  CORE --> STATE[State + Decision + WW Control]
-  STATE --> PUB[Publisher / EM2_Public_State]
-  PUB --> WEB[Website / frontend]
-  PUB --> PI[Power Intent SHADOW]
-  PI --> EVA[EV Power Adapter SHADOW]
-  PI --> WWA[WW Power Adapter SHADOW]
-  EVA -. future single writer .-> EASEE[Easee]
-  WWA -. future single writer .-> BOILER[Boiler]
-  CORE --> PROD[Current Tesla / boiler production writers]
-  PRICE[Contract / price context] --> CORE
-  PRICE --> PI
-  PLAN[24h Planner SHADOW] --> PI
-  VICTRON[Victron future adapter] -. planned .-> CORE
+  DEV[Homey devices / P1 / PV / Easee / Boiler / Quatt] --> CORE[Homey Core / canonical state]
+  HIST[SQLite history + live state] --> PI[Pi hardened dynamic planner v0.3]
+  FC[PV/base-load/WW forecasts] --> PI
+  CONTRACT[FIXED ENGIE contract policy] --> PI
+  CORE --> PI
+  PI --> API[Pi /control/current]
+  API --> BRIDGE[Homey PI Dynamic Planner Bridge v1.2.6]
+  BRIDGE --> INTENT[EM2_Power_Intent v0.2]
+  INTENT --> EVA[EV Power Adapter]
+  INTENT --> WWA[WW Power Adapter]
+  EVA --> EVG[EV Gate]
+  WWA --> WWG[WW Gate]
+  EVG --> EVACT[Single EV actuator]
+  WWG --> WWACT[Single WW actuator]
+  EVACT --> EASEE[Easee / Tesla]
+  WWACT --> BOILER[Boiler]
 ```
+
+De architectuurgrens is:
+
+**Pi bepaalt de productieplanning zolang `EM2_Planner_Authority = PI`; Homey blijft executor en lokale safety-laag. Power Intent blijft actuator-neutraal; adapters en gates bepalen uitvoerbaarheid; per fysieke actuator is maximaal één automatische writer actief.**
+
+## Runtime authority
+
+`EM2_Planner_Authority` is de enige runtime selector tussen Pi- en Homey-plannerauthority.
+
+- `PI` → `EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.2.6 DEADLINE-GUARD [READY]` mag de actuele Pi-command projecteren naar `EM2_Power_Intent`.
+- `HOMEY` → de Pi-bridge blijft inert en `EM v2 | 20 Power Intent | P1 v0.2.6 AUTHORITY-GUARD [HOMEY ACTIVE]` vormt het rollbackpad.
+- De twee producers mogen niet gelijktijdig authority claimen.
+- `planner/control-authority.json` is configuratie/diagnostiek en vormt geen tweede runtime gate.
+
+## Contract policy
+
+De productie-EMS is gekoppeld aan het vaste driejarige ENGIE-contract.
+
+Productie-invarianten:
+
+- `productionContractMode = FIXED`;
+- `productionContractId = ENGIE_3Y_2026_2029`;
+- `productionSupplier = ENGIE`;
+- dynamische prijzen zijn niet toegestaan als productie-sturingsbron zolang FIXED actief is;
+- dynamische prijzen mogen alleen voor shadow, analyse of replay worden gebruikt;
+- automatische contractomschakeling of fallback naar DYNAMIC is verboden;
+- ontbrekende of inconsistente contractconfiguratie faalt gesloten.
 
 ## Architectuurlagen
 
 1. **Fysieke veiligheid** — 3×25 A aansluiting, lokale apparaatbeveiligingen en Easee Equalizer staan boven software-optimalisatie.
-2. **Meet- en statelaag** — Core gebruikt maximaal één volledige device-snapshot per tick en publiceert canonieke Logic-state.
-3. **Contextlaag** — contract, prijs, PV/freshness en configuratie worden als losse context aangeboden.
-4. **EMS policy / Decision-laag** — MUST-verplichtingen gaan vóór economische opportunities. Deze laag bepaalt de gewenste energetische actie, niet de apparaat-specifieke opdracht.
-5. **Power Intent** — projecteert de gekozen policy naar actuator-neutrale doelen. Voor EV is dit numeriek `EV_target_W`; voor warm water is de huidige runtime-interface nog binair (`target_on`) en evolueert deze naar het architectuurcontract `WW_target_W` waar numerieke vermogenssturing zinvol is.
-6. **Device adapters** — EV Power Adapter en WW Power Adapter vertalen uitsluitend het upstream intent naar fysiek uitvoerbare, begrensde apparaatcommando's. Zij introduceren geen EMS-policy.
-7. **Writer lifecycle** — requested, commanded en confirmed state blijven gescheiden. Dedupe, idempotency, run-lease, retries en write-throttling horen hier. Per actuator is maximaal één fysieke writer actief.
-8. **Publisher / website** — `EM2_Public_State` is het publieke read-model en tegelijk revision-boundary voor downstream logic.
+2. **Meet- en statelaag** — Homey Core bouwt canonieke state en control context; Pi ontvangt de benodigde state voor planning.
+3. **Historie en forecast** — Pi gebruikt SQLite-history, PV-forecast, base-load forecast en warmwaterinput.
+4. **Planning** — Pi hardened dynamic planner v0.3 bouwt de kwartierplanning en bewaakt FIXED-contract-, freshness- en comfortinvarianten.
+5. **Control endpoint** — `/control/current` levert uitsluitend het actuele kwartiercommand met schema `EMS_PI_CONTROL_COMMAND_V0.1` en geldigheid begrensd door slot-end en planner `validUntil`.
+6. **Power Intent** — Homey bridge projecteert het Pi-command naar `EM2_POWER_INTENT_V0.2`; bij HOMEY-authority neemt de guarded Homey producer over.
+7. **Device adapters en gates** — EV/WW adapters vertalen uitsluitend upstream intent; gates controleren schema, revision, freshness en mapping fail-closed.
+8. **Single writer** — EV- en WW-actuatorflows zijn de enige fysieke writers voor hun actuator.
+9. **Publisher / website** — afgeleide publicaties zijn observability/read-model en geen tweede control plane.
 
-## Power Intent en adaptercontract
+## Tesla
 
-De software volgt voor elke flexibele actuator hetzelfde patroon:
+De productie-EV-keten is:
 
-`EMS policy -> Power Intent -> target -> Device Adapter -> Single Writer -> Actuator`
+`Pi planner -> /control/current -> PI Bridge -> EM2_Power_Intent -> EV Adapter -> EV Gate -> EV Actuator -> Easee`
 
-### EV
+Actuele Homey-componenten:
 
-`EMS policy -> Power Intent -> EV_target_W -> EV Power Adapter -> Easee`
+- adapter: `EM v2 | 60 Adapter | EV Power v0.1.5 DEADLINE-CAP OPPORTUNITY16 START6 RUN6`;
+- gate: `EM v2 | 80 Validation | EV Power Adapter Gate v0.2.6 START6`;
+- actuator: `EM v2 | 60 Actuator | EV Power v0.2.7 START6 RUN6 LIVE + EASEE SESSION`;
+- mapping: `FLOOR_3P230_START6_RUN6_FAIL_CLOSED`.
 
-Power Intent bepaalt het toegewezen laadvermogen in watt. De EV Power Adapter bepaalt vervolgens de elektrisch uitvoerbare laadopdracht, inclusief 3-fasevertaling, minimumstroom, maximumstroom, quantization/clamping, freshness en fail-closed gedrag. De adapter mag het upstream toegewezen vermogensbudget nooit verhogen.
+Een gepauzeerde sessie kan gevalideerd direct starten op 3×6 A. Deadline/MUST mag netenergie gebruiken indien nodig, maar geforceerd deadline-laden mag niet vóór `latest_start_at` worden geïntroduceerd. De Homey bridge bevat daarnaast een executor-side harde deadline guard als laatste safetylaag.
 
-### Warm water
+## Warm water
 
-`EMS policy -> Power Intent -> WW_target_W / WW intent -> WW Power Adapter -> Boiler`
+De productie-WW-keten is:
 
-De WW Power Adapter is de apparaatgrens voor warmwatersturing. De huidige Power Intent v0.2 projecteert warm water nog binair (`target_on=true/false/null`). `WW_target_W` is het doelcontract voor een numerieke variant; totdat die producer daadwerkelijk numeriek is, mag documentatie of adapterlogica geen fictief watt-target aannemen. De adapter blijft policy-vrij en SHADOW zolang de bestaande boilerwriter productie-eigenaar is.
+`Pi planner -> /control/current -> PI Bridge -> EM2_Power_Intent -> WW Adapter -> WW Gate -> Warm Water Actuator v0.9 -> Boiler`
 
-## Single-writer cut-over
+Actuele Homey writer:
 
-De nieuwe adapterketen mag pas fysiek schrijven na een gecontroleerde atomic cut-over. Voor iedere actuator geldt:
+`EM v2 | 60 Control | Warm Water Actuator v0.9 TARGETED-READ LIVE`
 
-- SHADOW-adapter valideert eerst dezelfde revisions en intent als productie;
-- mapping, safety, freshness en dedupe moeten runtime bewezen zijn;
-- bestaande productiewriter wordt atomair uitgeschakeld wanneer de nieuwe writer wordt geactiveerd;
-- nooit mogen legacy writer en nieuwe adapterwriter gelijktijdig fysieke writes uitvoeren;
-- rollback moet de vorige bewezen writer kunnen herstellen zonder state-reparatie.
+Deze flow is enabled, niet broken en de sole WW physical writer. Zij schrijft alleen na LIVE-arm, boilerbronmodus, juiste schema's, revision alignment, gate PASS en freshness. `HOLD` raakt het device niet. Device access gebeurt pas na de guards en via exact boiler-ID.
 
-## Belangrijkste operationele grenzen
+De WW-gate is `EM v2 | 80 Validation | WW Power Adapter Gate v0.2 TARGETED-READ` en vereist een exacte schema/revision/mapping match.
 
-- P1 is autoritatief voor netimport/export en flex-exportbudget.
-- Een ongeldige afgeleide huis/PV-balans blokkeert niet automatisch verse P1-flex.
-- Tesla-productie heeft momenteel één automatische Easee-writer; de EV Adapter is SHADOW.
-- Slimme WW-control/WW Adapter is SHADOW; fysieke boilerwrites lopen nog via gecontroleerde bestaande flows.
-- Fingerprint-detectie observeert en attribueert; zij stuurt geen actuators rechtstreeks aan.
-- Victron/batterij is nog niet runtime-geïntegreerd.
+## Single-writer boundary
+
+Voor elke actuator geldt permanent:
+
+- planner en Power Intent schrijven geen devices;
+- adapters en gates schrijven geen devices;
+- alleen de expliciete actuatorflow mag fysiek schrijven;
+- rollback mag nooit een tweede writer parallel activeren;
+- test/TEMP-flows met fysieke device-acties horen disabled of verwijderd te zijn.
+
+## Pi runtime
+
+GitHub `main` is bronwaarheid voor Pi runtime source, deploymentdefinities en architectuurdocumentatie. De deployed runtime staat onder `/home/jeroen/ems/runtime/` en moet na relevante wijzigingen tegen `main` worden gecontroleerd.
+
+De forecastketen draait via `ems-forecast-chain.service` (`Type=oneshot`). `inactive (dead)` na een succesvolle run is normaal.
+
+De Pi planner publiceert een 24-uurs actiezicht van 96 kwartieren en ondersteunt aanvullende lookahead voor WW-feasibility. De control endpoint levert uitsluitend het actuele slot.
+
+## Batterijgrens
+
+Victron/batterij is nog niet runtime-geïntegreerd. Na commissioning blijft Victron/DESS de primaire realtime batterijoptimizer; Pi/Homey mogen forecasts, load intent en policyconstraints leveren, maar geen concurrerende realtime batterijoptimizer vormen.
 
 ## Documentatieregel
 
-Alle onderliggende component- en flowdocumenten worden pas in dit masterdocument opgenomen nadat ze tegen actuele code/configuratie zijn gecontroleerd. Gegenereerde output is afgeleid en wordt niet handmatig gewijzigd. De architectuurdiagrammen moeten de actuele writer-boundary expliciet tonen: SHADOW-routes mogen niet als actieve fysieke writer worden afgebeeld.
+Architectuurgevoelige wijzigingen moeten in dezelfde release-range worden weerspiegeld in:
+
+- `docs/architecture/CURRENT-EMS-STATE.md`;
+- relevante documenten onder `docs/software-architecture/`;
+- deployment/systemd-documentatie waar van toepassing.
+
+De actuele implementatie wint bij een conflict. Vastgestelde documentatiedrift moet worden gecorrigeerd vóór een volgende architectuurwijziging als afgerond wordt beschouwd.
