@@ -155,9 +155,10 @@ def ev_realtime_envelope(plan, current, ev_w, ww_w):
         planner_target_a = 0
 
     return {
-        "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.2",
-        "shadowOnly": True,
-        "productionConsumerAllowed": False,
+        "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.3",
+        "shadowOnly": False,
+        "productionConsumerAllowed": True,
+        "executionOwner": "HOMEY_BOUNDED_REALTIME_WITHIN_PI_ENVELOPE",
         "allowed": policy_valid,
         "mode": "PV_OPPORTUNITY" if policy_valid else "DISABLED",
         "min_A": EV_MIN_A if policy_valid else 0,
@@ -309,8 +310,8 @@ class Handler(BaseHTTPRequestHandler):
                     "targets": {"ev": {"target_W": 0}, "ww": {"target_on": False}, "battery": {"target_W": 0}},
                     "realtime": {
                         "ev": {
-                            "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.2",
-                            "shadowOnly": True,
+                            "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.3",
+                            "shadowOnly": False,
                             "productionConsumerAllowed": False,
                             "allowed": False,
                             "mode": "DISABLED",
