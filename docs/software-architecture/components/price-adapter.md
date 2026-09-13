@@ -1,80 +1,103 @@
 ---
 component: price-adapter
-title: Contract Price Adapter
-status: implemented-shadow
-last_verified: 2026-08-25
+title: Contract Price Context
+status: active
+architecture_status: implemented-production
+last_verified: 2026-09-13
 source:
-  - Homey: EM v2 | 30 Context | Contract Price Adapter v0.8
+  - docs/architecture/CURRENT-EMS-STATE.md
+  - Homey: EM v2 | 30 Context | Contract Price Adapter v0.10 FIXED+DYNAMIC LOW-LOAD
   - Homey: EM v2 | 40 Decision | Contract-aware v0.2
 owner: EMS
 ---
 
-# Contract Price Adapter
+# Contract Price Context
 
 ## Doel
 
-De Contract Price Adapter levert één uniforme prijscontext voor FIXED en DYNAMIC contracten zonder dat downstream beslislogica kennis hoeft te hebben van de ruwe bron.
+De prijscontext ondersteunt zowel vaste als dynamische prijsdata, maar de **productiepolicy is momenteel uitsluitend FIXED**. De productie-EMS is gekoppeld aan het driejarige ENGIE-contract. DYNAMIC blijft beschikbaar voor shadow, analyse en replay, niet als productie-authority.
 
-## Bronwaarheid
+## Productiebronwaarheid
 
-`EMS_ContractType` is de enige autoritatieve contractinstelling en accepteert `FIXED` of `DYNAMIC`. Een ongeldige waarde valt fail-safe terug naar `FIXED`. `EM2_Contract_Type` is uitsluitend een compatibility mirror en mag niet als bronwaarheid worden gebruikt.
+De huidige productie-invarianten zijn:
 
-## FIXED
+- `productionContractMode = FIXED`;
+- `productionContractId = ENGIE_3Y_2026_2029`;
+- `productionSupplier = ENGIE`;
+- dynamische prijssturing is uitgeschakeld voor productie;
+- automatische fallback naar DYNAMIC is verboden;
+- automatische contract-mode switching is verboden;
+- inconsistente of ontbrekende contractconfiguratie faalt gesloten.
 
-FIXED gebruikt uitsluitend de lokaal geconfigureerde waarden:
-- `EM2_Fixed_Import_Normal`
-- `EM2_Fixed_Import_Offpeak`
-- `EM2_Fixed_Export`
-- `EM2_Fixed_Offpeak_Active`
+Daarmee is de operationele volgorde:
 
-De FIXED-route doet geen PBTH-read. De contextbron is `FIXED_CONFIG`, de horizon is `STATIC` en de kwaliteit is `GOOD` zolang alle vaste tarieven geldig zijn.
+`contract mode -> toegestane economic model -> toegestane price source -> planner decision`
 
-## DYNAMIC
+## FIXED productiepad
 
-DYNAMIC haalt `prices_json(next_hours)` op via PBTH en leest daarnaast de actuele import/exportprijs. De adapter valideert de beschikbare horizon en classificeert deze als `FULL`, `INTRADAY` of `DIAGNOSTIC`.
+Onder FIXED gebruikt de EMS uitsluitend de vaste contractcontext die voor het ENGIE-contract is geconfigureerd. PBTH/dynamische marktprijzen mogen geen productieactie creëren.
 
-De dynamische route berekent onder meer:
-- current import/export price;
-- negative-now;
-- cheap/expensive-now;
-- cheap/expensive-next-4h;
-- min/max/avg next 4h;
-- p25/p75 van de beschikbare horizon.
+Vaste prijscontext kan nog relevant zijn voor:
 
-Legacy `M7_Price_*` signalen worden niet gebruikt.
+- financiële observability;
+- rapportage;
+- replay/business-case analyse;
+- toekomstige policy-evaluatie buiten de actieve productiecontrol.
 
-## Uniform contract
+De productieplanner optimaliseert primair op eigen PV-gebruik, comfort/deadlineconstraints en flex-load feasibility; niet op dynamische uur- of kwartierarbitrage.
 
-De output is `EM2_ContractPrice_Context` met schema `EM2_UNIFORM_PRICE_CONTEXT_V0.3`. Kernvelden zijn `contractType`, `source`, `quality`, `updatedAt`, `importPriceNow`, `exportPriceNow`, `selfUseGainNow`, prijsflags en horizonstatistiek.
+## DYNAMIC context
 
-## Freshness
+Dynamische prijsdata mag nog worden opgehaald en verwerkt voor:
 
-De contract-aware beslislaag accepteert prijscontext alleen wanneer:
-- `updatedAt` geldig is;
-- leeftijd maximaal 35 minuten is;
-- `quality == GOOD`;
-- horizon voor DYNAMIC bruikbaar is (`FULL` of `INTRADAY`), of `STATIC` voor FIXED.
+- shadow planning;
+- A/B analyse;
+- replay;
+- contract/business-case vergelijking.
 
-Bij stale/degraded prijscontext blijft P1-gebaseerde opportunity-logica bruikbaar; prijsarbitrage valt fail-closed weg.
+Zolang FIXED actief is, mag DYNAMIC data niet:
+
+- Tesla opportunity starten;
+- WW productieactie veroorzaken;
+- planner authority wijzigen;
+- automatisch de contractmodus omschakelen;
+- als fallback productieprijsbron optreden.
+
+## Homey Contract Price Adapter
+
+De actuele Homey adapterfamilie bevat `EM v2 | 30 Context | Contract Price Adapter v0.10 FIXED+DYNAMIC LOW-LOAD`.
+
+Het bestaan van FIXED+DYNAMIC ondersteuning in de adapter betekent **niet** dat beide modi gelijktijdig of automatisch voor productie zijn toegestaan. De bovenliggende contractpolicy bepaalt welke route bruikbaar is.
 
 ## Contract-aware Decision
 
-`EM v2 | 40 Decision | Contract-aware v0.2` is `SHADOW_CANDIDATE` en schrijft geen actuators. De beslislaag maakt twee candidates:
-- `EM2_Decision_ContractCandidate` voor Tesla;
-- `EM2_Control_WW_ContractCandidate` voor warm water.
+`EM v2 | 40 Decision | Contract-aware v0.2` blijft een context/candidate-laag. Onder de huidige productiepolicy mag dynamische prijscontext alleen adviserend/shadow zijn.
 
-Tesla deadline/MUST blijft contractonafhankelijk. P1/flex-export opportunities blijven eveneens contractonafhankelijk. Prijscontext voegt uitsluitend opportunistische SHOULD/MAY-beslissingen toe.
+Tesla deadline/MUST blijft contractonafhankelijk. Directe PV/opportunity-logica blijft eveneens contractonafhankelijk.
 
-Voor warm water blijven mode, dagdoel, 19:00 deadline en catch-up leidend. Prijscontext kan alleen een opportunity toevoegen wanneer importbudget en guards dat toelaten.
+## Pi planner contractguard
 
-## Validiteitsmodel
+De Pi `/control/current` route accepteert voor productie uitsluitend commands die voldoen aan:
 
-P1/netmeting is autoritatief voor flex/export opportunities. Afgeleide PV/huisbalans is diagnostisch en mag door source-skew degraderen zonder verse P1-flex te blokkeren.
+- contract mode `FIXED`;
+- contract id `ENGIE_3Y_2026_2029`;
+- owner `PI`;
+- executor `HOMEY`;
+- geldige/fresh plannerstate.
+
+Een contract mismatch faalt gesloten.
+
+De Homey PI Bridge v1.2.6 valideert dezelfde FIXED/ENGIE metadata voordat het command naar `EM2_POWER_INTENT_V0.2` wordt geprojecteerd.
 
 ## Safety
 
-- geen actuator-writes;
-- geen legacy M7-prijsinput;
-- FIXED is onafhankelijk van PBTH;
-- stale prijscontext veroorzaakt geen fysieke actie;
-- candidate namespace blijft geïsoleerd van productiecontrollers.
+- geen automatische FIXED→DYNAMIC fallback;
+- geen automatische contract-mode switching;
+- DYNAMIC prijsdata is geen productie-trigger onder FIXED;
+- contract mismatch faalt gesloten;
+- planner en prijsadapter schrijven geen fysieke actuators;
+- P1/live netmeting blijft de relevante fysieke netwaarheid voor flex/exportgedrag.
+
+## Documentatiedrift die hiermee is opgeheven
+
+Het eerdere document suggereerde dat `EMS_ContractType` vrij tussen FIXED en DYNAMIC kon wisselen en dat beide routes gelijkwaardig voor downstream productie waren. Dat is niet meer de actuele production governance. Het driejarige ENGIE FIXED-contract is nu een harde productie-invariant; DYNAMIC is uitsluitend shadow/analyse/replay zolang deze contractpolicy actief is.
