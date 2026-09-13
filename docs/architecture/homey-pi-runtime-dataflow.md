@@ -18,6 +18,34 @@ They must not be collapsed into one bidirectional writer or polling loop.
 
 GitHub is source of truth for code and documentation, but **is not a runtime transport dependency** for either direction.
 
+### 1.1 End-to-end runtime loop
+
+The complete operational loop is:
+
+```text
+HOMEY                                  PI
+devices
+  ↓
+Core state
+  ↓
+EM2_Public_State
+  ───────── state push ───────────────→ energy-state-v2.json
+                                        ↓
+                                   forecast/planner
+                                        ↓
+                                   /control/current
+  ←──────── planner guidance ────────────┘
+PI Bridge
+  ↓
+Power Intent
+  ↓
+adapter → gate → actuator
+  ↓
+Tesla / boiler
+```
+
+This diagram is the compact reference for the two detailed one-way chains below. Homey pushes canonical observed state to the Pi; Homey subsequently pulls the Pi planner guidance through `/control/current` and remains responsible for realtime execution and local safety.
+
 ## 2. State chain: Homey → Pi
 
 Canonical chain:
