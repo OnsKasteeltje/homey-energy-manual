@@ -2,102 +2,62 @@
 
 **Datum:** 13 september 2026  
 **Status:** Live-code synopsis  
-**Scope:** Raspberry Pi runtime + actieve Homey flows  
-**Doel:** Vastleggen van de actuele softwarearchitectuur na de wijzigingen van de afgelopen dagen.
+**Scope:** Raspberry Pi runtime + actieve Homey flows + actuele GitHub-architectuur  
+**Doel:** Vastleggen van de actuele softwarearchitectuur na cross-check van live Homey, Pi-controlarchitectuur en GitHub `main`.
 
-> Deze beschrijving is gebaseerd op de actuele Pi-broncode en live Homey-flowcode, niet op oudere projectdocumentatie. Waar een component nog rollback- of shadow-functionaliteit bevat, is dat expliciet benoemd.
+> Deze beschrijving is gebaseerd op de actuele implementatie en canonical current-state documentatie. Waar nog technische schuld of rollback-functionaliteit bestaat, is dat expliciet benoemd.
 
 ## 1. Architectuuroverzicht
 
 ```text
-                     +----------------------+
-                     |      HOMEY DEVICES   |
-                     | P1 / PV / Easee      |
-                     | Boiler / Quatt       |
-                     | Washer / Dryer etc.  |
-                     +----------+-----------+
-                                |
-                                v
-                 +----------------------------+
-                 | HOMEY CORE v0.11n          |
-                 |                            |
-                 | - leest fysieke devices    |
-                 | - normaliseert state       |
-                 | - freshness / P1 gates     |
-                 | - WW dagstatus             |
-                 | - Tesla deadline context   |
-                 | - Quatt observe-only       |
-                 |                            |
-                 | -> EM2_State               |
-                 | -> EM2_Public_State        |
-                 +-------------+--------------+
-                               |
-                     direct HTTP POST
-                     iedere 5 min + 8 s
-                               |
-                               v
-              +----------------------------------+
-              |             PI RUNTIME           |
-              |                                  |
-              | /data/energy-state-v2.json       |
-              |             |                    |
-              |             v                    |
-              | forecasts + history + WW model   |
-              |             |                    |
-              |             v                    |
-              |      DYNAMIC PLANNER             |
-              |      15-min rolling horizon      |
-              |             |                    |
-              |             v                    |
-              | dynamic-shadow-plan.json         |
-              |             |                    |
-              |             v                    |
-              | HARDENED VALIDATOR               |
-              | freshness / contract / plan      |
-              |             |                    |
-              |             v                    |
-              | /control/current                 |
-              +-------------+--------------------+
-                            | LAN
-                            v
-             +----------------------------------+
-             | HOMEY AUTHORITY / BRIDGE         |
-             |                                  |
-             | EM2_Planner_Authority            |
-             |          |                       |
-             |      PI or HOMEY                 |
-             |          |                       |
-             |          v                       |
-             | EM2_Power_Intent                 |
-             +------------+---------------------+
-                          |
-             +------------+------------+
-             v                         v
-       EV Power Adapter           WW control path
-       W -> 0/6..16 A
-             |
-       Validation Gate
-             |
-       EV Actuator LIVE
-             |
-             v
-           Easee
+HOMEY DEVICES / P1 / PV / EASEE / BOILER / QUATT
+                         ↓
+                  HOMEY CORE v0.11n
+                         ↓
+                canonical Homey state
+                         ↓
+                 direct state push
+                         ↓
+                   PI RUNTIME
+        forecasts + history + WW model
+                         ↓
+          DYNAMIC PLANNER v0.3
+       rolling horizon / 15-min slots
+                         ↓
+              HARDENED VALIDATOR
+                         ↓
+               /control/current
+                         ↓ LAN
+              HOMEY PI BRIDGE v1.2.6
+                         ↓
+                 EM2_Power_Intent
+                  ↙             ↘
+          EV adapter/gate     WW adapter/gate
+                  ↓             ↓
+          EV actuator LIVE   WW actuator v0.9 LIVE
+                  ↓             ↓
+                Easee         Boiler
 ```
 
-## 2. Homey Core is de realtime sensor- en state-laag
+Canonical verantwoordelijkheidsverdeling:
 
-De actieve flow **EM v2 | 00 Core Tick | v0.11n PINNED SOURCE** vormt de realtime edge-laag. Deze flow draait periodiek en kan tevens event-driven reageren op wijzigingen in de EV-deadline-input.
+```text
+Pi     = rolling-horizon planning / optimization
+Homey  = realtime state / safety / execution
+GitHub = canonical source voor software + architectuurdocumentatie
+```
 
-De Core leest rechtstreeks onder andere:
+## 2. Homey Core is realtime state- en safety-contextlaag
+
+De actieve flow `EM v2 | 00 Core Tick | v0.11n PINNED SOURCE` leest en normaliseert onder andere:
 
 - P1/netmeting;
 - Tesla/Easee;
 - boiler;
 - Quatt;
 - SolarEdge;
-- GoodWe 4.2 kW en GoodWe 2.0 kW;
-- wasmachine en droger;
-- relevante Homey Logic contextvariabelen.
+- GoodWe 4.2 kW en 2.0 kW;
+- relevante Homey Logic context.
 
 De Core publiceert onder meer:
 
@@ -110,72 +70,40 @@ EM2_Control_EV
 EM2_Planner_Input
 ```
 
-De Core voert daarnaast realtime kwaliteitsbewaking uit voor P1-freshness, PV-source freshness, timing/skew tussen bronnen, balansvalidatie, flexbudgetten, Quatt-rampreserve, Tesla-connectiviteit en warmwaterstatus.
+Homey blijft daarmee de realtime observatie-, normalisatie- en lokale safetylaag.
 
-Homey is hierdoor niet alleen een hardwaregateway: het is de realtime observatie-, normalisatie- en safety-contextlaag.
+## 3. Runtime data loopt rechtstreeks Homey → Pi
 
-## 3. Runtime data loopt direct Homey -> Pi
-
-De actieve flow **EM v2 | 40 Data | Pi State Push v2.0 DIRECT RUNTIME** verstuurt `EM2_Public_State` rechtstreeks naar:
+De actieve `Pi State Push v2.0 DIRECT RUNTIME` verstuurt actuele state rechtstreeks naar de Pi-runtime. GitHub zit niet in de realtime control loop.
 
 ```text
-POST http://192.168.1.42:3100/state
-```
-
-De flow controleert onder andere:
-
-- schema-versie 2.12;
-- state revision;
-- alignment tussen public state en Homey state;
-- HTTP-resultaat;
-- Pi-ACK `ACCEPTED`;
-- revision van de ACK.
-
-Runtime telemetry gaat dus niet langer via GitHub.
-
-```text
-CODE      -> GitHub
-RUNTIME   -> Pi
-CONTROL   -> Pi <-> Homey
-UI/DOCS   -> website / GitHub
+CODE / DOCS  -> GitHub
+RUNTIME      -> Pi
+CONTROL      -> Pi <-> Homey
+UI/PUBLISH   -> website / GitHub artifacts
 ```
 
 ## 4. Raspberry Pi is de rolling-horizon optimization engine
 
-De actuele planner leest rechtstreeks uit Pi-runtimebestanden, waaronder:
+De Pi combineert runtime-state, forecasts en historie en optimaliseert flexibele verbruikers in kwartieren.
 
-```text
-/home/jeroen/ems/data/energy-state-v2.json
-pv-forecast.json
-weather-forecast.json
-quatt-forecast.json
-base-load-forecast.json
-pv-forecast-multiday.json
-base-load-forecast-multiday.json
-ww-input.json
-planner-axis.json
-```
-
-De planner werkt in kwartieren van 15 minuten en heeft als hoofdobjectief:
+Hoofdobjectief:
 
 ```text
 MAXIMIZE EXPECTED PV SELF-CONSUMPTION
 ```
 
-onder harde randvoorwaarden voor comfort, Tesla-deadlines, apparaatgrenzen en inputkwaliteit.
+onder harde randvoorwaarden voor:
 
-Belangrijke eigenschappen van de actuele planner:
+- warmwatercomfort;
+- Tesla-deadlines;
+- fysieke apparaatgrenzen;
+- freshness en inputkwaliteit;
+- fixed-contract governance.
 
-- WW-comfort is een harde constraint;
-- WW kan PV-flanken gebruiken;
-- Tesla gebruikt residual PV na WW-reservering;
-- EV-opportunity wordt dynamisch per slot en window gekwalificeerd;
-- forecast en live P1-context worden gecombineerd;
-- de planner verricht geen fysieke device writes.
+De planner verricht geen fysieke device writes.
 
 ## 5. WW en Tesla worden gezamenlijk geoptimaliseerd
-
-De planner modelleert eerst de niet-flexibele en comfortlasten en reserveert vervolgens benodigde warmwatercapaciteit. Daarna wordt de overblijvende PV-capaciteit opnieuw berekend voor Tesla.
 
 Conceptueel:
 
@@ -187,32 +115,33 @@ PV forecast
  = residual PV voor EV-flex
 ```
 
-Tesla-opportunity is daardoor niet meer alleen een simpele exportdrempel. De planner kiest per slot een target van 0 of 6..16 A op basis van marginale PV-capture versus importpenalty. Een opportunity-window moet minimaal twee kwartieren lang zijn.
+WW-comfort wordt eerst veiliggesteld; Tesla gebruikt vervolgens residual PV.
+
+De actuele EV opportunity-policy is **15-minuten-slotgebaseerd**:
+
+- start vereist minimaal **één positief uitvoerbaar 15-minuten-slot**;
+- elk volgend kwartier wordt opnieuw onafhankelijk beoordeeld;
+- de planner vereist dus niet langer een minimumwindow van twee kwartieren;
+- realtime anti-flap/sessionbescherming blijft een executorverantwoordelijkheid en staat los van de plannerwindow.
 
 ## 6. Tesla-deadline is canonical in de Pi-planner
 
-De actuele deadlinevolgorde is:
+De planner:
 
-```text
-1. plan echte PV-opportunity
-2. tel opportunity-kWh voor de deadline
-3. trek die energie af van remaining deadline kWh
-4. plan alleen het resterende tekort
-5. plan dat zo laat mogelijk binnen de haalbare slots
-6. respecteer deadline_max_a
-```
+1. plant echte PV-opportunity;
+2. telt opportunity-kWh vóór de deadline;
+3. trekt die af van remaining deadline kWh;
+4. plant alleen het resterende tekort;
+5. houdt rekening met `latest_start_at`;
+6. respecteert `deadline_max_a`.
 
-Bij een actieve deadline zonder geldige `deadline_max_a` van 6..16 A faalt de planner gesloten:
+Bij een actieve deadline zonder geldige `deadline_max_a` van 6..16 A hoort de planner fail-closed te werken.
 
-```text
-FAIL_CLOSED_INVALID_OR_MISSING_DEADLINE_MAX_A
-```
+De Pi is de canonical deadline allocator; Homey behoudt uitsluitend een executor-side hard deadline guard als laatste safetylaag.
 
-De dynamic planner is daarmee de enige canonical Tesla-deadline allocator.
+## 7. Hardened validator en contractgovernance
 
-## 7. Hardened planner is validator en production-readiness guard
-
-De hardened laag controleert voor uitvoering onder andere:
+Voor productie gelden:
 
 ```text
 production contract mode = FIXED
@@ -223,34 +152,37 @@ automatic switching      = false
 failClosed               = true
 ```
 
-Ook worden kritieke inputs op freshness gecontroleerd. Verouderde input leidt tot fail-closed gedrag.
+Dynamische prijsdata mag onder deze productieconfiguratie alleen voor shadow, analyse of replay worden gebruikt.
 
-De hardened Tesla-deadlinefunctie valideert het canonical plan maar hoort geen tweede deadlineplanning te maken.
+De hardened laag controleert daarnaast freshness, planvaliditeit en current-slot uitvoerbaarheid voordat `/control/current` een READY-command mag leveren.
 
 ### Bekende technische schuld
 
-In `deadline_requirement()` staat nog historische compatibiliteitscode met een lokale `max_a = 16`. De huidige validator gebruikt deze waarde niet meer om de planning te wijzigen, maar dit fragment is achterhaald omdat `deadline_max_a` inmiddels in de runtime-state beschikbaar is. Dit is een opschoonpunt.
+In `deadline_requirement()` staat nog historische compatibiliteitscode met lokale `max_a = 16`. Deze code is niet de huidige canonical deadline allocator; `deadline_max_a` uit runtime-state is leidend. Het fragment blijft een expliciet runtime-cleanupitem.
 
-## 8. Homey heeft een expliciete planner-authority switch
+## 8. Homey heeft één expliciete planner-authority switch
 
-Twee producers kunnen `EM2_Power_Intent` produceren:
+Twee producers kunnen `EM2_Power_Intent` leveren:
 
 ```text
 PI Dynamic Planner Bridge
-Homey P1 Power Intent
+Homey P1 Power Intent rollback producer
 ```
 
-Beide zijn beschermd door:
+Beide worden exclusief gemaakt door:
 
 ```text
 EM2_Planner_Authority
 ```
 
-De PI-route schrijft alleen bij authority `PI`; de Homey-route alleen bij authority `HOMEY`. Hierdoor bestaat een expliciet rollbackmechanisme zonder twee gelijktijdige schrijvers.
+- `PI` → alleen PI bridge produceert canonical intent.
+- `HOMEY` → PI bridge blijft inert en Homey rollbackproducer mag intent leveren.
 
-## 9. Pi -> Homey control via /control/current
+Er mag nooit gelijktijdig dubbele plannerauthority bestaan.
 
-De actieve **PI Dynamic Planner Bridge v1.2.6 DEADLINE-GUARD** leest:
+## 9. Pi → Homey control via /control/current
+
+De actieve bridge `EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.2.6 DEADLINE-GUARD [READY]` leest:
 
 ```text
 http://192.168.1.42:3100/control/current
@@ -268,24 +200,20 @@ contract.id = ENGIE_3Y_2026_2029
 validUntil > now
 ```
 
-Bij een fout wordt fail-closed gewerkt en wordt een niet-uitvoerbaar/0-target gepubliceerd.
+Bij fouten wordt fail-closed gewerkt.
 
-## 10. Homey blijft exact-minute executor safety owner
+## 10. Homey blijft exact-minute executor / safety owner
 
-Homey bevat bewust nog een executor-side hard deadline guard.
+Homey bevat bewust een hard deadline guard:
 
-Voor de veilige latest-start blijft het Pi-target leidend. Vanaf de noodzakelijke starttijd mag Homey bij een actieve, verbonden Tesla de laadopdracht op het ingestelde deadline maximum zetten om het gebruikersdoel te beschermen.
+- vóór de earliest safe latest-start blijft het Pi-target leidend;
+- vanaf de noodzakelijke starttijd mag Homey voor een actieve, aangesloten Tesla het ingestelde deadline maximum afdwingen.
 
-Dit is geen tweede optimizer, maar een safety override:
+Dit is een safety override en geen tweede optimizer.
 
-```text
-Pi    = planning owner
-Homey = exact-minute executor / safety owner
-```
+## 11. Power Intent vormt de architectuurgrens
 
-## 11. Power Intent is de grens tussen planning en uitvoering
-
-De canonical interface naar uitvoering is:
+Canonical interface:
 
 ```text
 EM2_POWER_INTENT_V0.2
@@ -299,7 +227,7 @@ targets.ww.target_on
 targets.battery.target_W
 ```
 
-De softwareketen is daardoor:
+Algemene keten:
 
 ```text
 PLAN
@@ -310,75 +238,54 @@ PLAN
  -> PHYSICAL DEVICE
 ```
 
-Dit is de belangrijkste abstractielaag voor toekomstige uitbreiding.
+## 12. Actieve EV execution chain
 
-## 12. EV Power Adapter vertaalt vermogen naar uitvoerbare laadstroom
-
-De actieve EV Power Adapter vertaalt een numerieke EV-target in watt naar een fysiek uitvoerbare 3-fasen laadstroom.
-
-Uitgangspunt:
+Actuele Homey-keten:
 
 ```text
-3 x 230 V = 690 W/A
-```
-
-Beleid:
-
-```text
-START_MIN_A       = 6
-RUN_MIN_A         = 6
-OPPORTUNITY_MAX_A = 16
-```
-
-Deadline-targets gebruiken daarnaast hun eigen deadline-cap.
-
-De adapter gebruikt `floor()` en verhoogt daardoor nooit zelfstandig het upstream gevraagde vermogen. Onder het minimale uitvoerbare laadvermogen wordt 0 A gevraagd.
-
-De adapter schrijft zelf niet naar het apparaat.
-
-## 13. Validation gate beschermt de fysieke EV-write
-
-Voor een fysieke laadstroomwijziging moeten onder andere kloppen:
-
-- schema;
-- revision alignment tussen intent, adapter, state en gate;
-- freshness;
-- adapter-validity;
-- mapping-contract;
-- toegestane stroom 0 of 6..16 A;
-- final gate status `PASS`.
-
-Bij inconsistentie wordt fail-closed naar 0 A gewerkt.
-
-## 14. EV Actuator is de fysieke writer
-
-De actieve actuator is:
-
-```text
-EM v2 | 60 Actuator | EV Power v0.2.7 START6 RUN6 LIVE + EASEE SESSION
-```
-
-Deze laag kan fysiek:
-
-- een Easee-laadsessie starten;
-- een gepauzeerde sessie hervatten;
-- `target_charger_current` schrijven;
-- bij fouten fail-closed naar 0 A gaan.
-
-De feitelijke ownership-keten is dus:
-
-```text
-Dynamic Pi Planner
- -> Power Intent
- -> EV Power Adapter
- -> Validation Gate
- -> EV Actuator
+EV Power Adapter v0.1.5
+ -> EV Power Adapter Gate v0.2.6
+ -> EV Power Actuator v0.2.7 LIVE
  -> Easee
 ```
 
-## 15. Quatt is observe-only comfort baseload
+Mapping:
 
-De actuele Core markeert Quatt expliciet als:
+```text
+3 x 230 V = 690 W/A
+START_MIN_A = 6
+RUN_MIN_A   = 6
+```
+
+De adapter gebruikt `floor()` en verhoogt het upstream vermogensbudget niet zelfstandig. De gate controleert schema, revisions, freshness en mapping. Alleen de actuator schrijft fysiek naar Easee.
+
+## 13. Actieve WW execution chain
+
+Actuele keten:
+
+```text
+Power Intent WW target_on
+ -> WW Power Adapter
+ -> WW Power Adapter Gate v0.2
+ -> Warm Water Actuator v0.9 TARGETED-READ LIVE
+ -> Boiler
+```
+
+De actuator controleert onder andere:
+
+- source mode;
+- kill switch;
+- schema/revision alignment;
+- gate PASS;
+- freshness;
+- actuele `onoff` state;
+- idempotent NOOP wanneer target al bereikt is.
+
+De WW-keten is hiermee fysiek geïntegreerd, maar Homey bevat nog meer realtime WW state/safety policy dan bij Tesla.
+
+## 14. Quatt is observe-only comfort baseload
+
+Quatt blijft:
 
 ```text
 role         = COMFORT_BASELOAD
@@ -386,94 +293,42 @@ controlMode  = OBSERVE_ONLY
 controllable = false
 ```
 
-Quatt wordt gemeten, gemodelleerd en voorzien van ramp-reserve, maar wordt niet door de EMS-planner aangestuurd.
+Quatt wordt gemeten en gemodelleerd, maar niet door de EMS-planner aangestuurd.
 
-## 16. Warm water heeft nog meer lokale Homey-policy dan Tesla
+## 15. End-to-end validatie
 
-Voor warm water produceert de Homey Core nog zelfstandig:
+De gecontroleerde cutover van 2026-09-12 heeft beide primaire flexloads end-to-end gevalideerd.
 
-```text
-EM2_WW_State
-EM2_Control_WW
-```
+Tesla:
 
-met onder andere:
+- Pi → Power Intent → EV gate → actuator → Easee ON/OFF PASS;
+- oorspronkelijke cutoverproef op 7 A;
+- afzonderlijk START6 vanaf paused bewezen op circa 4.235 kW.
 
-- `goalReachedToday`;
-- bevestigde heating-minuten;
-- fallback-minuten;
-- catch-up;
-- 19:00 deadline;
-- startvenster;
-- run-locks;
-- thermostat verification;
-- post-goal opportunities.
+Warm water:
 
-De Pi levert de strategische/kwartierplanning, terwijl Homey nog veel realtime WW-policy en safety bevat.
+- Pi WW target ON → WW gate → actuator → boiler ON;
+- restore target → boiler OFF;
+- fysieke keten PASS.
 
-De huidige verdeling is daarom:
+## 16. Source-of-truth beleid
 
 ```text
-Pi          = strategische WW-planning
-Homey Core  = realtime WW state machine + safety policy
-Actuator    = fysieke boiler-write
-```
-
-Dit werkt, maar is architectonisch minder strak geconsolideerd dan de Tesla-keten en is een logisch toekomstig vereenvoudigingspunt.
-
-## 17. Canonical softwarearchitectuur in een regel
-
-**Homey is de realtime edge/state/safety/execution controller; de Raspberry Pi is de rolling-horizon optimization engine; een revision-guarded Power Intent contract vormt de grens tussen planning en fysieke uitvoering.**
-
-Volledige gesloten regelkring:
-
-```text
-SENSORS
-   -> HOMEY CORE STATE
-   -> DIRECT PI STATE API
-   -> FORECAST + HISTORY
-   -> DYNAMIC PI OPTIMIZER
-   -> HARDENED VALIDATOR
-   -> CONTROL API
-   -> HOMEY AUTHORITY GATE
-   -> POWER INTENT
-   -> DEVICE ADAPTERS
-   -> VALIDATION GATES
-   -> ACTUATORS
-   -> PHYSICAL DEVICES
-   -> SENSORS
-```
-
-## 18. Architectuurbeoordeling
-
-De belangrijkste structurele verbeteringen van de afgelopen dagen zijn:
-
-1. GitHub is uit de realtime control loop gehaald.
-2. Pi en Homey communiceren via expliciete runtime- en control-contracten.
-3. Tesla heeft een canonical planner op de Pi en Homey alleen als executor/safety-owner.
-4. Revision-, freshness- en fail-closed guards zitten op meerdere controlgrenzen.
-5. Power Intent vormt een duidelijke hardware-onafhankelijke interface.
-6. GitHub is opnieuw source of truth voor productiesoftware; de Pi-runtime is de deployed copy.
-
-De belangrijkste resterende architectuurpunten zijn:
-
-- verdere consolidatie van WW-policy richting een eenduidiger ownershipmodel;
-- verwijderen van historische/stale compatibiliteitscode in de hardened planner;
-- blijvend bewaken dat runtimecode en GitHub canonical source synchroon blijven.
-
-## 19. Source-of-truth beleid
-
-De gewenste en huidige richting is:
-
-```text
-GitHub = canonical source voor software en documentatie
+GitHub = canonical software + documentatie
 Pi     = runtime/deployment target
 Homey  = live edge, integratie, safety en actuatorlaag
 ```
 
-Wijzigingen aan productielogica horen daarom eerst of direct daarna gecontroleerd terug te landen in GitHub, zodat live runtime en repository niet opnieuw divergeren.
+Runtimecode en GitHub moeten aantoonbaar synchroon blijven. Architectuurgevoelige wijzigingen horen in dezelfde release-range in `CURRENT-EMS-STATE.md` en relevante component-/flowdocumentatie te worden verwerkt.
+
+## 17. Resterende architectuurpunten
+
+- verdere vereenvoudiging van WW ownership;
+- verwijderen van historische `deadline_requirement()` compatibiliteitscode;
+- blijvend bewaken van GitHub ↔ Pi runtime drift;
+- batterij-integratie pas na commissioning, met Victron/DESS als primaire realtime batterijoptimizer.
 
 ---
 
-**Documentstatus:** Live As-Is architectuur, 13 september 2026.  
-**Validatiebasis:** actuele Homey flows + actuele Pi dynamic planner / hardened planner broncode.
+**Documentstatus:** Live As-Is architectuur, opnieuw gecrosscheckt op 13 september 2026.  
+**Canonical current-state:** `docs/architecture/CURRENT-EMS-STATE.md`.
