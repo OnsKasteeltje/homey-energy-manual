@@ -158,19 +158,46 @@
     add('line',{x1:x(now),y1:T,x2:x(now),y2:H-B,class:'hs-now'});
     add('text',{x:x(now)+4,y:T+12,class:'hs-now-label'},'NU');
 
+    const resetHighlight=()=>{
+      svg.querySelectorAll('.hs-room-line,.hs-effective-line').forEach(p=>{
+        p.style.opacity='';
+        p.style.filter='';
+        p.setAttribute('stroke-width',p.classList.contains('hs-effective-line')?'4':'2.2');
+      });
+    };
+    const highlightRoom=key=>{
+      svg.querySelectorAll('.hs-room-line,.hs-effective-line').forEach(p=>{
+        const selected=p.dataset.room===key;
+        p.style.opacity=selected?'1':'0.22';
+        p.style.filter=selected?'drop-shadow(0 0 1.5px currentColor)':'';
+        p.setAttribute('stroke-width',selected?(p.classList.contains('hs-effective-line')?'5':'3.6'):(p.classList.contains('hs-effective-line')?'4':'2.2'));
+      });
+    };
+
     const hit=add('rect',{x:L,y:T,width:W-L-R,height:H-T-B,fill:'transparent',class:'hs-hit'});
     hit.addEventListener('mousemove',e=>{
       const rect=svg.getBoundingClientRect();
       const sx=(e.clientX-rect.left)*(W/rect.width);
+      const sy=(e.clientY-rect.top)*(H/rect.height);
       const minute=Math.max(0,Math.min(1439,Math.round((sx-L)/(W-L-R)*1440)));
-      const rows=visible.map(r=>`<div><span><i style="background:${r.color}"></i>${esc(r.name)}</span><b>${temp(valueAt(r.baseline,minute))}</b></div>`).join('');
-      tooltip.innerHTML=`<strong>${hhmm(minute)}</strong>${rows}`;
+      const candidates=visible.map(r=>{
+        const baselineTemp=valueAt(r.baseline,minute);
+        const effectiveTemp=r.effective.length?valueAt(r.effective,minute):null;
+        const baselineDistance=Math.abs(sy-y(baselineTemp));
+        const effectiveDistance=effectiveTemp===null?Infinity:Math.abs(sy-y(effectiveTemp));
+        const useEffective=effectiveDistance<baselineDistance;
+        return {room:r,value:useEffective?effectiveTemp:baselineTemp,kind:useEffective?'EMS effectief':'Honeywell baseline',distance:Math.min(baselineDistance,effectiveDistance)};
+      }).sort((a,b)=>a.distance-b.distance);
+      const nearest=candidates[0];
+      if(!nearest)return;
+      highlightRoom(nearest.room.key);
+      tooltip.innerHTML=`<strong>${hhmm(minute)}</strong><div><span><i style="background:${nearest.room.color}"></i>${esc(nearest.room.name)}</span><b>${temp(nearest.value)}</b></div>${nearest.kind==='EMS effectief'?`<small>${esc(nearest.kind)}</small>`:''}`;
       tooltip.hidden=false;
       const host=root.querySelector('.hs-canvas-wrap').getBoundingClientRect();
       tooltip.style.left=`${Math.min(e.clientX-host.left+12,host.width-230)}px`;
       tooltip.style.top=`${Math.max(8,e.clientY-host.top-20)}px`;
     });
-    hit.addEventListener('mouseleave',()=>tooltip.hidden=true);
+    hit.addEventListener('mouseleave',()=>{tooltip.hidden=true;resetHighlight();});
   }
 
   fetch(`${DATA_URL}?ts=${Date.now()}`,{cache:'no-store'})
