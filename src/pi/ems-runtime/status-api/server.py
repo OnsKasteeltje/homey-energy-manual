@@ -5,6 +5,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+from state_ingest import handle_state_ingest
+
 HOST = "0.0.0.0"
 PORT = 3100
 START_TIME = time.time()
@@ -296,6 +298,12 @@ def send_json(handler, status, payload):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        if self.path == "/state/energy":
+            handle_state_ingest(self, send_json)
+            return
+        send_json(self, 404, {"status": "REJECTED", "reason": "NOT_FOUND", "stateWritten": False})
+
     def do_GET(self):
         if self.path == "/control/current":
             try:
