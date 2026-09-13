@@ -1,6 +1,6 @@
 # Software Architecture Documentation Framework
 
-Deze map is de primaire, versiebeheerbare bron voor de softwarearchitectuur van het Home Energy Management System (HEMS).
+Deze map is de primaire, versiebeheerbare bron voor de modulaire softwarearchitectuur van het Home Energy Management System (HEMS).
 
 ## Doel
 
@@ -8,10 +8,16 @@ De softwaredocumentatie wordt niet langer primair als handmatig Word-document on
 
 ## Bronnen van waarheid
 
-1. De actuele implementatie in code/configuratie is leidend.
-2. Markdown beschrijft uitsluitend de aantoonbaar geïmplementeerde of expliciet als SHADOW gemarkeerde situatie.
-3. Procesdiagrammen moeten overeenkomen met de actuele code/configuratie en worden bij relevante codewijzigingen opnieuw gevalideerd.
-4. `generated/` bevat afgeleide output en wordt niet handmatig bewerkt.
+1. De actuele implementatie in code/configuratie en de live gevalideerde Homey/Pi-runtime zijn leidend.
+2. `docs/architecture/CURRENT-EMS-STATE.md` is het canonieke current-state document voor de operationele Homey/Pi architectuur.
+3. De documenten onder `docs/software-architecture/` detailleren die architectuur per component en proces en mogen niet in strijd zijn met de canonical current state.
+4. Markdown beschrijft uitsluitend aantoonbaar geïmplementeerde functionaliteit of markeert SHADOW/rollback/planned expliciet.
+5. Procesdiagrammen moeten overeenkomen met actuele code/configuratie en worden bij relevante architectuurwijzigingen opnieuw gevalideerd.
+6. `generated/` bevat afgeleide output en wordt niet handmatig bewerkt.
+
+Bij conflict geldt de volgorde:
+
+`live gevalideerde implementatie -> CURRENT-EMS-STATE.md -> component/flow Markdown -> generated output -> historische DOCX/PDF baseline`.
 
 ## Structuur
 
@@ -26,7 +32,7 @@ De softwaredocumentatie wordt niet langer primair als handmatig Word-document on
 
 ## Verplichte componentsecties
 
-Iedere componentbeschrijving gebruikt dezelfde volgorde:
+Iedere componentbeschrijving gebruikt waar praktisch dezelfde volgorde:
 
 1. Doel
 2. Scope
@@ -48,23 +54,31 @@ Gebruik in YAML-frontmatter minimaal:
 
 - `component`
 - `title`
-- `version`
+- `version` waar relevant
 - `status`: `draft`, `shadow`, `active`, `deprecated`
-- `architecture_status`: `planned`, `implemented`, `validated`
+- `architecture_status`: bijvoorbeeld `planned`, `implemented-shadow`, `implemented-production`, `validated`
 - `last_verified`
 - `source`
 
-`last_verified` betekent: inhoud en diagrammen zijn op die datum gecontroleerd tegen de genoemde bronbestanden en actuele runtime-/configuratiestatus.
+`last_verified` betekent: inhoud en diagrammen zijn op die datum gecontroleerd tegen de genoemde bronbestanden én de actuele runtime-/configuratiestatus.
 
 ## Wijzigingsregel
 
-Een relevante wijziging aan een component is pas documentatie-compleet wanneer:
+Een architectuurrelevante wijziging is pas documentatie-compleet wanneer:
 
-- de component-Markdown is gecontroleerd/bijgewerkt;
-- relevante Mermaid-flow/state machine is gecontroleerd tegen de code;
+- `docs/architecture/CURRENT-EMS-STATE.md` is gecontroleerd/bijgewerkt wanneer responsibility, authority, contractpolicy, runtime/service of physical-writer boundary verandert;
+- de relevante component-Markdown is gecontroleerd/bijgewerkt;
+- relevante Mermaid-flow/state machine is gecontroleerd tegen de implementatie;
 - `last_verified` is bijgewerkt;
-- validatie of bekende beperking is toegevoegd wanneer gedrag nog niet volledig runtime-gevalideerd is.
+- validatie of bekende beperking is toegevoegd wanneer gedrag nog niet volledig runtime-gevalideerd is;
+- SHADOW/rollback/TEMP-functionaliteit niet als productiepad wordt afgebeeld.
+
+## Driftregel
+
+Vastgestelde documentatiedrift wordt niet opgelost door de actuele implementatie terug te interpreteren naar de oude tekst. De documentatie wordt gecorrigeerd naar de aantoonbare as-built situatie, tenzij expliciet is besloten de implementatie terug te draaien.
+
+Historische baselines blijven als historie bruikbaar, maar mogen niet als actuele runtimebron worden geciteerd wanneer nieuwere as-built documentatie beschikbaar is.
 
 ## Migratie
 
-Bestaande pagina's onder `docs/` blijven voorlopig intact. Inhoud wordt stapsgewijs naar deze structuur gemigreerd. Pas nadat een onderwerp inhoudelijk is gecontroleerd tegen de actuele implementatie wordt de nieuwe module als architectuurbron beschouwd.
+Bestaande pagina's onder `docs/` blijven waar nodig als historie of aanvullende context bestaan. Een onderwerp wordt pas als actuele architectuurbron beschouwd nadat het tegen de implementatie en canonical current-state documentatie is gecontroleerd.
