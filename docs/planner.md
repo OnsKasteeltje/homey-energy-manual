@@ -13,8 +13,8 @@ const defs=[
 ['Dynamische Pi Planner','https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/energy-planner-shadow-dynamic.json']];
 const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
 const unwrap=x=>x?.plan?.plan?.actions?x.plan:(x?.plan||x||{});
-const hhmm=x=>{const d=new Date(x);return Number.isNaN(d.getTime())?'—':d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})};
-const dt=x=>{const d=new Date(x);return Number.isNaN(d.getTime())?'—':d.toLocaleString('nl-NL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})};
+const hhmm=x=>{const d=new Date(x);return Number.isNaN(d.getTime())?'—':d.toLocaleTimeString('nl-NL',{timeZone:'Europe/Amsterdam',hour:'2-digit',minute:'2-digit',hour12:false})};
+const dt=x=>{const d=new Date(x);return Number.isNaN(d.getTime())?'—':d.toLocaleString('nl-NL',{timeZone:'Europe/Amsterdam',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtW=v=>finite(v)?`${Math.round(Number(v))} W`:'—';
 const fmtNet=v=>{if(!finite(v))return'—';const n=Number(v);return n>0?`import ${Math.round(n)} W`:n<0?`export ${Math.round(Math.abs(n))} W`:'0 W';};
