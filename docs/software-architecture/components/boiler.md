@@ -1,7 +1,7 @@
 ---
 component: boiler
 title: Warm Water / Boiler Control
-version: 0.2.0
+version: 0.2.1
 status: active
 architecture_status: implemented-production
 last_verified: 2026-09-13
@@ -9,6 +9,7 @@ source:
   - docs/architecture/CURRENT-EMS-STATE.md
   - homey://advancedflow/40d45aeb-174e-4a83-9a42-71ae46065cb4
   - homey://advancedflow/39c39cc5-12bb-4494-ba45-bad47a656696
+  - homey://advancedflow/8bf53fdb-76f4-47db-8ccb-773ac515f06e
   - docs/software-architecture/components/planner-power-intent.md
 ---
 
@@ -25,20 +26,20 @@ Pi hardened dynamic planner
         ↓
 Pi /control/current
         ↓
-Homey PI Dynamic Planner Bridge v1.2.6
+Homey PI Dynamic Planner Bridge v1.3.0 REALTIME-PV DEADLINE-GUARD [READY]
         ↓
 EM2_Power_Intent v0.2 / targets.ww.target_on
         ↓
-WW Power Adapter
+WW Power Adapter v0.2 TARGETED-READ SHADOW
         ↓
-WW Power Adapter Gate v0.2
+WW Power Adapter Gate v0.2 TARGETED-READ
         ↓
 Warm Water Actuator v0.9 TARGETED-READ LIVE
         ↓
 Boiler
 ```
 
-De Pi planner en bridge schrijven geen physical devices. Homey blijft executor en lokale safetylaag.
+De Pi planner en bridge schrijven geen physical devices. Homey blijft executor en lokale safetylaag. Dezelfde actuele PI bridge produceert de canonieke Power Intent voor zowel EV als WW; de domeinspecifieke adapters/gates/actuators splitsen daarna de fysieke uitvoering.
 
 ## 3. WW planning
 
@@ -161,6 +162,8 @@ Geobserveerd:
 - na terugkeer naar normale Pi target ging de boiler terug naar `onoff = false`, 0 W.
 
 Resultaat: **Pi → Homey → boiler ON en OFF beide PASS.**
+
+Op 13 september 2026 is de actieve Homey flow inventory opnieuw gecontroleerd. Daarin staan de actuele PI Dynamic Planner Bridge v1.3.0, WW Power Adapter v0.2, WW Power Adapter Gate v0.2 en Warm Water Actuator v0.9 als de productiecomponenten van deze keten.
 
 ## 10. Documentatiedrift die hiermee is opgeheven
 
