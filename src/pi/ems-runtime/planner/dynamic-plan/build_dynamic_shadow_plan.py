@@ -229,11 +229,14 @@ def ev_target_from_residual(residual_w):
 
 
 def apply_ev_deadline_constraint(slots, tesla_state, now_utc):
-    """Overlay the hard Tesla deadline on the canonical Pi action plan.
+    """Apply the canonical Tesla deadline requirement exactly once.
 
-    Normal PV opportunity planning remains untouched before latest-start.
-    At/after latest-start the planner requests the deadline maximum continuously
-    until the deadline. Homey remains the exact-minute executor safety owner.
+    Planning order:
+    1. Keep genuine PV opportunity charging unchanged.
+    2. Count only genuine opportunity energy before the deadline.
+    3. Subtract that from the remaining deadline target.
+    4. Add only the remaining required energy, latest slots first.
+    5. Homey remains the exact-minute safety owner.
     """
     result = {
         "active": tesla_state.get("deadline_active") is True,
@@ -244,12 +247,14 @@ def apply_ev_deadline_constraint(slots, tesla_state, now_utc):
         ),
         "deadlineAt": tesla_state.get("deadline_at"),
         "latestStartAt": tesla_state.get("latest_start_at"),
-        "inferredMaxA": None,
-        "targetW": 0,
+        "opportunityKWhBeforeDeadline": 0.0,
+        "deadlineRequiredKWh": 0.0,
+        "deadlineAddedKWh": 0.0,
+        "maxA": None,
         "appliedSlots": 0,
         "firstAppliedSlot": None,
         "lastAppliedSlot": None,
-        "policy": "HARD_DEADLINE_FROM_LATEST_START_V0.1",
+        "policy": "PV_OPPORTUNITY_THEN_LATEST_DEADLINE_RESERVE_V0.2",
         "executorSafetyOwner": "HOMEY_EXACT_MINUTE_GUARD",
     }
 
@@ -260,64 +265,137 @@ def apply_ev_deadline_constraint(slots, tesla_state, now_utc):
     ):
         return slots, result
 
-    deadline_dt = parse_utc(result["deadlineAt"]) if result["deadlineAt"] else None
-    latest_dt = (
-        parse_utc(result["latestStartAt"])
-        if result["latestStartAt"]
-        else None
+    deadline_dt = (
+        parse_utc(result["deadlineAt"])
+        if result["deadlineAt"] else None
     )
 
-    if (
-        deadline_dt is None
-        or latest_dt is None
-        or deadline_dt <= latest_dt
-        or deadline_dt <= now_utc
-    ):
+    if deadline_dt is None or deadline_dt <= now_utc:
         return slots, result
 
-    hours = (deadline_dt - latest_dt).total_seconds() / 3600
-    required_kw = result["remainingKWh"] / hours if hours > 0 else 0
-    inferred_a = int(round(required_kw / (EV_W_PER_A / 1000)))
-    inferred_a = max(EV_RUN_MIN_A, min(EV_MAX_A, inferred_a))
+    raw_max_a = tesla_state.get("deadline_max_a")
+    try:
+        deadline_max_a = int(round(float(raw_max_a)))
+    except (TypeError, ValueError):
+        deadline_max_a = 0
 
-    target_w = inferred_a * EV_W_PER_A
-    result["inferredMaxA"] = inferred_a
-    result["targetW"] = target_w
+    # Active deadline without an explicit valid user limit must never silently
+    # fall back to the hardware maximum.
+    if deadline_max_a < EV_RUN_MIN_A or deadline_max_a > EV_MAX_A:
+        result["policy"] = "FAIL_CLOSED_INVALID_OR_MISSING_DEADLINE_MAX_A"
+        result["feasible"] = False
+        result["error"] = "INVALID_OR_MISSING_DEADLINE_MAX_A"
+        return slots, result
 
-    force_from = max(now_utc, latest_dt)
+    result["maxA"] = deadline_max_a
+
+    # Genuine opportunity means charging selected by the PV optimizer itself,
+    # not energy introduced by any deadline mechanism.
+    opportunity_kwh = 0.0
+
+    for slot in slots:
+        start_dt = parse_utc(slot["slot_start_utc"])
+        if start_dt < now_utc or start_dt >= deadline_dt:
+            continue
+
+        reason = str(slot.get("evAllocationReason") or "")
+        ev_w = max(0, int(slot.get("evPlanW") or 0))
+
+        if (
+            reason.startswith("DYNAMIC_PV_")
+            and "OPPORTUNITY" in reason
+            or reason == "DYNAMIC_PV_PEAK_ABSORBER"
+        ):
+            opportunity_kwh += ev_w * SLOT_H / 1000
+
+    deadline_required_kwh = max(
+        0.0,
+        result["remainingKWh"] - opportunity_kwh,
+    )
+
+    result["opportunityKWhBeforeDeadline"] = round(opportunity_kwh, 3)
+    result["deadlineRequiredKWh"] = round(deadline_required_kwh, 3)
+
+    if deadline_required_kwh <= 1e-9:
+        return slots, result
+
+    remaining = deadline_required_kwh
     applied = []
+
+    # Latest feasible slots first. Existing genuine opportunity remains the base;
+    # deadline energy is only the incremental energy above that base.
+    eligible = []
 
     for slot in slots:
         start_dt = parse_utc(slot["slot_start_utc"])
         end_dt = start_dt + timedelta(minutes=SLOT_MIN)
 
-        # Include the currently running quarter if latest-start was crossed
-        # inside that quarter. Homey still owns the exact-minute transition.
-        if end_dt <= force_from or start_dt >= deadline_dt:
+        if end_dt <= now_utc or start_dt >= deadline_dt:
             continue
 
-        if int(slot.get("evPlanW") or 0) < target_w:
-            slot["evPlanW"] = target_w
-            slot["evPlanA"] = inferred_a
-            slot["evAllocationReason"] = "DEADLINE_REQUIRED"
+        eligible.append((start_dt, slot))
 
-            net_after = (
-                float(slot["baseLoadForecastW"])
-                + float(slot["quattForecastW"])
-                + float(slot["wwPlanW"])
-                + target_w
-                - float(slot["pvForecastW"])
-            )
-            slot["gridImportAfterFlexW"] = round(max(0.0, net_after))
-            slot["gridExportAfterFlexW"] = round(max(0.0, -net_after))
+    eligible.sort(key=lambda x: x[0], reverse=True)
 
+    added_kwh = 0.0
+
+    for start_dt, slot in eligible:
+        if remaining <= 1e-9:
+            break
+
+        base_w = max(0, int(slot.get("evPlanW") or 0))
+        base_a = int(slot.get("evPlanA") or 0)
+
+        # Deadline layer may raise the slot up to 16 A.
+        # Only incremental power counts as deadline-required energy.
+        max_increment_w = max(0, deadline_max_a * EV_W_PER_A - base_w)
+        if max_increment_w <= 0:
+            continue
+
+        required_increment_w = remaining * 1000 / SLOT_H
+        target_w = min(
+            deadline_max_a * EV_W_PER_A,
+            base_w + required_increment_w,
+        )
+
+        target_a = int(math.ceil(target_w / EV_W_PER_A))
+        target_a = max(EV_RUN_MIN_A, min(deadline_max_a, target_a))
+        target_w = target_a * EV_W_PER_A
+
+        if target_w <= base_w:
+            continue
+
+        incremental_kwh = (target_w - base_w) * SLOT_H / 1000
+
+        slot["evPlanW"] = target_w
+        slot["evPlanA"] = target_a
+        slot["evAllocationReason"] = "DEADLINE_REQUIRED"
         slot["evDeadlineRequired"] = True
+
+        net_after = (
+            float(slot["baseLoadForecastW"])
+            + float(slot["quattForecastW"])
+            + float(slot["wwPlanW"])
+            + target_w
+            - float(slot["pvForecastW"])
+        )
+
+        slot["gridImportAfterFlexW"] = round(max(0.0, net_after))
+        slot["gridExportAfterFlexW"] = round(max(0.0, -net_after))
+
+        added_kwh += incremental_kwh
+        remaining = max(0.0, remaining - incremental_kwh)
         applied.append(slot["slot_start_utc"])
 
+    result["deadlineAddedKWh"] = round(added_kwh, 3)
     result["appliedSlots"] = len(applied)
+    result["feasible"] = remaining <= 1e-9
+    result["unplannedDeadlineKWh"] = round(remaining, 3)
+
     if applied:
-        result["firstAppliedSlot"] = applied[0]
-        result["lastAppliedSlot"] = applied[-1]
+        chronological = sorted(applied)
+        result["firstAppliedSlot"] = chronological[0]
+        result["lastAppliedSlot"] = chronological[-1]
 
     return slots, result
 

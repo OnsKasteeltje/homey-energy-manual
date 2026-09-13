@@ -28,7 +28,7 @@ QUATT_FILE = DATA / "quatt-forecast.json"
 BASE_FILE = DATA / "base-load-forecast.json"
 WW_FILE = DATA / "ww-input.json"
 AXIS_FILE = DATA / "planner-axis.json"
-ENERGY_STATE_FILE = REPO / "docs/data/energy-state-v2.json"
+ENERGY_STATE_FILE = Path("/home/jeroen/ems/data/energy-state-v2.json")
 BUILDER = RUNTIME / "planner/dynamic-plan/build_dynamic_shadow_plan.py"
 OUTPUT = DATA / "dynamic-shadow-plan.json"
 
@@ -162,81 +162,76 @@ def deadline_requirement(energy_state, now):
 
 
 def apply_tesla_deadline(plan, requirement, now):
+    """Validate the canonical Tesla deadline plan without modifying it.
+
+    The Dynamic Pi planner is the sole Tesla deadline allocator.
+    This hardened layer only verifies that the published action plan
+    contains enough executable EV energy before the deadline.
+    """
     if not requirement or requirement["remainingKWh"] <= 0:
         return {
             "active": False,
             "feasible": True,
             "remainingKWh": 0.0 if requirement else None,
             "plannedKWh": 0.0,
+            "opportunityKWh": 0.0,
+            "deadlineRequiredKWh": 0.0,
+            "validatorOnly": True,
         }
 
     deadline = requirement["deadline"]
-    max_a = requirement["maxA"]
-    max_w = max_a * EV_W_PER_A
     needed_kwh = requirement["remainingKWh"]
 
-    eligible = []
-    for i, slot in enumerate(plan.get("slots") or []):
+    opportunity_kwh = 0.0
+    deadline_kwh = 0.0
+    total_kwh = 0.0
+    planned_slots = 0
+
+    for slot in plan.get("slots") or []:
         start = parse_utc(slot.get("slot_start_utc"))
         if start is None:
             continue
-        if start >= now - timedelta(minutes=15) and start < deadline:
-            eligible.append(i)
 
-    capacity_kwh = len(eligible) * max_w * SLOT_H / 1000
-    feasible = capacity_kwh + 1e-9 >= needed_kwh
+        # Allow the currently running quarter, matching planner semantics.
+        if start < now - timedelta(minutes=15) or start >= deadline:
+            continue
 
-    # Preserve PV objective: fill the slots with the largest corrected residual
-    # export first. Deadline feasibility, not market price, is the hard constraint.
-    eligible.sort(
-        key=lambda i: (
-            float(plan["slots"][i].get("evResidualExportW") or 0),
-            plan["slots"][i].get("slot_start_utc") or "",
-        ),
-        reverse=True,
-    )
+        ev_w = max(0.0, float(slot.get("evPlanW") or 0))
+        if ev_w <= 0:
+            continue
 
-    remaining = needed_kwh
-    planned = 0.0
-    for i in eligible:
-        if remaining <= 1e-9:
-            break
-        slot = plan["slots"][i]
-        slot_capacity = max_w * SLOT_H / 1000
-        # Round up to whole amps; never exceed maxA. Deadline charging is allowed
-        # to import because reaching the explicit user goal is the hard constraint.
-        required_w = min(max_w, remaining * 1000 / SLOT_H)
-        amps = min(max_a, max(6, int(math.ceil(required_w / EV_W_PER_A))))
-        ev_w = amps * EV_W_PER_A
-        delivered = ev_w * SLOT_H / 1000
+        kwh = ev_w * SLOT_H / 1000
+        reason = str(slot.get("evAllocationReason") or "")
 
-        slot["evPlanW"] = round(ev_w)
-        slot["evPlanA"] = amps
-        slot["evAllocationReason"] = "TESLA_DEADLINE_HARD_REQUIREMENT"
-        slot["teslaDeadlineAt"] = iso_z(deadline)
+        total_kwh += kwh
+        planned_slots += 1
 
-        net_after = (
-            float(slot.get("baseLoadForecastW") or 0)
-            + float(slot.get("quattForecastW") or 0)
-            + float(slot.get("wwPlanW") or 0)
-            + ev_w
-            - float(slot.get("pvForecastW") or 0)
-        )
-        slot["gridImportAfterFlexW"] = round(max(0.0, net_after))
-        slot["gridExportAfterFlexW"] = round(max(0.0, -net_after))
+        if reason == "DEADLINE_REQUIRED" or slot.get("evDeadlineRequired") is True:
+            deadline_kwh += kwh
+        elif (
+            reason.startswith("DYNAMIC_PV_")
+            or reason == "DYNAMIC_PV_PEAK_ABSORBER"
+        ):
+            opportunity_kwh += kwh
 
-        planned += delivered
-        remaining = max(0.0, remaining - delivered)
+    feasible = total_kwh + 1e-9 >= needed_kwh
+
+    canonical = (plan.get("tesla") or {}).get("deadlinePlan") or {}
 
     return {
         "active": True,
         "deadlineAt": iso_z(deadline),
         "remainingKWh": round(needed_kwh, 3),
-        "plannedKWh": round(min(planned, needed_kwh), 3),
-        "maxA": max_a,
-        "capacityKWhBeforeDeadline": round(capacity_kwh, 3),
+        "plannedKWh": round(min(total_kwh, needed_kwh), 3),
+        "plannedEnergyKWh": round(total_kwh, 3),
+        "opportunityKWh": round(opportunity_kwh, 3),
+        "deadlineRequiredKWh": round(deadline_kwh, 3),
+        "plannedSlots": planned_slots,
         "feasible": feasible,
-        "policy": "HARD_DEADLINE_PV_BEST_SLOTS_FIRST_GRID_IMPORT_ALLOWED",
+        "policy": "VALIDATE_CANONICAL_DEADLINE_PLAN_V0.2",
+        "validatorOnly": True,
+        "canonicalPolicy": canonical.get("policy"),
+        "executorSafetyOwner": "HOMEY_EXACT_MINUTE_GUARD",
     }
 
 

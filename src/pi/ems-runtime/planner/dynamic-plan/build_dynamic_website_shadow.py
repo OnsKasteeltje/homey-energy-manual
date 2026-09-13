@@ -70,60 +70,66 @@ if (
     inferred_max_a = int(round(inferred_kw / (EV_W_PER_A / 1000)))
     inferred_max_a = clamp(inferred_max_a, EV_MIN_A, EV_MAX_A)
 
-# Deadline overlay is intentionally website-shadow only. It makes the hard
-# executor deadline visible in the 24 h planner without changing the canonical
-# Dynamic Pi control plan. The Homey executor remains the deadline safety owner.
-deadline_overlay_w = {}
-base_future_ev_kwh = 0.0
-reserve_need_kwh = 0.0
-reserve_added_kwh = 0.0
+# Tesla deadline planning is canonical in dynamic-shadow-plan.json.
+# This website builder is render-only: it must never reconstruct or add
+# deadline energy. It only exposes the canonical planner classification.
+canonical_deadline = (src.get("tesla") or {}).get("deadlinePlan") or {}
+
 deadline_in_horizon = False
-
-if (
-    inferred_max_a is not None
-    and deadline_dt is not None
-    and deadline_dt > now_utc
-):
-    future_before_deadline = []
-    for i, s in enumerate(slots):
+if deadline_dt is not None:
+    starts = []
+    for s in slots:
         start_dt = parse_utc(s.get("slot_start_utc"))
-        if start_dt is None or start_dt < now_utc or start_dt >= deadline_dt:
-            continue
-        base_w = max(0, int(round(s.get("evPlanW") or 0)))
-        base_future_ev_kwh += base_w * SLOT_H / 1000
-        future_before_deadline.append((i, start_dt, base_w))
-
-    if future_before_deadline:
+        if start_dt is not None:
+            starts.append(start_dt)
+    if starts:
         deadline_in_horizon = deadline_dt <= (
-            max(x[1] for x in future_before_deadline) + timedelta(minutes=SLOT_MIN)
+            max(starts) + timedelta(minutes=SLOT_MIN)
         )
 
-    reserve_need_kwh = max(0.0, remaining_kwh - base_future_ev_kwh)
-    remaining_reserve = reserve_need_kwh
-    deadline_target_w = inferred_max_a * EV_W_PER_A
+base_future_ev_kwh = 0.0
+deadline_required_kwh = 0.0
 
-    # Reserve the latest slots first. Earlier profitable PV slots stay untouched;
-    # their planned energy therefore automatically moves the effective hard start
-    # later, matching the executor-side latest-start behaviour.
-    for i, start_dt, base_w in sorted(
-        future_before_deadline,
-        key=lambda x: x[1],
-        reverse=True,
+for s in slots:
+    start_dt = parse_utc(s.get("slot_start_utc"))
+    if (
+        start_dt is None
+        or start_dt < now_utc
+        or deadline_dt is None
+        or start_dt >= deadline_dt
     ):
-        if remaining_reserve <= 1e-9:
-            break
-        target_w = max(base_w, deadline_target_w)
-        incremental_kwh = max(0, target_w - base_w) * SLOT_H / 1000
-        if incremental_kwh <= 0:
-            continue
-        deadline_overlay_w[i] = target_w
-        reserve_added_kwh += incremental_kwh
-        remaining_reserve = max(0.0, remaining_reserve - incremental_kwh)
+        continue
 
-    deadline_feasible = remaining_reserve <= 1e-6
-else:
-    deadline_feasible = not deadline_active or remaining_kwh <= 0
+    ev_w = max(0, int(round(s.get("evPlanW") or 0)))
+    if ev_w <= 0:
+        continue
 
+    kwh = ev_w * SLOT_H / 1000
+    reason = str(s.get("evAllocationReason") or "")
+
+    if reason == "DEADLINE_REQUIRED" or s.get("evDeadlineRequired") is True:
+        deadline_required_kwh += kwh
+    else:
+        base_future_ev_kwh += kwh
+
+reserve_need_kwh = max(
+    0.0,
+    float(canonical_deadline.get("deadlineRequiredKWh") or 0),
+)
+reserve_added_kwh = max(
+    0.0,
+    float(canonical_deadline.get("deadlineAddedKWh") or 0),
+)
+deadline_feasible = (
+    not deadline_active
+    or remaining_kwh <= 0
+    or (
+        base_future_ev_kwh
+        + deadline_required_kwh
+        + 1e-9
+        >= remaining_kwh
+    )
+)
 
 actions = []
 for i, s in enumerate(slots):
@@ -137,18 +143,20 @@ for i, s in enumerate(slots):
     ))
     ww_w = int(round(s.get("wwPlanW") or 0))
     source_ev_w = int(round(s.get("evPlanW") or 0))
-    ev_w = int(deadline_overlay_w.get(i, source_ev_w))
-    deadline_required = i in deadline_overlay_w
+    ev_w = source_ev_w
 
-    if deadline_required:
+    tesla_reason = s.get("evAllocationReason")
+    deadline_required = (
+        tesla_reason == "DEADLINE_REQUIRED"
+        or s.get("evDeadlineRequired") is True
+    )
+
+    if deadline_required and source_ev_w > 0:
         tesla_mode = "DEADLINE_REQUIRED"
-        tesla_reason = "PI_WEBSITE_DEADLINE_RESERVE"
     elif source_ev_w > 0:
         tesla_mode = "OPPORTUNITY"
-        tesla_reason = s.get("evAllocationReason")
     else:
         tesla_mode = "HOLD"
-        tesla_reason = s.get("evAllocationReason")
 
     actions.append({
         "i": i,
@@ -204,10 +212,10 @@ deadline_plan = {
     "baseOpportunityPlannedKWhBeforeDeadline": round(base_future_ev_kwh, 3),
     "reserveNeedKWh": round(reserve_need_kwh, 3),
     "reserveAddedKWh": round(reserve_added_kwh, 3),
-    "reserveSlots": len(deadline_overlay_w),
+    "reserveSlots": int(canonical_deadline.get("appliedSlots") or 0),
     "deadlineWithinActionHorizon": deadline_in_horizon,
     "feasibleWithinVisibleHorizon": deadline_feasible,
-    "policy": "LATEST_SLOTS_AFTER_PV_OPPORTUNITY_V0.1",
+    "policy": canonical_deadline.get("policy") or "CANONICAL_DYNAMIC_PLANNER",
     "controlImpact": "NONE_WEBSITE_SHADOW_ONLY",
     "executorSafetyOwner": "HOMEY"
 }
@@ -257,7 +265,7 @@ OUTPUT.write_text(json.dumps(payload, indent=2) + "\n")
 print("PASS: Dynamic Pi website shadow v0.2 built")
 print("slots                  :", len(actions))
 print("Tesla source slots     :", sum(1 for x in actions if x["targets"]["sourceEvTargetW"] > 0))
-print("Tesla deadline slots   :", len(deadline_overlay_w))
+print("Tesla deadline slots   :", int(canonical_deadline.get("appliedSlots") or 0))
 print("WW slots               :", sum(1 for x in actions if x["warmWater"] == "RUN"))
 print("deadline active        :", deadline_active)
 print("deadline inferred maxA :", inferred_max_a)
