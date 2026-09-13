@@ -567,6 +567,336 @@ def enforce_min_run(selected, candidates, scores, required_slots):
 
 
 
+
+def ww_positive_windows(candidates):
+    """Return contiguous positive-export windows, strongest first.
+
+    This restores the original WW planner semantics: when Tesla is connected,
+    WW should use the shoulders of a broad PV window and leave the central
+    high-power peak available for EV opportunity charging.
+    """
+    windows = []
+    current = []
+
+    def finish(indices):
+        if len(indices) < WW_MIN_RUN_SLOTS:
+            return
+        avg_export = sum(
+            max(0.0, float(candidates[i].get("correctedExportBeforeFlexW") or 0))
+            for i in indices
+        ) / len(indices)
+        windows.append({
+            "indices": tuple(indices),
+            "avgExportW": avg_export,
+            "start": candidates[indices[0]]["slot_start_utc"],
+        })
+
+    for i, slot in enumerate(candidates):
+        export_w = max(
+            0.0, float(slot.get("correctedExportBeforeFlexW") or 0)
+        )
+        pv_coverage = clamp(export_w / BOILER_W) if BOILER_W else 0.0
+        grid_import_w = max(0.0, BOILER_W - export_w)
+
+        shoulder_feasible = (
+            pv_coverage >= WW_SHOULDER_MIN_COVERAGE
+            and grid_import_w <= WW_SHOULDER_MAX_IMPORT_W
+        )
+
+        if not shoulder_feasible:
+            finish(current)
+            current = []
+            continue
+
+        if current and not is_consecutive(candidates[current[-1]], slot):
+            finish(current)
+            current = []
+
+        current.append(i)
+
+    finish(current)
+
+    windows.sort(
+        key=lambda x: (-x["avgExportW"], x["start"])
+    )
+    return windows
+
+
+def ww_best_subrun(indices, candidates, length):
+    """Pick strongest consecutive WW subrun."""
+    best = None
+
+    for pos in range(0, len(indices) - length + 1):
+        run = indices[pos:pos + length]
+        score = sum(
+            max(
+                0.0,
+                float(
+                    candidates[i].get("correctedExportBeforeFlexW") or 0
+                ),
+            )
+            for i in run
+        )
+        start = candidates[run[0]]["slot_start_utc"]
+        key = (score, -parse_utc(start).timestamp())
+
+        if best is None or key > best[0]:
+            best = (key, run)
+
+    return tuple(best[1]) if best else tuple()
+
+
+def ww_shoulder_subruns(indices, candidates, length):
+    """Use both shoulders of a broad PV window.
+
+    Each shoulder stays at least WW_MIN_RUN_SLOTS long. If the required
+    runtime is too short to form two valid shoulders, use the strongest
+    contiguous subrun instead.
+    """
+    if length >= len(indices):
+        return tuple(indices)
+
+    if length < 2 * WW_MIN_RUN_SLOTS:
+        return ww_best_subrun(indices, candidates, length)
+
+    left_len = max(WW_MIN_RUN_SLOTS, length // 2)
+    right_len = max(WW_MIN_RUN_SLOTS, length - left_len)
+
+    while left_len + right_len > length:
+        if right_len > left_len and right_len > WW_MIN_RUN_SLOTS:
+            right_len -= 1
+        elif left_len > WW_MIN_RUN_SLOTS:
+            left_len -= 1
+        else:
+            return ww_best_subrun(indices, candidates, length)
+
+    if length % 2:
+        left_score = sum(
+            max(
+                0.0,
+                float(
+                    candidates[i].get("correctedExportBeforeFlexW") or 0
+                ),
+            )
+            for i in indices[:left_len + 1]
+        )
+        right_score = sum(
+            max(
+                0.0,
+                float(
+                    candidates[i].get("correctedExportBeforeFlexW") or 0
+                ),
+            )
+            for i in indices[-(right_len + 1):]
+        )
+
+        if left_score > right_score and right_len > WW_MIN_RUN_SLOTS:
+            left_len += 1
+            right_len -= 1
+        elif right_score > left_score and left_len > WW_MIN_RUN_SLOTS:
+            right_len += 1
+            left_len -= 1
+
+    run = list(indices[:left_len]) + list(indices[-right_len:])
+    return tuple(dict.fromkeys(run))
+
+
+def select_ww_slots(
+    candidates,
+    scores,
+    required_slots,
+    tesla_connected_now,
+):
+    """Select WW with day-wide geometric PV shoulders when EV is relevant.
+
+    With a connected Tesla the invariant is:
+
+        early usable PV shoulder -> EV central peak -> late usable PV shoulder
+
+    WW comfort remains the hard constraint. Score ranking is used only as
+    fallback when the geometric shoulders cannot supply enough valid slots.
+    """
+    ranked = sorted(
+        range(len(candidates)),
+        key=lambda i: (
+            scores[i],
+            candidates[i]["slot_start_utc"],
+        ),
+        reverse=True,
+    )
+
+    if required_slots <= 0:
+        return set(), set()
+
+    if not tesla_connected_now:
+        selected = set(ranked[:required_slots])
+        selected = enforce_min_run(
+            selected, candidates, scores, required_slots
+        )
+        return selected, set()
+
+    windows = sorted(
+        ww_positive_windows(candidates),
+        key=lambda w: w["start"],
+    )
+
+    if not windows:
+        selected = set(ranked[:required_slots])
+        selected = enforce_min_run(
+            selected, candidates, scores, required_slots
+        )
+        return selected, set()
+
+    selected = set()
+    shoulder_selected = set()
+
+    # Build chronological pools from all shoulder-feasible windows.
+    #
+    # This deliberately does NOT rank complete windows by PV strength.
+    # WW should occupy the outside of the usable PV period so that the
+    # central high-power part remains available for EV charging.
+    chronological = []
+    for window in windows:
+        chronological.extend(window["indices"])
+
+    chronological = list(dict.fromkeys(chronological))
+
+    if len(chronological) >= required_slots:
+        if required_slots < 2 * WW_MIN_RUN_SLOTS:
+            # Too little runtime for two proper shoulders.
+            run = ww_best_subrun(
+                chronological,
+                candidates,
+                required_slots,
+            )
+            selected.update(run)
+            shoulder_selected.update(run)
+        else:
+            # Do NOT divide WW equally over both shoulders.
+            #
+            # Search every valid left/right split and preserve the most
+            # valuable central PV region for EV opportunity charging.
+            #
+            # WW only needs BOILER_W, so lower-but-still-feasible PV slots
+            # are preferable for hot water while the highest export slots
+            # should remain available to the Tesla.
+            best = None
+
+            for left_len in range(
+                WW_MIN_RUN_SLOTS,
+                required_slots - WW_MIN_RUN_SLOTS + 1,
+            ):
+                right_len = required_slots - left_len
+
+                if right_len < WW_MIN_RUN_SLOTS:
+                    continue
+
+                left = tuple(chronological[:left_len])
+                right = tuple(chronological[-right_len:])
+
+                # The two shoulders may never overlap.
+                if set(left).intersection(right):
+                    continue
+
+                # Both shoulders must remain real consecutive WW runs.
+                if any(
+                    not is_consecutive(
+                        candidates[left[pos - 1]],
+                        candidates[left[pos]],
+                    )
+                    for pos in range(1, len(left))
+                ):
+                    continue
+
+                if any(
+                    not is_consecutive(
+                        candidates[right[pos - 1]],
+                        candidates[right[pos]],
+                    )
+                    for pos in range(1, len(right))
+                ):
+                    continue
+
+                chosen = set(left) | set(right)
+
+                middle = [
+                    i for i in chronological
+                    if i not in chosen
+                ]
+
+                # Primary objective:
+                # leave maximum EV opportunity value in the centre.
+                ev_value = 0.0
+                middle_export_sum = 0.0
+                middle_peak = 0.0
+
+                for i in middle:
+                    export_w = max(
+                        0.0,
+                        float(
+                            candidates[i].get(
+                                "correctedExportBeforeFlexW"
+                            ) or 0
+                        ),
+                    )
+
+                    _ev_w, ev_score = ev_best_option(export_w)
+
+                    ev_value += ev_score
+                    middle_export_sum += export_w
+                    middle_peak = max(middle_peak, export_w)
+
+                # Secondary objectives make the intention explicit:
+                # preserve as much export and the highest peak as possible.
+                key = (
+                    ev_value,
+                    middle_export_sum,
+                    middle_peak,
+                )
+
+                if best is None or key > best[0]:
+                    best = (
+                        key,
+                        left,
+                        right,
+                    )
+
+            if best is not None:
+                _key, left, right = best
+
+                selected.update(left)
+                selected.update(right)
+                shoulder_selected.update(left)
+                shoulder_selected.update(right)
+            else:
+                # Defensive fallback: preserve comfort if no valid
+                # two-shoulder split exists.
+                run = ww_best_subrun(
+                    chronological,
+                    candidates,
+                    required_slots,
+                )
+                selected.update(run)
+                shoulder_selected.update(run)
+
+    else:
+        # All economically usable shoulder slots are valuable.
+        selected.update(chronological)
+        shoulder_selected.update(chronological)
+
+    # Comfort is a hard constraint. If the economically valid shoulders
+    # cannot cover the full WW demand, fill only the remainder using the
+    # existing score model.
+    if len(selected) < required_slots:
+        for i in ranked:
+            if i in selected:
+                continue
+            selected.add(i)
+            if len(selected) >= required_slots:
+                break
+
+    return selected, shoulder_selected
+
 def ww_singleton_count(selected):
     """Count isolated WW slots; a joint swap may never make this worse."""
     selected = set(selected)
@@ -865,6 +1195,7 @@ def main():
         by_date.setdefault(slot["localDate"], []).append(slot)
 
     ww_selected_ts = set()
+    ww_shoulder_ts = set()
     daily = []
     for date_key, day_slots in sorted(by_date.items()):
         weekday_expected_kwh, weekday_target_min = weekday_ww_target(date_key)
@@ -928,13 +1259,29 @@ def main():
                 and parse_utc(s["slot_start_utc"]) >= now_utc - timedelta(minutes=15)
             ]
         else:
-            candidates = []
+            # Future local dates can overlap the normal 24 h action horizon.
+            # Preserve those canonical 24 h slots exactly as used by the
+            # visible planner, including corrected export and Quatt.
+            # Extend only the part beyond the action horizon with multiday
+            # PV/base data.
+            candidates = [
+                s for s in day_slots
+                if parse_utc(s["slot_start_utc"]) < deadline
+                and parse_utc(s["slot_start_utc"]) >= now_utc - timedelta(minutes=15)
+            ]
+
+            existing_ts = {
+                s["slot_start_utc"] for s in candidates
+            }
 
             common_multiday = sorted(
                 set(pv_multiday_map).intersection(base_multiday_map)
             )
 
             for ts in common_multiday:
+                if ts in existing_ts:
+                    continue
+
                 slot_dt = parse_utc(ts)
                 local_dt = slot_dt.astimezone(TZ)
 
@@ -967,6 +1314,10 @@ def main():
                     "confidence": 0.70,
                     "lookaheadSource": "MULTIDAY_PV_BASE",
                 })
+
+            candidates.sort(
+                key=lambda x: x["slot_start_utc"]
+            )
 
         required_slots = (
             int(math.ceil(remaining_min / SLOT_MIN)) if not goal_reached else 0
@@ -1031,21 +1382,12 @@ def main():
             s["wwShoulderEligible"] = shoulder_eligible
             s["wwShoulderBonus"] = round(shoulder_bonus, 1)
 
-        ranked = sorted(
-            range(len(candidates)),
-            key=lambda i: (scores[i], candidates[i]["slot_start_utc"]),
-            reverse=True,
+        selected, shoulder_selected = select_ww_slots(
+            candidates,
+            scores,
+            required_slots,
+            tesla_connected_now,
         )
-        selected = set(ranked[:required_slots])
-        selected = enforce_min_run(
-            selected, candidates, scores, required_slots
-        )
-
-        if len(selected) < required_slots:
-            for i in ranked:
-                selected.add(i)
-                if len(selected) >= required_slots:
-                    break
 
         joint_swap = {
             "applied": False,
@@ -1067,14 +1409,23 @@ def main():
                 tesla_connected_now,
             )
 
+        # A joint swap may move one slot away from the initial shoulder set.
+        shoulder_selected.intersection_update(selected)
+
         selected_ts = {
             candidates[i]["slot_start_utc"] for i in selected
+        }
+        shoulder_ts = {
+            candidates[i]["slot_start_utc"]
+            for i in shoulder_selected
         }
 
         published_ts = selected_ts.intersection(action_ts)
         deferred_ts = selected_ts.difference(action_ts)
+        published_shoulder_ts = shoulder_ts.intersection(action_ts)
 
         ww_selected_ts.update(published_ts)
+        ww_shoulder_ts.update(published_shoulder_ts)
 
         daily.append({
             "date": date_key,
@@ -1098,7 +1449,8 @@ def main():
                 else "24H_ACTION_HORIZON"
             ),
             "lookaheadQuattIncluded": False if lookahead_used else True,
-            "allocationPolicy": "DYNAMIC_PV_SHOULDER_WITH_EV_OPPORTUNITY_COST",
+            "allocationPolicy": "GEOMETRIC_PV_SHOULDERS_THEN_SCORE_FALLBACK",
+            "geometricShoulderSlots": len(shoulder_selected),
             "jointSwapPolicy": "ONE_SLOT_WW_RELOCATION_FOR_QUALIFIED_EV_WINDOW_V0.1",
             "jointSwap": joint_swap,
         })
@@ -1112,7 +1464,8 @@ def main():
         if ww_w:
             s["wwAllocationReason"] = (
                 "DYNAMIC_WW_PV_SHOULDER"
-                if s.get("wwShoulderEligible") is True
+                if s["slot_start_utc"] in ww_shoulder_ts
+                or s.get("wwShoulderEligible") is True
                 else "DYNAMIC_COMFORT_PV_SLOT"
             )
         else:
