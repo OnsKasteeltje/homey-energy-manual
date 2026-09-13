@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import math
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -16,15 +17,36 @@ PV_SCALE_W_PER_WM2 = PV_NOMINAL_W / 1000
 MIN_PROFILE_DAYS = 3
 MIN_PROFILE_SAMPLES = 3
 HISTORICAL_WEIGHT = 0.85
+SOLAR_CONSTANT_W_M2 = 1367.7
+MIN_CLEAR_SKY_W_M2 = 25.0
 
 OUTPUT = Path("/home/jeroen/ems/data/pv-forecast.json")
 AXIS = Path("/home/jeroen/ems/data/planner-axis.json")
 PROFILE = Path("/home/jeroen/ems/data/pv-history-profile.json")
 
+
+def haurwitz_clear_sky_ghi(terrestrial_w_m2):
+    """Estimate surface clear-sky GHI from top-of-atmosphere radiation.
+
+    Open-Meteo exposes terrestrial_radiation at 15-minute resolution. It is
+    cloud-independent and equals the solar-position factor times the solar
+    constant. The Haurwitz clear-sky model converts that geometry into a
+    surface clear-sky GHI estimate suitable for the cloud attenuation ratio.
+    """
+    terrestrial = max(0.0, float(terrestrial_w_m2 or 0))
+    cos_zenith = min(1.0, terrestrial / SOLAR_CONSTANT_W_M2)
+    if cos_zenith <= 0.0:
+        return 0.0
+    return max(
+        0.0,
+        1098.0 * cos_zenith * math.exp(-0.059 / cos_zenith),
+    )
+
+
 params = {
     "latitude": LAT,
     "longitude": LON,
-    "minutely_15": "shortwave_radiation,shortwave_radiation_clear_sky",
+    "minutely_15": "shortwave_radiation,terrestrial_radiation",
     "past_minutely_15": 96,
     "forecast_minutely_15": 104,
     "timezone": "UTC",
@@ -37,7 +59,7 @@ url = (
 
 request = urllib.request.Request(
     url,
-    headers={"User-Agent": "ems-pi-pv-forecast/0.2"},
+    headers={"User-Agent": "ems-pi-pv-forecast/0.3"},
 )
 
 with urllib.request.urlopen(request, timeout=20) as response:
@@ -46,12 +68,12 @@ with urllib.request.urlopen(request, timeout=20) as response:
 quarter = weather.get("minutely_15", {})
 times = quarter.get("time", [])
 radiation = quarter.get("shortwave_radiation", [])
-clear_sky = quarter.get("shortwave_radiation_clear_sky", [])
+terrestrial_radiation = quarter.get("terrestrial_radiation", [])
 
 if (
     not times
     or len(times) != len(radiation)
-    or len(times) != len(clear_sky)
+    or len(times) != len(terrestrial_radiation)
 ):
     raise RuntimeError("Invalid Open-Meteo 15-minute response")
 
@@ -82,7 +104,7 @@ slots = []
 historical_slots = 0
 fallback_slots = 0
 
-for ts, irr, clear in zip(times, radiation, clear_sky):
+for ts, irr, terrestrial in zip(times, radiation, terrestrial_radiation):
     dt = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc)
     start = dt.isoformat().replace("+00:00", "Z")
 
@@ -93,7 +115,8 @@ for ts, irr, clear in zip(times, radiation, clear_sky):
         break
 
     irr = max(0.0, float(irr or 0))
-    clear = max(0.0, float(clear or 0))
+    terrestrial = max(0.0, float(terrestrial or 0))
+    clear = haurwitz_clear_sky_ghi(terrestrial)
 
     theoretical_w = min(PV_NOMINAL_W, irr * PV_SCALE_W_PER_WM2)
 
@@ -107,7 +130,7 @@ for ts, irr, clear in zip(times, radiation, clear_sky):
         usable_days >= MIN_PROFILE_DAYS
         and sample_count >= MIN_PROFILE_SAMPLES
         and envelope is not None
-        and clear >= 25
+        and clear >= MIN_CLEAR_SKY_W_M2
     )
 
     if use_history:
@@ -130,7 +153,9 @@ for ts, irr, clear in zip(times, radiation, clear_sky):
     slots.append({
         "start": start,
         "shortwave_radiation_w_m2": round(irr, 2),
+        "terrestrial_radiation_w_m2": round(terrestrial, 2),
         "shortwave_radiation_clear_sky_w_m2": round(clear, 2),
+        "clear_sky_method": "HAURWITZ_FROM_TERRESTRIAL_RADIATION",
         "local_quarter": local_quarter,
         "pv_forecast_w": round(pv_w),
         "forecast_model": model,
@@ -168,6 +193,7 @@ document = {
         "historical_weight": HISTORICAL_WEIGHT,
         "min_profile_days": MIN_PROFILE_DAYS,
         "profile_usable_days": usable_days,
+        "clear_sky_method": "HAURWITZ_FROM_TERRESTRIAL_RADIATION",
         "historical_slots": historical_slots,
         "fallback_slots": fallback_slots,
     },
@@ -186,5 +212,6 @@ tmp.replace(OUTPUT)
 
 print(f"PASS: wrote {len(slots)} slots to {OUTPUT}")
 print("profile usable days :", usable_days)
+print("clear-sky method    : HAURWITZ_FROM_TERRESTRIAL_RADIATION")
 print("historical slots    :", historical_slots)
 print("fallback slots      :", fallback_slots)
