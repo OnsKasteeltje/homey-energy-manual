@@ -1,213 +1,184 @@
 ---
 component: tesla
 title: Tesla procesflows
-version: 2.7.15
+version: 3.0.0
 status: active
-architecture_status: implemented
-last_verified: 2026-08-25
+architecture_status: implemented-production
+last_verified: 2026-09-13
 source:
-  - Homey Advanced Flow: Tesla laden v2.7.15 + RC run lease
-  - Homey Advanced Flow: EM v2 | 60 Adapter | EV Power v0.1 SHADOW
+  - docs/architecture/CURRENT-EMS-STATE.md
+  - Homey Advanced Flow: EM v2 | 60 Adapter | EV Power v0.1.5 DEADLINE-CAP OPPORTUNITY16 START6 RUN6
+  - Homey Advanced Flow: EM v2 | 80 Validation | EV Power Adapter Gate v0.2.6 START6
+  - Homey Advanced Flow: EM v2 | 60 Actuator | EV Power v0.2.7 START6 RUN6 LIVE + EASEE SESSION
+  - Homey Advanced Flow: EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.2.6 DEADLINE-GUARD [READY]
 ---
 
 # Tesla procesflows
 
-## Productiecontroller
+## Productieketen
 
 ```process-model
 {
-  "id": "tesla-flow-1",
+  "id": "tesla-flow-production",
   "kind": "mermaid-source",
   "declaration": "flowchart TD",
   "lines": [
-    "    A[Elke minuut of handmatige start] --> B{55 s run lease verkregen?}",
-    "    B -- Nee --> Z[Run overslaan]",
-    "    B -- Ja --> C[Lees Logic + Easee + P1 + command]",
-    "    C --> D{Nieuwe command?}",
-    "    D -- Ja --> E{Command geldig en deadline toekomst?}",
-    "    E -- Nee --> F[Stop fysiek / reject of failsafe]",
-    "    E -- Ja --> G[Leg Easee lifetime meter baseline vast]",
-    "    D -- Nee --> H[Gebruik bestaande runtime state]",
-    "    G --> I[Integreer geleverde energie]",
-    "    H --> I",
-    "    I --> J{Meetgap > 120 s of geen geldige bron?}",
-    "    J -- Ja --> K[Deactivate deadline + fysieke stop]",
-    "    J -- Nee --> L{Doelenergie bereikt?}",
-    "    L -- Ja --> M[Stop + terminal lifecycle]",
-    "    L -- Nee --> N{Deadline actief?}",
-    "    N -- Ja --> O{Tesla aangesloten?}",
-    "    O -- Nee --> P[Wachten]",
-    "    O -- Ja --> Q{Deadline verstreken of latest-start bereikt?}",
-    "    Q -- Ja --> R[Target = maxA]",
-    "    Q -- Nee --> S{DYNAMIC + bruikbare negatieve prijs?}",
-    "    S -- Ja --> R",
-    "    S -- Nee --> T{Stabiele directe PV opportunity?}",
-    "    T -- Ja --> U[Target = berekende 6..11 A]",
-    "    T -- Nee --> V{DYNAMIC + bruikbare goedkope prijs?}",
-    "    V -- Ja --> R",
-    "    V -- Nee --> W[Target = 0 A / wachten]",
-    "    N -- Nee --> X{11:00-17:30 + stabiele PV opportunity?}",
-    "    X -- Ja --> U",
-    "    X -- Nee --> Y{Was fysiek laden actief en opportunity net weg?}",
-    "    Y -- Ja --> AA[120 s stop-confirm op 6 A]",
-    "    Y -- Nee --> W",
-    "    R --> AB[applyTarget]",
-    "    U --> AB",
-    "    W --> AB",
-    "    AA --> AB",
-    "    AB --> AC[Update deadline status/runtime Logic]"
+    "    A[Pi dynamic planner v0.3] --> B[Pi /control/current]",
+    "    B --> C[PI Bridge v1.2.6]",
+    "    C --> D[EM2_POWER_INTENT_V0.2]",
+    "    D --> E[EV Power Adapter v0.1.5]",
+    "    E --> F[EV Gate v0.2.6]",
+    "    F -->|PASS| G[EV Actuator v0.2.7]",
+    "    F -->|FAIL| H[Fail closed / no positive write]",
+    "    G --> I[Easee session/current]",
+    "    I --> J[Tesla]"
   ]
 }
 ```
 
-<!-- GENERATED_MERMAID:tesla-flow-1 START -->
+<!-- GENERATED_MERMAID:tesla-flow-production START -->
 ```mermaid
 flowchart TD
-    A[Elke minuut of handmatige start] --> B{55 s run lease verkregen?}
-    B -- Nee --> Z[Run overslaan]
-    B -- Ja --> C[Lees Logic + Easee + P1 + command]
-    C --> D{Nieuwe command?}
-    D -- Ja --> E{Command geldig en deadline toekomst?}
-    E -- Nee --> F[Stop fysiek / reject of failsafe]
-    E -- Ja --> G[Leg Easee lifetime meter baseline vast]
-    D -- Nee --> H[Gebruik bestaande runtime state]
-    G --> I[Integreer geleverde energie]
-    H --> I
-    I --> J{Meetgap > 120 s of geen geldige bron?}
-    J -- Ja --> K[Deactivate deadline + fysieke stop]
-    J -- Nee --> L{Doelenergie bereikt?}
-    L -- Ja --> M[Stop + terminal lifecycle]
-    L -- Nee --> N{Deadline actief?}
-    N -- Ja --> O{Tesla aangesloten?}
-    O -- Nee --> P[Wachten]
-    O -- Ja --> Q{Deadline verstreken of latest-start bereikt?}
-    Q -- Ja --> R[Target = maxA]
-    Q -- Nee --> S{DYNAMIC + bruikbare negatieve prijs?}
-    S -- Ja --> R
-    S -- Nee --> T{Stabiele directe PV opportunity?}
-    T -- Ja --> U[Target = berekende 6..11 A]
-    T -- Nee --> V{DYNAMIC + bruikbare goedkope prijs?}
-    V -- Ja --> R
-    V -- Nee --> W[Target = 0 A / wachten]
-    N -- Nee --> X{11:00-17:30 + stabiele PV opportunity?}
-    X -- Ja --> U
-    X -- Nee --> Y{Was fysiek laden actief en opportunity net weg?}
-    Y -- Ja --> AA[120 s stop-confirm op 6 A]
-    Y -- Nee --> W
-    R --> AB[applyTarget]
-    U --> AB
-    W --> AB
-    AA --> AB
-    AB --> AC[Update deadline status/runtime Logic]
+    A[Pi dynamic planner v0.3] --> B[Pi /control/current]
+    B --> C[PI Bridge v1.2.6]
+    C --> D[EM2_POWER_INTENT_V0.2]
+    D --> E[EV Power Adapter v0.1.5]
+    E --> F[EV Gate v0.2.6]
+    F -->|PASS| G[EV Actuator v0.2.7]
+    F -->|FAIL| H[Fail closed / no positive write]
+    G --> I[Easee session/current]
+    I --> J[Tesla]
 ```
-<!-- GENERATED_MERMAID:tesla-flow-1 END -->
+<!-- GENERATED_MERMAID:tesla-flow-production END -->
 
-## Fysieke write-policy
+## Opportunity policy
 
 ```process-model
 {
-  "id": "tesla-flow-2",
+  "id": "tesla-flow-opportunity",
   "kind": "mermaid-source",
   "declaration": "flowchart TD",
   "lines": [
-    "    A[Gewenste target A] --> B{target <= 0?}",
-    "    B -- Ja --> C{Current/offered > 0?}",
-    "    C -- Ja --> D[Write target_charger_current = 0]",
-    "    C -- Nee --> E[Geen current write]",
-    "    D --> F{charger on?}",
+    "    A[Residual PV after WW reservation] --> B{Positive 15-min slot?}",
+    "    B -->|No| C[Target 0 W]",
+    "    B -->|Yes| D{Executable at >= 3x6A?}",
+    "    D -->|No| C",
+    "    D -->|Yes| E[Publish EV target_W]",
+    "    E --> F[Following quarter re-evaluated independently]"
+  ]
+}
+```
+
+<!-- GENERATED_MERMAID:tesla-flow-opportunity START -->
+```mermaid
+flowchart TD
+    A[Residual PV after WW reservation] --> B{Positive 15-min slot?}
+    B -->|No| C[Target 0 W]
+    B -->|Yes| D{Executable at >= 3x6A?}
+    D -->|No| C
+    D -->|Yes| E[Publish EV target_W]
+    E --> F[Following quarter re-evaluated independently]
+```
+<!-- GENERATED_MERMAID:tesla-flow-opportunity END -->
+
+START6/RUN6 is productiegedrag. Nominaal minimum uitvoerbaar vermogen is 4140 W bij 3×230 V. Goedkope of negatieve dynamische prijs is onder FIXED geen opportunity-trigger.
+
+## Deadline policy
+
+```process-model
+{
+  "id": "tesla-flow-deadline",
+  "kind": "mermaid-source",
+  "declaration": "flowchart TD",
+  "lines": [
+    "    A[Active deadline + remaining kWh] --> B{Tesla connected?}",
+    "    B -->|No| C[Wait / no forced target]",
+    "    B -->|Yes| D{Before latest_start_at?}",
+    "    D -->|Yes| E[Only normal PV opportunity may charge]",
+    "    D -->|No| F[Deadline MUST may use grid]",
+    "    F --> G[Homey bridge deadline guard as final safety]",
+    "    G --> H[Clamp to configured max A]"
+  ]
+}
+```
+
+<!-- GENERATED_MERMAID:tesla-flow-deadline START -->
+```mermaid
+flowchart TD
+    A[Active deadline + remaining kWh] --> B{Tesla connected?}
+    B -->|No| C[Wait / no forced target]
+    B -->|Yes| D{Before latest_start_at?}
+    D -->|Yes| E[Only normal PV opportunity may charge]
+    D -->|No| F[Deadline MUST may use grid]
+    F --> G[Homey bridge deadline guard as final safety]
+    G --> H[Clamp to configured max A]
+```
+<!-- GENERATED_MERMAID:tesla-flow-deadline END -->
+
+## Adapter en gate
+
+```process-model
+{
+  "id": "tesla-flow-adapter-gate",
+  "kind": "mermaid-source",
+  "declaration": "flowchart TD",
+  "lines": [
+    "    A[EV target_W] --> B[Adapter: floor target / 3x230]",
+    "    B --> C{requested_A >= 6?}",
+    "    C -->|No| D[0 A]",
+    "    C -->|Yes| E[Clamp to safe max]",
+    "    D --> F[Gate validation]",
     "    E --> F",
-    "    F -- Ja --> G[Write onoff = false]",
-    "    F -- Nee --> H[Geen write]",
-    "    B -- Nee --> I{charger off?}",
-    "    I -- Ja --> J[Write onoff = true]",
-    "    I -- Nee --> K[Geen onoff write]",
-    "    J --> L{target=6 en stilstand?}",
-    "    K --> L",
-    "    L -- Ja --> M[7 A bootstrap → 10 s → 6 A]",
-    "    L -- Nee --> N{currentA != targetA?}",
-    "    N -- Ja --> O[Write target current]",
-    "    N -- Nee --> P[Geen write]"
+    "    F --> G{schema + revision + freshness + mapping valid?}",
+    "    G -->|No| H[FAIL closed]",
+    "    G -->|Yes| I[PASS to single actuator]"
   ]
 }
 ```
 
-<!-- GENERATED_MERMAID:tesla-flow-2 START -->
+<!-- GENERATED_MERMAID:tesla-flow-adapter-gate START -->
 ```mermaid
 flowchart TD
-    A[Gewenste target A] --> B{target <= 0?}
-    B -- Ja --> C{Current/offered > 0?}
-    C -- Ja --> D[Write target_charger_current = 0]
-    C -- Nee --> E[Geen current write]
-    D --> F{charger on?}
+    A[EV target_W] --> B[Adapter: floor target / 3x230]
+    B --> C{requested_A >= 6?}
+    C -->|No| D[0 A]
+    C -->|Yes| E[Clamp to safe max]
+    D --> F[Gate validation]
     E --> F
-    F -- Ja --> G[Write onoff = false]
-    F -- Nee --> H[Geen write]
-    B -- Nee --> I{charger off?}
-    I -- Ja --> J[Write onoff = true]
-    I -- Nee --> K[Geen onoff write]
-    J --> L{target=6 en stilstand?}
-    K --> L
-    L -- Ja --> M[7 A bootstrap → 10 s → 6 A]
-    L -- Nee --> N{currentA != targetA?}
-    N -- Ja --> O[Write target current]
-    N -- Nee --> P[Geen write]
+    F --> G{schema + revision + freshness + mapping valid?}
+    G -->|No| H[FAIL closed]
+    G -->|Yes| I[PASS to single actuator]
 ```
-<!-- GENERATED_MERMAID:tesla-flow-2 END -->
+<!-- GENERATED_MERMAID:tesla-flow-adapter-gate END -->
 
-## EV Power Adapter SHADOW
+Mappingcontract: `FLOOR_3P230_START6_RUN6_FAIL_CLOSED`.
+
+## Fysieke writer
 
 ```process-model
 {
-  "id": "tesla-flow-3",
+  "id": "tesla-flow-writer",
   "kind": "mermaid-source",
   "declaration": "flowchart TD",
   "lines": [
-    "    A[EM2_Power_Intent gewijzigd] --> B[Lees Logic-only intent + EM2_State]",
-    "    B --> C{Revision aligned + schema geldig + intent valid + no writes?}",
-    "    C -- Nee --> D[REVISION_MISMATCH]",
-    "    C -- Ja --> E{Numeriek EV target_W?}",
-    "    E -- Nee --> F[WAITING_FOR_NUMERIC_EV_TARGET]",
-    "    E -- Ja --> G{target_W <= 0?}",
-    "    G -- Ja --> H[commandA = 0]",
-    "    G -- Nee --> I{W/A context beschikbaar?}",
-    "    I -- Nee --> J[WAITING_FOR_ELECTRICAL_CONTEXT]",
-    "    I -- Ja --> K{target_W onder 6 A deadband?}",
-    "    K -- Ja --> H",
-    "    K -- Nee --> L[Vertaal W → 6..16 A]",
-    "    D --> M[Schrijf alleen EM2_EV_Power_Adapter Logic]",
-    "    F --> M",
-    "    H --> M",
-    "    J --> M",
-    "    L --> M",
-    "    M --> N[Geen device read/write, geen netwerkcall]"
+    "    A[Validated EV gate command] --> B{Target > 0?}",
+    "    B -->|No| C[Pause/0A idempotently if needed]",
+    "    B -->|Yes| D[Ensure Easee session active/resumed]",
+    "    D --> E[Set requested current if changed]",
+    "    E --> F[Publish actuator status]"
   ]
 }
 ```
 
-<!-- GENERATED_MERMAID:tesla-flow-3 START -->
+<!-- GENERATED_MERMAID:tesla-flow-writer START -->
 ```mermaid
 flowchart TD
-    A[EM2_Power_Intent gewijzigd] --> B[Lees Logic-only intent + EM2_State]
-    B --> C{Revision aligned + schema geldig + intent valid + no writes?}
-    C -- Nee --> D[REVISION_MISMATCH]
-    C -- Ja --> E{Numeriek EV target_W?}
-    E -- Nee --> F[WAITING_FOR_NUMERIC_EV_TARGET]
-    E -- Ja --> G{target_W <= 0?}
-    G -- Ja --> H[commandA = 0]
-    G -- Nee --> I{W/A context beschikbaar?}
-    I -- Nee --> J[WAITING_FOR_ELECTRICAL_CONTEXT]
-    I -- Ja --> K{target_W onder 6 A deadband?}
-    K -- Ja --> H
-    K -- Nee --> L[Vertaal W → 6..16 A]
-    D --> M[Schrijf alleen EM2_EV_Power_Adapter Logic]
-    F --> M
-    H --> M
-    J --> M
-    L --> M
-    M --> N[Geen device read/write, geen netwerkcall]
+    A[Validated EV gate command] --> B{Target > 0?}
+    B -->|No| C[Pause/0A idempotently if needed]
+    B -->|Yes| D[Ensure Easee session active/resumed]
+    D --> E[Set requested current if changed]
+    E --> F[Publish actuator status]
 ```
-<!-- GENERATED_MERMAID:tesla-flow-3 END -->
+<!-- GENERATED_MERMAID:tesla-flow-writer END -->
 
-## Architectuurregel
-
-De eerste twee diagrammen beschrijven de actieve productiecontroller. Het derde diagram is uitsluitend SHADOW en mag niet als fysieke control-route worden geïnterpreteerd.
+De EV actuator is de enige automatische physical Easee writer. Het oude `Tesla laden v2.7.15` pad is geen actuele productiearchitectuur meer.
