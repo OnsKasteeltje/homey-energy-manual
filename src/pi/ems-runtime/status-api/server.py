@@ -20,6 +20,8 @@ STALE_AFTER_SECONDS = 25 * 60
 SLOT_MINUTES = 15
 CONTROL_POLICY_SCHEMA = "EMS_CONTROL_AUTHORITY_V1.0"
 PI_PLAN_SCHEMA = "EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3"
+EV_MIN_A = 6
+EV_MAX_A = 16
 
 
 def git_revision():
@@ -96,6 +98,68 @@ def ww_plan_status(path):
         except Exception:
             result["status"] = "invalid"
     return result
+
+
+def ev_realtime_envelope(plan, current, ev_w, ww_w):
+    """Expose a bounded realtime EV envelope without changing slot targets.
+
+    This is metadata only. Homey must not consume it for production control
+    until the separate realtime controller has completed SHADOW validation.
+    The Pi remains the planner/authority; Homey may only modulate inside an
+    opportunity slot explicitly authorized by the Pi planner.
+    """
+    reason = str(current.get("evAllocationReason") or "")
+    genuine_opportunity = (
+        ev_w > 0
+        and (
+            (reason.startswith("DYNAMIC_PV_") and "OPPORTUNITY" in reason)
+            or reason == "DYNAMIC_PV_PEAK_ABSORBER"
+        )
+        and current.get("evDeadlineRequired") is not True
+    )
+
+    deadline_plan = ((plan.get("tesla") or {}).get("deadlinePlan") or {})
+    deadline_active = deadline_plan.get("active") is True
+    deadline_max_a = deadline_plan.get("maxA")
+    try:
+        deadline_max_a = int(round(float(deadline_max_a))) if deadline_max_a is not None else None
+    except (TypeError, ValueError):
+        deadline_max_a = None
+
+    hard_max_a = EV_MAX_A
+    if deadline_active:
+        if deadline_max_a is None or not (EV_MIN_A <= deadline_max_a <= EV_MAX_A):
+            genuine_opportunity = False
+            hard_max_a = 0
+        else:
+            hard_max_a = deadline_max_a
+
+    planner_target_a = current.get("evPlanA")
+    try:
+        planner_target_a = int(round(float(planner_target_a))) if planner_target_a is not None else 0
+    except (TypeError, ValueError):
+        planner_target_a = 0
+
+    return {
+        "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.1",
+        "shadowOnly": True,
+        "productionConsumerAllowed": False,
+        "allowed": genuine_opportunity,
+        "mode": "PV_OPPORTUNITY" if genuine_opportunity else "DISABLED",
+        "min_A": EV_MIN_A if genuine_opportunity else 0,
+        "max_A": hard_max_a if genuine_opportunity else 0,
+        "plannerTarget_A": planner_target_a,
+        "plannerTarget_W": ev_w,
+        "plannerReason": reason or "PI_DYNAMIC_SLOT",
+        "wwReserved_W": ww_w,
+        "deadlineActive": deadline_active,
+        "deadlineMax_A": deadline_max_a,
+        "selfLoadCorrection": "P1_NET_EXPORT_PLUS_EV_ACTUAL_W",
+        "wwSelfLoadCorrection": False,
+        "requiresFreshP1": True,
+        "requiresFreshEvActualPower": True,
+        "failClosed": True,
+    }
 
 
 def current_control_command():
@@ -178,6 +242,9 @@ def current_control_command():
             },
             "battery": {"target_W": 0}
         },
+        "realtime": {
+            "ev": ev_realtime_envelope(plan, current, ev_w, ww_w)
+        },
         "authority": {
             "enforcedBy": "HOMEY_SELECTOR",
             "piPolicyPlannerOwner": policy.get("plannerOwner"),
@@ -214,7 +281,19 @@ class Handler(BaseHTTPRequestHandler):
                     "readyForCutover": False,
                     "reason": str(exc),
                     "plannerOwner": "PI",
-                    "targets": {"ev": {"target_W": 0}, "ww": {"target_on": False}, "battery": {"target_W": 0}}
+                    "targets": {"ev": {"target_W": 0}, "ww": {"target_on": False}, "battery": {"target_W": 0}},
+                    "realtime": {
+                        "ev": {
+                            "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.1",
+                            "shadowOnly": True,
+                            "productionConsumerAllowed": False,
+                            "allowed": False,
+                            "mode": "DISABLED",
+                            "min_A": 0,
+                            "max_A": 0,
+                            "failClosed": True,
+                        }
+                    }
                 })
             return
 
