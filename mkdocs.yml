@@ -24,12 +24,12 @@ markdown_extensions:
       permalink: true
 
 # Assetversies worden tijdens de build gesynchroniseerd vanuit frontend-version.txt.
-# De Planner-pagina bevat de basisweergave inline; deze kleine progressive-enhancement
-# voegt de interactieve forecastweergave toe zonder plannerdata of control logic te wijzigen.
+# De timezone guard staat bewust vóór de frontend bundle zodat UTC-timestamps
+# nooit eerst als lokale datetime zichtbaar worden.
 extra_javascript:
+  - javascripts/timezone-europe-amsterdam-v1.0.1.js
   - javascripts/frontend-bundle-__FRONTEND_VERSION__.js
   - javascripts/planner-forecast-interactive-v1.0.0.js
-  - javascripts/timezone-europe-amsterdam-v1.0.0.js
   - javascripts/tesla-deadline-pending-intent-v1.0.0.js
   - javascripts/heating-schedule-chart-v1.0.0.js
 
