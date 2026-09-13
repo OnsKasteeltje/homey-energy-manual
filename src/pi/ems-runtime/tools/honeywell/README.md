@@ -34,11 +34,12 @@ Expected local-only runtime material:
 ├── honeywell_common.py
 ├── collect_honeywell.py
 ├── collect_honeywell_schedule.py
+├── export_schedule_for_site.py
 └── probe/
     └── probe_honeywell.py
 ```
 
-Credentials, tokens, caches and generated output must never be committed to GitHub.
+Credentials, tokens, caches and generated canonical runtime output must never be committed to GitHub.
 
 ## Library and authentication
 
@@ -53,17 +54,30 @@ The library exposes access-token, expiry and refresh-token state. The EMS persis
 The cloud workload is deliberately split:
 
 - `collect_honeywell.py` is the state collector. Intended cadence: every 5 minutes. It calls `update()` and records current zone temperature, target and setpoint mode. It does **not** fetch schedules.
-- `collect_honeywell_schedule.py` is the schedule collector. Intended cadence: every 6 hours, with an optional explicit refresh after a detected schedule/configuration change. It calls `get_schedule()` per mapped zone and records current/next switchpoints.
+- `collect_honeywell_schedule.py` is the schedule collector. Intended cadence: every 6 hours, with an optional explicit refresh after a detected schedule/configuration change. It calls `get_schedule()` per mapped zone and records current/next switchpoints plus the complete Honeywell weekly schedule for every mapped room.
 
-No systemd timer is enabled until the collectors and token reuse have been validated manually on the Pi.
+The weekly schedule from this existing collector is the canonical baseline for the room-heating planner. The website must not maintain a separate hand-authored schedule source.
 
 ## Outputs
 
 `output/honeywell-state.json` uses `EMS_HONEYWELL_STATE_V0.2` and contains the normalized 8-zone current state under canonical EMS/Homey names.
 
-`output/honeywell-schedule.json` uses `EMS_HONEYWELL_SCHEDULE_V0.1` and contains current/next Honeywell switchpoints under the same canonical zone mapping.
+`output/honeywell-schedule.json` uses `EMS_HONEYWELL_SCHEDULE_V0.2` and contains current/next Honeywell switchpoints plus `weeklySchedule` for every mapped zone. `weeklySchedule` is the read-only Honeywell baseline used by the Planner visualisation and future PV-preheat optimizer.
 
-Both outputs are written atomically only after a successful cloud read. A failed vendor call therefore leaves the previous valid output intact; downstream consumers must use `generatedAt` freshness and fail closed when data is stale.
+Both canonical outputs are written atomically only after a successful cloud read. A failed vendor call therefore leaves the previous valid output intact; downstream consumers must use `generatedAt` freshness and fail closed when data is stale.
+
+### Website export
+
+`export_schedule_for_site.py` creates a privacy-safe derived view of the canonical schedule output. It does **not** contact Honeywell and is not another source of truth. It removes Honeywell system/zone IDs, Homey device IDs and authentication metadata before writing a website snapshot.
+
+Example:
+
+```bash
+python3 export_schedule_for_site.py \
+  --target /home/jeroen/ems/repo/homey-energy-manual/docs/data/honeywell-schedule.json
+```
+
+The resulting `EMS_PUBLIC_HEATING_SCHEDULE_V0.1` file contains only canonical room names and the weekly baseline schedules required by the Planner page. The normal website publish workflow may commit that derived snapshot.
 
 ## First probe
 
