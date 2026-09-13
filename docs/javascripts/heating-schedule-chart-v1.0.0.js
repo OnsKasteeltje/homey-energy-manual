@@ -1,5 +1,5 @@
 (() => {
-  const DATA_URL = 'data/honeywell-schedule.json';
+  const DATA_URL = 'https://raw.githubusercontent.com/OnsKasteeltje/homey-energy-manual/main/docs/data/honeywell-schedule.json';
   const DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const COLORS = ['#2f9e87','#2e86b7','#8d6cab','#d08b33','#4778bd','#b75d74','#6d9b45','#8a6f4d'];
 
