@@ -1,48 +1,61 @@
 {
-  "schema": "EM2_EV_CONTROL_STATUS_V0.3",
-  "publishedAt": "2026-09-13T20:08:01.295Z",
+  "schema": "EM2_EV_CONTROL_STATUS_V0.4",
+  "publishedAt": "2026-09-13T20:08:29.714Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
-  "revision": 7013,
   "targetW": 11040,
   "evStatus": "NUMERIC_DEADLINE_TARGET",
   "requestedA": 0,
-  "adapterRevision": 7013,
-  "stateRevision": 7013,
-  "deviceHealth": {
-    "schema": "EM2_EV_DEVICE_HEALTH_V0.2",
-    "status": "OK",
-    "reason": "FRESH_TELEMETRY",
-    "evStatus": "PLUGGED_IN_PAUSED",
-    "controlAvailability": "CONTROL_AVAILABLE",
-    "controlSafe": true,
-    "sampledAt": "2026-09-13T20:08:00.871Z",
-    "telemetryAgeSec": 171,
-    "deviceAvailable": true,
-    "chargeState": "plugged_in_paused",
-    "warning": null
+  "controlRevision": "",
+  "adapterControlRevision": "",
+  "gateControlRevision": "",
+  "sourceRevisions": {
+    "intent": 7013,
+    "adapter": 7013,
+    "adapterState": 7013,
+    "core": 7013
+  },
+  "adapter": {
+    "valid": false,
+    "status": "CONTROL_REVISION_OR_SCHEMA_MISMATCH",
+    "reason": "Power Intent controlRevision/schema invalid",
+    "generatedAt": "2026-09-13T20:08:00.485Z",
+    "stateAgeSec": 60,
+    "intentAgeSec": 0
   },
   "gate": {
     "status": "FAIL",
-    "revision": 7013,
-    "intentRevision": 7013,
-    "stateRevision": 7013,
+    "errors": [
+      "CONTROLREVISIONALIGNED",
+      "TRANSLATION"
+    ],
+    "checks": {
+      "schema": true,
+      "controlRevisionAligned": false,
+      "safety": true,
+      "coreSafety": true,
+      "electrical": true,
+      "commandRange": true,
+      "translation": false
+    },
     "coreRevision": 7013,
-    "deviceHealth": {
-      "observabilityOnly": true,
-      "schema": "EM2_EV_DEVICE_HEALTH_V0.2",
-      "status": "OK",
-      "reason": "FRESH_TELEMETRY"
-    }
+    "updatedAt": "2026-09-13T20:08:02.451Z"
   },
   "actuator": {
     "status": "LIVE_FAIL_CLOSED",
     "reason": "CONTROL_REVISION_MISMATCH",
-    "revision": null,
     "live": true,
     "physicalWritePerformed": false,
     "targetA": 0,
-    "previousA": 0
+    "previousA": 0,
+    "controlRevision": "",
+    "coreRevision": null
   },
-  "coherent": true
+  "deviceHealth": {
+    "status": "OK",
+    "reason": "FRESH_TELEMETRY",
+    "chargeState": "plugged_in_paused",
+    "telemetryAgeSec": 171
+  },
+  "coherent": false
 }
