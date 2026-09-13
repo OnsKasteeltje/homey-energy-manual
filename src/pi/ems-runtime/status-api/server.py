@@ -91,7 +91,7 @@ def forecast_status(path, expected_schema):
 
 
 def ww_plan_status(path):
-    result = forecast_status(path, "EMS_PI_WW_PLAN_V0.2")
+    result = forecast_status(path, "EMS_PI_WW_PLAN_V0.7.0")
     result["planned_kwh"] = None
     if result["status"] in ("ok", "stale"):
         try:
@@ -336,7 +336,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        pv = forecast_status(PV_FILE, "EMS_PI_PV_FORECAST_V0.1")
+        pv = forecast_status(PV_FILE, "EMS_PI_PV_FORECAST_V0.2")
         weather = forecast_status(WEATHER_FILE, "EMS_PI_WEATHER_FORECAST_V0.2")
         quatt = forecast_status(QUATT_FILE, "EMS_PI_QUATT_FORECAST_V0.2")
         ww = ww_plan_status(WW_FILE)
