@@ -1,136 +1,161 @@
 ---
 component: tesla
-title: Tesla Charging Controller
-version: 2.7.15
+title: Tesla Charging Control
+version: 3.0.0
 status: active
-architecture_status: implemented
-last_verified: 2026-08-25
+architecture_status: implemented-production
+last_verified: 2026-09-13
 source:
-  - Homey Advanced Flow: Tesla laden v2.7.15 + RC run lease
-  - Homey Advanced Flow: EM v2 | 60 Adapter | EV Power v0.1 SHADOW
-  - docs/javascripts/tesla-deadline-controller-v2.8.115.js
-  - docs/javascripts/tesla-deadline-core-invariant-v2.8.114.js
+  - docs/architecture/CURRENT-EMS-STATE.md
+  - Homey Advanced Flow: EM v2 | 60 Adapter | EV Power v0.1.5 DEADLINE-CAP OPPORTUNITY16 START6 RUN6
+  - Homey Advanced Flow: EM v2 | 80 Validation | EV Power Adapter Gate v0.2.6 START6
+  - Homey Advanced Flow: EM v2 | 60 Actuator | EV Power v0.2.7 START6 RUN6 LIVE + EASEE SESSION
+  - Homey Advanced Flow: EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.2.6 DEADLINE-GUARD [READY]
 ---
 
-# Tesla Charging Controller
+# Tesla Charging Control
 
 ## Doel
 
-De Tesla-laadfunctie combineert deadline-laden, PV-opportunity laden en contractafhankelijke prijssturing. De productiecontroller is de enige automatische Easee-writer. De nieuwe EV Power Adapter is uitsluitend SHADOW en vertaalt een numeriek vermogensdoel naar een theoretische stroomopdracht zonder fysieke writes.
+De Tesla-laadfunctie gebruikt de Pi voor planning en Homey voor executor/safety. Het oude autonome `Tesla laden v2.7.15` productiepad is niet meer de actuele control-architectuur. De productie-EV-keten loopt via Pi planner → Power Intent → EV adapter/gate → single actuator.
 
 ## Productiepad
 
-De actieve Homey-flow is `Tesla laden v2.7.15 + RC run lease`. Deze draait iedere minuut en kan ook handmatig worden gestart. Voor iedere controller-run wordt eerst een 55-seconden Logic lease verkregen. Een overlappende tweede run wordt overgeslagen.
+```text
+Pi hardened dynamic planner v0.3
+        ↓
+Pi /control/current
+        ↓
+Homey PI Dynamic Planner Bridge v1.2.6
+        ↓
+EM2_Power_Intent v0.2
+        ↓
+EV Power Adapter v0.1.5
+        ↓
+EV Power Adapter Gate v0.2.6
+        ↓
+EV Power Actuator v0.2.7
+        ↓
+Easee / Tesla
+```
 
-De productiecontroller leest de Easee charger en P1-meter en gebruikt `target_charger_current` en `onoff` voor fysieke aansturing. Daarmee is dit pad de enige automatische writer naar Easee.
+Homey blijft de lokale executor en safetylaag. De planner en bridge schrijven zelf geen physical devices.
 
-## Deadline-opdracht
+## Runtime authority
 
-Deadline-opdrachten worden gelezen uit `docs/data/tesla-deadline-command.json`. Een nieuwe actieve opdracht bevat ten minste:
+`EM2_Planner_Authority` bepaalt wie Power Intent mag produceren.
 
-- deadline;
-- current SOC;
-- target SOC;
-- doelenergie in kWh;
-- maximale laadstroom.
+- `PI` → Pi bridge authority.
+- `HOMEY` → guarded Homey P1 v0.2.6 rollback producer.
 
-Een deadline in het verleden wordt expliciet geweigerd. Een nieuwe deadline wordt alleen geaccepteerd wanneer de Easee lifetime `meter_power` beschikbaar is; die waarde vormt de immutable calibratiebaseline voor de sessie.
+Deze selector voorkomt dubbele planner authority.
 
-## Deadline-beslisvolgorde
+## Opportunity charging
 
-Bij een actieve deadline geldt de volgende prioriteit:
+Opportunity charging is PV-gedreven.
 
-1. Integratie- of energiemeetfout → failsafe stop.
-2. Doelenergie bereikt → laden stoppen en lifecycle afsluiten.
-3. Tesla niet aangesloten → wachten.
-4. Deadline verstreken → catch-up op ingestelde maximale stroom.
-5. Latest-start bereikt → catch-up op ingestelde maximale stroom.
-6. DYNAMIC + verse GOOD negatieve prijscontext → laden op maximale stroom.
-7. Voldoende stabiel direct PV-overschot → opportunity laden op berekende stroom.
-8. DYNAMIC + verse GOOD goedkope prijscontext en niet expensive → laden op maximale stroom.
-9. DYNAMIC maar prijscontext niet bruikbaar → wachten op prijscontext.
-10. Anders wachten.
+Actuele regels:
 
-Voor `FIXED` vindt geen prijsarbitrage plaats. Deadline/MUST en directe P1/PV-opportunity blijven contractonafhankelijk.
+- residual PV na WW reservation is de primaire opportunitybron;
+- startminimum = 3×6 A;
+- runminimum = 3×6 A;
+- nominaal minimumvermogen = 4140 W bij 3×230 V;
+- opportunity start vereist minstens één positief plannerkwartier;
+- elk volgend kwartier wordt opnieuw beoordeeld;
+- korte anti-flap/session protection blijft een executor concern.
 
-## Opportunity zonder deadline
+Een goedkope of negatieve prijs mag onder het huidige FIXED-contract geen Tesla-opportunity creëren.
 
-Zonder actieve deadline kan tussen 11:00 en 17:30 direct PV-opportunity laden plaatsvinden. De controller gebruikt een rolling buffer van circa vier minuten en vereist minimaal drie samples over minimaal 115 seconden.
+## Deadline charging
 
-De minimale startgrens is 6 A-equivalent. De gebruikte conversie is 690 W/A. De maximale opportunity-stroom is 11 A. Wanneer de opportunity tijdens laden wegvalt, wordt eerst gedurende 120 seconden bevestigd voordat fysiek wordt gestopt; gedurende deze bevestigingsfase wordt op 6 A gehouden.
+Een expliciete deadline is een harde MUST-constraint.
 
-## Energiemeting en failsafe
+- PV blijft waar mogelijk eerste bron.
+- Netenergie mag worden gebruikt wanneer dat noodzakelijk is om de deadline te halen.
+- Geforceerd deadline-laden mag niet vóór `latest_start_at` worden geïntroduceerd.
+- De Homey PI bridge v1.2.6 bevat een executor-side deadline guard als laatste safetylaag.
+- De guard gebruikt canonieke Tesla connectivity/chargeState en remaining-energy/deadlinecontext.
+- At/after de earliest safe latest-start kan de guard een aangesloten Tesla naar het geconfigureerde deadline maximum projecteren.
 
-De voorkeursbron voor voortgang is Easee `measure_power`. Wanneer die niet bruikbaar is, kan een P1-delta fallback worden gebruikt mits een geldige baseline bestaat en de berekende Tesla-last binnen plausibele grenzen blijft.
+## EV Power Adapter
 
-De Easee- en P1-schatting worden onderling gecrosscheckt. Een meetgat groter dan 120 seconden tijdens een actieve deadline veroorzaakt `INTEGRATION_GAP_FAILSAFE`: deadline wordt gedeactiveerd en fysiek laden wordt gestopt.
+Actuele adapter:
 
-Wanneer geen geldige energiebron beschikbaar is, geldt `NO_VALID_ENERGY_SOURCE_FAILSAFE`.
+`EM v2 | 60 Adapter | EV Power v0.1.5 DEADLINE-CAP OPPORTUNITY16 START6 RUN6`
 
-## Idempotency
+De adapter vertaalt `targets.ev.target_W` naar een uitvoerbare stroomopdracht. Hij introduceert geen nieuwe EMS-policy en mag het upstream vermogensbudget niet verhogen.
 
-Voor de productiecontroller geldt een 55-seconden run lease met een korte arbitrageperiode. Daardoor kunnen twee vrijwel gelijktijdige starts niet twee controllerexecuties of dubbele fysieke writes veroorzaken.
+Actuele mappingcontract:
 
-Binnen `applyTarget()` worden writes bovendien alleen uitgevoerd wanneer de gewenste toestand afwijkt van de actuele toestand. Voor een start op 6 A bestaat een speciale 7 A → 10 s → 6 A bootstrap wanneer de lader uit stilstand moet starten.
+`FLOOR_3P230_START6_RUN6_FAIL_CLOSED`
 
-## Contract-aware prijscontext
+Daarmee geldt conceptueel:
 
-De controller leest uitsluitend:
+`requested_A = floor(target_W / (3 × 230))`
 
-- `EMS_ContractType`;
-- `EM2_ContractPrice_Negative`;
-- `EM2_ContractPrice_Cheap_Next4h`;
-- `EM2_ContractPrice_Expensive_Next4h`;
-- `EM2_ContractPrice_Quality`;
-- `EM2_ContractPrice_UpdatedAt`.
+met minimaal 6 A voor een positieve uitvoerbare laadopdracht en maximaal de toegestane capability/configuratiegrens.
 
-Prijsinformatie is alleen bruikbaar wanneer het contract `DYNAMIC` is, quality `GOOD` is en de context maximaal 30 minuten oud is. Legacy M7-prijsinputs worden niet meer gebruikt voor productie-Tesla.
+## EV Gate
 
-## EV Power Adapter v0.1 SHADOW
+Actuele gate:
 
-`EM v2 | 60 Adapter | EV Power v0.1 SHADOW` is een afzonderlijk toekomstpad. De adapter wordt getriggerd door wijziging van `EM2_Power_Intent` en doet zelf geen device-reads, netwerkcalls of fysieke writes.
+`EM v2 | 80 Validation | EV Power Adapter Gate v0.2.6 START6`
 
-De adapter accepteert `EM2_POWER_INTENT_V0.1` of `V0.2`, vereist revision-alignment met `EM2_State`, `intent.valid=true` en `deviceWrites=false`, en vertaalt `target_W` naar `command.value_A`.
+De gate bewaakt onder meer:
 
-W/A wordt bij voorkeur afgeleid uit geobserveerd Tesla-vermogen gedeeld door requested A. Als dat niet beschikbaar is, wordt spanning × aantal actieve fasen gebruikt. Onder de minimale 6 A-deadband wordt de theoretische opdracht 0 A.
+- Power Intent schema;
+- adapter schema;
+- source/state revision alignment;
+- freshness;
+- electrical mapping semantics;
+- fail-closed gedrag.
 
-De output blijft:
+Een coherente positieve opdracht wordt niet uitsluitend geblokkeerd omdat observability-only Easee telemetry health als `STALE` staat. Device-health blijft diagnostisch; onafhankelijke schema/revision/mapping safetychecks blijven hard.
 
-- `readOnly: true`;
-- `controlMode: SHADOW`;
-- `deviceWrites: false`;
-- `physicalWrite: false`.
+## EV actuator
 
-Dedupe gebeurt op revision + input schema + target_W.
+Actuele fysieke writer:
 
-## Frontend en Core-invariant
+`EM v2 | 60 Actuator | EV Power v0.2.7 START6 RUN6 LIVE + EASEE SESSION`
 
-De websitecontroller `tesla-deadline-controller-v2.8.115.js` valideert invoer vóór versturen, blokkeert deadlines in het verleden en gebruikt een PIN-protected worker-route. Na opslaan wacht de UI maximaal 120 seconden op bevestiging door Core.
+Deze actuator is de enige automatische fysieke Easee-writer in de productiearchitectuur. Hij verzorgt session start/resume, current setting, idempotency en fail-closed stop/pause op basis van de gevalideerde gate-output.
 
-`tesla-deadline-core-invariant-v2.8.114.js` handhaaft een harde frontend-invariant: zodra Energy Core meldt dat de deadline terminal/inactief is, mag stale command- of pending-state de UI niet actief houden.
+Legacy automatische Tesla-flows mogen niet parallel physical writes uitvoeren. Handmatige flows mogen alleen blijven bestaan wanneer zij expliciet handmatig zijn en niet concurreren met automatic control.
 
-## Outputs
+## START6 validatie
 
-Belangrijke Logic-outputs van de productiecontroller zijn:
+Op 12 september 2026 is gecontroleerd bewezen dat een gepauzeerde Easee/Tesla-sessie direct kan starten op 3×6 A. Gemeten waarden lagen rond 6.01/6.03/6.05 A en circa 4.235 kW totaal.
 
-- `EV Deadline actief`;
-- `EV Deadline tijd`;
-- `EV Doel kWh`;
-- `EV Max laadstroom A`;
-- `EV Deadline status`;
-- `EV Geladen kWh`;
-- `EV Resterend kWh`;
-- `EV Latest start`;
-- `EV Deadline Runtime State v2.0`.
+Dit is de basis voor START6/RUN6 in productie.
+
+Een eerdere gecontroleerde Pi cutover-test op 7 A bewees daarnaast de volledige ON/OFF-keten Pi → Homey → Easee/Tesla.
+
+## Contract policy
+
+De productie-EMS staat op:
+
+- `FIXED`;
+- `ENGIE_3Y_2026_2029`;
+- supplier `ENGIE`.
+
+Dynamische prijsdata mag alleen voor shadow/analyse/replay worden gebruikt. Automatische fallback of mode-switching naar DYNAMIC is niet toegestaan.
+
+## Fail-safe gedrag
+
+Bij ongeldige/stale Pi-command, schemafout, revision mismatch of ongeldige adapter/gate mapping wordt de EV-target fail-closed 0 W / 0 A.
+
+De Pi planner zelf schrijft geen Easee-device. De fysieke writer blijft Homey.
 
 ## Architectuurgrens
 
-Totdat expliciet gevalideerd en geactiveerd geldt:
+Actuele invariant:
 
-- productie `v2.7.15` = enige automatische Easee-writer;
-- EV Power Adapter v0.1 = SHADOW translator zonder writes;
-- Energy Core en Power Intent mogen dus nog niet rechtstreeks fysieke Easee-aansturing overnemen.
+```text
+planner policy != device writer
+Power Intent != device writer
+adapter != device writer
+gate != device writer
+exact één EV actuator = physical writer
+```
 
-## Validatie-status
-
-De live Homey-flow is enabled en niet broken. RC-idempotency is structureel in de flow ingebouwd via de 55 s lease. De EV Power Adapter is enabled maar expliciet SHADOW.
+Het oude documentatiemodel waarin `Tesla laden v2.7.15` de productiecontroller was en EV Power Adapter uitsluitend SHADOW was, is vervallen.
