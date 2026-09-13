@@ -101,24 +101,27 @@ def ww_plan_status(path):
 
 
 def ev_realtime_envelope(plan, current, ev_w, ww_w):
-    """Expose a bounded realtime EV envelope without changing slot targets.
+    """Expose a bounded realtime EV opportunity envelope without changing targets.
 
-    This is metadata only. Homey must not consume it for production control
-    until the separate realtime controller has completed SHADOW validation.
-    The Pi remains the planner/authority; Homey may only modulate inside an
-    opportunity slot explicitly authorized by the Pi planner.
+    The Pi remains strategy/authority owner. The envelope answers whether Homey
+    may *in shadow* evaluate residual-PV EV modulation in the current slot. It
+    is deliberately independent of whether the 15-minute planner selected an
+    EV target: otherwise a forecast miss could never be recovered from live P1.
+
+    WW remains reserved exactly as planned. Homey must use net P1 export after
+    WW and may add back EV actual power only; WW power is never added back.
+    Deadline-required slots remain owned by the canonical deadline target and
+    are not realtime-opportunity slots.
     """
     reason = str(current.get("evAllocationReason") or "")
-    genuine_opportunity = (
-        ev_w > 0
-        and (
-            (reason.startswith("DYNAMIC_PV_") and "OPPORTUNITY" in reason)
-            or reason == "DYNAMIC_PV_PEAK_ABSORBER"
-        )
-        and current.get("evDeadlineRequired") is not True
+    tesla_plan = plan.get("tesla") or {}
+    tesla_connected = tesla_plan.get("connectedNow") is True
+    deadline_required = (
+        current.get("evDeadlineRequired") is True
+        or reason == "DEADLINE_REQUIRED"
     )
 
-    deadline_plan = ((plan.get("tesla") or {}).get("deadlinePlan") or {})
+    deadline_plan = tesla_plan.get("deadlinePlan") or {}
     deadline_active = deadline_plan.get("active") is True
     deadline_max_a = deadline_plan.get("maxA")
     try:
@@ -127,10 +130,21 @@ def ev_realtime_envelope(plan, current, ev_w, ww_w):
         deadline_max_a = None
 
     hard_max_a = EV_MAX_A
+    policy_valid = tesla_connected and not deadline_required
+    block_reason = None
+
+    if not tesla_connected:
+        policy_valid = False
+        block_reason = "TESLA_NOT_CONNECTED_AT_PLAN_BUILD"
+    elif deadline_required:
+        policy_valid = False
+        block_reason = "DEADLINE_TARGET_OWNS_SLOT"
+
     if deadline_active:
         if deadline_max_a is None or not (EV_MIN_A <= deadline_max_a <= EV_MAX_A):
-            genuine_opportunity = False
+            policy_valid = False
             hard_max_a = 0
+            block_reason = "INVALID_DEADLINE_MAX_A"
         else:
             hard_max_a = deadline_max_a
 
@@ -141,19 +155,30 @@ def ev_realtime_envelope(plan, current, ev_w, ww_w):
         planner_target_a = 0
 
     return {
-        "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.1",
+        "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.2",
         "shadowOnly": True,
         "productionConsumerAllowed": False,
-        "allowed": genuine_opportunity,
-        "mode": "PV_OPPORTUNITY" if genuine_opportunity else "DISABLED",
-        "min_A": EV_MIN_A if genuine_opportunity else 0,
-        "max_A": hard_max_a if genuine_opportunity else 0,
+        "allowed": policy_valid,
+        "mode": "PV_OPPORTUNITY" if policy_valid else "DISABLED",
+        "min_A": EV_MIN_A if policy_valid else 0,
+        "max_A": hard_max_a if policy_valid else 0,
         "plannerTarget_A": planner_target_a,
         "plannerTarget_W": ev_w,
         "plannerReason": reason or "PI_DYNAMIC_SLOT",
+        "plannerSelectedOpportunity": (
+            ev_w > 0
+            and (
+                (reason.startswith("DYNAMIC_PV_") and "OPPORTUNITY" in reason)
+                or reason == "DYNAMIC_PV_PEAK_ABSORBER"
+            )
+        ),
+        "policyBasis": "PI_POLICY_ALLOWS_REALTIME_PV_CAPTURE_INDEPENDENT_OF_SLOT_TARGET",
+        "blockReason": block_reason,
         "wwReserved_W": ww_w,
+        "wwMustRemainUnchanged": True,
         "deadlineActive": deadline_active,
         "deadlineMax_A": deadline_max_a,
+        "deadlineRequiredSlot": deadline_required,
         "selfLoadCorrection": "P1_NET_EXPORT_PLUS_EV_ACTUAL_W",
         "wwSelfLoadCorrection": False,
         "requiresFreshP1": True,
@@ -284,7 +309,7 @@ class Handler(BaseHTTPRequestHandler):
                     "targets": {"ev": {"target_W": 0}, "ww": {"target_on": False}, "battery": {"target_W": 0}},
                     "realtime": {
                         "ev": {
-                            "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.1",
+                            "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.2",
                             "shadowOnly": True,
                             "productionConsumerAllowed": False,
                             "allowed": False,
