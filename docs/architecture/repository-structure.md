@@ -31,6 +31,9 @@ homey-energy-manual/
 │       ├── api/
 │       │   └── status/
 │       ├── integrations/
+│       │   ├── homey/
+│       │   │   ├── ingress/
+│       │   │   └── egress/
 │       │   ├── tesla/
 │       │   ├── easee/
 │       │   ├── honeywell/
@@ -81,6 +84,7 @@ The target structure follows the operational ownership model:
 
 - **Homey** is the executor / edge-control layer.
 - **Pi** owns planning, orchestration, state processing and external integrations unless explicitly documented otherwise.
+- **Homey ↔ Pi integration** lives under `services/pi/integrations/homey/`: ingress describes the Homey-to-Pi state boundary, while egress owns Pi-to-Homey control publication. The HTTP endpoint itself remains under `services/pi/api/` because API transport and integration semantics are separate concerns.
 - **Pi API** exposes bounded machine interfaces such as health, state ingest and planner/control status without changing the underlying runtime ownership boundaries.
 - **Website** owns presentation and human-facing observability.
 - **docs/** contains architecture, component documentation, decisions, commissioning records and operational runbooks, not production runtime implementation.
