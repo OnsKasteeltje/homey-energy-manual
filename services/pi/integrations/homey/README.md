@@ -12,19 +12,19 @@ This directory defines the Pi-side boundary between Homey and the EMS Pi.
 
 Homey publishes the canonical energy-state snapshot to the authenticated Pi endpoint `POST /state/energy`.
 
-The HTTP boundary is implemented by `services/pi/api/status/server.py`; Homey-specific validation and persistence are currently implemented by `services/pi/api/status/state_ingest.py` because they are part of that API endpoint's runtime. The accepted state is written to `/home/jeroen/ems/data/energy-state-v2.json` and then consumed by Pi planners.
+The HTTP transport boundary remains implemented by `services/pi/api/status/server.py`. Homey-specific validation and persistence are owned by `ingress/state_ingest.py`. At deployment time that module is placed into the existing status-API runtime directory so the runtime import contract remains unchanged. The accepted state is written to `/home/jeroen/ems/data/energy-state-v2.json` and then consumed by Pi planners.
 
 Source flow:
 
 ```text
 Homey Core state
     → POST /state/energy
-    → Pi status API
+    → services/pi/integrations/homey/ingress/state_ingest.py
     → energy-state-v2.json + history
     → Pi planner/control
 ```
 
-Do not duplicate the ingest implementation under this integration directory merely for folder symmetry. The API owns transport; this integration documentation owns the Homey↔Pi boundary semantics.
+The API owns HTTP transport; the Homey integration owns Homey-specific state semantics and validation.
 
 ## Pi → Homey (egress)
 
@@ -45,11 +45,12 @@ Pi planner/control
 
 ## Runtime compatibility
 
-Repository placement is independent from the installed Pi runtime layout. During the incremental repository migration, the egress publisher continues to deploy to its existing runtime path:
+Repository placement is independent from the installed Pi runtime layout. During the incremental repository migration the existing runtime contracts stay unchanged:
 
-`/home/jeroen/ems/runtime/homey-deploy/publish_pi_control_intent.py`
+- ingress: `/home/jeroen/ems/runtime/status-api/state_ingest.py`
+- egress: `/home/jeroen/ems/runtime/homey-deploy/publish_pi_control_intent.py`
 
-This keeps existing runtime callers stable while the Git source converges to the target architecture.
+This keeps existing imports and callers stable while the Git source converges to the target architecture.
 
 ## Out of scope
 
