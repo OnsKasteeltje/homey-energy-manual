@@ -2,9 +2,9 @@
 
 > Detailed companion to `docs/architecture/CURRENT-EMS-STATE.md`.
 >
-> This document defines the two one-way runtime chains between Homey and the Raspberry Pi. The chains are deliberately asymmetric: Homey publishes observed state to the Pi; the Pi publishes bounded control commands back to Homey. Neither side may bypass the defined ownership boundary.
+> This document defines the two one-way runtime chains between Homey and the Raspberry Pi. The chains are deliberately asymmetric: Homey publishes observed state to the Pi; the Pi exposes bounded control commands for Homey to consume. Neither side may bypass the defined ownership boundary.
 
-**Status date:** 2026-09-13  
+**Status date:** 2026-09-14  
 **Repository:** `OnsKasteeltje/homey-energy-manual`
 
 ## 1. Architectural rule
@@ -12,15 +12,15 @@
 There are two separate directions:
 
 1. **State direction — Homey → Pi**: realtime observed state and Homey-owned operational facts.
-2. **Control direction — Pi → Homey**: planner output for the current slot, executed and safety-checked by Homey.
+2. **Control direction — Pi → Homey**: planner output for the current slot, pulled and executed by Homey under local safety constraints.
 
 They must not be collapsed into one bidirectional writer or polling loop.
 
 GitHub is source of truth for code and documentation, but **is not a runtime transport dependency** for either direction.
 
-### 1.1 End-to-end runtime loop
+Historical archiving follows the state direction. The Pi must build operational P1/PV/boiler/Tesla history from accepted Homey Core pushes; it must not continuously pull Homey Insights merely to reconstruct data that Homey already publishes to the Pi.
 
-The complete operational loop is:
+### 1.1 End-to-end runtime loop
 
 ```text
 HOMEY                                  PI
@@ -29,13 +29,17 @@ devices
 Core state
   ↓
 EM2_Public_State
-  ───────── state push ───────────────→ energy-state-v2.json
+  ───────── state push ───────────────→ /state/energy
                                         ↓
-                                   forecast/planner
-                                        ↓
-                                   /control/current
-  ←──────── planner guidance ────────────┘
-PI Bridge
+                                  validated ingest
+                                   ↙           ↘
+                       energy-state-v2.json   ems-history.sqlite
+                                   ↓             ↓
+                              forecast/planner/history
+                                   ↓
+                              /control/current
+  ←──────── planner guidance ───────┘
+PI Dynamic Planner Bridge
   ↓
 Power Intent
   ↓
@@ -44,7 +48,7 @@ adapter → gate → actuator
 Tesla / boiler
 ```
 
-This diagram is the compact reference for the two detailed one-way chains below. Homey pushes canonical observed state to the Pi; Homey subsequently pulls the Pi planner guidance through `/control/current` and remains responsible for realtime execution and local safety.
+Homey pushes canonical observed state to the Pi. The Pi persists current state and local history. Homey subsequently pulls Pi planner guidance through `/control/current` and remains responsible for realtime execution and local safety.
 
 ## 2. State chain: Homey → Pi
 
@@ -65,10 +69,12 @@ EM v2 | 05 Transport | Homey→Pi State Push v0.1
        ems-status-api.service
                     ↓
  state_ingest.py validation / anti-replay
-                    ↓
- atomic write: /home/jeroen/ems/data/energy-state-v2.json
-                    ↓
-         Pi forecast/planner chain
+             ↙                    ↘
+atomic current-state write      local history archive
+             ↓                    ↓
+energy-state-v2.json          ems-history.sqlite
+             ↓                    ↓
+         Pi forecast / planner / analytics
 ```
 
 ### 2.1 Ownership
@@ -76,9 +82,10 @@ EM v2 | 05 Transport | Homey→Pi State Push v0.1
 - Homey owns acquisition of live device state and construction of the canonical Core state snapshot.
 - The Pi does **not** poll Homey to reconstruct this state.
 - Homey Core publishes the canonical snapshot to `EM2_Public_State`.
-- The dedicated transport flow `EM v2 | 05 Transport | Homey→Pi State Push v0.1` forwards that exact state to the Pi.
-- The transport component performs no device reads, planning decisions or physical writes; it reads only the canonical state and ingest token.
-- The Pi owns validation, persistence and subsequent planner consumption.
+- `EM v2 | 05 Transport | Homey→Pi State Push v0.1` forwards that exact state to the Pi.
+- The transport component performs no additional device reads, planning decisions or physical writes.
+- The Pi owns validation, persistence, historical archiving and subsequent planner consumption.
+- Historical archiving is local Pi work and must not create additional Homey API traffic.
 
 ### 2.2 Endpoint
 
@@ -90,6 +97,7 @@ Implemented by:
 
 - `src/pi/ems-runtime/status-api/server.py`
 - `src/pi/ems-runtime/status-api/state_ingest.py`
+- `src/pi/ems-runtime/status-api/history_archive.py`
 
 Runtime service:
 
@@ -108,7 +116,7 @@ Pi token source:
 
 A missing token configuration fails closed. An absent or incorrect Authorization header is rejected.
 
-The endpoint currently uses plain HTTP on the trusted LAN. The Bearer token therefore authenticates the sender but does not encrypt LAN traffic.
+The endpoint currently uses plain HTTP on the trusted LAN. The Bearer token authenticates the sender but does not encrypt LAN traffic.
 
 ### 2.4 State contract
 
@@ -124,9 +132,11 @@ Current required schema:
 - `meta.schema_version = 2.12`
 - `meta.publisher_version` starts with `EM2_CORE_STATE_`
 
+The canonical payload also carries the operational fields needed for local history, including P1, the three PV inverter powers, Tesla charging power, boiler power, Quatt electrical power and appliance state.
+
 Freshness and ordering use:
 
-- `source_sample_at` for physical sample freshness;
+- `source_sample_at` for physical sample time;
 - `generated_at` for state generation time;
 - `heartbeat_at` for publication liveness;
 - `state_revision` for monotonic state ordering.
@@ -139,7 +149,7 @@ Acceptance rules include:
 - equal revision is accepted only when `heartbeat_at` is newer;
 - invalid or replayed input leaves the existing runtime state untouched.
 
-### 2.5 Atomic persistence
+### 2.5 Atomic current-state persistence
 
 Accepted input is written atomically to:
 
@@ -147,7 +157,32 @@ Accepted input is written atomically to:
 
 The ingest writes a temporary file in the same directory, flushes/fsyncs it, replaces the target with `os.replace()`, then fsyncs the directory. Planners therefore see either the previous complete state or the new complete state, never a partially-written JSON document.
 
-### 2.6 Publication cadence
+### 2.6 Local historical persistence
+
+After a state payload has passed ingest validation and the current-state file has been written successfully, the same accepted payload is archived locally in:
+
+`/home/jeroen/ems/data/ems-history.sqlite`
+
+Current archived operational measurements include:
+
+- P1 grid power;
+- SolarEdge power;
+- GoodWe 4200 power;
+- GoodWe 2000 power;
+- Tesla charging power;
+- boiler electrical power;
+- Quatt electrical power;
+- washer/dryer active state when present.
+
+The archive uses `meta.source_sample_at` as the physical sample timestamp and the existing `(ts_utc, device_id, metric_id)` uniqueness constraint for idempotency. Same-sample heartbeat pushes therefore do not duplicate measurements.
+
+Per-source PV freshness metadata is preserved as `observed` versus `held` quality where available. Invalid grid measurement state is not archived as a valid P1 sample.
+
+Historical persistence is intentionally **best-effort relative to live state acceptance**: a SQLite archive failure is logged and reported by the ingest response, but it must not make a genuinely fresh and valid Homey state unavailable to the planner. This prevents an analytics/storage fault from becoming a live-control outage.
+
+The legacy `EM2_Day_History` / Homey Insights pull path remains useful only for explicit backfill or diagnostics. It is not a production live-history transport and must not have an automatic production timer.
+
+### 2.7 Publication cadence
 
 The state path is push-based, not poll-based.
 
@@ -158,12 +193,14 @@ Desired Homey behavior:
 - current Core metadata advertises `min_publish_interval_sec = 300`;
 - avoid aggressive periodic publication and avoid new Homey device polling.
 
+The Pi history archive consumes exactly these accepted pushes; it does not introduce a second sampling cadence against Homey.
+
 ## 3. Planning chain inside the Pi
 
 After accepted state persistence, the canonical forecast/planning chain remains owned by the Pi:
 
 ```text
-energy-state-v2.json
+energy-state-v2.json + ems-history.sqlite
         ↓
 planner axis / weather / Quatt forecast
         ↓
@@ -201,7 +238,7 @@ current validated plan
            ↓
 GET /control/current
            ↓
-Homey PI Dynamic Planner Bridge
+Homey PI Dynamic Planner Bridge v1.3.0
            ↓
 canonical EM2_Power_Intent
         ↙                 ↘
@@ -252,6 +289,8 @@ The PI Dynamic Planner Bridge:
 
 Downstream adapters, gates and actuators remain the only permitted route to physical writes.
 
+The former Pi-side `publish_pi_control_intent.py` mechanism is not a production control transport. An automatic `ems-pi-control-publish.timer` would create a second writer path and additional Homey API traffic and is therefore forbidden while the Homey PI Dynamic Planner Bridge owns production consumption of `/control/current`.
+
 ## 5. EV bounded realtime execution
 
 For Tesla opportunity charging the current responsibility split is:
@@ -278,6 +317,13 @@ If state publication stops or becomes stale:
 - hardened planner freshness checks eventually fail closed;
 - no freshness threshold may be relaxed merely to keep planning running.
 
+If only historical SQLite archiving fails:
+
+- the accepted current state remains available to the planner;
+- the archive failure is logged and exposed in the ingest response;
+- history quality/coverage monitoring must show the gap;
+- the failure must be repaired locally without adding Homey polling load.
+
 ### Pi → Homey control direction
 
 If the plan or `/control/current` is invalid/stale:
@@ -302,14 +348,15 @@ Any change to either direction must update, in the same release range:
 
 Required validation order:
 
-**GitHub source → Pi deployed runtime → endpoint behavior → Homey bridge/executor behavior → physical evidence when a physical actuator is involved.**
+**GitHub source → Pi deployed runtime → endpoint behavior → local SQLite evidence → Homey bridge/executor behavior → physical evidence when a physical actuator is involved.**
 
 ## 8. Commissioning rule for state ingest
 
 Do not validate successful ingest by making old physical values appear fresh in the production state file. A synthetic payload must use an isolated test target/test harness, or the planner generation chain must be isolated and the production state restored before re-enabling it.
 
-Production planner generation should resume only after a genuinely fresh Homey Core state has been accepted.
+For the local history archive, use a temporary SQLite database for synthetic tests. Production history validation must come from a genuinely fresh accepted Homey push.
 
+Production planner generation should resume only after a genuinely fresh Homey Core state has been accepted.
 
 ## 9. Production validation — 2026-09-13
 
@@ -334,3 +381,16 @@ The status API health contract validates the current planner schemas:
 - `EMS_PI_WW_PLAN_V0.7.0`
 
 Schema drift in observability must not be mistaken for planner failure.
+
+## 10. History incident and correction — 2026-09-14
+
+Operational history for P1/PV/boiler stopped after 2026-09-13 16:00Z. Investigation showed repeated Homey `Too many requests` responses in the former automatic Homey Insights/day-history pull chain. The live Homey→Pi Core state push continued independently.
+
+Correction:
+
+- operational energy history is sourced from accepted Homey→Pi Core pushes;
+- the Pi archives those pushes locally in SQLite;
+- automatic legacy Homey Insights/day-history polling is removed from the production timer set;
+- automatic Pi-side control publishing is removed from the production timer set because the Homey PI Bridge is the canonical control consumer.
+
+This correction aligns runtime behavior with the already-documented one-way ownership boundaries and the mandatory Homey low-load API rules.
