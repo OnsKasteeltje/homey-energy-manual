@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOC="docs/architecture/CURRENT-EMS-STATE.md"
+STRUCTURE_DOC="docs/architecture/repository-structure.md"
 HONEYWELL_DOC="docs/architecture/honeywell-integration.md"
 CONNECTLIFE_DOC="docs/architecture/connectlife-integration.md"
 HOMEY_DOC="services/pi/integrations/homey/README.md"
@@ -21,6 +22,7 @@ pass() { echo "ARCHITECTURE GATE: PASS: $*"; }
 
 cd "$REPO"
 [[ -f "$DOC" ]] || fail "$DOC missing"
+[[ -f "$STRUCTURE_DOC" ]] || fail "$STRUCTURE_DOC missing"
 [[ -f "$HONEYWELL_DOC" ]] || fail "$HONEYWELL_DOC missing"
 [[ -f "$CONNECTLIFE_DOC" ]] || fail "$CONNECTLIFE_DOC missing"
 [[ -f "$HOMEY_DOC" ]] || fail "$HOMEY_DOC missing"
@@ -103,16 +105,18 @@ if [[ -n "$BASE_REF" ]]; then
       pass "architecture-sensitive changes include canonical document update"
     else
       ARCH_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
-      NON_INTEGRATION_ARCH="$(printf '%s\n' "$ARCH_CHANGED" | grep -Ev '^(services/pi/integrations/(honeywell|connectlife|homey)/|services/pi/api/status/state_ingest\.py$|src/pi/ems-runtime/homey-deploy/publish_pi_control_intent\.py$|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
+      NON_STRUCTURAL_ARCH="$(printf '%s\n' "$ARCH_CHANGED" | grep -Ev '^(services/pi/integrations/(honeywell|connectlife|homey)/|services/pi/api/status/(server|history_archive|state_ingest)\.py$|src/pi/ems-runtime/homey-deploy/publish_pi_control_intent\.py$|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
       HONEYWELL_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^services/pi/integrations/honeywell/' || true)"
       CONNECTLIFE_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^services/pi/integrations/connectlife/' || true)"
       HOMEY_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^(services/pi/integrations/homey/|services/pi/api/status/state_ingest\.py$|src/pi/ems-runtime/homey-deploy/publish_pi_control_intent\.py$)' || true)"
+      STATUS_STRUCTURE_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^services/pi/api/status/(server|history_archive|state_ingest)\.py$' || true)"
       DOCS_OK=true
       [[ -z "$HONEYWELL_CHANGED" ]] || printf '%s\n' "$CHANGED" | grep -Fxq "$HONEYWELL_DOC" || DOCS_OK=false
       [[ -z "$CONNECTLIFE_CHANGED" ]] || printf '%s\n' "$CHANGED" | grep -Fxq "$CONNECTLIFE_DOC" || DOCS_OK=false
       [[ -z "$HOMEY_CHANGED" ]] || printf '%s\n' "$CHANGED" | grep -Fxq "$HOMEY_DOC" || DOCS_OK=false
-      if [[ -z "$NON_INTEGRATION_ARCH" && "$DOCS_OK" == true ]]; then
-        pass "integration-only architecture changes include dedicated architecture document update"
+      [[ -z "$STATUS_STRUCTURE_CHANGED" ]] || printf '%s\n' "$CHANGED" | grep -Fxq "$STRUCTURE_DOC" || DOCS_OK=false
+      if [[ -z "$NON_STRUCTURAL_ARCH" && "$DOCS_OK" == true ]]; then
+        pass "documented target-structure migration does not change operational architecture"
       else
         echo "Architecture-sensitive files changed since $BASE_REF:" >&2
         printf '%s\n' "$ARCH_CHANGED" >&2 || true
