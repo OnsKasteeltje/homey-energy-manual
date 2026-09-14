@@ -6,6 +6,7 @@ RUNTIME="/home/jeroen/ems/runtime"
 SOURCE="$REPO/src/pi/ems-runtime"
 TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
+PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 SYSTEMD="$REPO/deploy/systemd"
 BACKUP_ROOT="/home/jeroen/ems/backup"
 DEPLOY_MARKER="/home/jeroen/ems/data/deployed-git-commit"
@@ -117,6 +118,9 @@ rsync -a --delete \
     --exclude='*.pyc' \
     "$TARGET_HISTORY_SOURCE/" "$TARGET_HISTORY_RUNTIME/"
 
+chmod 0755 "$TARGET_HISTORY_RUNTIME/ems_performance.py"
+ln -sfn "$TARGET_HISTORY_RUNTIME/ems_performance.py" "$PERFORMANCE_COMMAND"
+
 echo
 echo "=== DEPLOY SYSTEMD ==="
 cp -a "$SYSTEMD/"* /etc/systemd/system/
@@ -137,5 +141,6 @@ echo "=== DEPLOYMENT COMPLETE ==="
 echo "Release commit: $(git -C "$REPO" rev-parse --short HEAD)"
 echo "Backup: $BACKUP"
 echo "Deployment marker: $(cat "$DEPLOY_MARKER")"
+echo "Performance command: $PERFORMANCE_COMMAND"
 echo
 echo "NOTE: Services were NOT restarted by this script."
