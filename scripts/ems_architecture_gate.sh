@@ -78,9 +78,9 @@ grep -q 'EMS PERFORMANCE COMMAND' scripts/ems_pi_drift_check.sh || fail "ems-per
 pass "standardized read-only EMS performance command present"
 
 grep -q 'services/pi/integrations/honeywell' scripts/deploy_ems_pi.sh || fail "Honeywell target-structure source is not deployed"
-grep -q "--exclude='.venv/'" scripts/deploy_ems_pi.sh || fail "Honeywell local virtualenv is not protected during deployment"
+grep -q -- "--exclude='.venv/'" scripts/deploy_ems_pi.sh || fail "Honeywell local virtualenv is not protected during deployment"
 grep -q 'TARGET-STRUCTURE HONEYWELL FILES' scripts/ems_pi_drift_check.sh || fail "Honeywell target-structure source is not drift-checked"
-grep -q "-not -path './.venv/\*'" scripts/ems_pi_drift_check.sh || fail "Honeywell local virtualenv is not excluded from drift validation"
+grep -q -- "-not -path './.venv/\*'" scripts/ems_pi_drift_check.sh || fail "Honeywell local virtualenv is not excluded from drift validation"
 pass "Honeywell target-structure deployment preserves host-local runtime state"
 
 for legacy_unit in \
