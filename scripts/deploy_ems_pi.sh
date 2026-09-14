@@ -6,6 +6,8 @@ RUNTIME="/home/jeroen/ems/runtime"
 SOURCE="$REPO/src/pi/ems-runtime"
 TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
+TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
+TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 SYSTEMD="$REPO/deploy/systemd"
 BACKUP_ROOT="/home/jeroen/ems/backup"
@@ -60,11 +62,14 @@ echo "=== CHECK RUNTIME FOR UNMANAGED FILES ==="
 
 UNMANAGED="$(
     diff -u \
-        <(cd "$SOURCE" && find . -type f -printf '%P\n' | sort) \
+        <(cd "$SOURCE" && find . -type f \
+            -not -path './tools/honeywell/*' \
+            -printf '%P\n' | sort) \
         <(cd "$RUNTIME" && find . -type f \
             -not -path './data/*' \
             -not -path './logs/*' \
             -not -path './history/*' \
+            -not -path './tools/honeywell/*' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort) \
@@ -98,6 +103,29 @@ if echo "$HISTORY_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; then
     exit 1
 fi
 
+mkdir -p "$TARGET_HONEYWELL_RUNTIME"
+HONEYWELL_UNMANAGED="$(
+    diff -u \
+        <(cd "$TARGET_HONEYWELL_SOURCE" && find . -type f -printf '%P\n' | sort) \
+        <(cd "$TARGET_HONEYWELL_RUNTIME" && find . -type f \
+            -not -path './.venv/*' \
+            -not -path './cache/*' \
+            -not -path './output/*' \
+            -not -path './config/account.env' \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort) \
+        || true
+)"
+
+if echo "$HONEYWELL_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; then
+    echo "ERROR: unmanaged files exist in runtime/tools/honeywell."
+    echo "Deployment aborted to protect Honeywell runtime state and credentials."
+    echo
+    echo "$HONEYWELL_UNMANAGED"
+    exit 1
+fi
+
 echo "PASS: runtime contains no unmanaged source files"
 
 echo
@@ -106,6 +134,7 @@ rsync -a --delete \
     --exclude='data/' \
     --exclude='logs/' \
     --exclude='history/' \
+    --exclude='tools/honeywell/' \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     --exclude='*.bak*' \
@@ -117,6 +146,16 @@ rsync -a --delete \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     "$TARGET_HISTORY_SOURCE/" "$TARGET_HISTORY_RUNTIME/"
+
+mkdir -p "$TARGET_HONEYWELL_RUNTIME"
+rsync -a --delete \
+    --exclude='.venv/' \
+    --exclude='cache/' \
+    --exclude='output/' \
+    --exclude='config/account.env' \
+    --exclude='__pycache__/' \
+    --exclude='*.pyc' \
+    "$TARGET_HONEYWELL_SOURCE/" "$TARGET_HONEYWELL_RUNTIME/"
 
 chmod 0755 "$TARGET_HISTORY_RUNTIME/ems_performance.py"
 ln -sfn "$TARGET_HISTORY_RUNTIME/ems_performance.py" "$PERFORMANCE_COMMAND"
