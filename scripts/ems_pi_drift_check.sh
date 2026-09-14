@@ -8,6 +8,8 @@ TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
 TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
 TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
+TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
+TARGET_STATUS_RUNTIME="$RUNTIME/status-api"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 SYSTEMD="$REPO/deploy/systemd"
 
@@ -16,6 +18,7 @@ echo "Repo:      $REPO"
 echo "Source:    $SOURCE"
 echo "History:   $TARGET_HISTORY_SOURCE"
 echo "Honeywell: $TARGET_HONEYWELL_SOURCE"
+echo "Status API:$TARGET_STATUS_SOURCE"
 echo "Runtime:   $RUNTIME"
 echo
 
@@ -38,6 +41,7 @@ while IFS= read -r rel; do
     fi
 done < <(
     cd "$SOURCE" && find . -type f \
+        -not -path './status-api/*' \
         -not -path '*/__pycache__/*' \
         -not -name '*.pyc' \
         -printf '%P\n' | sort
@@ -92,6 +96,34 @@ else
             -not -path './cache/*' \
             -not -path './output/*' \
             -not -path './config/account.env' \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort
+    )
+fi
+
+echo
+echo "=== TARGET-STRUCTURE STATUS API FILES ==="
+if [[ ! -d "$TARGET_STATUS_RUNTIME" ]]; then
+    echo "MISSING: $TARGET_STATUS_RUNTIME"
+    FAIL=1
+else
+    while IFS= read -r rel; do
+        src="$TARGET_STATUS_SOURCE/$rel"
+        dst="$TARGET_STATUS_RUNTIME/$rel"
+
+        if [[ ! -f "$dst" ]]; then
+            echo "MISSING: status-api/$rel"
+            FAIL=1
+            continue
+        fi
+
+        if ! cmp -s "$src" "$dst"; then
+            echo "DRIFT:   status-api/$rel"
+            FAIL=1
+        fi
+    done < <(
+        cd "$TARGET_STATUS_SOURCE" && find . -type f \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort
