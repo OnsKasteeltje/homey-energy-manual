@@ -8,6 +8,7 @@ STATE_INGEST="src/pi/ems-runtime/status-api/state_ingest.py"
 HISTORY_ARCHIVE="src/pi/ems-runtime/status-api/history_archive.py"
 PLANNER_HISTORY="services/pi/history/archive_planner_snapshot.py"
 PERFORMANCE="services/pi/history/ems_performance.py"
+HONEYWELL="services/pi/integrations/honeywell"
 FORECAST_CHAIN="deploy/systemd/ems-forecast-chain.service"
 BASE_REF="${1:-}"
 
@@ -28,6 +29,7 @@ cd "$REPO"
 [[ -f "$HISTORY_ARCHIVE" ]] || fail "$HISTORY_ARCHIVE missing"
 [[ -f "$PLANNER_HISTORY" ]] || fail "$PLANNER_HISTORY missing"
 [[ -f "$PERFORMANCE" ]] || fail "$PERFORMANCE missing"
+[[ -d "$HONEYWELL" ]] || fail "$HONEYWELL missing"
 [[ -f "$FORECAST_CHAIN" ]] || fail "$FORECAST_CHAIN missing"
 
 python3 - "$POLICY" <<'PY'
@@ -74,6 +76,12 @@ grep -q 'constrainedOptimumAvailable' "$PERFORMANCE" || fail "EMS performance re
 grep -q '/usr/local/bin/ems-performance' scripts/deploy_ems_pi.sh || fail "ems-performance command is not installed by deployment"
 grep -q 'EMS PERFORMANCE COMMAND' scripts/ems_pi_drift_check.sh || fail "ems-performance installation is not drift-checked"
 pass "standardized read-only EMS performance command present"
+
+grep -q 'services/pi/integrations/honeywell' scripts/deploy_ems_pi.sh || fail "Honeywell target-structure source is not deployed"
+grep -q "--exclude='.venv/'" scripts/deploy_ems_pi.sh || fail "Honeywell local virtualenv is not protected during deployment"
+grep -q 'TARGET-STRUCTURE HONEYWELL FILES' scripts/ems_pi_drift_check.sh || fail "Honeywell target-structure source is not drift-checked"
+grep -q "-not -path './.venv/\*'" scripts/ems_pi_drift_check.sh || fail "Honeywell local virtualenv is not excluded from drift validation"
+pass "Honeywell target-structure deployment preserves host-local runtime state"
 
 for legacy_unit in \
   deploy/systemd/ems-day-history.service \
