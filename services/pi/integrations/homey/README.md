@@ -28,20 +28,20 @@ The API owns HTTP transport; the Homey integration owns Homey-specific state sem
 
 ## Pi → Homey (egress)
 
-`services/pi/integrations/homey/egress/publish_pi_control_intent.py` reads the hardened current Pi command from `http://127.0.0.1:3100/control/current`, validates planner/executor/contract ownership and publishes `EM2_POWER_INTENT_V0.2` to Homey Logic.
+The active production transport is Homey pulling `GET /control/current` through the enabled PI Dynamic Planner Bridge. `services/pi/integrations/homey/egress/publish_pi_control_intent.py` remains compatibility code and must not become a second production writer while the Homey bridge is authoritative.
 
-It does not write devices directly. Homey adapters/gates and actuators remain responsible for safe execution.
-
-Source flow:
+Production flow:
 
 ```text
 Pi planner/control
     → /control/current
-    → services/pi/integrations/homey/egress/publish_pi_control_intent.py
+    → Homey PI Dynamic Planner Bridge
     → Homey EM2_Power_Intent
-    → Homey executor/safety
+    → adapter / gate / actuator
     → devices
 ```
+
+The Pi planner never writes devices directly. Homey remains responsible for bounded realtime execution and local safety.
 
 ## Runtime compatibility
 
@@ -49,11 +49,14 @@ Repository placement is independent from the installed Pi runtime layout. During
 
 - ingress source: `services/pi/integrations/homey/ingress/state_ingest.py`
   → runtime: `/home/jeroen/ems/runtime/status-api/state_ingest.py`
-- egress source: `services/pi/integrations/homey/egress/publish_pi_control_intent.py`
+- compatibility egress source: `services/pi/integrations/homey/egress/publish_pi_control_intent.py`
   → runtime: `/home/jeroen/ems/runtime/homey-deploy/publish_pi_control_intent.py`
 
 This keeps existing imports and callers stable while the Git source converges to the target architecture.
 
-## Out of scope
+## Operator / maintenance tooling
 
-The legacy `homey_flow_audit.py` and `homey_flow_deploy.py` are operator/maintenance tools, not runtime state/control transport. They remain separate from the Homey↔Pi data path and should move to the repository tooling area when next touched.
+Homey Advanced Flow audit/deploy helpers are not part of the runtime state/control transport. They live under:
+
+- `tools/maintenance/homey/homey_flow_audit.py`
+- `tools/maintenance/homey/homey_flow_deploy.py`
