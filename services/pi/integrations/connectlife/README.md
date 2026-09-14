@@ -2,6 +2,12 @@
 
 This directory contains the read-only ConnectLife oven telemetry integration used by the EMS Pi runtime.
 
+Canonical repository path:
+
+```text
+services/pi/integrations/connectlife/
+```
+
 ## Scope
 
 The integration observes the oven through ConnectLife and publishes a normalized JSON state for EMS observability. It does **not** send appliance commands and does not create a new actuator path.
@@ -96,7 +102,7 @@ The Python environment currently used by the service is:
 From the repository root on the Pi:
 
 ```bash
-bash scripts/pi/connectlife/install_systemd.sh
+bash services/pi/integrations/connectlife/install_systemd.sh
 ```
 
 The installer validates that the virtual environment and `connectlife` package exist, asks for credentials without storing them in the repository, installs the unit, enables the service, and prints the resulting normalized state when available.

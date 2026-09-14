@@ -9,9 +9,9 @@ StartLimitBurst=5
 Type=simple
 User=jeroen
 Group=jeroen
-WorkingDirectory=/home/jeroen/ems/repo/homey-energy-manual/scripts/pi/connectlife
+WorkingDirectory=/home/jeroen/ems/repo/homey-energy-manual/services/pi/integrations/connectlife
 EnvironmentFile=/etc/ems/connectlife.env
-ExecStart=/home/jeroen/ems/tools/connectlife-probe/.venv/bin/python /home/jeroen/ems/repo/homey-energy-manual/scripts/pi/connectlife/oven_poll.py --watch --interval 60 --max-failures 3 --output /home/jeroen/ems/runtime/state/oven-state.json
+ExecStart=/home/jeroen/ems/tools/connectlife-probe/.venv/bin/python /home/jeroen/ems/repo/homey-energy-manual/services/pi/integrations/connectlife/oven_poll.py --watch --interval 60 --max-failures 3 --output /home/jeroen/ems/runtime/state/oven-state.json
 Restart=on-failure
 RestartSec=30
 

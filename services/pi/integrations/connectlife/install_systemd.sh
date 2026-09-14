@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="/home/jeroen/ems/repo/homey-energy-manual"
-SCRIPT_DIR="$ROOT_DIR/scripts/pi/connectlife"
+SCRIPT_DIR="$ROOT_DIR/services/pi/integrations/connectlife"
 PYTHON_BIN="/home/jeroen/ems/tools/connectlife-probe/.venv/bin/python"
 STATE_DIR="/home/jeroen/ems/runtime/state"
 ENV_DIR="/etc/ems"
