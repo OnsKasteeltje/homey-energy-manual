@@ -21,6 +21,9 @@ ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/warm-water/build_ww_
 ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/datastore/import_ww_forecast.py
 ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/quarter-hour-plan/build_shadow_load_plan.py
 ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/dynamic-plan/build_hardened_dynamic_shadow_plan_start6.py
+# Best-effort audit capture of the exact hardened decision context. The script
+# always exits successfully on archive failure so observability cannot block control.
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/history/archive_planner_snapshot.py
 ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/quarter-hour-plan/build_website_shadow.py
 ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/planner/dynamic-plan/build_dynamic_website_shadow.py
 ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/publisher/publish_planner_shadow.py
