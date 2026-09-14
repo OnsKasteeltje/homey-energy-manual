@@ -105,10 +105,10 @@ if [[ -n "$BASE_REF" ]]; then
       pass "architecture-sensitive changes include canonical document update"
     else
       ARCH_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
-      NON_STRUCTURAL_ARCH="$(printf '%s\n' "$ARCH_CHANGED" | grep -Ev '^(services/pi/integrations/(honeywell|connectlife|homey)/|services/pi/api/status/(server|history_archive|state_ingest)\.py$|src/pi/ems-runtime/homey-deploy/publish_pi_control_intent\.py$|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
+      NON_STRUCTURAL_ARCH="$(printf '%s\n' "$ARCH_CHANGED" | grep -Ev '^(services/pi/integrations/(honeywell|connectlife|homey)/|services/pi/api/status/(server|history_archive|state_ingest)\.py$|src/pi/ems-runtime/homey-deploy/(publish_pi_control_intent|homey_flow_audit|homey_flow_deploy)\.py$|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
       HONEYWELL_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^services/pi/integrations/honeywell/' || true)"
       CONNECTLIFE_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^services/pi/integrations/connectlife/' || true)"
-      HOMEY_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^(services/pi/integrations/homey/|services/pi/api/status/state_ingest\.py$|src/pi/ems-runtime/homey-deploy/publish_pi_control_intent\.py$)' || true)"
+      HOMEY_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^(services/pi/integrations/homey/|services/pi/api/status/state_ingest\.py$|src/pi/ems-runtime/homey-deploy/(publish_pi_control_intent|homey_flow_audit|homey_flow_deploy)\.py$)' || true)"
       STATUS_STRUCTURE_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^services/pi/api/status/(server|history_archive|state_ingest)\.py$' || true)"
       DOCS_OK=true
       [[ -z "$HONEYWELL_CHANGED" ]] || printf '%s\n' "$CHANGED" | grep -Fxq "$HONEYWELL_DOC" || DOCS_OK=false
