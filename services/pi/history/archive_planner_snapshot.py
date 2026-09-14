@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-"""Archive each hardened Pi planner run for retrospective EMS validation.
+"""Archive hardened Pi planner runs for retrospective EMS validation.
 
-This is observability-only history. It must never block planner/control output.
-The current hardened plan and the decision context that cannot be reconstructed
-later are stored as a compressed snapshot in a local SQLite database.
+Observability only: archive failure must never block planner/control output.
+The hardened plan itself is the atomic decision record. Context is therefore
+extracted from fields embedded in that plan; this script deliberately does not
+re-read mutable live Homey state after the planner has completed.
 
 Runtime target:
   /home/jeroen/ems/runtime/history/archive_planner_snapshot.py
@@ -22,8 +23,6 @@ from pathlib import Path
 
 DATA = Path("/home/jeroen/ems/data")
 PLAN_FILE = DATA / "dynamic-shadow-plan.json"
-STATE_FILE = DATA / "energy-state-v2.json"
-WW_FILE = DATA / "ww-input.json"
 DB_FILE = DATA / "planner-history.sqlite"
 STATUS_FILE = DATA / "planner-history-status.json"
 RETENTION_DAYS = 120
@@ -71,58 +70,69 @@ def ensure_schema(con):
     )
 
 
-def compact_context(state, ww):
-    meta = state.get("meta") or {}
-    tesla = state.get("tesla") or {}
-    grid = state.get("grid") or {}
-    hot_water = state.get("hot_water") or {}
-    warm_water = ww.get("warmWater") or {}
+def planner_context(plan):
+    """Return only context that is already frozen inside the planner output.
+
+    Re-reading energy-state-v2.json or ww-input.json here would introduce a race:
+    Homey can publish a newer state between plan generation and archive capture.
+    For replay, a slightly smaller but internally consistent decision record is
+    preferable to attaching a newer state that the planner never saw.
+    """
+    tesla = plan.get("tesla") or {}
+    deadline = tesla.get("deadlinePlan") or plan.get("teslaDeadline") or {}
+    realtime = plan.get("realtime") or {}
+    daily = plan.get("dailyPlans") or []
+
+    current_day = None
+    for item in daily:
+        if item.get("goalReached") is not None:
+            current_day = item
+            break
 
     return {
-        "state": {
-            "meta": {
-                "state_revision": meta.get("state_revision"),
-                "source_sample_at": meta.get("source_sample_at"),
-                "heartbeat_at": meta.get("heartbeat_at"),
-                "publisher_version": meta.get("publisher_version"),
-            },
-            "grid": {
-                "power_w": grid.get("power_w"),
-                "import_w": grid.get("import_w"),
-                "export_w": grid.get("export_w"),
-            },
-            "tesla": {
-                "connected": tesla.get("connected"),
-                "charging": tesla.get("charging"),
-                "power_w": tesla.get("power_w"),
-                "soc_pct": tesla.get("soc_pct"),
-                "deadline_active": tesla.get("deadline_active"),
-                "deadline_at": tesla.get("deadline_at"),
-                "latest_start_at": tesla.get("latest_start_at"),
-                "remaining_kwh": tesla.get("remaining_kwh"),
-                "deadline_max_a": tesla.get("deadline_max_a"),
-            },
-            "hot_water": {
-                "boiler_power_w": hot_water.get("boiler_power_w"),
-            },
+        "contextSource": "PLAN_EMBEDDED_DECISION_OUTPUT",
+        "realtime": {
+            "actualP1ExportW": realtime.get("actualP1ExportW"),
+            "recentLocalAccuracy": realtime.get("recentLocalAccuracy"),
+            "recentP1ExportSamples": realtime.get("recentP1ExportSamples"),
+            "p1CorrectionPolicy": realtime.get("p1CorrectionPolicy"),
         },
-        "warmWater": warm_water,
+        "tesla": {
+            "connected": tesla.get("connectedNow"),
+            "charging": tesla.get("chargingNow"),
+            "availabilityPolicy": tesla.get("availabilityPolicy"),
+            "deadline": deadline,
+            "qualifiedWindows": tesla.get("qualifiedWindows"),
+        },
+        "warmWater": current_day,
+        "guardrails": plan.get("guardrails"),
+        "contract": plan.get("contract"),
+        "inputFreshness": plan.get("inputFreshness"),
     }
 
 
 def archive():
     captured = utc_now()
     plan = load(PLAN_FILE)
-    state = load(STATE_FILE)
-    ww = load(WW_FILE)
 
     generated = plan.get("generated_at") or plan.get("generatedAt")
     if not generated:
         raise RuntimeError("planner snapshot missing generated_at")
 
-    context = compact_context(state, ww)
+    context = planner_context(plan)
+    tesla = context["tesla"]
+    deadline = tesla.get("deadline") or {}
+    warm_water = context.get("warmWater") or {}
+
+    # The current plan schema does not yet embed Homey state_revision or
+    # source_sample_at. Do not fabricate them by reading mutable live state here.
+    # Exact measured actuals remain available in ems-history.sqlite and are joined
+    # by time during retrospective replay.
+    state_revision = None
+    source_sample_at = None
+
     snapshot = {
-        "schema": "EMS_PI_PLANNER_DECISION_SNAPSHOT_V0.1",
+        "schema": "EMS_PI_PLANNER_DECISION_SNAPSHOT_V0.2",
         "capturedAt": iso_z(captured),
         "objective": plan.get("objective"),
         "plan": plan,
@@ -132,10 +142,6 @@ def archive():
         json.dumps(snapshot, separators=(",", ":")).encode("utf-8"),
         level=6,
     )
-
-    meta = context["state"]["meta"]
-    tesla = context["state"]["tesla"]
-    warm_water = context["warmWater"]
 
     con = sqlite3.connect(DB_FILE, timeout=5)
     try:
@@ -154,14 +160,11 @@ def archive():
                 iso_z(captured),
                 plan.get("schema"),
                 plan.get("validUntil"),
-                meta.get("state_revision"),
-                meta.get("source_sample_at"),
+                state_revision,
+                source_sample_at,
                 1 if tesla.get("connected") is True else 0,
-                1 if tesla.get("deadline_active") is True else 0,
-                1 if (
-                    warm_water.get("goalReachedToday") is True
-                    or warm_water.get("goalReached") is True
-                ) else 0,
+                1 if deadline.get("active") is True else 0,
+                1 if warm_water.get("goalReached") is True else 0,
                 sqlite3.Binary(blob),
             ),
         )
@@ -182,13 +185,15 @@ def archive():
         con.close()
 
     status = {
-        "schema": "EMS_PI_PLANNER_HISTORY_STATUS_V0.1",
+        "schema": "EMS_PI_PLANNER_HISTORY_STATUS_V0.2",
         "updatedAt": iso_z(captured),
         "status": "OK",
         "inserted": inserted,
         "latestPlanGeneratedAt": generated,
-        "stateRevision": meta.get("state_revision"),
-        "sourceSampleAt": meta.get("source_sample_at"),
+        "contextSource": context["contextSource"],
+        "stateRevision": state_revision,
+        "sourceSampleAt": source_sample_at,
+        "actualP1ExportW": context["realtime"].get("actualP1ExportW"),
         "retentionDays": RETENTION_DAYS,
         "snapshotCount": row[0],
         "oldestSnapshot": row[1],
@@ -204,10 +209,9 @@ def main():
         print("PASS: planner decision snapshot archived")
         print("inserted           :", result["inserted"])
         print("latest plan        :", result["latestPlanGeneratedAt"])
-        print("state revision     :", result["stateRevision"])
+        print("context source     :", result["contextSource"])
         print("snapshot count     :", result["snapshotCount"])
     except Exception as exc:
-        # Historical observability must never take down the forecast/control chain.
         print(f"WARN: planner decision history archive failed: {exc}", file=sys.stderr)
         return 0
     return 0
