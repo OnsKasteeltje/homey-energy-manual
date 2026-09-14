@@ -8,6 +8,7 @@ TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
 TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
 TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
+TARGET_HOMEY_INGRESS_FILE="$REPO/services/pi/integrations/homey/ingress/state_ingest.py"
 TARGET_HOMEY_EGRESS_SOURCE="$REPO/services/pi/integrations/homey/egress"
 TARGET_HOMEY_EGRESS_RUNTIME="$RUNTIME/homey-deploy"
 TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
@@ -134,19 +135,27 @@ if echo "$HONEYWELL_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; th
     exit 1
 fi
 
+if [[ ! -f "$TARGET_HOMEY_INGRESS_FILE" ]]; then
+    echo "ERROR: Homey ingress source is missing."
+    echo "Deployment aborted to protect the Homey -> Pi state path."
+    exit 1
+fi
+
 mkdir -p "$TARGET_HOMEY_EGRESS_RUNTIME"
-if [[ -f "$TARGET_HOMEY_EGRESS_RUNTIME/publish_pi_control_intent.py" ]] && \
-   [[ ! -f "$TARGET_HOMEY_EGRESS_SOURCE/publish_pi_control_intent.py" ]]; then
-    echo "ERROR: Homey egress runtime source is missing."
-    echo "Deployment aborted to prevent accidental loss of the Pi -> Homey bridge."
+if [[ ! -f "$TARGET_HOMEY_EGRESS_SOURCE/publish_pi_control_intent.py" ]]; then
+    echo "ERROR: Homey egress source is missing."
+    echo "Deployment aborted to protect the Pi -> Homey control path."
     exit 1
 fi
 
 mkdir -p "$TARGET_STATUS_RUNTIME"
 STATUS_UNMANAGED="$(
     diff -u \
-        <(cd "$TARGET_STATUS_SOURCE" && find . -type f -printf '%P\n' | sort) \
+        <(cd "$TARGET_STATUS_SOURCE" && find . -type f \
+            -not -path './state_ingest.py' \
+            -printf '%P\n' | sort) \
         <(cd "$TARGET_STATUS_RUNTIME" && find . -type f \
+            -not -path './state_ingest.py' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort) \
@@ -201,9 +210,11 @@ cp -a \
 
 mkdir -p "$TARGET_STATUS_RUNTIME"
 rsync -a --delete \
+    --exclude='state_ingest.py' \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     "$TARGET_STATUS_SOURCE/" "$TARGET_STATUS_RUNTIME/"
+cp -a "$TARGET_HOMEY_INGRESS_FILE" "$TARGET_STATUS_RUNTIME/state_ingest.py"
 
 chmod 0755 "$TARGET_HISTORY_RUNTIME/ems_performance.py"
 ln -sfn "$TARGET_HISTORY_RUNTIME/ems_performance.py" "$PERFORMANCE_COMMAND"
