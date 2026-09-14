@@ -16,7 +16,8 @@ Detailed bidirectional runtime chain: `docs/architecture/homey-pi-runtime-datafl
 - GitHub `main` is authoritative for Pi runtime source, deployment definitions and architecture documentation.
 - Deployed runtime: `/home/jeroen/ems/runtime/`.
 - Pi repository checkout: `/home/jeroen/ems/repo/homey-energy-manual`.
-- SQLite `/home/jeroen/ems/data/ems-history.sqlite` is the single operational historical database.
+- SQLite `/home/jeroen/ems/data/ems-history.sqlite` is the canonical operational measurement history.
+- SQLite `/home/jeroen/ems/data/planner-history.sqlite` is the canonical planner decision/replay history.
 - JSON under `/home/jeroen/ems/data/` and `docs/data/` is derived state, cache or publication output.
 - Homey Logic variable `EM2_Planner_Authority` is the sole runtime selector between Homey and Pi planner authority.
 - GitHub is **not** a runtime transport dependency for live Homey ↔ Pi state or control.
@@ -128,8 +129,9 @@ The regular chain builds planning inputs in this order:
 7. WW forecast import;
 8. quarter-hour planning inputs / shadow load plan;
 9. hardened dynamic planner;
-10. website shadow representations;
-11. publication artifacts.
+10. best-effort planner decision snapshot for retrospective replay;
+11. website shadow representations;
+12. publication artifacts.
 
 The forecast chain is executed by `ems-forecast-chain.service` (`Type=oneshot`), normally triggered by `ems-forecast-chain.timer`. `inactive (dead)` after a successful run is normal.
 
@@ -148,6 +150,30 @@ The current plan schema is `EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3` and includes:
 - multiday lookahead for WW feasibility.
 
 The term **dynamic planner** refers to rolling optimization of flexible loads; it does not imply a dynamic electricity contract.
+
+### 4.1 Planner decision history and PV replay
+
+Every successfully hardened planner run is followed in the same forecast chain by `services/pi/history/archive_planner_snapshot.py`, deployed as `/home/jeroen/ems/runtime/history/archive_planner_snapshot.py`.
+
+The archive stores a compressed append-only decision snapshot in `/home/jeroen/ems/data/planner-history.sqlite`. Each snapshot is keyed by the planner generation timestamp and contains:
+
+- the complete hardened 96-slot plan, including PV/base-load/Quatt forecasts and predicted grid import/export after flexible loads;
+- WW allocation choices, candidate diagnostics, comfort/deadline context and allocation reasons;
+- Tesla connection/deadline context, selected opportunity windows, targets and allocation reasons;
+- the Homey Core `state_revision` and physical `source_sample_at` used as live context;
+- relevant P1, Tesla and warm-water state needed to explain the decision later;
+- fixed-contract and input-freshness metadata already embedded in the hardened plan.
+
+Retention is 120 days. Duplicate planner generation timestamps are idempotently ignored.
+
+This decision history complements, rather than replaces, `ems-history.sqlite`. Together they provide the two historical layers required for objective EMS performance review:
+
+1. **actuals** — what PV, grid, boiler, Tesla, Quatt and loads actually did;
+2. **decision context** — what the planner knew, forecast, constrained and selected at that time.
+
+The existing PV-capture validator measures realised self-consumption/capture. It is not by itself proof of the theoretical constrained optimum. A retrospective optimum/replay analysis must compare measured actuals with the archived decision context under the same WW comfort, Tesla availability/deadline and actuator constraints.
+
+Planner-history capture is observability-only and best-effort. Failure to archive a snapshot is logged but must not block generation, publication or execution of an otherwise valid plan.
 
 ## 5. Current control endpoint
 
@@ -296,6 +322,13 @@ If only SQLite historical archiving fails:
 - history quality/coverage must show the gap;
 - repair must remain local and must not add aggressive Homey polling.
 
+If only planner decision-history archiving fails:
+
+- the hardened plan remains valid and available to `/control/current`;
+- the forecast chain continues;
+- the archive warning is visible in the forecast-chain journal;
+- retrospective optimum/replay quality must report the missing decision-history interval.
+
 ### Control direction
 
 If the Pi plan or `/control/current` becomes stale or invalid:
@@ -330,6 +363,8 @@ For Homey ↔ Pi boundary changes, documentation must cover both state and contr
 
 Production `deploy/systemd/` must contain only units that remain valid for the intended runtime architecture. Obsolete automatic Homey pollers or alternative control writers must not remain deployable production timers.
 
+New Pi history functionality uses the target repository structure under `services/pi/history/`. The active planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path would require coordinated systemd, deployment and runtime-path migration and would add unrelated cutover risk. This is an explicit `touch it, place it correctly` migration decision rather than a new legacy placement.
+
 ## 12. Battery boundary
 
 The planned battery architecture is Victron AC-coupled. When commissioned, Victron/DESS remains the primary realtime battery optimizer. Pi/Homey may provide forecasts, load intent and policy constraints but must not create a competing realtime battery optimizer.
@@ -355,6 +390,8 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - no second independent planner-generation owner;
 - no GitHub dependency in the live Homey ↔ Pi runtime state/control path;
 - accepted Homey state is the production source for local operational energy history;
+- hardened planner decisions are archived locally for retrospective replay without becoming a control-path dependency;
+- new Pi history code is placed under the target `services/pi/history/` structure and included in deployment/drift validation;
 - no automatic production timers for legacy Homey Insights/day-history polling;
 - no automatic Pi-side Homey control publisher while the Homey PI Bridge owns `/control/current` consumption.
 

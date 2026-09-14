@@ -4,6 +4,8 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME="/home/jeroen/ems/runtime"
 SOURCE="$REPO/src/pi/ems-runtime"
+TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
+TARGET_HISTORY_RUNTIME="$RUNTIME/history"
 SYSTEMD="$REPO/deploy/systemd"
 BACKUP_ROOT="/home/jeroen/ems/backup"
 DEPLOY_MARKER="/home/jeroen/ems/data/deployed-git-commit"
@@ -61,6 +63,7 @@ UNMANAGED="$(
         <(cd "$RUNTIME" && find . -type f \
             -not -path './data/*' \
             -not -path './logs/*' \
+            -not -path './history/*' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort) \
@@ -75,6 +78,25 @@ if echo "$UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; then
     exit 1
 fi
 
+mkdir -p "$TARGET_HISTORY_RUNTIME"
+HISTORY_UNMANAGED="$(
+    diff -u \
+        <(cd "$TARGET_HISTORY_SOURCE" && find . -type f -printf '%P\n' | sort) \
+        <(cd "$TARGET_HISTORY_RUNTIME" && find . -type f \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort) \
+        || true
+)"
+
+if echo "$HISTORY_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; then
+    echo "ERROR: unmanaged files exist in runtime/history."
+    echo "Deployment aborted to prevent accidental deletion."
+    echo
+    echo "$HISTORY_UNMANAGED"
+    exit 1
+fi
+
 echo "PASS: runtime contains no unmanaged source files"
 
 echo
@@ -82,11 +104,18 @@ echo "=== DEPLOY RUNTIME SOURCE ==="
 rsync -a --delete \
     --exclude='data/' \
     --exclude='logs/' \
+    --exclude='history/' \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     --exclude='*.bak*' \
     --exclude='*.before-*' \
     "$SOURCE/" "$RUNTIME/"
+
+mkdir -p "$TARGET_HISTORY_RUNTIME"
+rsync -a --delete \
+    --exclude='__pycache__/' \
+    --exclude='*.pyc' \
+    "$TARGET_HISTORY_SOURCE/" "$TARGET_HISTORY_RUNTIME/"
 
 echo
 echo "=== DEPLOY SYSTEMD ==="
