@@ -8,6 +8,8 @@ TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
 TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
 TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
+TARGET_HOMEY_EGRESS_SOURCE="$REPO/services/pi/integrations/homey/egress"
+TARGET_HOMEY_EGRESS_RUNTIME="$RUNTIME/homey-deploy"
 TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
 TARGET_STATUS_RUNTIME="$RUNTIME/status-api"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
@@ -18,6 +20,7 @@ echo "Repo:      $REPO"
 echo "Source:    $SOURCE"
 echo "History:   $TARGET_HISTORY_SOURCE"
 echo "Honeywell: $TARGET_HONEYWELL_SOURCE"
+echo "Homey out: $TARGET_HOMEY_EGRESS_SOURCE"
 echo "Status API:$TARGET_STATUS_SOURCE"
 echo "Runtime:   $RUNTIME"
 echo
@@ -42,6 +45,7 @@ while IFS= read -r rel; do
 done < <(
     cd "$SOURCE" && find . -type f \
         -not -path './status-api/*' \
+        -not -path './homey-deploy/publish_pi_control_intent.py' \
         -not -path '*/__pycache__/*' \
         -not -name '*.pyc' \
         -printf '%P\n' | sort
@@ -96,6 +100,34 @@ else
             -not -path './cache/*' \
             -not -path './output/*' \
             -not -path './config/account.env' \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort
+    )
+fi
+
+echo
+echo "=== TARGET-STRUCTURE HOMEY EGRESS FILES ==="
+if [[ ! -d "$TARGET_HOMEY_EGRESS_RUNTIME" ]]; then
+    echo "MISSING: $TARGET_HOMEY_EGRESS_RUNTIME"
+    FAIL=1
+else
+    while IFS= read -r rel; do
+        src="$TARGET_HOMEY_EGRESS_SOURCE/$rel"
+        dst="$TARGET_HOMEY_EGRESS_RUNTIME/$rel"
+
+        if [[ ! -f "$dst" ]]; then
+            echo "MISSING: homey-deploy/$rel"
+            FAIL=1
+            continue
+        fi
+
+        if ! cmp -s "$src" "$dst"; then
+            echo "DRIFT:   homey-deploy/$rel"
+            FAIL=1
+        fi
+    done < <(
+        cd "$TARGET_HOMEY_EGRESS_SOURCE" && find . -type f \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort
