@@ -1,7 +1,7 @@
 """Authenticated LAN ingest for Homey Core energy-state snapshots.
 
 Runtime direction is deliberately one-way for state transport:
-Homey Core -> Pi status API -> local runtime file -> Pi planners.
+Homey Core -> Pi status API -> local runtime file + local history -> Pi planners.
 
 This module performs no Homey polling, no GitHub calls and no device writes.
 """
@@ -9,8 +9,11 @@ This module performs no Homey polling, no GitHub calls and no device writes.
 import hmac
 import json
 import os
+import sys
 import tempfile
 from datetime import datetime, timezone
+
+from history_archive import archive_state_history
 
 ENERGY_STATE_FILE = "/home/jeroen/ems/data/energy-state-v2.json"
 TOKEN_ENV = "EMS_STATE_INGEST_TOKEN"
@@ -206,8 +209,24 @@ def handle_state_ingest(handler, send_json):
         })
         return
 
+    history = {
+        "archived": False,
+        "inserted": 0,
+        "skipped": 0,
+    }
+    try:
+        history = archive_state_history(payload)
+    except Exception as exc:
+        # Historical persistence is deliberately decoupled from the live state
+        # acceptance path. A local archive failure must be visible in the journal
+        # but must not make a fresh, valid Homey state unavailable to the planner.
+        print(f"WARN: state history archive failed: {exc}", file=sys.stderr)
+
     send_json(handler, 202, {
         "status": "ACCEPTED",
         "stateWritten": True,
+        "historyArchived": history.get("archived") is True,
+        "historyInserted": history.get("inserted", 0),
+        "historySkipped": history.get("skipped", 0),
         **accepted,
     })
