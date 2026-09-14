@@ -8,6 +8,8 @@ TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
 TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
 TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
+TARGET_HOMEY_EGRESS_SOURCE="$REPO/services/pi/integrations/homey/egress"
+TARGET_HOMEY_EGRESS_RUNTIME="$RUNTIME/homey-deploy"
 TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
 TARGET_STATUS_RUNTIME="$RUNTIME/status-api"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
@@ -67,6 +69,7 @@ UNMANAGED="$(
         <(cd "$SOURCE" && find . -type f \
             -not -path './status-api/*' \
             -not -path './tools/honeywell/*' \
+            -not -path './homey-deploy/publish_pi_control_intent.py' \
             -printf '%P\n' | sort) \
         <(cd "$RUNTIME" && find . -type f \
             -not -path './data/*' \
@@ -74,6 +77,7 @@ UNMANAGED="$(
             -not -path './history/*' \
             -not -path './status-api/*' \
             -not -path './tools/honeywell/*' \
+            -not -path './homey-deploy/publish_pi_control_intent.py' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort) \
@@ -130,6 +134,14 @@ if echo "$HONEYWELL_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; th
     exit 1
 fi
 
+mkdir -p "$TARGET_HOMEY_EGRESS_RUNTIME"
+if [[ -f "$TARGET_HOMEY_EGRESS_RUNTIME/publish_pi_control_intent.py" ]] && \
+   [[ ! -f "$TARGET_HOMEY_EGRESS_SOURCE/publish_pi_control_intent.py" ]]; then
+    echo "ERROR: Homey egress runtime source is missing."
+    echo "Deployment aborted to prevent accidental loss of the Pi -> Homey bridge."
+    exit 1
+fi
+
 mkdir -p "$TARGET_STATUS_RUNTIME"
 STATUS_UNMANAGED="$(
     diff -u \
@@ -159,6 +171,7 @@ rsync -a --delete \
     --exclude='history/' \
     --exclude='status-api/' \
     --exclude='tools/honeywell/' \
+    --exclude='homey-deploy/publish_pi_control_intent.py' \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     --exclude='*.bak*' \
@@ -180,6 +193,11 @@ rsync -a --delete \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     "$TARGET_HONEYWELL_SOURCE/" "$TARGET_HONEYWELL_RUNTIME/"
+
+mkdir -p "$TARGET_HOMEY_EGRESS_RUNTIME"
+cp -a \
+    "$TARGET_HOMEY_EGRESS_SOURCE/publish_pi_control_intent.py" \
+    "$TARGET_HOMEY_EGRESS_RUNTIME/publish_pi_control_intent.py"
 
 mkdir -p "$TARGET_STATUS_RUNTIME"
 rsync -a --delete \
