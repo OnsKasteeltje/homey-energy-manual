@@ -6,6 +6,7 @@ RUNTIME="/home/jeroen/ems/runtime"
 SOURCE="$REPO/src/pi/ems-runtime"
 TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
+PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 SYSTEMD="$REPO/deploy/systemd"
 
 echo "=== EMS PI DRIFT CHECK ==="
@@ -61,6 +62,21 @@ done < <(
         -not -name '*.pyc' \
         -printf '%P\n' | sort
 )
+
+echo
+echo "=== EMS PERFORMANCE COMMAND ==="
+if [[ ! -L "$PERFORMANCE_COMMAND" ]]; then
+    echo "MISSING: $PERFORMANCE_COMMAND symlink"
+    FAIL=1
+elif [[ "$(readlink -f "$PERFORMANCE_COMMAND")" != "$TARGET_HISTORY_RUNTIME/ems_performance.py" ]]; then
+    echo "DRIFT:   $PERFORMANCE_COMMAND -> $(readlink -f "$PERFORMANCE_COMMAND")"
+    FAIL=1
+elif [[ ! -x "$TARGET_HISTORY_RUNTIME/ems_performance.py" ]]; then
+    echo "NOT EXECUTABLE: $TARGET_HISTORY_RUNTIME/ems_performance.py"
+    FAIL=1
+else
+    echo "PASS: ems-performance command installed"
+fi
 
 echo
 echo "=== SYSTEMD FILES ==="
