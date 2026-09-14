@@ -154,6 +154,21 @@ Bij Homey rate limiting worden calls geminimaliseerd. Gebruik waar mogelijk Pi/G
 
 Er is geen tweede automatische reconnect-controller nodig. Na opnieuw aansluiten loopt de normale periodieke single-writer control-keten opnieuw. Bij target 0 A normaliseert de actuator Easee naar 0 A; bij opportunity charging wordt de geldige bounded opdracht afgedwongen; bij deadline ownership wordt het deadline-target afgedwongen.
 
+## TODO bij volgende EV-ketenwijziging: robuuste session continuity
+
+Nachtvalidatie 13→14 september 2026 liet zien dat Easee tijdens aantoonbaar actief deadline-laden kortstondig `plugged_out` kan rapporteren terwijl de EMS nog een geldig 16 A / 11.04 kW deadline-target bezit. Een enkele tegenstrijdige connectiviteitsstatus mag daarom in een reeds fysiek bevestigde laadsessie niet automatisch de session authority beëindigen.
+
+Bij de volgende inhoudelijke wijziging aan de EV-keten ontwerpen en valideren:
+
+- fysiek bewezen laden (`power > 0` en/of consistente fasestromen) krijgt voor **session continuity** tijdelijk voorrang boven één kortstondige `plugged_out`-status;
+- `plugged_out` tijdens bewezen stroomafname wordt behandeld als verdachte/transiënte telemetry, niet direct als bewezen disconnect;
+- een actieve sessie wordt pas als werkelijk beëindigd beschouwd wanneer disconnect wordt bevestigd door samenhangende fysieke signalen, bijvoorbeeld `plugged_out` én vermogen/stromen circa nul gedurende een korte bevestigingsperiode;
+- voeg hysterese/debounce toe zodat één afwijkende statusupdate geen lopende deadline-sessie onderbreekt;
+- safety blijft fail-closed bij echte fault/offline/error, incoherente authority of een bevestigde fysieke disconnect;
+- leg een expliciete diagnostische reason/status vast, bijvoorbeeld `CHARGING_CONFIRMED_IGNORE_TRANSIENT_PLUGGED_OUT`, zodat dit gedrag achteraf aantoonbaar is.
+
+Dit is bewust een **TODO en geen huidige productiewijziging**. De exacte drempels, bevestigingsduur en gebruikte Easee-signalen moeten eerst met replay/live evidence worden vastgesteld voordat de EV device-health/gate/actuator wordt aangepast.
+
 ## START6 validatie
 
 Op 12 september 2026 is bewezen dat een gepauzeerde Easee/Tesla-sessie direct kan starten op 3×6 A. Gemeten waarden lagen rond 6.01/6.03/6.05 A en circa 4.235 kW totaal. Dit is de basis voor START6/RUN6.
