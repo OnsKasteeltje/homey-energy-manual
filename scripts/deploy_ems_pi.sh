@@ -8,6 +8,8 @@ TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
 TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
 TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
+TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
+TARGET_STATUS_RUNTIME="$RUNTIME/status-api"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 SYSTEMD="$REPO/deploy/systemd"
 BACKUP_ROOT="/home/jeroen/ems/backup"
@@ -63,12 +65,14 @@ echo "=== CHECK RUNTIME FOR UNMANAGED FILES ==="
 UNMANAGED="$(
     diff -u \
         <(cd "$SOURCE" && find . -type f \
+            -not -path './status-api/*' \
             -not -path './tools/honeywell/*' \
             -printf '%P\n' | sort) \
         <(cd "$RUNTIME" && find . -type f \
             -not -path './data/*' \
             -not -path './logs/*' \
             -not -path './history/*' \
+            -not -path './status-api/*' \
             -not -path './tools/honeywell/*' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
@@ -126,6 +130,25 @@ if echo "$HONEYWELL_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; th
     exit 1
 fi
 
+mkdir -p "$TARGET_STATUS_RUNTIME"
+STATUS_UNMANAGED="$(
+    diff -u \
+        <(cd "$TARGET_STATUS_SOURCE" && find . -type f -printf '%P\n' | sort) \
+        <(cd "$TARGET_STATUS_RUNTIME" && find . -type f \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort) \
+        || true
+)"
+
+if echo "$STATUS_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; then
+    echo "ERROR: unmanaged files exist in runtime/status-api."
+    echo "Deployment aborted to prevent accidental deletion."
+    echo
+    echo "$STATUS_UNMANAGED"
+    exit 1
+fi
+
 echo "PASS: runtime contains no unmanaged source files"
 
 echo
@@ -134,6 +157,7 @@ rsync -a --delete \
     --exclude='data/' \
     --exclude='logs/' \
     --exclude='history/' \
+    --exclude='status-api/' \
     --exclude='tools/honeywell/' \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
@@ -156,6 +180,12 @@ rsync -a --delete \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     "$TARGET_HONEYWELL_SOURCE/" "$TARGET_HONEYWELL_RUNTIME/"
+
+mkdir -p "$TARGET_STATUS_RUNTIME"
+rsync -a --delete \
+    --exclude='__pycache__/' \
+    --exclude='*.pyc' \
+    "$TARGET_STATUS_SOURCE/" "$TARGET_STATUS_RUNTIME/"
 
 chmod 0755 "$TARGET_HISTORY_RUNTIME/ems_performance.py"
 ln -sfn "$TARGET_HISTORY_RUNTIME/ems_performance.py" "$PERFORMANCE_COMMAND"
