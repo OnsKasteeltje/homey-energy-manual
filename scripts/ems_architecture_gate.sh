@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOC="docs/architecture/CURRENT-EMS-STATE.md"
+HONEYWELL_DOC="docs/architecture/honeywell-integration.md"
 POLICY="src/pi/ems-runtime/planner/contract-policy.json"
 STATE_INGEST="src/pi/ems-runtime/status-api/state_ingest.py"
 HISTORY_ARCHIVE="src/pi/ems-runtime/status-api/history_archive.py"
@@ -24,6 +25,7 @@ pass() {
 cd "$REPO"
 
 [[ -f "$DOC" ]] || fail "$DOC missing"
+[[ -f "$HONEYWELL_DOC" ]] || fail "$HONEYWELL_DOC missing"
 [[ -f "$POLICY" ]] || fail "$POLICY missing"
 [[ -f "$STATE_INGEST" ]] || fail "$STATE_INGEST missing"
 [[ -f "$HISTORY_ARCHIVE" ]] || fail "$HISTORY_ARCHIVE missing"
@@ -81,6 +83,8 @@ grep -q 'services/pi/integrations/honeywell' scripts/deploy_ems_pi.sh || fail "H
 grep -q -- "--exclude='.venv/'" scripts/deploy_ems_pi.sh || fail "Honeywell local virtualenv is not protected during deployment"
 grep -q 'TARGET-STRUCTURE HONEYWELL FILES' scripts/ems_pi_drift_check.sh || fail "Honeywell target-structure source is not drift-checked"
 grep -q -- "-not -path './.venv/\*'" scripts/ems_pi_drift_check.sh || fail "Honeywell local virtualenv is not excluded from drift validation"
+grep -q 'services/pi/integrations/honeywell/' "$HONEYWELL_DOC" || fail "Honeywell target repository boundary missing from architecture document"
+grep -q '/home/jeroen/ems/runtime/tools/honeywell/' "$HONEYWELL_DOC" || fail "Honeywell runtime compatibility path missing from architecture document"
 pass "Honeywell target-structure deployment preserves host-local runtime state"
 
 for legacy_unit in \
@@ -99,12 +103,18 @@ if [[ -n "$BASE_REF" ]]; then
   CHANGED="$(git diff --name-only "$BASE_REF"..HEAD)"
 
   if printf '%s\n' "$CHANGED" | grep -Eq '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)'; then
-    if ! printf '%s\n' "$CHANGED" | grep -Fxq "$DOC"; then
-      echo "Architecture-sensitive files changed since $BASE_REF:" >&2
-      printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' >&2 || true
-      fail "$DOC was not updated in the same release range"
+    if printf '%s\n' "$CHANGED" | grep -Fxq "$DOC"; then
+      pass "architecture-sensitive changes include canonical document update"
+    else
+      NON_HONEYWELL_ARCH="$(printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' | grep -Ev '^(services/pi/integrations/honeywell/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
+      if [[ -z "$NON_HONEYWELL_ARCH" ]] && printf '%s\n' "$CHANGED" | grep -Fxq "$HONEYWELL_DOC"; then
+        pass "Honeywell-only architecture changes include dedicated architecture document update"
+      else
+        echo "Architecture-sensitive files changed since $BASE_REF:" >&2
+        printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' >&2 || true
+        fail "$DOC was not updated in the same release range"
+      fi
     fi
-    pass "architecture-sensitive changes include canonical document update"
   else
     pass "no architecture-sensitive changes in release range"
   fi
