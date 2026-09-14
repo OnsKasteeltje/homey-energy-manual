@@ -4,11 +4,14 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME="/home/jeroen/ems/runtime"
 SOURCE="$REPO/src/pi/ems-runtime"
+TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
+TARGET_HISTORY_RUNTIME="$RUNTIME/history"
 SYSTEMD="$REPO/deploy/systemd"
 
 echo "=== EMS PI DRIFT CHECK ==="
 echo "Repo:    $REPO"
 echo "Source:  $SOURCE"
+echo "History: $TARGET_HISTORY_SOURCE"
 echo "Runtime: $RUNTIME"
 echo
 
@@ -31,6 +34,29 @@ while IFS= read -r rel; do
     fi
 done < <(
     cd "$SOURCE" && find . -type f \
+        -not -path '*/__pycache__/*' \
+        -not -name '*.pyc' \
+        -printf '%P\n' | sort
+)
+
+echo
+echo "=== TARGET-STRUCTURE HISTORY FILES ==="
+while IFS= read -r rel; do
+    src="$TARGET_HISTORY_SOURCE/$rel"
+    dst="$TARGET_HISTORY_RUNTIME/$rel"
+
+    if [[ ! -f "$dst" ]]; then
+        echo "MISSING: history/$rel"
+        FAIL=1
+        continue
+    fi
+
+    if ! cmp -s "$src" "$dst"; then
+        echo "DRIFT:   history/$rel"
+        FAIL=1
+    fi
+done < <(
+    cd "$TARGET_HISTORY_SOURCE" && find . -type f \
         -not -path '*/__pycache__/*' \
         -not -name '*.pyc' \
         -printf '%P\n' | sort
