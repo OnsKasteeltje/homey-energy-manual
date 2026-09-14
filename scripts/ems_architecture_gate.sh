@@ -4,6 +4,8 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOC="docs/architecture/CURRENT-EMS-STATE.md"
 POLICY="src/pi/ems-runtime/planner/contract-policy.json"
+STATE_INGEST="src/pi/ems-runtime/status-api/state_ingest.py"
+HISTORY_ARCHIVE="src/pi/ems-runtime/status-api/history_archive.py"
 BASE_REF="${1:-}"
 
 fail() {
@@ -19,6 +21,8 @@ cd "$REPO"
 
 [[ -f "$DOC" ]] || fail "$DOC missing"
 [[ -f "$POLICY" ]] || fail "$POLICY missing"
+[[ -f "$STATE_INGEST" ]] || fail "$STATE_INGEST missing"
+[[ -f "$HISTORY_ARCHIVE" ]] || fail "$HISTORY_ARCHIVE missing"
 
 python3 - "$POLICY" <<'PY'
 import json, sys
@@ -48,6 +52,22 @@ grep -q 'productionContractMode = FIXED' "$DOC" || fail "FIXED contract architec
 grep -q 'dynamic pricing is \*\*disabled for production\*\*' "$DOC" || fail "dynamic-production prohibition missing from canonical document"
 grep -q 'fail closed' "$DOC" || fail "fail-closed architecture rule missing from canonical document"
 pass "canonical architecture invariants documented"
+
+grep -q 'from history_archive import archive_state_history' "$STATE_INGEST" || fail "state ingest does not archive accepted Homey pushes"
+grep -q 'archive_state_history(payload)' "$STATE_INGEST" || fail "state history archive hook missing"
+grep -q 'ems-history.sqlite' "$HISTORY_ARCHIVE" || fail "history archive target is not canonical SQLite"
+pass "Homey push-fed local history archive present"
+
+for legacy_unit in \
+  deploy/systemd/ems-day-history.service \
+  deploy/systemd/ems-day-history.timer \
+  deploy/systemd/ems-homey-insights.service \
+  deploy/systemd/ems-homey-insights.timer \
+  deploy/systemd/ems-pi-control-publish.service \
+  deploy/systemd/ems-pi-control-publish.timer; do
+  [[ ! -e "$legacy_unit" ]] || fail "legacy production unit must not be deployable: $legacy_unit"
+done
+pass "legacy Homey polling/control-push units absent from production deploy set"
 
 if [[ -n "$BASE_REF" ]]; then
   git rev-parse --verify "$BASE_REF^{commit}" >/dev/null 2>&1 || fail "base ref $BASE_REF is not a commit"
