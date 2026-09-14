@@ -28,6 +28,8 @@ homey-energy-manual/
 │       ├── planner/
 │       ├── control/
 │       ├── state/
+│       ├── api/
+│       │   └── status/
 │       ├── integrations/
 │       │   ├── tesla/
 │       │   ├── easee/
@@ -79,6 +81,7 @@ The target structure follows the operational ownership model:
 
 - **Homey** is the executor / edge-control layer.
 - **Pi** owns planning, orchestration, state processing and external integrations unless explicitly documented otherwise.
+- **Pi API** exposes bounded machine interfaces such as health, state ingest and planner/control status without changing the underlying runtime ownership boundaries.
 - **Website** owns presentation and human-facing observability.
 - **docs/** contains architecture, component documentation, decisions, commissioning records and operational runbooks, not production runtime implementation.
 - **deploy/** contains installation, migration and runtime-service definitions.
