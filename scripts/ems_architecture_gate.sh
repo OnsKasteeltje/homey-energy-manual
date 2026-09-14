@@ -7,6 +7,7 @@ POLICY="src/pi/ems-runtime/planner/contract-policy.json"
 STATE_INGEST="src/pi/ems-runtime/status-api/state_ingest.py"
 HISTORY_ARCHIVE="src/pi/ems-runtime/status-api/history_archive.py"
 PLANNER_HISTORY="services/pi/history/archive_planner_snapshot.py"
+PERFORMANCE="services/pi/history/ems_performance.py"
 FORECAST_CHAIN="deploy/systemd/ems-forecast-chain.service"
 BASE_REF="${1:-}"
 
@@ -26,28 +27,22 @@ cd "$REPO"
 [[ -f "$STATE_INGEST" ]] || fail "$STATE_INGEST missing"
 [[ -f "$HISTORY_ARCHIVE" ]] || fail "$HISTORY_ARCHIVE missing"
 [[ -f "$PLANNER_HISTORY" ]] || fail "$PLANNER_HISTORY missing"
+[[ -f "$PERFORMANCE" ]] || fail "$PERFORMANCE missing"
 [[ -f "$FORECAST_CHAIN" ]] || fail "$FORECAST_CHAIN missing"
 
 python3 - "$POLICY" <<'PY'
 import json, sys
 p = json.load(open(sys.argv[1]))
 errors = []
-if p.get("productionContractMode") != "FIXED":
-    errors.append("productionContractMode must be FIXED")
-if p.get("productionContractId") != "ENGIE_3Y_2026_2029":
-    errors.append("productionContractId must be ENGIE_3Y_2026_2029")
+if p.get("productionContractMode") != "FIXED": errors.append("productionContractMode must be FIXED")
+if p.get("productionContractId") != "ENGIE_3Y_2026_2029": errors.append("productionContractId must be ENGIE_3Y_2026_2029")
 d = p.get("dynamicPricing") or {}
-if d.get("enabledForProduction") is not False:
-    errors.append("dynamic pricing must be disabled for production")
-if d.get("automaticFallbackAllowed") is not False:
-    errors.append("dynamic fallback must be disabled")
+if d.get("enabledForProduction") is not False: errors.append("dynamic pricing must be disabled for production")
+if d.get("automaticFallbackAllowed") is not False: errors.append("dynamic fallback must be disabled")
 s = p.get("safety") or {}
-if s.get("failClosed") is not True:
-    errors.append("failClosed must be true")
-if s.get("automaticContractModeSwitchAllowed") is not False:
-    errors.append("automatic contract-mode switching must be disabled")
-if errors:
-    raise SystemExit("; ".join(errors))
+if s.get("failClosed") is not True: errors.append("failClosed must be true")
+if s.get("automaticContractModeSwitchAllowed") is not False: errors.append("automatic contract-mode switching must be disabled")
+if errors: raise SystemExit("; ".join(errors))
 PY
 pass "contract-policy invariants valid"
 
@@ -72,6 +67,14 @@ grep -q 'services/pi/history' scripts/deploy_ems_pi.sh || fail "target-structure
 grep -q 'TARGET-STRUCTURE HISTORY FILES' scripts/ems_pi_drift_check.sh || fail "target-structure Pi history source is not drift-checked"
 pass "planner decision history uses atomic planner-owned context"
 
+grep -q 'EMS_PI_DAY_PERFORMANCE_V0.1' "$PERFORMANCE" || fail "standard EMS performance report schema missing"
+grep -q 'ems-history.sqlite' "$PERFORMANCE" || fail "EMS performance command does not use canonical measurement history"
+grep -q 'planner-history.sqlite' "$PERFORMANCE" || fail "EMS performance command does not use planner replay history"
+grep -q 'constrainedOptimumAvailable' "$PERFORMANCE" || fail "EMS performance report must distinguish constrained optimum from upper bound"
+grep -q '/usr/local/bin/ems-performance' scripts/deploy_ems_pi.sh || fail "ems-performance command is not installed by deployment"
+grep -q 'EMS PERFORMANCE COMMAND' scripts/ems_pi_drift_check.sh || fail "ems-performance installation is not drift-checked"
+pass "standardized read-only EMS performance command present"
+
 for legacy_unit in \
   deploy/systemd/ems-day-history.service \
   deploy/systemd/ems-day-history.timer \
@@ -87,10 +90,10 @@ if [[ -n "$BASE_REF" ]]; then
   git rev-parse --verify "$BASE_REF^{commit}" >/dev/null 2>&1 || fail "base ref $BASE_REF is not a commit"
   CHANGED="$(git diff --name-only "$BASE_REF"..HEAD)"
 
-  if printf '%s\n' "$CHANGED" | grep -Eq '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$)'; then
+  if printf '%s\n' "$CHANGED" | grep -Eq '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)'; then
     if ! printf '%s\n' "$CHANGED" | grep -Fxq "$DOC"; then
       echo "Architecture-sensitive files changed since $BASE_REF:" >&2
-      printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$)' >&2 || true
+      printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' >&2 || true
       fail "$DOC was not updated in the same release range"
     fi
     pass "architecture-sensitive changes include canonical document update"
