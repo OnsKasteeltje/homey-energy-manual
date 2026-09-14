@@ -129,12 +129,19 @@ def main():
     if not isinstance(ww_on, bool):
         raise SystemExit("FAIL_CLOSED: WW target_on invalid")
 
+    # One Homey read supplies the current EM2_State revision required by the
+    # existing downstream exact-revision adapter/gate safety contract.
     state_var = read_homey_variable(STATE_VAR_ID)
     state = parse_json(state_var.get("value")) or {}
     revision = state.get("revision")
     if revision is None:
         raise SystemExit("FAIL_CLOSED: Homey state revision missing")
 
+    # Only actuator-relevant semantics belong in the idempotency key.
+    # Planner generatedAt/validUntil change during routine refreshes and must
+    # not cause redundant Homey writes when revision and physical targets are
+    # unchanged. Fresh/stale planner validation is already enforced by the Pi
+    # /control/current endpoint before this point.
     semantic = {
         "sourceRevision": revision,
         "evW": ev_w,
