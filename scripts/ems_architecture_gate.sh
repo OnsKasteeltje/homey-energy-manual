@@ -5,6 +5,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOC="docs/architecture/CURRENT-EMS-STATE.md"
 HONEYWELL_DOC="docs/architecture/honeywell-integration.md"
 CONNECTLIFE_DOC="docs/architecture/connectlife-integration.md"
+HOMEY_DOC="services/pi/integrations/homey/README.md"
 POLICY="src/pi/ems-runtime/planner/contract-policy.json"
 STATE_INGEST="services/pi/integrations/homey/ingress/state_ingest.py"
 HISTORY_ARCHIVE="services/pi/api/status/history_archive.py"
@@ -22,6 +23,7 @@ cd "$REPO"
 [[ -f "$DOC" ]] || fail "$DOC missing"
 [[ -f "$HONEYWELL_DOC" ]] || fail "$HONEYWELL_DOC missing"
 [[ -f "$CONNECTLIFE_DOC" ]] || fail "$CONNECTLIFE_DOC missing"
+[[ -f "$HOMEY_DOC" ]] || fail "$HOMEY_DOC missing"
 [[ -f "$POLICY" ]] || fail "$POLICY missing"
 [[ -f "$STATE_INGEST" ]] || fail "$STATE_INGEST missing"
 [[ -f "$HISTORY_ARCHIVE" ]] || fail "$HISTORY_ARCHIVE missing"
@@ -86,6 +88,10 @@ grep -q 'services/pi/integrations/connectlife' "$CONNECTLIFE/ems-connectlife-ove
 grep -q 'services/pi/integrations/connectlife' "$CONNECTLIFE/install_systemd.sh" || fail "ConnectLife installer does not use target repository path"
 pass "ConnectLife target-structure and read-only boundary documented"
 
+grep -q 'services/pi/integrations/homey/ingress/state_ingest.py' "$HOMEY_DOC" || fail "Homey ingress target repository boundary missing from integration document"
+grep -q 'services/pi/integrations/homey/egress/publish_pi_control_intent.py' "$HOMEY_DOC" || fail "Homey egress target repository boundary missing from integration document"
+pass "Homey ingress/egress repository boundary documented"
+
 for legacy_unit in deploy/systemd/ems-day-history.service deploy/systemd/ems-day-history.timer deploy/systemd/ems-homey-insights.service deploy/systemd/ems-homey-insights.timer deploy/systemd/ems-pi-control-publish.service deploy/systemd/ems-pi-control-publish.timer; do [[ ! -e "$legacy_unit" ]] || fail "legacy production unit must not be deployable: $legacy_unit"; done
 pass "legacy Homey polling/control-push units absent from production deploy set"
 
@@ -97,12 +103,14 @@ if [[ -n "$BASE_REF" ]]; then
       pass "architecture-sensitive changes include canonical document update"
     else
       ARCH_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
-      NON_INTEGRATION_ARCH="$(printf '%s\n' "$ARCH_CHANGED" | grep -Ev '^(services/pi/integrations/(honeywell|connectlife)/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
+      NON_INTEGRATION_ARCH="$(printf '%s\n' "$ARCH_CHANGED" | grep -Ev '^(services/pi/integrations/(honeywell|connectlife|homey)/|services/pi/api/status/state_ingest\.py$|src/pi/ems-runtime/homey-deploy/publish_pi_control_intent\.py$|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
       HONEYWELL_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^services/pi/integrations/honeywell/' || true)"
       CONNECTLIFE_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^services/pi/integrations/connectlife/' || true)"
+      HOMEY_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^(services/pi/integrations/homey/|services/pi/api/status/state_ingest\.py$|src/pi/ems-runtime/homey-deploy/publish_pi_control_intent\.py$)' || true)"
       DOCS_OK=true
       [[ -z "$HONEYWELL_CHANGED" ]] || printf '%s\n' "$CHANGED" | grep -Fxq "$HONEYWELL_DOC" || DOCS_OK=false
       [[ -z "$CONNECTLIFE_CHANGED" ]] || printf '%s\n' "$CHANGED" | grep -Fxq "$CONNECTLIFE_DOC" || DOCS_OK=false
+      [[ -z "$HOMEY_CHANGED" ]] || printf '%s\n' "$CHANGED" | grep -Fxq "$HOMEY_DOC" || DOCS_OK=false
       if [[ -z "$NON_INTEGRATION_ARCH" && "$DOCS_OK" == true ]]; then
         pass "integration-only architecture changes include dedicated architecture document update"
       else
