@@ -4,12 +4,14 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOC="docs/architecture/CURRENT-EMS-STATE.md"
 HONEYWELL_DOC="docs/architecture/honeywell-integration.md"
+CONNECTLIFE_DOC="docs/architecture/connectlife-integration.md"
 POLICY="src/pi/ems-runtime/planner/contract-policy.json"
 STATE_INGEST="src/pi/ems-runtime/status-api/state_ingest.py"
 HISTORY_ARCHIVE="src/pi/ems-runtime/status-api/history_archive.py"
 PLANNER_HISTORY="services/pi/history/archive_planner_snapshot.py"
 PERFORMANCE="services/pi/history/ems_performance.py"
 HONEYWELL="services/pi/integrations/honeywell"
+CONNECTLIFE="services/pi/integrations/connectlife"
 FORECAST_CHAIN="deploy/systemd/ems-forecast-chain.service"
 BASE_REF="${1:-}"
 
@@ -19,12 +21,14 @@ pass() { echo "ARCHITECTURE GATE: PASS: $*"; }
 cd "$REPO"
 [[ -f "$DOC" ]] || fail "$DOC missing"
 [[ -f "$HONEYWELL_DOC" ]] || fail "$HONEYWELL_DOC missing"
+[[ -f "$CONNECTLIFE_DOC" ]] || fail "$CONNECTLIFE_DOC missing"
 [[ -f "$POLICY" ]] || fail "$POLICY missing"
 [[ -f "$STATE_INGEST" ]] || fail "$STATE_INGEST missing"
 [[ -f "$HISTORY_ARCHIVE" ]] || fail "$HISTORY_ARCHIVE missing"
 [[ -f "$PLANNER_HISTORY" ]] || fail "$PLANNER_HISTORY missing"
 [[ -f "$PERFORMANCE" ]] || fail "$PERFORMANCE missing"
 [[ -d "$HONEYWELL" ]] || fail "$HONEYWELL missing"
+[[ -d "$CONNECTLIFE" ]] || fail "$CONNECTLIFE missing"
 [[ -f "$FORECAST_CHAIN" ]] || fail "$FORECAST_CHAIN missing"
 
 python3 - "$POLICY" <<'PY'
@@ -76,6 +80,12 @@ grep -q 'services/pi/integrations/honeywell/' "$HONEYWELL_DOC" || fail "Honeywel
 grep -q '/home/jeroen/ems/runtime/tools/honeywell/' "$HONEYWELL_DOC" || fail "Honeywell runtime compatibility path missing from architecture document"
 pass "Honeywell target-structure deployment preserves host-local runtime state"
 
+grep -q 'services/pi/integrations/connectlife/' "$CONNECTLIFE_DOC" || fail "ConnectLife target repository boundary missing from architecture document"
+grep -q 'read-only telemetry' "$CONNECTLIFE_DOC" || fail "ConnectLife read-only safety boundary missing from architecture document"
+grep -q 'services/pi/integrations/connectlife' "$CONNECTLIFE/ems-connectlife-oven.service" || fail "ConnectLife service does not use target repository path"
+grep -q 'services/pi/integrations/connectlife' "$CONNECTLIFE/install_systemd.sh" || fail "ConnectLife installer does not use target repository path"
+pass "ConnectLife target-structure and read-only boundary documented"
+
 for legacy_unit in deploy/systemd/ems-day-history.service deploy/systemd/ems-day-history.timer deploy/systemd/ems-homey-insights.service deploy/systemd/ems-homey-insights.timer deploy/systemd/ems-pi-control-publish.service deploy/systemd/ems-pi-control-publish.timer; do [[ ! -e "$legacy_unit" ]] || fail "legacy production unit must not be deployable: $legacy_unit"; done
 pass "legacy Homey polling/control-push units absent from production deploy set"
 
@@ -86,12 +96,18 @@ if [[ -n "$BASE_REF" ]]; then
     if printf '%s\n' "$CHANGED" | grep -Fxq "$DOC"; then
       pass "architecture-sensitive changes include canonical document update"
     else
-      NON_HONEYWELL_ARCH="$(printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' | grep -Ev '^(services/pi/integrations/honeywell/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
-      if [[ -z "$NON_HONEYWELL_ARCH" ]] && printf '%s\n' "$CHANGED" | grep -Fxq "$HONEYWELL_DOC"; then
-        pass "Honeywell-only architecture changes include dedicated architecture document update"
+      ARCH_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
+      NON_INTEGRATION_ARCH="$(printf '%s\n' "$ARCH_CHANGED" | grep -Ev '^(services/pi/integrations/(honeywell|connectlife)/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' || true)"
+      HONEYWELL_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^services/pi/integrations/honeywell/' || true)"
+      CONNECTLIFE_CHANGED="$(printf '%s\n' "$ARCH_CHANGED" | grep -E '^services/pi/integrations/connectlife/' || true)"
+      DOCS_OK=true
+      [[ -z "$HONEYWELL_CHANGED" ]] || printf '%s\n' "$CHANGED" | grep -Fxq "$HONEYWELL_DOC" || DOCS_OK=false
+      [[ -z "$CONNECTLIFE_CHANGED" ]] || printf '%s\n' "$CHANGED" | grep -Fxq "$CONNECTLIFE_DOC" || DOCS_OK=false
+      if [[ -z "$NON_INTEGRATION_ARCH" && "$DOCS_OK" == true ]]; then
+        pass "integration-only architecture changes include dedicated architecture document update"
       else
         echo "Architecture-sensitive files changed since $BASE_REF:" >&2
-        printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$|scripts/ems_pi_drift_check\.sh$)' >&2 || true
+        printf '%s\n' "$ARCH_CHANGED" >&2 || true
         fail "$DOC was not updated in the same release range"
       fi
     fi
