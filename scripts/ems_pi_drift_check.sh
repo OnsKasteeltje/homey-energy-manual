@@ -8,6 +8,7 @@ TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
 TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
 TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
+TARGET_HOMEY_INGRESS_FILE="$REPO/services/pi/integrations/homey/ingress/state_ingest.py"
 TARGET_HOMEY_EGRESS_SOURCE="$REPO/services/pi/integrations/homey/egress"
 TARGET_HOMEY_EGRESS_RUNTIME="$RUNTIME/homey-deploy"
 TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
@@ -20,6 +21,7 @@ echo "Repo:      $REPO"
 echo "Source:    $SOURCE"
 echo "History:   $TARGET_HISTORY_SOURCE"
 echo "Honeywell: $TARGET_HONEYWELL_SOURCE"
+echo "Homey in:  $TARGET_HOMEY_INGRESS_FILE"
 echo "Homey out: $TARGET_HOMEY_EGRESS_SOURCE"
 echo "Status API:$TARGET_STATUS_SOURCE"
 echo "Runtime:   $RUNTIME"
@@ -107,6 +109,19 @@ else
 fi
 
 echo
+echo "=== TARGET-STRUCTURE HOMEY INGRESS FILE ==="
+if [[ ! -f "$TARGET_HOMEY_INGRESS_FILE" ]]; then
+    echo "MISSING: $TARGET_HOMEY_INGRESS_FILE"
+    FAIL=1
+elif [[ ! -f "$TARGET_STATUS_RUNTIME/state_ingest.py" ]]; then
+    echo "MISSING: status-api/state_ingest.py"
+    FAIL=1
+elif ! cmp -s "$TARGET_HOMEY_INGRESS_FILE" "$TARGET_STATUS_RUNTIME/state_ingest.py"; then
+    echo "DRIFT:   status-api/state_ingest.py"
+    FAIL=1
+fi
+
+echo
 echo "=== TARGET-STRUCTURE HOMEY EGRESS FILES ==="
 if [[ ! -d "$TARGET_HOMEY_EGRESS_RUNTIME" ]]; then
     echo "MISSING: $TARGET_HOMEY_EGRESS_RUNTIME"
@@ -156,6 +171,7 @@ else
         fi
     done < <(
         cd "$TARGET_STATUS_SOURCE" && find . -type f \
+            -not -path './state_ingest.py' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort
