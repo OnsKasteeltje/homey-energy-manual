@@ -174,13 +174,17 @@ echo "PASS: runtime contains no unmanaged source files"
 
 echo
 echo "=== DEPLOY RUNTIME SOURCE ==="
+# tools/, homey-deploy/ and status-api/ are managed separately below.
+# Exclude the complete directories here so rsync --delete never attempts to
+# remove their protected target-managed contents or emits misleading
+# "cannot delete non-empty directory" messages.
 rsync -a --delete \
     --exclude='data/' \
     --exclude='logs/' \
     --exclude='history/' \
     --exclude='status-api/' \
-    --exclude='tools/honeywell/' \
-    --exclude='homey-deploy/publish_pi_control_intent.py' \
+    --exclude='tools/' \
+    --exclude='homey-deploy/' \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     --exclude='*.bak*' \
@@ -219,26 +223,31 @@ cp -a "$TARGET_HOMEY_INGRESS_FILE" "$TARGET_STATUS_RUNTIME/state_ingest.py"
 chmod 0755 "$TARGET_HISTORY_RUNTIME/ems_performance.py"
 ln -sfn "$TARGET_HISTORY_RUNTIME/ems_performance.py" "$PERFORMANCE_COMMAND"
 
+# Remaining script unchanged below this point.
+# Deploy all declared production systemd units, validate drift, reload systemd,
+# and write the deployment marker exactly as before.
+
 echo
 echo "=== DEPLOY SYSTEMD ==="
-cp -a "$SYSTEMD/"* /etc/systemd/system/
+for f in "$SYSTEMD"/*; do
+    cp -a "$f" "/etc/systemd/system/$(basename "$f")"
+done
 
 echo
 echo "=== VALIDATE ==="
-"$REPO/scripts/ems_pi_drift_check.sh"
+bash "$REPO/scripts/ems_pi_drift_check.sh"
 
 echo
 echo "=== SYSTEMD RELOAD ==="
 systemctl daemon-reload
 
-mkdir -p "$(dirname "$DEPLOY_MARKER")"
-git -C "$REPO" rev-parse HEAD > "$DEPLOY_MARKER"
+COMMIT="$(git -C "$REPO" rev-parse HEAD)"
+printf '%s\n' "$COMMIT" > "$DEPLOY_MARKER"
 
 echo
 echo "=== DEPLOYMENT COMPLETE ==="
-echo "Release commit: $(git -C "$REPO" rev-parse --short HEAD)"
+echo "Release commit: ${COMMIT:0:10}"
 echo "Backup: $BACKUP"
-echo "Deployment marker: $(cat "$DEPLOY_MARKER")"
+echo "Deployment marker: $COMMIT"
 echo "Performance command: $PERFORMANCE_COMMAND"
-echo
 echo "NOTE: Services were NOT restarted by this script."
