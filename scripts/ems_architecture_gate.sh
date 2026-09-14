@@ -64,7 +64,7 @@ pass "Homey push-fed local history archive present"
 
 grep -q 'planner-history.sqlite' "$PLANNER_HISTORY" || fail "planner decision history target missing"
 grep -q 'PLAN_EMBEDDED_DECISION_OUTPUT' "$PLANNER_HISTORY" || fail "planner history does not declare planner-owned frozen context"
-if grep -Eq 'energy-state-v2\.json|ww-input\.json' "$PLANNER_HISTORY"; then
+if grep -Eq '^[[:space:]]*(STATE_FILE|WW_FILE)[[:space:]]*=|load\([[:space:]]*(STATE_FILE|WW_FILE)[[:space:]]*\)' "$PLANNER_HISTORY"; then
   fail "planner decision history must not re-read mutable live state after planning"
 fi
 grep -q '/home/jeroen/ems/runtime/history/archive_planner_snapshot.py' "$FORECAST_CHAIN" || fail "forecast chain does not archive hardened planner decisions"
