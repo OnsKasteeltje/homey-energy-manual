@@ -177,6 +177,28 @@ The existing PV-capture validator measures realised self-consumption/capture. It
 
 Planner-history capture is observability-only and best-effort. Failure to archive a snapshot is logged but must not block generation, publication or execution of an otherwise valid plan.
 
+### 4.2 Standard EMS performance question
+
+The canonical operator command is installed as `/usr/local/bin/ems-performance` and points to `services/pi/history/ems_performance.py` in the deployed target-structure runtime.
+
+The standard interaction contract is:
+
+- **“Hoe heeft de EMS gepresteerd?”** means the previous complete local day and maps to `ems-performance yesterday`;
+- **“Hoe heeft de EMS vandaag gepresteerd?”** maps to `ems-performance today` and must be treated as a partial-day report;
+- an explicit date maps to `ems-performance YYYY-MM-DD`;
+- timezone and day boundaries are `Europe/Amsterdam`.
+
+The report combines `ems-history.sqlite` actuals with `planner-history.sqlite` decision-history coverage. It reports PV production, import/export, direct self-use, boiler/Tesla/Quatt energy, flexible-load PV capture and candidate exported-PV windows for replay.
+
+Version V0.1 also calculates a same-flex-energy **unconstrained upper bound**: the maximum flexible-load PV capture possible if the day's measured flexible-load energy could be shifted freely. This benchmark intentionally ignores detailed availability, minimum-run, comfort and deadline constraints. Therefore:
+
+- `upperBoundGapKWh` is a replay candidate, not proof of an EMS error;
+- `upperBoundScore` is not the final constrained theoretical optimum score;
+- `surplusWindowsForReplay` are observations, not automatically missed opportunities;
+- the report must expose `constrainedOptimumAvailable = false` until a dedicated constrained replay optimiser evaluates the archived decision context under the original constraints.
+
+The command is read-only and may not write Homey, planner authority, actuator state or physical devices.
+
 ## 5. Current control endpoint
 
 The Pi exposes:
@@ -377,6 +399,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - WW ownership remains more distributed than EV ownership because Homey still carries substantial realtime WW state/safety policy in addition to Pi strategic planning.
 - PV forecast quality still requires follow-up: successful planner runs can contain fallback PV slots and zero historical slots. This is a forecast-quality issue, not a runtime-chain failure.
 - Planner schema V0.3 does not yet embed Homey `state_revision` / `source_sample_at`; retrospective replay therefore correlates decision snapshots with canonical measurement history by time until those identifiers can be stamped atomically by the planner itself.
+- `ems-performance` V0.1 provides a measured-performance report plus an unconstrained same-energy upper bound; the dedicated constrained replay optimiser is still future work and must not be implied by the V0.1 score.
 - Legacy backfill collectors (`collect_homey_insights.py`, `EM2_Day_History` tooling) remain in source for explicit recovery/diagnostics but are not production live collectors.
 - Legacy `publish_pi_control_intent.py` remains in source as compatibility/history code but must not have a production systemd writer while the Homey PI Bridge is authoritative.
 
@@ -396,6 +419,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - hardened planner decisions are archived locally for retrospective replay without becoming a control-path dependency;
 - planner-history capture must use planner-owned frozen decision output and must not re-read mutable live state after plan generation;
 - new Pi history code is placed under the target `services/pi/history/` structure and included in deployment/drift validation;
+- the standardized `ems-performance` command uses both canonical histories and explicitly distinguishes unconstrained upper-bound benchmarking from a future constrained replay optimum;
 - no automatic production timers for legacy Homey Insights/day-history polling;
 - no automatic Pi-side Homey control publisher while the Homey PI Bridge owns `/control/current` consumption.
 
