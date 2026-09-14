@@ -19,13 +19,11 @@ spec.loader.exec_module(planner_history)
 
 
 class PlannerSnapshotArchiveTest(unittest.TestCase):
-    def test_archives_hardened_plan_and_context_idempotently(self):
+    def test_archives_plan_embedded_context_idempotently(self):
         with tempfile.TemporaryDirectory() as tmp:
             data = Path(tmp)
             planner_history.DATA = data
             planner_history.PLAN_FILE = data / "dynamic-shadow-plan.json"
-            planner_history.STATE_FILE = data / "energy-state-v2.json"
-            planner_history.WW_FILE = data / "ww-input.json"
             planner_history.DB_FILE = data / "planner-history.sqlite"
             planner_history.STATUS_FILE = data / "planner-history-status.json"
 
@@ -35,6 +33,30 @@ class PlannerSnapshotArchiveTest(unittest.TestCase):
                 "validUntil": "2026-09-14T18:35:00Z",
                 "objective": "MAXIMIZE_PV_SELF_CONSUMPTION_SUBJECT_TO_WW_COMFORT",
                 "contract": {"mode": "FIXED", "id": "ENGIE_3Y_2026_2029"},
+                "realtime": {
+                    "actualP1ExportW": 500,
+                    "recentLocalAccuracy": 0.91,
+                    "recentP1ExportSamples": [500, 450],
+                    "p1CorrectionPolicy": "TEST_POLICY",
+                },
+                "tesla": {
+                    "connectedNow": True,
+                    "chargingNow": False,
+                    "availabilityPolicy": "LIVE_CONNECTED_CURRENT_STATE_ONLY",
+                    "deadlinePlan": {
+                        "active": True,
+                        "deadlineAt": "2026-09-15T05:00:00Z",
+                        "remainingKWh": 10.0,
+                        "maxA": 16,
+                    },
+                    "qualifiedWindows": [],
+                },
+                "dailyPlans": [{
+                    "date": "2026-09-14",
+                    "goalReached": False,
+                    "remainingFallbackMin": 120,
+                    "deadlineLocal": "19:00",
+                }],
                 "slots": [{
                     "slot_start_utc": "2026-09-14T18:15:00Z",
                     "pvForecastW": 1000,
@@ -43,30 +65,6 @@ class PlannerSnapshotArchiveTest(unittest.TestCase):
                     "gridExportAfterFlexW": 500,
                 }],
             }))
-            planner_history.STATE_FILE.write_text(json.dumps({
-                "meta": {
-                    "state_revision": 42,
-                    "source_sample_at": "2026-09-14T18:14:59Z",
-                    "heartbeat_at": "2026-09-14T18:14:59Z",
-                    "publisher_version": "EM2_CORE_STATE_TEST",
-                },
-                "grid": {"power_w": -500, "import_w": 0, "export_w": 500},
-                "tesla": {
-                    "connected": True,
-                    "charging": False,
-                    "deadline_active": True,
-                    "deadline_at": "2026-09-15T05:00:00Z",
-                    "remaining_kwh": 10.0,
-                    "deadline_max_a": 16,
-                },
-                "hot_water": {"boiler_power_w": 0},
-            }))
-            planner_history.WW_FILE.write_text(json.dumps({
-                "warmWater": {
-                    "goalReachedToday": False,
-                    "remainingFallbackMin": 120,
-                }
-            }))
 
             first = planner_history.archive()
             second = planner_history.archive()
@@ -74,23 +72,36 @@ class PlannerSnapshotArchiveTest(unittest.TestCase):
             self.assertTrue(first["inserted"])
             self.assertFalse(second["inserted"])
             self.assertEqual(second["snapshotCount"], 1)
-            self.assertEqual(second["stateRevision"], 42)
+            self.assertEqual(
+                second["contextSource"],
+                "PLAN_EMBEDDED_DECISION_OUTPUT",
+            )
+            self.assertIsNone(second["stateRevision"])
+            self.assertIsNone(second["sourceSampleAt"])
+            self.assertEqual(second["actualP1ExportW"], 500)
 
             con = sqlite3.connect(planner_history.DB_FILE)
             row = con.execute(
-                "SELECT generated_at_utc, state_revision, snapshot_zlib "
+                "SELECT generated_at_utc, state_revision, source_sample_at_utc, "
+                "tesla_connected, tesla_deadline_active, snapshot_zlib "
                 "FROM planner_snapshots"
             ).fetchone()
             con.close()
 
             self.assertEqual(row[0], "2026-09-14T18:15:00Z")
-            self.assertEqual(row[1], 42)
-            snapshot = json.loads(zlib.decompress(row[2]).decode("utf-8"))
+            self.assertIsNone(row[1])
+            self.assertIsNone(row[2])
+            self.assertEqual(row[3], 1)
+            self.assertEqual(row[4], 1)
+
+            snapshot = json.loads(zlib.decompress(row[5]).decode("utf-8"))
+            self.assertEqual(snapshot["schema"], "EMS_PI_PLANNER_DECISION_SNAPSHOT_V0.2")
             self.assertEqual(
                 snapshot["plan"]["contract"]["id"],
                 "ENGIE_3Y_2026_2029",
             )
-            self.assertTrue(snapshot["context"]["state"]["tesla"]["connected"])
+            self.assertTrue(snapshot["context"]["tesla"]["connected"])
+            self.assertEqual(snapshot["context"]["realtime"]["actualP1ExportW"], 500)
             self.assertEqual(
                 snapshot["context"]["warmWater"]["remainingFallbackMin"],
                 120,
