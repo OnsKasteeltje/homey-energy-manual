@@ -6,6 +6,8 @@ DOC="docs/architecture/CURRENT-EMS-STATE.md"
 POLICY="src/pi/ems-runtime/planner/contract-policy.json"
 STATE_INGEST="src/pi/ems-runtime/status-api/state_ingest.py"
 HISTORY_ARCHIVE="src/pi/ems-runtime/status-api/history_archive.py"
+PLANNER_HISTORY="services/pi/history/archive_planner_snapshot.py"
+FORECAST_CHAIN="deploy/systemd/ems-forecast-chain.service"
 BASE_REF="${1:-}"
 
 fail() {
@@ -23,6 +25,8 @@ cd "$REPO"
 [[ -f "$POLICY" ]] || fail "$POLICY missing"
 [[ -f "$STATE_INGEST" ]] || fail "$STATE_INGEST missing"
 [[ -f "$HISTORY_ARCHIVE" ]] || fail "$HISTORY_ARCHIVE missing"
+[[ -f "$PLANNER_HISTORY" ]] || fail "$PLANNER_HISTORY missing"
+[[ -f "$FORECAST_CHAIN" ]] || fail "$FORECAST_CHAIN missing"
 
 python3 - "$POLICY" <<'PY'
 import json, sys
@@ -58,6 +62,12 @@ grep -q 'archive_state_history(payload)' "$STATE_INGEST" || fail "state history 
 grep -q 'ems-history.sqlite' "$HISTORY_ARCHIVE" || fail "history archive target is not canonical SQLite"
 pass "Homey push-fed local history archive present"
 
+grep -q 'planner-history.sqlite' "$PLANNER_HISTORY" || fail "planner decision history target missing"
+grep -q '/home/jeroen/ems/runtime/history/archive_planner_snapshot.py' "$FORECAST_CHAIN" || fail "forecast chain does not archive hardened planner decisions"
+grep -q 'services/pi/history' scripts/deploy_ems_pi.sh || fail "target-structure Pi history source is not deployed"
+grep -q 'TARGET-STRUCTURE HISTORY FILES' scripts/ems_pi_drift_check.sh || fail "target-structure Pi history source is not drift-checked"
+pass "planner decision history and target repository placement present"
+
 for legacy_unit in \
   deploy/systemd/ems-day-history.service \
   deploy/systemd/ems-day-history.timer \
@@ -73,10 +83,10 @@ if [[ -n "$BASE_REF" ]]; then
   git rev-parse --verify "$BASE_REF^{commit}" >/dev/null 2>&1 || fail "base ref $BASE_REF is not a commit"
   CHANGED="$(git diff --name-only "$BASE_REF"..HEAD)"
 
-  if printf '%s\n' "$CHANGED" | grep -Eq '^(src/pi/ems-runtime/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$)'; then
+  if printf '%s\n' "$CHANGED" | grep -Eq '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$)'; then
     if ! printf '%s\n' "$CHANGED" | grep -Fxq "$DOC"; then
       echo "Architecture-sensitive files changed since $BASE_REF:" >&2
-      printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$)' >&2 || true
+      printf '%s\n' "$CHANGED" | grep -E '^(src/pi/ems-runtime/|services/pi/|deploy/systemd/|scripts/deploy_ems_pi\.sh$|scripts/ems_architecture_gate\.sh$)' >&2 || true
       fail "$DOC was not updated in the same release range"
     fi
     pass "architecture-sensitive changes include canonical document update"
