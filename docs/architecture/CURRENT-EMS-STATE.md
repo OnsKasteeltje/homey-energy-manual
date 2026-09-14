@@ -158,18 +158,20 @@ Every successfully hardened planner run is followed in the same forecast chain b
 The archive stores a compressed append-only decision snapshot in `/home/jeroen/ems/data/planner-history.sqlite`. Each snapshot is keyed by the planner generation timestamp and contains:
 
 - the complete hardened 96-slot plan, including PV/base-load/Quatt forecasts and predicted grid import/export after flexible loads;
-- WW allocation choices, candidate diagnostics, comfort/deadline context and allocation reasons;
-- Tesla connection/deadline context, selected opportunity windows, targets and allocation reasons;
-- the Homey Core `state_revision` and physical `source_sample_at` used as live context;
-- relevant P1, Tesla and warm-water state needed to explain the decision later;
-- fixed-contract and input-freshness metadata already embedded in the hardened plan.
+- WW allocation choices, candidate diagnostics, comfort/deadline context and allocation reasons already frozen in the plan;
+- Tesla connection/deadline context, selected opportunity windows, targets and allocation reasons already frozen in the plan;
+- the realtime P1 correction context, forecast-confidence information, guardrails, contract and input-freshness metadata embedded in that planner output.
+
+The hardened planner output is the **atomic decision record**. The history archiver must not re-read mutable `energy-state-v2.json` or `ww-input.json` after plan generation, because a new Homey push between planning and archive capture could attach state the planner never used. Measured Homey/P1/device actuals remain independently available in `ems-history.sqlite` and are correlated by time during retrospective replay.
+
+The current planner schema does not yet embed `state_revision` and `source_sample_at` inside the final decision output. Planner-history therefore leaves those SQLite columns empty rather than fabricating them from a later live-state read. If these identifiers are added later, they must be stamped by the planner itself as part of the same atomic output.
 
 Retention is 120 days. Duplicate planner generation timestamps are idempotently ignored.
 
 This decision history complements, rather than replaces, `ems-history.sqlite`. Together they provide the two historical layers required for objective EMS performance review:
 
 1. **actuals** — what PV, grid, boiler, Tesla, Quatt and loads actually did;
-2. **decision context** — what the planner knew, forecast, constrained and selected at that time.
+2. **decision context** — what the planner forecast, constrained and selected at that time.
 
 The existing PV-capture validator measures realised self-consumption/capture. It is not by itself proof of the theoretical constrained optimum. A retrospective optimum/replay analysis must compare measured actuals with the archived decision context under the same WW comfort, Tesla availability/deadline and actuator constraints.
 
@@ -374,6 +376,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - The hardened planner still contains historical compatibility code in `deadline_requirement()` with a local `max_a = 16`. Current planning authority uses `deadline_max_a` from runtime state, so this fragment is cleanup debt rather than the active deadline allocator.
 - WW ownership remains more distributed than EV ownership because Homey still carries substantial realtime WW state/safety policy in addition to Pi strategic planning.
 - PV forecast quality still requires follow-up: successful planner runs can contain fallback PV slots and zero historical slots. This is a forecast-quality issue, not a runtime-chain failure.
+- Planner schema V0.3 does not yet embed Homey `state_revision` / `source_sample_at`; retrospective replay therefore correlates decision snapshots with canonical measurement history by time until those identifiers can be stamped atomically by the planner itself.
 - Legacy backfill collectors (`collect_homey_insights.py`, `EM2_Day_History` tooling) remain in source for explicit recovery/diagnostics but are not production live collectors.
 - Legacy `publish_pi_control_intent.py` remains in source as compatibility/history code but must not have a production systemd writer while the Homey PI Bridge is authoritative.
 
@@ -391,6 +394,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - no GitHub dependency in the live Homey ↔ Pi runtime state/control path;
 - accepted Homey state is the production source for local operational energy history;
 - hardened planner decisions are archived locally for retrospective replay without becoming a control-path dependency;
+- planner-history capture must use planner-owned frozen decision output and must not re-read mutable live state after plan generation;
 - new Pi history code is placed under the target `services/pi/history/` structure and included in deployment/drift validation;
 - no automatic production timers for legacy Homey Insights/day-history polling;
 - no automatic Pi-side Homey control publisher while the Homey PI Bridge owns `/control/current` consumption.
