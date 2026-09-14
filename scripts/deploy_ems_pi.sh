@@ -60,18 +60,21 @@ echo "=== CHECK RUNTIME FOR UNMANAGED FILES ==="
 
 UNMANAGED="$(
     diff -u \
-        <(cd "$SOURCE" && find . -type f -printf '%P\n' | sort) \
+        <(cd "$SOURCE" && find . -type f \
+            -not -path '*/.venv/*' \
+            -printf '%P\n' | sort) \
         <(cd "$RUNTIME" && find . -type f \
             -not -path './data/*' \
             -not -path './logs/*' \
             -not -path './history/*' \
+            -not -path '*/.venv/*' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort) \
         || true
 )"
 
-if echo "$UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; then
+if echo "$UNMANAGED" | grep -E '^\+' | grep -v '^+++ ' >/dev/null; then
     echo "ERROR: unmanaged files exist in runtime."
     echo "Deployment aborted to prevent accidental deletion."
     echo
@@ -90,7 +93,7 @@ HISTORY_UNMANAGED="$(
         || true
 )"
 
-if echo "$HISTORY_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; then
+if echo "$HISTORY_UNMANAGED" | grep -E '^\+' | grep -v '^+++ ' >/dev/null; then
     echo "ERROR: unmanaged files exist in runtime/history."
     echo "Deployment aborted to prevent accidental deletion."
     echo
@@ -106,6 +109,7 @@ rsync -a --delete \
     --exclude='data/' \
     --exclude='logs/' \
     --exclude='history/' \
+    --exclude='.venv/' \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     --exclude='*.bak*' \
