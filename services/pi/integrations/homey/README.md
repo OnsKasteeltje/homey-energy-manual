@@ -12,7 +12,7 @@ This directory defines the Pi-side boundary between Homey and the EMS Pi.
 
 Homey publishes the canonical energy-state snapshot to the authenticated Pi endpoint `POST /state/energy`.
 
-The HTTP transport boundary remains implemented by `services/pi/api/status/server.py`. Homey-specific validation and persistence are owned by `ingress/state_ingest.py`. At deployment time that module is placed into the existing status-API runtime directory so the runtime import contract remains unchanged. The accepted state is written to `/home/jeroen/ems/data/energy-state-v2.json` and then consumed by Pi planners.
+The HTTP transport boundary remains implemented by `services/pi/api/status/server.py`. Homey-specific validation and persistence are owned by `services/pi/integrations/homey/ingress/state_ingest.py`. At deployment time that module is placed into the existing status-API runtime directory so the runtime import contract remains unchanged. The accepted state is written to `/home/jeroen/ems/data/energy-state-v2.json` and then consumed by Pi planners.
 
 Source flow:
 
@@ -28,7 +28,7 @@ The API owns HTTP transport; the Homey integration owns Homey-specific state sem
 
 ## Pi → Homey (egress)
 
-`egress/publish_pi_control_intent.py` reads the hardened current Pi command from `http://127.0.0.1:3100/control/current`, validates planner/executor/contract ownership and publishes `EM2_POWER_INTENT_V0.2` to Homey Logic.
+`services/pi/integrations/homey/egress/publish_pi_control_intent.py` reads the hardened current Pi command from `http://127.0.0.1:3100/control/current`, validates planner/executor/contract ownership and publishes `EM2_POWER_INTENT_V0.2` to Homey Logic.
 
 It does not write devices directly. Homey adapters/gates and actuators remain responsible for safe execution.
 
@@ -37,7 +37,7 @@ Source flow:
 ```text
 Pi planner/control
     → /control/current
-    → egress/publish_pi_control_intent.py
+    → services/pi/integrations/homey/egress/publish_pi_control_intent.py
     → Homey EM2_Power_Intent
     → Homey executor/safety
     → devices
@@ -47,8 +47,10 @@ Pi planner/control
 
 Repository placement is independent from the installed Pi runtime layout. During the incremental repository migration the existing runtime contracts stay unchanged:
 
-- ingress: `/home/jeroen/ems/runtime/status-api/state_ingest.py`
-- egress: `/home/jeroen/ems/runtime/homey-deploy/publish_pi_control_intent.py`
+- ingress source: `services/pi/integrations/homey/ingress/state_ingest.py`
+  → runtime: `/home/jeroen/ems/runtime/status-api/state_ingest.py`
+- egress source: `services/pi/integrations/homey/egress/publish_pi_control_intent.py`
+  → runtime: `/home/jeroen/ems/runtime/homey-deploy/publish_pi_control_intent.py`
 
 This keeps existing imports and callers stable while the Git source converges to the target architecture.
 
