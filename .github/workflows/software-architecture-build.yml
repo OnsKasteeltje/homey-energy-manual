@@ -69,7 +69,7 @@ jobs:
           assert '# Inhoudsopgave {.unnumbered}' in publication
           assert 'Softwarearchitectuur Overzicht' in publication
           assert 'Systeemcontext' in publication
-          assert '24h Energy Planner and Power Intent' in publication
+          assert 'Pi Planner and Power Intent' in publication
           assert 'w:type="page"' in publication
           expected = master.count('```mermaid')
           actual = publication.count('![Procesdiagram](')
@@ -110,7 +110,7 @@ jobs:
           grep -q 'Inhoudsopgave' /tmp/publication.txt
           grep -q 'Softwarearchitectuur Overzicht' /tmp/publication.txt
           grep -q 'Systeemcontext' /tmp/publication.txt
-          grep -q '24h Energy Planner and Power Intent' /tmp/publication.txt
+          grep -q 'Pi Planner and Power Intent' /tmp/publication.txt
           echo 'PASS: static TOC and expected headings present in DOCX'
 
       - name: Build PDF from DOCX
