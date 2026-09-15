@@ -3,20 +3,30 @@ name: EMS Architecture Gate
 on:
   pull_request:
     paths:
-      - 'src/pi/ems-runtime/**'
-      - 'deploy/systemd/**'
+      - 'src/pi/**'
+      - 'services/pi/**'
+      - 'deploy/**'
+      - 'config/**'
+      - 'tools/**'
       - 'scripts/deploy_ems_pi.sh'
       - 'scripts/ems_architecture_gate.sh'
+      - 'scripts/ems_pi_drift_check.sh'
       - 'docs/architecture/CURRENT-EMS-STATE.md'
+      - 'docs/architecture/repository-structure.md'
       - '.github/workflows/ems-architecture-gate.yml'
   push:
     branches: [ main ]
     paths:
-      - 'src/pi/ems-runtime/**'
-      - 'deploy/systemd/**'
+      - 'src/pi/**'
+      - 'services/pi/**'
+      - 'deploy/**'
+      - 'config/**'
+      - 'tools/**'
       - 'scripts/deploy_ems_pi.sh'
       - 'scripts/ems_architecture_gate.sh'
+      - 'scripts/ems_pi_drift_check.sh'
       - 'docs/architecture/CURRENT-EMS-STATE.md'
+      - 'docs/architecture/repository-structure.md'
       - '.github/workflows/ems-architecture-gate.yml'
 
 jobs:
@@ -40,6 +50,9 @@ jobs:
             fi
             echo "ref=$BEFORE" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Run repository structure gate
+        run: bash tools/validation/repository_structure_gate.sh "${{ steps.base.outputs.ref }}"
 
       - name: Run EMS architecture gate
         run: bash scripts/ems_architecture_gate.sh "${{ steps.base.outputs.ref }}"
