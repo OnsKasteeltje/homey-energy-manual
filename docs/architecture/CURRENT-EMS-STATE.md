@@ -4,8 +4,8 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-09-14  
-**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation and 2026-09-14 history-chain incident analysis  
+**Status date:** 2026-09-15  
+**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis and 2026-09-15 Honeywell read-only schedule recovery/validation  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
 
@@ -23,6 +23,18 @@ Detailed bidirectional runtime chain: `docs/architecture/homey-pi-runtime-datafl
 - GitHub is **not** a runtime transport dependency for live Homey ↔ Pi state or control.
 
 Operational energy history follows the canonical Homey → Pi state direction. Accepted Core state pushes are archived locally on the Pi; automatic Pi polling of Homey Insights is not a production history transport.
+
+### 1.1 Heating room-model boundary — read-only/shadow
+
+Honeywell/Resideo remains the comfort and schedule authority. The canonical vendor acquisition boundary is `services/pi/integrations/honeywell/`; it produces `EMS_HONEYWELL_SCHEDULE_V0.2` and `EMS_HONEYWELL_STATE_V0.2` without physical writes.
+
+The first canonical EMS interpretation layer is `services/pi/state/heating/build_heating_room_model.py`, schema `EMS_HEATING_ROOM_MODEL_V0.1`. It joins schedule and current room state by stable canonical room key, preserves the actual Honeywell target separately from the scheduled baseline, and classifies the next baseline transition as `UP`, `DOWN` or `NONE` using the scheduled current/next targets only. All EMS-facing schedule timestamps are offset-aware in `Europe/Amsterdam`.
+
+V0.1 is **READ_ONLY / SHADOW**. It contains no PV/preheat decision and no Honeywell, Homey, OpenTherm, Quatt or actuator write path. Future PV preheat belongs under `services/pi/planner/heating/`; any later guarded execution belongs under `services/pi/control/heating/` and requires a separately validated adapter/gate/actuator boundary.
+
+A live 2026-09-15 Honeywell schedule collection validated all eight mapped room keys and the exact source representation. For `woonkamer`, the observed baseline moved from 19.0 °C at 19:30 local time to 15.5 °C at 22:00 local time; the room model therefore classifies that transition as `DOWN`. A future energy optimizer must never advance a scheduled reduction.
+
+Honeywell runtime deployment is a mixed managed/runtime-state directory. Repository-managed source may be refreshed, but host-local `.venv/`, `config/account.env`, `cache/oauth-token.json` and last valid generated outputs must survive normal source deployment. Secrets, OAuth cache and generated runtime output remain outside GitHub. On 2026-09-15 the Honeywell venv/credential/cache chain was recovered after the repository/runtime relocation and a fresh read-only schedule collection completed successfully.
 
 ## 2. Control architecture
 
@@ -387,7 +399,7 @@ For Homey ↔ Pi boundary changes, documentation must cover both state and contr
 
 Production `deploy/systemd/` must contain only units that remain valid for the intended runtime architecture. Obsolete automatic Homey pollers or alternative control writers must not remain deployable production timers.
 
-New Pi history functionality uses the target repository structure under `services/pi/history/`. The active planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path would require coordinated systemd, deployment and runtime-path migration and would add unrelated cutover risk. This is an explicit `touch it, place it correctly` migration decision rather than a new legacy placement.
+New Pi history functionality uses the target repository structure under `services/pi/history/`. New canonical room-heating interpretation uses `services/pi/state/heating/`. The active planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path would require coordinated systemd, deployment and runtime-path migration and would add unrelated cutover risk. This is an explicit `touch it, place it correctly` migration decision rather than a new legacy placement.
 
 ## 12. Battery boundary
 
@@ -402,6 +414,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - `ems-performance` V0.1 provides a measured-performance report plus an unconstrained same-energy upper bound; the dedicated constrained replay optimiser is still future work and must not be implied by the V0.1 score.
 - Legacy backfill collectors (`collect_homey_insights.py`, `EM2_Day_History` tooling) remain in source for explicit recovery/diagnostics but are not production live collectors.
 - Legacy `publish_pi_control_intent.py` remains in source as compatibility/history code but must not have a production systemd writer while the Homey PI Bridge is authoritative.
+- Honeywell source deployment must preserve host-local venv, credentials and OAuth cache; this invariant now needs deployment-path regression coverage so a future source relocation cannot repeat the 2026-09-15 recovery incident.
 
 ## 14. Architecture enforcement
 
@@ -419,6 +432,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - hardened planner decisions are archived locally for retrospective replay without becoming a control-path dependency;
 - planner-history capture must use planner-owned frozen decision output and must not re-read mutable live state after plan generation;
 - new Pi history code is placed under the target `services/pi/history/` structure and included in deployment/drift validation;
+- new canonical room-heating interpretation is placed under `services/pi/state/heating/` and remains read-only/shadow until separately validated planning/control layers exist;
 - the standardized `ems-performance` command uses both canonical histories and explicitly distinguishes unconstrained upper-bound benchmarking from a future constrained replay optimum;
 - no automatic production timers for legacy Homey Insights/day-history polling;
 - no automatic Pi-side Homey control publisher while the Homey PI Bridge owns `/control/current` consumption.
