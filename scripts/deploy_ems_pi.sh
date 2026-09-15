@@ -68,9 +68,6 @@ echo "=== CHECK RUNTIME FOR UNMANAGED FILES ==="
 UNMANAGED="$(
     diff -u \
         <(cd "$SOURCE" && find . -type f \
-            -not -path './status-api/*' \
-            -not -path './tools/honeywell/*' \
-            -not -path './homey-deploy/publish_pi_control_intent.py' \
             -printf '%P\n' | sort) \
         <(cd "$RUNTIME" && find . -type f \
             -not -path './data/*' \
