@@ -59,5 +59,8 @@ jobs:
       - name: Run EMS architecture gate
         run: bash scripts/ems_architecture_gate.sh "${{ steps.base.outputs.ref }}"
 
+      - name: Install test dependency
+        run: python -m pip install pytest
+
       - name: Run Pi state tests
         run: python -m pytest -q tests/state
