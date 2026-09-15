@@ -1,16 +1,48 @@
 # Raspberry Pi EMS migration preparation
 
 Status: **PREPARED / NOT DEPLOYED / NO PHYSICAL WRITES**  
-Last sync: 2026-09-10  
-GitHub sync anchor observed during preparation: `ef50e0d4981380f65f1c82bc9a4a5106a151fbde`
+Last sync: 2026-09-15
 
 ## Purpose
 
-This directory is the migration boundary for moving suitable HEMS runtime responsibilities from Homey to the Raspberry Pi 5 without changing the current physical-control ownership prematurely.
+This directory is the canonical repository boundary for Raspberry Pi EMS runtime source. The deployed Pi runtime lives under `/home/jeroen/ems/runtime/`; repository source and deployed runtime must remain explicitly traceable to each other.
 
-The migration is code-first: the current GitHub sources under `src/homey/` remain authoritative for logic and schemas until a component has been explicitly ported, replay-tested, shadow-validated and cut over. The Pi must not reimplement a second independent planner, price model or actuator policy.
+## Mandatory repository placement guard
 
-## Operational planner source-of-truth rule — 2026-09-10
+Before **every** GitHub change that creates, moves or materially changes Pi runtime code, the contributor or automation must first inspect this file and the current `src/pi/ems-runtime/` tree. Do not invent a new top-level runtime directory merely because it is convenient for one component.
+
+Placement order:
+
+1. classify the responsibility/domain of the component;
+2. reuse an existing domain below `src/pi/ems-runtime/` when that domain owns the responsibility;
+3. determine the corresponding deployed path below `/home/jeroen/ems/runtime/`;
+4. only introduce a new runtime domain when the existing domains demonstrably do not fit;
+5. a new runtime domain requires an explicit architecture decision/documentation update in the same change cycle;
+6. update deployment definitions and canonical architecture documentation when the runtime/service boundary changes;
+7. validate the deployed/runtime path before removing a legacy source location.
+
+Current canonical Pi runtime domains on GitHub are derived from the actual `src/pi/ems-runtime/` tree. At the time of this update these include:
+
+- `datastore/` — persistent/runtime data access responsibilities;
+- `planner/` — rolling-horizon planning and planner-specific logic;
+- `publisher/` — publication/transport output responsibilities;
+- `thermal/` — thermal-domain acquisition, observation and thermal modelling.
+
+These are **domains, not a closed forever list**. Expansion must be deliberate and architecture-documented rather than ad hoc.
+
+### Anti-spaghetti rules
+
+- Do not place new Pi runtime domain logic in generic root `scripts/`.
+- Do not use `docs/`, `docs/data/` or generated artifacts as runtime source.
+- Do not duplicate the same responsibility in multiple runtime directories.
+- Integration/acquisition code and EMS domain interpretation must remain distinguishable, even when they share a domain.
+- Runtime output, caches, credentials, OAuth material and other mutable local state are not canonical source and must not be committed as source code.
+- `deploy/systemd/` contains deployment/lifecycle definitions; it is not the implementation directory for runtime domain logic.
+- A repository checkout update (`git pull`) is not itself a deployment into `/home/jeroen/ems/runtime/`.
+
+For architecture-sensitive changes also check `docs/architecture/CURRENT-EMS-STATE.md` and the relevant document under `docs/software-architecture/`.
+
+## Operational planner source-of-truth rule
 
 For planner components that have been migrated to the Pi, the **active Pi runtime is the operational source of truth**.
 
@@ -19,14 +51,11 @@ For planner components that have been migrated to the Pi, the **active Pi runtim
 - Only after a successful Pi test is the accepted planner source synchronized back to GitHub under `src/pi/ems-runtime/planner/...` and committed.
 - GitHub remains the versioned repository, audit trail, documentation source and publication target; it must not be used to introduce a planner-code change ahead of the Pi runtime.
 - Generated planner snapshots under `docs/data/` are observability artifacts and do not make GitHub the planner execution source.
-- A repository checkout update (`git pull`) does not deploy planner code into `/home/jeroen/ems/runtime`; deployment/synchronization must be explicit.
 - Runtime/systemd definitions in GitHub must be treated as deployment manifests and checked against the installed Pi units before claiming runtime parity.
 
-This rule prevents silent drift between repository code and the planner that is actually executing on the Pi.
+## Architecture invariants
 
-## Current architecture to preserve
-
-The Pi migration must preserve these invariants:
+The Pi runtime must preserve these invariants:
 
 - P1 remains authoritative for net import/export.
 - One consistent state/revision is used downstream.
@@ -37,91 +66,20 @@ The Pi migration must preserve these invariants:
 - Victron Dynamic ESS remains the primary future battery optimizer; the HEMS orchestrates household flexibility and must not become a competing realtime battery optimizer.
 - New Pi control starts read-only/shadow. Physical ownership is transferred only by an explicit atomic cutover with rollback.
 
-## Runtime baseline versus newer GitHub preparation
+## Migration discipline
 
-The last Homey ↔ GitHub runtime reconciliation remains `src/homey/runtime-sync-baseline-2026-08-30.md`. It records the active critical Homey runtime, including Core v0.11a, Power Intent v0.2.4, Planner v0.4.7, WW and EV adapter/gate/actuator chains.
+The machine-readable historical migration inventory is `src/pi/runtime-migration-manifest-v0.1.json`. Its component states may age, so current live implementation and `docs/architecture/CURRENT-EMS-STATE.md` take precedence when they conflict.
 
-Since that reconciliation, GitHub has gained important **shadow/read-only** price-source work that the Pi preparation must include from day one:
+A component migration/change is complete only when applicable source, deployed path, deployment definition, architecture documentation and runtime validation agree. Historical or deprecated source may remain temporarily during controlled migration but must be clearly identified and must not silently become a second authority.
 
-- `src/homey/context/price-source-normalizer-v0.1.mjs`
-- `src/homey/context/price-source-selector-v0.1.mjs`
-- `src/homey/context/price-source-e2e-shadow-v0.1.mjs`
-- `docs/snippets/pbth-energyzero-selector-shadow-v0.1.js`
-- `docs/snippets/pbth-energyzero-evening-validation-v0.1.js`
+## Definition of Done for Pi runtime changes
 
-The selector is deliberately deterministic and contains no Homey calls, writes or network access. The E2E runner is explicitly Node/Pi-compatible and combines captured PBTH data with live EnergyZero REST data. This makes the price-source chain a strong first native-Pi candidate while it remains `SHADOW_READ_ONLY`.
-
-The live A/B validation on 2026-09-01 established an exact semantic match for 109/109 overlapping PBTH and EnergyZero NL DAP15 slots. That validates the current PBTH `importPrice` mapping against EnergyZero `MARKET_EX_VAT` for that run, but it does **not** authorize production source switching. Horizon/readiness behaviour must still be validated, including the prepared evening probe.
-
-## Migration sequence
-
-### Phase P0 — repository sync and replay boundary — CURRENT
-
-Run all work outside the physical control loop. Reuse current GitHub source files, schemas and captured fixtures. No Pi-to-device writes and no disabling of Homey flows.
-
-Required outcomes:
-
-1. A Pi runtime can consume recorded/captured state without Homey broad polling.
-2. Deterministic modules run under Node on ARM64 unchanged or with a thin environment adapter only.
-3. Outputs can be compared against the current Homey/GitHub shadow publications by schema, revision, timestamps and decision reason.
-4. Price-source normalizer/selector/E2E logic is executable on the Pi in shadow mode.
-
-### Phase P1 — Pi shadow services
-
-Move compute-heavy/read-only responsibilities first:
-
-- price-source acquisition/normalization/selection;
-- 24h Planner replay/shadow calculation;
-- evidence/history processing;
-- diagnostics and validation.
-
-Homey remains authoritative for live inputs that have not yet received a dedicated event/bridge interface. The Pi must consume compact state/events rather than reproduce `getDevices()` / `getVariables()` collection polling.
-
-### Phase P2 — Power Intent shadow parity
-
-Run Pi-produced Planner output and Power Intent beside the Homey chain. Require agreement on schema, intended watts, MUST/SHOULD/MAY priority, reason codes, freshness and revision provenance. Differences are evidence to investigate, not a reason to silently prefer one side.
-
-### Phase P3 — adapter ownership transfer, one actuator at a time
-
-Only after shadow parity and a targeted smoke test may ownership move. Transfer must be atomic:
-
-1. establish Pi writer with physical writes disabled;
-2. verify end-to-end command, guard and rollback path;
-3. disable the old automatic writer;
-4. enable exactly one new writer;
-5. smoke-test and record PASS/FAIL;
-6. rollback immediately on failure.
-
-Do not migrate WW and EV writers in the same cutover batch.
-
-### Phase P4 — Victron integration
-
-After Victron hardware commissioning, expose measurement/status to the HEMS and hand battery optimization to Victron/DESS. Planner may publish household-flex forecasts/reservations such as future load requirements, but must not duplicate DESS arbitrage.
-
-## Current component disposition
-
-See `src/pi/runtime-migration-manifest-v0.1.json` for the machine-readable migration inventory. The key rule is that `native_pi_shadow_candidate` does not mean `production_on_pi`.
-
-Current recommended first executable chain on the Pi:
-
-`EnergyZero REST / captured PBTH -> price normalizer -> shadow selector -> Planner shadow input -> Planner replay -> comparison/evidence`
-
-This path has no actuator dependency and therefore gives useful Pi validation without increasing Homey throttling risk.
-
-## Runtime packaging decision intentionally still open
-
-No prior project decision establishes Docker versus native Node/systemd as the canonical Pi packaging model. This sync therefore does **not** invent one. The runtime modules are prepared to remain ordinary Node-compatible source; packaging should be decided once the Pi is available and after checking operational needs such as restart behaviour, logs, secrets, updates and resource overhead.
-
-Until that decision is made, do not add a production service that automatically starts physical writers at boot.
-
-## Definition of Done before first Pi cutover
-
-- Pi checkout is pinned to a known Git commit.
-- Node/ARM64 smoke tests pass for all migrated deterministic modules.
-- Homey and Pi clock/timezone handling agrees on `Europe/Amsterdam` and DST boundaries.
-- Price horizon and next-day availability behaviour has shadow evidence.
-- Planner output matches the accepted Homey/GitHub reference for replay fixtures.
-- No duplicate actuator ownership exists.
-- Kill switch and rollback are tested before physical writes.
-- Observability records input revision, output revision/schema, decision reason and writer ownership.
-- GitHub runtime baseline is updated in the same change cycle as any real cutover.
+- placement checked against the canonical runtime domains before coding;
+- source path and deployed `/home/jeroen/ems/runtime/...` path are explicit;
+- no duplicate runtime responsibility or writer is introduced;
+- syntax/smoke/shadow validation is performed where applicable;
+- timezone handling uses `Europe/Amsterdam` where local household time is involved;
+- deployment/systemd definitions are checked when lifecycle changes;
+- `CURRENT-EMS-STATE.md` and relevant component/flow documentation are checked when architecture changes;
+- rollback/SHADOW/TEMP functionality is not represented as production;
+- legacy location is removed only after the new path is validated.
