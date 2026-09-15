@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/pi/**'
       - 'services/pi/**'
+      - 'tests/**'
       - 'deploy/**'
       - 'config/**'
       - 'tools/**'
@@ -19,6 +20,7 @@ on:
     paths:
       - 'src/pi/**'
       - 'services/pi/**'
+      - 'tests/**'
       - 'deploy/**'
       - 'config/**'
       - 'tools/**'
@@ -56,3 +58,6 @@ jobs:
 
       - name: Run EMS architecture gate
         run: bash scripts/ems_architecture_gate.sh "${{ steps.base.outputs.ref }}"
+
+      - name: Run Pi state tests
+        run: python -m pytest -q tests/state
