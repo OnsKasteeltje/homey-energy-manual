@@ -1,85 +1,61 @@
-# Raspberry Pi EMS migration preparation
+# Raspberry Pi EMS migration area
 
-Status: **PREPARED / NOT DEPLOYED / NO PHYSICAL WRITES**  
+Status: **LEGACY / MIGRATION BOUNDARY — DO NOT USE FOR NEW SOURCE BY DEFAULT**  
 Last sync: 2026-09-15
 
-## Purpose
+## Authority
 
-This directory is the canonical repository boundary for Raspberry Pi EMS runtime source. The deployed Pi runtime lives under `/home/jeroen/ems/runtime/`; repository source and deployed runtime must remain explicitly traceable to each other.
+The canonical repository placement policy is:
 
-## Mandatory repository placement guard
+`docs/architecture/repository-structure.md`
 
-Before **every** GitHub change that creates, moves or materially changes Pi runtime code, the contributor or automation must first inspect this file and the current `src/pi/ems-runtime/` tree. Do not invent a new top-level runtime directory merely because it is convenient for one component.
+That document takes precedence over this README for repository placement.
 
-Placement order:
+The target Pi production-source boundary is `services/pi/`, with responsibilities separated into planner, control, state, API, integrations and history. Existing source under `src/pi/` and `src/pi/ems-runtime/` is migration-era source and may remain while it is still operationally required, but its existence must not be used as precedent for new files.
 
-1. classify the responsibility/domain of the component;
-2. reuse an existing domain below `src/pi/ems-runtime/` when that domain owns the responsibility;
-3. determine the corresponding deployed path below `/home/jeroen/ems/runtime/`;
-4. only introduce a new runtime domain when the existing domains demonstrably do not fit;
-5. a new runtime domain requires an explicit architecture decision/documentation update in the same change cycle;
-6. update deployment definitions and canonical architecture documentation when the runtime/service boundary changes;
-7. validate the deployed/runtime path before removing a legacy source location.
+The deployed Pi runtime remains under `/home/jeroen/ems/runtime/`. Repository source and deployed runtime must remain explicitly traceable, but their directory layouts do not have to be identical when the documented deployment mapping intentionally differs.
 
-Current canonical Pi runtime domains on GitHub are derived from the actual `src/pi/ems-runtime/` tree. At the time of this update these include:
+## Mandatory placement rule
 
-- `datastore/` — persistent/runtime data access responsibilities;
-- `planner/` — rolling-horizon planning and planner-specific logic;
-- `publisher/` — publication/transport output responsibilities;
-- `thermal/` — thermal-domain acquisition, observation and thermal modelling.
+Before every GitHub change that creates, moves or materially changes EMS source:
 
-These are **domains, not a closed forever list**. Expansion must be deliberate and architecture-documented rather than ad hoc.
+1. read/check `docs/architecture/repository-structure.md`;
+2. classify the touched file by architectural owner and lifecycle;
+3. place new source directly in the target structure;
+4. apply **Touch it, place it correctly** to materially changed legacy files;
+5. if a legacy path cannot safely move in the same change, document why it temporarily remains;
+6. update imports, systemd/deployment paths, drift checks, tests and architecture documentation atomically when a move occurs;
+7. validate the deployed Pi path before deleting the old source.
 
-### Anti-spaghetti rules
-
-- Do not place new Pi runtime domain logic in generic root `scripts/`.
-- Do not use `docs/`, `docs/data/` or generated artifacts as runtime source.
-- Do not duplicate the same responsibility in multiple runtime directories.
-- Integration/acquisition code and EMS domain interpretation must remain distinguishable, even when they share a domain.
-- Runtime output, caches, credentials, OAuth material and other mutable local state are not canonical source and must not be committed as source code.
-- `deploy/systemd/` contains deployment/lifecycle definitions; it is not the implementation directory for runtime domain logic.
-- A repository checkout update (`git pull`) is not itself a deployment into `/home/jeroen/ems/runtime/`.
-
-For architecture-sensitive changes also check `docs/architecture/CURRENT-EMS-STATE.md` and the relevant document under `docs/software-architecture/`.
+Do not create a new `src/pi/...` location merely because related legacy code still exists there.
 
 ## Operational planner source-of-truth rule
 
-For planner components that have been migrated to the Pi, the **active Pi runtime is the operational source of truth**.
+For planner components already running on the Pi, the active Pi runtime is the operational source of truth during a change cycle:
 
-- Planner logic is developed and changed first under `/home/jeroen/ems/runtime/planner/...` on the Pi.
-- The changed Pi planner is syntax/smoke tested and run in `PURE_SHADOW` before it is considered accepted.
-- Only after a successful Pi test is the accepted planner source synchronized back to GitHub under `src/pi/ems-runtime/planner/...` and committed.
-- GitHub remains the versioned repository, audit trail, documentation source and publication target; it must not be used to introduce a planner-code change ahead of the Pi runtime.
-- Generated planner snapshots under `docs/data/` are observability artifacts and do not make GitHub the planner execution source.
-- Runtime/systemd definitions in GitHub must be treated as deployment manifests and checked against the installed Pi units before claiming runtime parity.
+- change/test the active planner under `/home/jeroen/ems/runtime/planner/...` first;
+- syntax/smoke test and use `PURE_SHADOW` where applicable;
+- synchronize the accepted implementation back to the **current target repository location** under `services/pi/planner/` when that component is migrated to target structure;
+- legacy planner source under `src/pi/ems-runtime/planner/` may temporarily remain only where required for a controlled migration/rollback path;
+- GitHub remains the versioned repository, audit trail, documentation source and publication target;
+- `git pull` is not deployment into `/home/jeroen/ems/runtime/`.
 
 ## Architecture invariants
-
-The Pi runtime must preserve these invariants:
 
 - P1 remains authoritative for net import/export.
 - One consistent state/revision is used downstream.
 - Planner and price/context logic remain deterministic and replayable.
 - Exactly one automatic writer may own each physical actuator.
 - Easee Equalizer remains the independent hard EV load-balancing layer.
-- Quatt remains `OBSERVE_ONLY` unless a separately validated control policy is introduced.
-- Victron Dynamic ESS remains the primary future battery optimizer; the HEMS orchestrates household flexibility and must not become a competing realtime battery optimizer.
-- New Pi control starts read-only/shadow. Physical ownership is transferred only by an explicit atomic cutover with rollback.
+- Quatt remains `OBSERVE_ONLY` unless separately validated control is introduced.
+- Victron Dynamic ESS remains the primary future battery optimizer.
+- New Pi control starts read-only/shadow and transfers ownership only by explicit atomic cutover with rollback.
+- Household-local time semantics use `Europe/Amsterdam` and DST-aware timestamps.
 
-## Migration discipline
+## Migration inventory
 
-The machine-readable historical migration inventory is `src/pi/runtime-migration-manifest-v0.1.json`. Its component states may age, so current live implementation and `docs/architecture/CURRENT-EMS-STATE.md` take precedence when they conflict.
+`src/pi/runtime-migration-manifest-v0.1.json` is historical/migration inventory, not the repository placement authority. Current live implementation, `docs/architecture/CURRENT-EMS-STATE.md`, and `docs/architecture/repository-structure.md` take precedence where older migration material conflicts.
 
-A component migration/change is complete only when applicable source, deployed path, deployment definition, architecture documentation and runtime validation agree. Historical or deprecated source may remain temporarily during controlled migration but must be clearly identified and must not silently become a second authority.
+## Definition of done
 
-## Definition of Done for Pi runtime changes
-
-- placement checked against the canonical runtime domains before coding;
-- source path and deployed `/home/jeroen/ems/runtime/...` path are explicit;
-- no duplicate runtime responsibility or writer is introduced;
-- syntax/smoke/shadow validation is performed where applicable;
-- timezone handling uses `Europe/Amsterdam` where local household time is involved;
-- deployment/systemd definitions are checked when lifecycle changes;
-- `CURRENT-EMS-STATE.md` and relevant component/flow documentation are checked when architecture changes;
-- rollback/SHADOW/TEMP functionality is not represented as production;
-- legacy location is removed only after the new path is validated.
+A Pi-related GitHub change is complete only when, where applicable, implementation, target placement, deployed path, deployment definition, drift validation, tests and canonical architecture documentation agree. Newly obsolete files require an explicit KEEP / ROLLBACK / ARCHIVE / DELETE decision.
