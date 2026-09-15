@@ -41,6 +41,21 @@ Expected local-only runtime material:
 
 Credentials, tokens, caches and generated canonical runtime output must never be committed to GitHub.
 
+### Deployment invariant
+
+Repository deployment must treat the Honeywell runtime directory as a **mixed managed/runtime-state directory**. A source sync may update repository-managed code, `requirements.txt`, `config/account.env.example` and `config/zone-map.json`, but it must not replace the whole runtime directory in a way that deletes local-only state.
+
+The following paths must survive every normal source deployment:
+
+- `.venv/` — host-local Python virtual environment;
+- `config/account.env` — Honeywell credentials, mode `0600`;
+- `cache/oauth-token.json` — reusable OAuth access/refresh token state, mode `0600`;
+- `output/honeywell-state.json` and `output/honeywell-schedule.json` — last successfully collected canonical runtime outputs.
+
+If a deployment intentionally rebuilds `.venv/`, it must recreate it and install the pinned `requirements.txt` before enabling or restarting Honeywell systemd collectors. Secrets and OAuth cache are never reconstructed from GitHub.
+
+This invariant was revalidated after the 2026-09-14 repository/runtime relocation: a later source deployment had left `.venv/` without `bin/python` and removed `config/account.env` and `cache/oauth-token.json`. On 2026-09-15 the venv was rebuilt with Python 3.13.5 and `evohome-async==2.1.0`, the local credential/cache state was recovered from the pre-relocation runtime backup, and a fresh read-only schedule collection completed successfully.
+
 ## Library and authentication
 
 The tool uses `evohome-async` 2.1.0 (`evohomeasync2` namespace), an asyncio client for the Resideo Total Connect Comfort EU/EMEA API. Python >=3.13 is required by that release.
@@ -65,6 +80,19 @@ The weekly schedule from this existing collector is the canonical baseline for t
 `output/honeywell-schedule.json` uses `EMS_HONEYWELL_SCHEDULE_V0.2` and contains current/next Honeywell switchpoints plus `weeklySchedule` for every mapped zone. `weeklySchedule` is the read-only Honeywell baseline used by the Planner visualisation and future PV-preheat optimizer.
 
 Both canonical outputs are written atomically only after a successful cloud read. A failed vendor call therefore leaves the previous valid output intact; downstream consumers must use `generatedAt` freshness and fail closed when data is stale.
+
+### Validated schedule representation
+
+A live 2026-09-15 collection confirmed all eight mapped room keys and the exact schedule representation consumed by the EMS:
+
+- `currentSwitchpoint.time` and `nextSwitchpoint.time` are absolute, offset-aware local timestamps (for example `2026-09-15T22:00:00+02:00`);
+- their target is exposed as `targetTemperature_C`;
+- `weeklySchedule` is a seven-day list using lowercase `day_of_week` values;
+- each day contains ordered `switchpoints` with `time_of_day` (`HH:MM:SS`) and `heat_setpoint` (°C).
+
+For the validated `woonkamer` sample the current switchpoint was 19.0 °C at 19:30 local time and the next switchpoint was 15.5 °C at 22:00 local time. The Heating Room Model therefore classifies that next baseline transition as `DOWN`; future energy optimisation must never advance such a reduction.
+
+The collector obtains current/next switchpoints from `evohome-async`; downstream EMS code should preserve those resolved local timestamps rather than independently reinterpreting them. Weekly schedule projection beyond the supplied next switchpoint must use `Europe/Amsterdam` and produce offset-aware absolute timestamps.
 
 ### Website export
 

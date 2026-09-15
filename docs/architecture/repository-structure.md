@@ -61,6 +61,7 @@ homey-energy-manual/
 ├── tests/
 │   ├── planner/
 │   ├── control/
+│   ├── state/
 │   ├── integrations/
 │   └── replay/
 │
@@ -90,7 +91,7 @@ The target structure follows the operational ownership model:
 - **docs/** contains architecture, component documentation, decisions, commissioning records and operational runbooks, not production runtime implementation.
 - **deploy/** contains installation, migration and runtime-service definitions.
 - **config/** contains declarative configuration and schemas, not runtime business logic.
-- **tests/** contains automated validation, replay and regression artefacts.
+- **tests/** contains automated validation, replay and regression artefacts, grouped by the production boundary they validate (including state processing).
 - **tools/** contains manually invoked diagnostics, validation and maintenance utilities.
 - **archive/** contains intentionally retained legacy implementations and experiments that are no longer part of production.
 
