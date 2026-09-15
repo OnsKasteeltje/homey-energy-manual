@@ -46,8 +46,6 @@ while IFS= read -r rel; do
     fi
 done < <(
     cd "$SOURCE" && find . -type f \
-        -not -path './status-api/*' \
-        -not -path './homey-deploy/publish_pi_control_intent.py' \
         -not -path '*/__pycache__/*' \
         -not -name '*.pyc' \
         -printf '%P\n' | sort
