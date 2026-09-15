@@ -30,7 +30,9 @@ Honeywell/Resideo remains the comfort and schedule authority. The canonical vend
 
 The first canonical EMS interpretation layer is `services/pi/state/heating/build_heating_room_model.py`, schema `EMS_HEATING_ROOM_MODEL_V0.1`. It joins schedule and current room state by stable canonical room key, preserves the actual Honeywell target separately from the scheduled baseline, and classifies the next baseline transition as `UP`, `DOWN` or `NONE` using the scheduled current/next targets only. All EMS-facing schedule timestamps are offset-aware in `Europe/Amsterdam`.
 
-V0.1 is **READ_ONLY / SHADOW**. It contains no PV/preheat decision and no Honeywell, Homey, OpenTherm, Quatt or actuator write path. Future PV preheat belongs under `services/pi/planner/heating/`; any later guarded execution belongs under `services/pi/control/heating/` and requires a separately validated adapter/gate/actuator boundary.
+The first canonical heating planner layer is `services/pi/planner/heating/build_heating_preheat_plan.py`, schema `EMS_HEATING_PREHEAT_PLAN_V0.1`. It remains **READ_ONLY / SHADOW**. A valid upcoming Honeywell `UP` transition becomes `ELIGIBLE_UP_TRANSITION`; `DOWN` and `NONE` remain `NOT_ELIGIBLE`. The candidate target is exactly the later Honeywell baseline target and `candidate.startAt` remains `null` until a separately validated opportunity-selection increment exists. This V0.1 planner consumes no PV forecast, tariff or actuator input and performs no physical writes.
+
+Both heating V0.1 layers fail closed on invalid source/time semantics. Honeywell remains the comfort authority. Future PV preheat may only advance an `UP` transition and may never exceed the later Honeywell target; any later guarded execution belongs under `services/pi/control/heating/` and requires a separately validated adapter/gate/actuator boundary.
 
 A live 2026-09-15 Honeywell schedule collection validated all eight mapped room keys and the exact source representation. For `woonkamer`, the observed baseline moved from 19.0 °C at 19:30 local time to 15.5 °C at 22:00 local time; the room model therefore classifies that transition as `DOWN`. A future energy optimizer must never advance a scheduled reduction.
 
@@ -399,7 +401,7 @@ For Homey ↔ Pi boundary changes, documentation must cover both state and contr
 
 Production `deploy/systemd/` must contain only units that remain valid for the intended runtime architecture. Obsolete automatic Homey pollers or alternative control writers must not remain deployable production timers.
 
-New Pi history functionality uses the target repository structure under `services/pi/history/`. New canonical room-heating interpretation uses `services/pi/state/heating/`. The active planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path would require coordinated systemd, deployment and runtime-path migration and would add unrelated cutover risk. This is an explicit `touch it, place it correctly` migration decision rather than a new legacy placement.
+New Pi history functionality uses the target repository structure under `services/pi/history/`. New canonical room-heating interpretation uses `services/pi/state/heating/`; new canonical room-heating planning uses `services/pi/planner/heating/`. The active general planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path would require coordinated systemd, deployment and runtime-path migration and would add unrelated cutover risk. This is an explicit `touch it, place it correctly` migration decision rather than a new legacy placement.
 
 ## 12. Battery boundary
 
@@ -433,6 +435,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - planner-history capture must use planner-owned frozen decision output and must not re-read mutable live state after plan generation;
 - new Pi history code is placed under the target `services/pi/history/` structure and included in deployment/drift validation;
 - new canonical room-heating interpretation is placed under `services/pi/state/heating/` and remains read-only/shadow until separately validated planning/control layers exist;
+- new canonical room-heating planning is placed under `services/pi/planner/heating/`, remains read-only/shadow, and may only expose advancement candidates for Honeywell `UP` transitions until a separately validated opportunity-selection/control layer exists;
 - the standardized `ems-performance` command uses both canonical histories and explicitly distinguishes unconstrained upper-bound benchmarking from a future constrained replay optimum;
 - no automatic production timers for legacy Homey Insights/day-history polling;
 - no automatic Pi-side Homey control publisher while the Homey PI Bridge owns `/control/current` consumption.
