@@ -104,11 +104,15 @@ Production remains locked to the fixed three-year ENGIE contract:
 - `productionContractMode = FIXED`;
 - `productionContractId = ENGIE_3Y_2026_2029`;
 - `productionSupplier = ENGIE`;
-- dynamic pricing is disabled for production and may only be used for shadow/analysis/replay;
-- automatic fallback to DYNAMIC and automatic contract-mode switching are forbidden;
-- invalid or inconsistent configuration fails closed.
+- dynamic pricing is **disabled for production**;
+- dynamic prices may only be used for shadow, analysis or replay;
+- automatic fallback to DYNAMIC is forbidden;
+- automatic contract-mode switching is forbidden;
+- invalid or inconsistent configuration must fail closed.
 
-Ordering rule: **contract mode → permitted economic model → permitted price source → planner decision**.
+Ordering rule:
+
+**contract mode → permitted economic model → permitted price source → planner decision**
 
 ## 4. Pi planning chain
 
