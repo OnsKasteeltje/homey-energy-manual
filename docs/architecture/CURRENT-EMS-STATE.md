@@ -5,7 +5,7 @@
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
 **Status date:** 2026-09-16  
-**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis and 2026-09-15 Honeywell read-only schedule recovery/validation  
+**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
 
@@ -24,21 +24,27 @@ Detailed bidirectional runtime chain: `docs/architecture/homey-pi-runtime-datafl
 
 Operational energy history follows the canonical Homey → Pi state direction. Accepted Core state pushes are archived locally on the Pi; automatic Pi polling of Homey Insights is not a production history transport.
 
-### 1.1 Heating room-model boundary — read-only/shadow
+### 1.1 Ruimteverwarming — Honeywell baseline, PV-voorverwarming and Thermal Learning
 
 Honeywell/Resideo remains the comfort and schedule authority. The canonical vendor acquisition boundary is `services/pi/integrations/honeywell/`; it produces `EMS_HONEYWELL_SCHEDULE_V0.2` and `EMS_HONEYWELL_STATE_V0.2` without physical writes.
 
-The first canonical EMS interpretation layer is `services/pi/state/heating/build_heating_room_model.py`, schema `EMS_HEATING_ROOM_MODEL_V0.1`. It joins schedule and current room state by stable canonical room key, preserves the actual Honeywell target separately from the scheduled baseline, and classifies the next baseline transition as `UP`, `DOWN` or `NONE` using the scheduled current/next targets only. All EMS-facing schedule timestamps are offset-aware in `Europe/Amsterdam`.
+The canonical EMS interpretation layer is `services/pi/state/heating/build_heating_room_model.py`, schema `EMS_HEATING_ROOM_MODEL_V0.1`. It joins schedule and current room state by stable canonical room key, preserves the actual Honeywell target separately from the scheduled baseline, and classifies the next baseline transition as `UP`, `DOWN` or `NONE` using scheduled current/next targets only. EMS-facing schedule timestamps are offset-aware in `Europe/Amsterdam`.
 
-The canonical heating planner layer is `services/pi/planner/heating/build_heating_preheat_plan.py`, schema `EMS_HEATING_PREHEAT_PLAN_V0.1`, and remains **READ_ONLY / SHADOW**. A valid upcoming Honeywell `UP` transition is the only transition eligible for advancement; `DOWN` and `NONE` remain `NOT_ELIGIBLE`. The candidate target is always exactly the later Honeywell baseline target and `candidate.startAt` remains `null` in this layer.
+The canonical shadow preheat layer is `services/pi/planner/heating/build_heating_preheat_plan.py`, schema `EMS_HEATING_PREHEAT_PLAN_V0.2`. It remains **READ_ONLY / SHADOW** and creates no physical writes. PV-preheat scope is explicitly limited to `woonkamer`, `eetkamer`, `keuken` and `serre`; `woonkamer` and `eetkamer` carry common `living_area` grouping metadata. Other Honeywell rooms remain normal baseline/comfort rooms but are outside PV-preheat scope.
 
-The heating planner does not own or create a separate PV-opportunity schema and does not independently select a PV slot. Normal Honeywell schedule heating remains baseline comfort demand. Only the possible earlier heating represented by an eligible `UP` candidate is flexible demand. Forecast PV-export potential and any eventual allocation between flexible WW, heating-preheat and EV demand belong to the existing Dynamic Pi Planner. No thermal power, heat-up duration, COP, building heat loss or room-response assumption is invented by this V0.1 heating layer.
+Only an upcoming Honeywell `UP` transition can become a preheat candidate. The provisional maximum advancement horizon is 180 minutes. Measured room temperature is decisive: when the later Honeywell target is already satisfied, no preheat candidate exists. When an eligible larger baseline increase is advanced, V0.2 exposes candidate setpoint steps of at most 0.5 °C and skips already-satisfied steps. The later Honeywell target is an absolute ceiling. `DOWN` and `NONE` transitions are never advanced.
 
-Both heating V0.1 layers fail closed on invalid source/time semantics. `sourceRoomModelGeneratedAt` is required to be offset-aware, but V0.1 defines no maximum-age threshold. Honeywell remains the comfort authority. Future PV preheat may only advance an `UP` transition, may never exceed the later Honeywell target and must not intentionally create grid import merely to preheat a room. Any later guarded execution belongs under `services/pi/control/heating/` and requires a separately validated adapter/gate/actuator boundary.
+Normal Honeywell schedule execution remains baseline comfort demand. EMS creates no new heat demand. PV-voorverwarming may only shift already-planned future Honeywell demand earlier when usable forecast PV-export potential exists; it must not intentionally create grid import merely to absorb energy. `candidate.startAt` remains `null` in the heating-preheat layer. Forecast PV-export evaluation and eventual joint allocation with WW and EV remain the responsibility of the existing Dynamic Pi Planner; this release does **not** modify that planner.
 
-A live 2026-09-15 Honeywell schedule collection validated all eight mapped room keys and the exact source representation. For `woonkamer`, the observed baseline moved from 19.0 °C at 19:30 local time to 15.5 °C at 22:00 local time; the room model therefore classifies that transition as `DOWN`. The energy optimizer must never advance a scheduled reduction.
+No thermal power, heat-up duration, COP, building heat loss or room-response coefficient is invented by Heating Preheat V0.2. The 180-minute horizon and 0.5 °C advancement steps are shadow guardrails, not learned physical constants.
 
-Honeywell runtime deployment is a mixed managed/runtime-state directory. Repository-managed source may be refreshed, but host-local `.venv/`, `config/account.env`, `cache/oauth-token.json` and last valid generated outputs must survive normal source deployment. Secrets, OAuth cache and generated runtime output remain outside GitHub. On 2026-09-15 the Honeywell venv/credential/cache chain was recovered after the repository/runtime relocation and a fresh read-only schedule collection completed successfully.
+The former legacy `src/pi/ems-runtime/thermal/build_thermal_observer.py` is retired rather than migrated as a parallel thermal model. Its overlapping Honeywell/schedule/room-state responsibility is superseded by the canonical Heating Room Model. There must not be both `EMS_THERMAL_OBSERVER_V0.1` and `EMS_HEATING_ROOM_MODEL_V0.1` as competing descriptions of room-heating state.
+
+Quatt acquisition that remains useful for thermal analysis is canonicalized under `services/pi/integrations/quatt/collect_quatt_current.py`. The production systemd unit points to this target-structure source. Quatt telemetry, canonical room state and historical measurements form the input basis for **Heating Thermal Learning**: empirical evaluation of room response, heat retention, useful advancement horizon and rebound around the original Honeywell comfort time. Thermal Learning is observational; it does not create a second comfort authority or physical writer.
+
+Detailed component documentation is under `docs/software-architecture/components/space-heating.md`, `heating-room-model.md` and `heating-preheat-plan.md`.
+
+Honeywell runtime deployment remains a mixed managed/runtime-state directory. Repository-managed source may be refreshed, but host-local `.venv/`, `config/account.env`, `cache/oauth-token.json` and last valid generated outputs must survive normal source deployment. Secrets, OAuth cache and generated runtime output remain outside GitHub.
 
 ## 2. Control architecture
 
@@ -66,17 +72,7 @@ EM v2 | 05 Transport | Homey→Pi State Push v0.1
         Pi forecast / planner / analytics
 ```
 
-The state path is push-based. The Pi must not poll Homey merely to reconstruct the canonical Core state. The Homey publisher reuses the already-built Core snapshot and introduces no extra device reads solely for publication.
-
-The Pi write endpoint is authenticated with a Bearer token loaded from `EMS_STATE_INGEST_TOKEN` through `/etc/ems/state-ingest.env`. The secret remains outside GitHub.
-
-Accepted state is written atomically to `/home/jeroen/ems/data/energy-state-v2.json`. Required blocks are `meta`, `grid`, `tesla` and `hot_water`. Current schema is `2.12` and publisher versions must start with `EM2_CORE_STATE_`.
-
-Freshness and ordering use `source_sample_at`, `generated_at`, `heartbeat_at` and monotonic `state_revision`. Stale, future-skewed, replayed or malformed payloads fail closed and do not replace the existing runtime state.
-
-After successful live-state persistence, the same accepted payload is archived locally by `src/pi/ems-runtime/status-api/history_archive.py`. Current archive coverage includes P1, all three PV inverter powers, Tesla charging power, boiler power, Quatt electrical power and washer/dryer active state when present. Duplicate source samples are ignored by the existing measurements uniqueness constraint.
-
-Historical archiving is best-effort relative to live state acceptance: an SQLite failure is visible in the journal/ingest response but does not invalidate a fresh Homey state or cause a planner outage.
+The state path is push-based. The Pi must not poll Homey merely to reconstruct canonical Core state. Accepted state is written atomically to `/home/jeroen/ems/data/energy-state-v2.json`; accepted payloads are also archived locally to operational history. Freshness and ordering use source timestamps and monotonic revision semantics; stale, future-skewed, replayed or malformed payloads fail closed.
 
 ### 2.2 Control direction — Pi → Homey
 
@@ -87,7 +83,7 @@ Pi forecasts + history + fixed-contract policy
                     ↓
           Pi /control/current
                     ↓
- Homey PI Dynamic Planner Bridge v1.3.0
+ Homey PI Dynamic Planner Bridge
                     ↓
           EM2_Power_Intent
              ↙             ↘
@@ -99,25 +95,11 @@ Pi forecasts + history + fixed-contract policy
      Easee              boiler
 ```
 
-The Pi is the active planner authority. Homey is the realtime state, executor and local safety layer. The planner itself never writes physical devices.
-
-The production control transport is **Homey pulling `/control/current`**. The former Pi-side `publish_pi_control_intent.py` path is legacy compatibility code, not a production writer. `ems-pi-control-publish.service/timer` must not be part of the active production systemd set while the Homey PI Bridge owns this role.
-
-### Runtime authority selector
-
-`EM2_Planner_Authority` is the **single HOMEY↔PI authority gate**.
-
-- `PI` → the Homey PI bridge may publish the current Pi command into `EM2_Power_Intent`.
-- `HOMEY` → the Pi bridge remains inert and the guarded Homey producer remains the rollback producer.
-- Active Pi bridge source: `src/homey/ev/pi-dynamic-planner-bridge-v1.3.0.live-homey.js`.
-
-There must never be two simultaneous planner authorities or two independent production writers for the same actuator intent.
+The Pi is the active planner authority. Homey is the realtime state, executor and local safety layer. The planner itself never writes physical devices. `EM2_Planner_Authority` remains the single HOMEY↔PI authority gate; dual planner authority or dual independent writers are forbidden.
 
 ## 3. Production contract policy
 
-The production EMS is locked to the fixed three-year ENGIE contract.
-
-Required invariants:
+Production remains locked to the fixed three-year ENGIE contract:
 
 - `productionContractMode = FIXED`;
 - `productionContractId = ENGIE_3Y_2026_2029`;
@@ -134,313 +116,94 @@ Ordering rule:
 
 ## 4. Pi planning chain
 
-The regular chain builds planning inputs in this order:
+The active general planner remains the hardened rolling 24-hour Pi planner with 96 quarter-hour slots. It owns joint strategic allocation of flexible demand while preserving hard comfort/safety feasibility. The term **dynamic planner** refers to rolling optimization, not a dynamic electricity contract.
 
-1. planner axis / weather / Quatt forecast inputs;
-2. PV forecast;
-3. clean base-load history from local SQLite;
-4. base-load forecast;
-5. warm-water input;
-6. warm-water plan;
-7. WW forecast import;
-8. quarter-hour planning inputs / shadow load plan;
-9. hardened dynamic planner;
-10. best-effort planner decision snapshot for retrospective replay;
-11. website shadow representations;
-12. publication artifacts.
+Heating Preheat V0.2 does not alter the active Dynamic Pi Planner. It exposes only validated shadow advancement candidates; PV-slot selection and any later competition/allocation between WW, heating-preheat and EV remain outside the heating candidate builder.
 
-The forecast chain is executed by `ems-forecast-chain.service` (`Type=oneshot`), normally triggered by `ems-forecast-chain.timer`. `inactive (dead)` after a successful run is normal.
-
-A second independent planner-generation timer is forbidden. Freshness guards are intentional fail-closed boundaries and must not be weakened to mask a broken upstream state producer.
-
-The current plan schema is `EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3` and includes:
-
-- 96 quarter-hour action slots / 24-hour action horizon;
-- `plannerOwner = PI`;
-- fixed ENGIE contract metadata;
-- input freshness checks;
-- `validUntil`;
-- WW comfort feasibility;
-- Tesla deadline feasibility;
-- fail-closed execution metadata;
-- multiday lookahead for WW feasibility.
-
-The term **dynamic planner** refers to rolling optimization of flexible loads; it does not imply a dynamic electricity contract.
-
-### 4.1 Planner decision history and PV replay
-
-Every successfully hardened planner run is followed in the same forecast chain by `services/pi/history/archive_planner_snapshot.py`, deployed as `/home/jeroen/ems/runtime/history/archive_planner_snapshot.py`.
-
-The archive stores a compressed append-only decision snapshot in `/home/jeroen/ems/data/planner-history.sqlite`. Each snapshot is keyed by the planner generation timestamp and contains:
-
-- the complete hardened 96-slot plan, including PV/base-load/Quatt forecasts and predicted grid import/export after flexible loads;
-- WW allocation choices, candidate diagnostics, comfort/deadline context and allocation reasons already frozen in the plan;
-- Tesla connection/deadline context, selected opportunity windows, targets and allocation reasons already frozen in the plan;
-- the realtime P1 correction context, forecast-confidence information, guardrails, contract and input-freshness metadata embedded in that planner output.
-
-The hardened planner output is the **atomic decision record**. The history archiver must not re-read mutable `energy-state-v2.json` or `ww-input.json` after plan generation, because a new Homey push between planning and archive capture could attach state the planner never used. Measured Homey/P1/device actuals remain independently available in `ems-history.sqlite` and are correlated by time during retrospective replay.
-
-The current planner schema does not yet embed `state_revision` and `source_sample_at` inside the final decision output. Planner-history therefore leaves those SQLite columns empty rather than fabricating them from a later live-state read. If these identifiers are added later, they must be stamped by the planner itself as part of the same atomic output.
-
-Retention is 120 days. Duplicate planner generation timestamps are idempotently ignored.
-
-This decision history complements, rather than replaces, `ems-history.sqlite`. Together they provide the two historical layers required for objective EMS performance review:
-
-1. **actuals** — what PV, grid, boiler, Tesla, Quatt and loads actually did;
-2. **decision context** — what the planner forecast, constrained and selected at that time.
-
-The existing PV-capture validator measures realised self-consumption/capture. It is not by itself proof of the theoretical constrained optimum. A retrospective optimum/replay analysis must compare measured actuals with the archived decision context under the same WW comfort, Tesla availability/deadline and actuator constraints.
-
-Planner-history capture is observability-only and best-effort. Failure to archive a snapshot is logged but must not block generation, publication or execution of an otherwise valid plan.
-
-### 4.2 Standard EMS performance question
-
-The canonical operator command is installed as `/usr/local/bin/ems-performance` and points to `services/pi/history/ems_performance.py` in the deployed target-structure runtime.
-
-The standard interaction contract is:
-
-- **“Hoe heeft de EMS gepresteerd?”** means the previous complete local day and maps to `ems-performance yesterday`;
-- **“Hoe heeft de EMS vandaag gepresteerd?”** maps to `ems-performance today` and must be treated as a partial-day report;
-- an explicit date maps to `ems-performance YYYY-MM-DD`;
-- timezone and day boundaries are `Europe/Amsterdam`.
-
-The report combines `ems-history.sqlite` actuals with `planner-history.sqlite` decision-history coverage. It reports PV production, import/export, direct self-use, boiler/Tesla/Quatt energy, flexible-load PV capture and candidate exported-PV windows for replay.
-
-Version V0.1 also calculates a same-flex-energy **unconstrained upper bound**: the maximum flexible-load PV capture possible if the day's measured flexible-load energy could be shifted freely. This benchmark intentionally ignores detailed availability, minimum-run, comfort and deadline constraints. Therefore:
-
-- `upperBoundGapKWh` is a replay candidate, not proof of an EMS error;
-- `upperBoundScore` is not the final constrained theoretical optimum score;
-- `surplusWindowsForReplay` are observations, not automatically missed opportunities;
-- the report must expose `constrainedOptimumAvailable = false` until a dedicated constrained replay optimiser evaluates the archived decision context under the original constraints.
-
-The command is read-only and may not write Homey, planner authority, actuator state or physical devices.
+Planner decisions are archived best-effort in `/home/jeroen/ems/data/planner-history.sqlite`; measured actuals remain in `/home/jeroen/ems/data/ems-history.sqlite`. Retrospective performance analysis must distinguish measured actuals, archived decision context and any unconstrained upper-bound benchmark from a future constrained replay optimum.
 
 ## 5. Current control endpoint
 
-The Pi exposes:
-
-`GET /control/current`
-
-A valid production response uses schema `EMS_PI_CONTROL_COMMAND_V0.1`, returns `status = READY` and `readyForCutover = true`, and contains only the command for the current quarter-hour slot.
-
-Current-slot semantics:
-
-- start from `slot_start_utc`;
-- end from `slot_end_utc`, or exactly start + 15 minutes when absent;
-- current slot when `start <= now < end`;
-- command validity bounded by both slot end and planner `validUntil`.
-
-The endpoint validates at least owner/executor, fixed-contract invariants, planner freshness, planner validity and current-slot resolution. It is a readiness/command endpoint, not a second authority selector.
-
-Invalid or stale planner input fails closed with zero/off targets.
+The Pi exposes `GET /control/current`. A valid production response uses schema `EMS_PI_CONTROL_COMMAND_V0.1`, is bounded to the current quarter-hour slot and planner validity, and fails closed on stale or invalid planner input. The endpoint is a readiness/command endpoint, not a second authority selector.
 
 ## 6. Current state ingest and history endpoint
 
-The Pi exposes:
+The Pi exposes `POST /state/energy` for authenticated Homey→Pi state ingestion. Missing/incorrect authentication, malformed state, stale state and replayed state fail closed for current-state acceptance. Operational history insertion is idempotent; a local history-archive failure must not invalidate otherwise fresh accepted live state.
 
-`POST /state/energy`
-
-Implementation:
-
-- `src/pi/ems-runtime/status-api/server.py`;
-- `src/pi/ems-runtime/status-api/state_ingest.py`;
-- `src/pi/ems-runtime/status-api/history_archive.py`.
-
-Runtime direction:
-
-**Homey Core v0.11n → `EM2_Public_State` → dedicated Homey transport flow → authenticated LAN POST → Pi status API → validated atomic current state + local SQLite history → Pi planners/analytics**.
-
-Important invariants:
-
-- no GitHub/cloud dependency in the live state path;
-- no Pi polling of Homey for canonical Core state;
-- no extra Homey API calls for operational history archiving;
-- no additional Homey device reads caused by the push itself;
-- physical freshness determined by `source_sample_at`;
-- monotonic anti-replay based on `state_revision`, with same-revision acceptance only for a newer heartbeat;
-- maximum accepted physical sample age currently 20 minutes;
-- successful current-state persistence is atomic;
-- history insertion is idempotent for duplicate physical sample timestamps;
-- missing/incorrect auth, malformed state, stale state and replayed state fail closed for current-state acceptance;
-- a local history archive failure does not turn a valid fresh state into a control-path failure.
-
-The Homey publication cadence is event-driven on meaningful Core state changes plus a heartbeat no slower than the existing Core publication interval. Current Core metadata advertises `min_publish_interval_sec = 300`.
-
-The legacy `EM2_Day_History`, `ems-day-history` and `ems-homey-insights` chain may be retained only as explicit backfill/diagnostic tooling. It is not the production live-history path and must not run from automatic production timers.
+Legacy Homey Insights/day-history polling may remain only as explicit backfill/diagnostic tooling and must not run as an automatic production history transport.
 
 ## 7. Tesla production chain
 
-Tesla charging is split into Pi planning and Homey execution.
-
-### Pi planning
-
-- opportunity charging uses residual PV after WW reservation;
-- validated start and stable run minimum are both 3×6 A;
-- nominal minimum executable power is 4140 W at 3×230 V;
-- opportunity start requires at least one positive 15-minute planner slot;
-- every following quarter-hour is evaluated independently;
-- short realtime anti-flap/session protection remains an executor concern;
-- explicit deadline charging is a hard requirement and may use grid energy when required;
-- forced grid charging may not be introduced before published `latest_start_at`.
-
-### Homey execution
-
-Current chain:
-
-- PI bridge reads `/control/current` and the bounded realtime envelope;
-- adapter: `EM v2 | 60 Adapter | EV Power v0.1.5 DEADLINE-CAP OPPORTUNITY16 START6 RUN6`;
-- gate: `EM v2 | 80 Validation | EV Power Adapter Gate v0.2.6 START6`;
-- actuator: `EM v2 | 60 Actuator | EV Power v0.2.7 START6 RUN6 LIVE + EASEE SESSION`.
-
-Homey validates schema, revision alignment, freshness and electrical mapping. Mapping contract is `FLOOR_3P230_START6_RUN6_FAIL_CLOSED`. The actuator is the sole automatic physical Easee writer in this production chain.
-
-For realtime opportunity execution within the Pi envelope:
-
-`available_pre_ev_w = max(0, -P1_W + EV_actual_W)`
-
-WW is not added back. Deadline-required charging overrides opportunity trimming when required. Homey must not become a second independent planner.
+Tesla charging remains split between Pi planning and Homey guarded execution. Opportunity charging uses residual PV subject to executable Easee limits; explicit deadline charging is a hard requirement and may use grid energy when required. Homey may trim within the Pi envelope but must not become a second independent planner. The guarded EV actuator remains the sole automatic physical Easee writer in the production EV chain.
 
 ## 8. Warm-water production chain
 
-WW comfort is a hard constraint above optimization.
-
-Pi planning:
-
-- schedules remaining required heating before 19:00;
-- prefers useful PV periods;
-- can use PV-window shoulders so Tesla can absorb the central peak;
-- avoids unnecessary repeat heating after the daily goal is reached.
-
-Homey execution:
-
-- Power Intent publishes `targets.ww.target_on`;
-- WW Power Adapter translates the binary target;
-- WW Gate requires exact schema/revision/mapping agreement;
-- `EM v2 | 60 Control | Warm Water Actuator v0.9 TARGETED-READ LIVE` is the guarded physical boiler writer;
-- source mode, kill switch, freshness and current device state are checked before a write.
+WW comfort remains a hard constraint above optimization. The Pi schedules remaining required heating before the comfort deadline and prefers useful PV periods. Homey translates the Power Intent through the WW adapter/gate chain; the guarded Warm Water Actuator remains the physical boiler writer. Source mode, kill switch, freshness and current device state are checked before writes.
 
 ## 9. Live cutover validation
 
-The controlled cutover on 2026-09-12 validated the full Pi → Homey physical path.
+The controlled 2026-09-12 cutover validated Pi→Homey→Tesla and Pi→Homey→boiler end-to-end. The Homey→Pi state direction was validated in production on 2026-09-13 using genuinely fresh Homey Core state. Synthetic freshness must not be used as production evidence.
 
-Tesla:
+The 2026-09-14 history incident demonstrated that a separate Homey Insights pull chain is unsuitable as the production history transport; accepted Homey state pushes are archived locally instead.
 
-- Pi target 4830 W / 7 A was executed;
-- Easee reported charging at approximately 4.9 kW;
-- EV gate passed;
-- actuator physical write succeeded;
-- return to 0 A physically paused the charger.
-
-A separate 2026-09-12 test proved direct START6 from a paused session at approximately 4.235 kW.
-
-Warm water:
-
-- controlled Pi WW target ON produced boiler `onoff = true` and approximately 2.03 kW;
-- return to normal target switched the boiler back OFF.
-
-Result: **Pi → Homey → Tesla and Pi → Homey → boiler both validated end-to-end.**
-
-The Homey → Pi state direction was validated end-to-end in production on 2026-09-13 using genuinely fresh Homey Core v0.11n state. The dedicated transport flow published `EM2_Public_State` over the LAN to `/state/energy`; the Pi accepted the genuine state and the canonical planner chain subsequently completed successfully. Synthetic freshness must not be used as production evidence.
-
-The 2026-09-14 history incident showed that the former separate Homey Insights/day-history pull chain had stopped after repeated Homey `429 Too many requests` responses. This was a history/observability failure, not a failure of the production Homey→Pi live-state transport. The architecture correction is to archive accepted state pushes locally instead of restoring aggressive Homey polling.
+Heating Preheat V0.2 remains shadow-only. No Honeywell, Homey or Quatt physical control is introduced by this release, so no heating-control cutover is claimed.
 
 ## 10. Failure behavior
 
-### State direction
+If Homey Core publication stops, local Pi state ages and planner freshness checks eventually fail closed. Freshness limits must not be relaxed merely to keep planning alive. History-only failures are observable but must not turn fresh live state or a valid planner output into a control-path outage.
 
-If Homey Core publication stops:
-
-- the local Pi state ages;
-- stale ingest is rejected;
-- hardened planner freshness checks eventually fail closed;
-- freshness limits must not be relaxed merely to keep planning alive.
-
-If only SQLite historical archiving fails:
-
-- the accepted current state remains available to the planner;
-- the failure is logged and exposed by the ingest response;
-- history quality/coverage must show the gap;
-- repair must remain local and must not add aggressive Homey polling.
-
-If only planner decision-history archiving fails:
-
-- the hardened plan remains valid and available to `/control/current`;
-- the forecast chain continues;
-- the archive warning is visible in the forecast-chain journal;
-- retrospective optimum/replay quality must report the missing decision-history interval.
-
-### Control direction
-
-If the Pi plan or `/control/current` becomes stale or invalid:
-
-- the Homey PI bridge must reject production readiness;
-- downstream adapter/gate/actuator logic remains fail closed.
-
-### GitHub
-
-Loss of GitHub availability must not interrupt the live Homey ↔ Pi runtime transport. GitHub publication remains versioning/observability output, not the runtime bus.
+If the Pi plan or `/control/current` becomes stale or invalid, the Homey PI bridge must reject production readiness and downstream adapter/gate/actuator logic remains fail closed. Loss of GitHub availability must not interrupt the live Homey↔Pi runtime transport.
 
 ## 11. Runtime / repository discipline
 
-Deployment pattern:
+Deployment pattern: **inspect → minimal change → update architecture → architecture gate → deploy → validate → monitor**.
 
-**inspect → minimal change → update architecture → architecture gate → deploy → validate → monitor**
+GitHub `main` remains authoritative. Production `deploy/systemd/` must contain only units valid for the intended runtime architecture. New/touched code follows **touch it, place it correctly**.
 
-For Pi runtime changes:
+Canonical heating placement is now:
 
-- GitHub `main` remains authoritative;
-- deployed runtime must be checked for drift against the intended Git commit;
-- a clean working tree alone is not proof that the runtime checkout is current.
+```text
+services/pi/integrations/honeywell/   # vendor schedule/state acquisition
+services/pi/integrations/quatt/       # Quatt telemetry acquisition
+services/pi/state/heating/             # canonical Heating Room Model / future thermal state learning
+services/pi/planner/heating/           # READ_ONLY/SHADOW preheat candidate construction
+```
 
-For Homey flow changes:
-
-- inspect the exact live flow by stable ID;
-- apply the smallest reviewed change;
-- perform targeted read-back;
-- verify semantic and physical evidence before declaring PASS.
-
-For Homey ↔ Pi boundary changes, documentation must cover both state and control direction in the same release range.
-
-Production `deploy/systemd/` must contain only units that remain valid for the intended runtime architecture. Obsolete automatic Homey pollers or alternative control writers must not remain deployable production timers.
-
-New Pi history functionality uses the target repository structure under `services/pi/history/`. New canonical room-heating interpretation uses `services/pi/state/heating/`; new canonical room-heating planning uses `services/pi/planner/heating/`. The active general planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path would require coordinated systemd, deployment and runtime-path migration and would add unrelated cutover risk. This is an explicit `touch it, place it correctly` migration decision rather than a new legacy placement.
+The touched legacy `src/pi/ems-runtime/thermal/` subsystem is removed in this release. Its Quatt collector moves to the canonical integration boundary and its duplicate thermal observer is retired. The active general planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path is a separate high-risk migration and is explicitly outside this release.
 
 ## 12. Battery boundary
 
 The planned battery architecture is Victron AC-coupled. When commissioned, Victron/DESS remains the primary realtime battery optimizer. Pi/Homey may provide forecasts, load intent and policy constraints but must not create a competing realtime battery optimizer.
 
-## 13. Known technical debt
+## 13. Known technical debt / next validation
 
-- The hardened planner still contains historical compatibility code in `deadline_requirement()` with a local `max_a = 16`. Current planning authority uses `deadline_max_a` from runtime state, so this fragment is cleanup debt rather than the active deadline allocator.
-- WW ownership remains more distributed than EV ownership because Homey still carries substantial realtime WW state/safety policy in addition to Pi strategic planning.
-- PV forecast quality still requires follow-up: successful planner runs can contain fallback PV slots and zero historical slots. This is a forecast-quality issue, not a runtime-chain failure.
-- Planner schema V0.3 does not yet embed Homey `state_revision` / `source_sample_at`; retrospective replay therefore correlates decision snapshots with canonical measurement history by time until those identifiers can be stamped atomically by the planner itself.
-- `ems-performance` V0.1 provides a measured-performance report plus an unconstrained same-energy upper bound; the dedicated constrained replay optimiser is still future work and must not be implied by the V0.1 score.
-- Legacy backfill collectors (`collect_homey_insights.py`, `EM2_Day_History` tooling) remain in source for explicit recovery/diagnostics but are not production live collectors.
-- Legacy `publish_pi_control_intent.py` remains in source as compatibility/history code but must not have a production systemd writer while the Homey PI Bridge is authoritative.
-- Honeywell source deployment must preserve host-local venv, credentials and OAuth cache; this invariant now needs deployment-path regression coverage so a future source relocation cannot repeat the 2026-09-15 recovery incident.
+- The hardened planner still contains historical compatibility code in `deadline_requirement()` with local `max_a = 16`; current authority uses runtime `deadline_max_a`.
+- WW ownership remains more distributed than EV ownership because Homey still carries substantial realtime WW state/safety policy.
+- PV forecast quality remains a follow-up item.
+- Planner schema V0.3 does not yet embed Homey `state_revision` / `source_sample_at` in the final decision output.
+- A dedicated constrained replay optimizer remains future work.
+- Legacy backfill collectors remain source-only diagnostic/recovery tooling, not production live collectors.
+- Honeywell deployment must continue preserving host-local venv, credentials and OAuth cache.
+- Heating Thermal Learning still needs fine-grained empirical room-response data. The provisional 180-minute preheat horizon and <=0.5 °C steps must be evaluated in shadow against actual room temperature, Quatt activity, PV-export capture and rebound/reduced heating around the original Honeywell comfort time before any LIVE heating control is considered.
+- Woonkamer/eetkamer grouping is planning metadata and must not be treated as proof of a learned thermal coupling coefficient.
 
 ## 14. Architecture enforcement
 
 `scripts/ems_architecture_gate.sh` must continue to enforce at least:
 
-- valid fixed-contract invariants;
-- presence of this canonical document;
-- FIXED production mode;
-- dynamic-production prohibition;
-- fail-closed behavior;
-- same-release documentation updates for architecture-sensitive runtime/systemd/deployment changes;
-- no second independent planner-generation owner;
-- no GitHub dependency in the live Homey ↔ Pi runtime state/control path;
-- accepted Homey state is the production source for local operational energy history;
-- hardened planner decisions are archived locally for retrospective replay without becoming a control-path dependency;
-- planner-history capture must use planner-owned frozen decision output and must not re-read mutable live state after plan generation;
-- new Pi history code is placed under the target `services/pi/history/` structure and included in deployment/drift validation;
-- new canonical room-heating interpretation is placed under `services/pi/state/heating/` and remains read-only/shadow until separately validated planning/control layers exist;
-- new canonical room-heating planning is placed under `services/pi/planner/heating/`, remains read-only/shadow, and may only expose advancement candidates for Honeywell `UP` transitions; it must not independently select PV slots, advance `DOWN`/`NONE`, raise the Honeywell target or write physical devices;
-- forecast PV-export potential and any joint flexible-load allocation remain owned by the Dynamic Pi Planner; heating must not introduce a parallel PV-opportunity forecast/schema;
-- the standardized `ems-performance` command uses both canonical histories and explicitly distinguishes unconstrained upper-bound benchmarking from a future constrained replay optimum;
-- no automatic production timers for legacy Homey Insights/day-history polling;
-- no automatic Pi-side Homey control publisher while the Homey PI Bridge owns `/control/current` consumption.
+- valid fixed-contract invariants and fail-closed behavior;
+- same-release update of this canonical document for architecture-sensitive runtime/systemd/deployment changes;
+- no second independent planner-generation owner or physical writer;
+- no GitHub dependency in the live Homey↔Pi state/control path;
+- target-structure placement for touched Pi code;
+- Honeywell remains baseline/comfort authority;
+- canonical room-heating interpretation remains under `services/pi/state/heating/`;
+- canonical preheat candidate construction remains under `services/pi/planner/heating/`, READ_ONLY/SHADOW;
+- only Honeywell `UP` demand may be advanced; `DOWN`/`NONE` may not be advanced and Honeywell targets may not be exceeded;
+- measured room temperature can suppress unnecessary preheat;
+- forecast PV-export evaluation and joint flexible-load allocation remain owned by the Dynamic Pi Planner, not a parallel heating PV schema;
+- Quatt acquisition belongs under `services/pi/integrations/quatt/` and is observational for Thermal Learning;
+- the retired legacy thermal observer must not reappear as a competing thermal state model;
+- no automatic production timers for legacy Homey Insights/day-history polling or alternative Pi-side Homey control publishers.
 
 A failed architecture gate is a hard deployment stop and must not be bypassed in normal operation.

@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""Collect current Quatt telemetry through Homey (read-only).
+
+Canonical repository location: services/pi/integrations/quatt/.
+The collector performs one Homey device read, stores explicitly defined
+canonical metrics in ems-history.sqlite, and publishes the existing
+EMS_QUATT_CURRENT_STATE_V0.1 runtime artifact. It performs no device writes.
+"""
 
 import json
 import os
@@ -19,8 +26,6 @@ DEVICE_KEY = "quatt_cic"
 DEVICE_ID = "1e5dcde5-c1cf-4c32-9141-33e00ce36de9"
 SOURCE_RESOLUTION_SECONDS = 300
 
-# Canonical SQLite metrics. These MUST already exist; this collector never
-# extends the datastore schema implicitly.
 CANONICAL = {
     "measure_power": "electrical_power_w",
     "measure_heatpump_temperature_outside.heatpump1": "outside_temperature_c",
@@ -32,9 +37,6 @@ CANONICAL = {
     "measure_thermostat_heating_on": "heating_on",
 }
 
-# Useful observer-only signals retained in the JSON artifact. These are not
-# inserted into SQLite until their canonical metric semantics are explicitly
-# defined.
 OBSERVER_ONLY = {
     "measure_boiler_cic_central_heating_onoff_boiler": "boilerAssistOn",
     "measure_flowmeter_water_flow_speed": "waterFlow_Lph",
@@ -50,22 +52,8 @@ def now_utc_iso():
 def fetch_device():
     env = os.environ.copy()
     env["PATH"] = f"{NODE24_BIN}:{env.get('PATH', '')}"
-    cmd = [
-        str(HOMEY_CLI),
-        "api",
-        "devices",
-        "get-device",
-        "--id",
-        DEVICE_ID,
-        "--json",
-    ]
-    result = subprocess.run(
-        cmd,
-        cwd=HOMEY_PROJECT,
-        env=env,
-        capture_output=True,
-        text=True,
-    )
+    cmd = [str(HOMEY_CLI), "api", "devices", "get-device", "--id", DEVICE_ID, "--json"]
+    result = subprocess.run(cmd, cwd=HOMEY_PROJECT, env=env, capture_output=True, text=True)
     if result.returncode != 0:
         err = (result.stderr or result.stdout or "").strip()
         raise RuntimeError(f"Homey get-device failed: {err}")
@@ -76,10 +64,7 @@ def capability(caps, key):
     obj = caps.get(key)
     if not isinstance(obj, dict):
         return None
-    return {
-        "value": obj.get("value"),
-        "sourceLastUpdated": obj.get("lastUpdated"),
-    }
+    return {"value": obj.get("value"), "sourceLastUpdated": obj.get("lastUpdated")}
 
 
 def atomic_write_json(path, payload):
@@ -104,14 +89,8 @@ def main():
     observed_at = now_utc_iso()
     device = fetch_device()
     caps = device.get("capabilitiesObj") or {}
-
-    canonical_state = {}
-    for capability_key, metric_key in CANONICAL.items():
-        canonical_state[metric_key] = capability(caps, capability_key)
-
-    observer_state = {}
-    for capability_key, output_key in OBSERVER_ONLY.items():
-        observer_state[output_key] = capability(caps, capability_key)
+    canonical_state = {metric_key: capability(caps, capability_key) for capability_key, metric_key in CANONICAL.items()}
+    observer_state = {output_key: capability(caps, capability_key) for capability_key, output_key in OBSERVER_ONLY.items()}
 
     payload = {
         "schema": "EMS_QUATT_CURRENT_STATE_V0.1",
@@ -133,28 +112,18 @@ def main():
 
     con = sqlite3.connect(DB)
     try:
-        row = con.execute(
-            "SELECT id FROM devices WHERE device_key=?",
-            (DEVICE_KEY,),
-        ).fetchone()
+        row = con.execute("SELECT id FROM devices WHERE device_key=?", (DEVICE_KEY,)).fetchone()
         if not row:
             raise RuntimeError(f"Unknown canonical device_key: {DEVICE_KEY}")
         device_db_id = row[0]
-
         metric_ids = {}
         for metric_key in CANONICAL.values():
-            row = con.execute(
-                "SELECT id FROM metrics WHERE metric_key=?",
-                (metric_key,),
-            ).fetchone()
+            row = con.execute("SELECT id FROM metrics WHERE metric_key=?", (metric_key,)).fetchone()
             if not row:
                 raise RuntimeError(f"Missing canonical metric_key: {metric_key}")
             metric_ids[metric_key] = row[0]
 
-        attempted = 0
-        inserted = 0
-        skipped_null = 0
-
+        attempted = inserted = skipped_null = 0
         for metric_key, state in canonical_state.items():
             attempted += 1
             if not state:
@@ -164,49 +133,19 @@ def main():
             if value is None:
                 skipped_null += 1
                 continue
-
             cur = con.execute(
-                """
-                INSERT OR IGNORE INTO measurements
-                (
-                    ts_utc,
-                    device_id,
-                    metric_id,
-                    value_real,
-                    quality,
-                    source_resolution_seconds
-                )
-                VALUES (?, ?, ?, ?, 'observed', ?)
-                """,
-                (
-                    observed_at,
-                    device_db_id,
-                    metric_ids[metric_key],
-                    value,
-                    SOURCE_RESOLUTION_SECONDS,
-                ),
+                "INSERT OR IGNORE INTO measurements (ts_utc, device_id, metric_id, value_real, quality, source_resolution_seconds) VALUES (?, ?, ?, ?, 'observed', ?)",
+                (observed_at, device_db_id, metric_ids[metric_key], value, SOURCE_RESOLUTION_SECONDS),
             )
             inserted += cur.rowcount
-
         con.commit()
     finally:
         con.close()
 
-    # Only publish the current-state artifact after both the Homey read and the
-    # canonical database write have completed successfully.
     atomic_write_json(OUTPUT, payload)
-
-    print(
-        f"PASS: schema={payload['schema']} observedAt={observed_at} "
-        f"attempted={attempted} inserted={inserted} skipped_null={skipped_null}"
-    )
+    print(f"PASS: schema={payload['schema']} observedAt={observed_at} attempted={attempted} inserted={inserted} skipped_null={skipped_null}")
     print(f"output={OUTPUT}")
-    print(
-        "heating_on="
-        f"{(canonical_state.get('heating_on') or {}).get('value')} "
-        "boilerAssistOn="
-        f"{(observer_state.get('boilerAssistOn') or {}).get('value')}"
-    )
+    print("heating_on=" f"{(canonical_state.get('heating_on') or {}).get('value')} " "boilerAssistOn=" f"{(observer_state.get('boilerAssistOn') or {}).get('value')}")
 
 
 if __name__ == "__main__":

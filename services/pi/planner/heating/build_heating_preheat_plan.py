@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
-"""Build EMS_HEATING_PREHEAT_PLAN_V0.1 from the canonical heating room model.
+"""Build EMS_HEATING_PREHEAT_PLAN_V0.2 from the canonical heating room model.
 
-Shadow candidate builder only. It identifies upcoming Honeywell UP transitions but
-does not select PV slots. PV allocation belongs to the joint Dynamic Pi Planner.
+Shadow candidate builder only. It evaluates room/schedule eligibility and produces
+bounded 0.5 C candidate steps. It does not select PV slots or write devices.
+PV allocation remains owned by the joint Dynamic Pi Planner.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 SOURCE_SCHEMA = "EMS_HEATING_ROOM_MODEL_V0.1"
-OUTPUT_SCHEMA = "EMS_HEATING_PREHEAT_PLAN_V0.1"
+OUTPUT_SCHEMA = "EMS_HEATING_PREHEAT_PLAN_V0.2"
 HOME_TZ_NAME = "Europe/Amsterdam"
+MAX_ADVANCE = timedelta(hours=3)
+MAX_STEP_C = 0.5
+SCOPED_ROOMS = {"woonkamer", "eetkamer", "keuken", "serre"}
+ROOM_GROUPS = {"living_area": ["woonkamer", "eetkamer"]}
 
 
 class PlanError(ValueError):
@@ -31,7 +36,7 @@ def _number(value: Any, label: str) -> float:
     return float(value)
 
 
-def _aware_timestamp(value: Any, label: str) -> str:
+def _aware_datetime(value: Any, label: str) -> datetime:
     if not isinstance(value, str) or not value:
         raise PlanError(f"{label} missing timestamp")
     try:
@@ -40,7 +45,23 @@ def _aware_timestamp(value: Any, label: str) -> str:
         raise PlanError(f"{label} invalid timestamp: {value}") from exc
     if dt.tzinfo is None or dt.utcoffset() is None:
         raise PlanError(f"{label} must be offset-aware")
-    return value
+    return dt
+
+
+def _candidate_steps(current_baseline: float, future_target: float, actual: float) -> list[float]:
+    """Split an advanced baseline rise into <=0.5 C setpoint steps.
+
+    Steps already satisfied by measured room temperature are omitted. The final
+    step never exceeds the future Honeywell baseline target.
+    """
+    steps: list[float] = []
+    value = current_baseline
+    while value < future_target - 1e-9:
+        value = min(value + MAX_STEP_C, future_target)
+        value = round(value, 2)
+        if value > actual + 1e-9:
+            steps.append(value)
+    return steps
 
 
 def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = None) -> dict[str, Any]:
@@ -55,9 +76,10 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
     if room_model.get("valid") is not True:
         raise PlanError("room model is not valid")
 
-    source_generated_at = _aware_timestamp(
-        room_model.get("generatedAt"), "room model generatedAt"
-    )
+    source_generated_at = _aware_datetime(room_model.get("generatedAt"), "room model generatedAt")
+    now = generated_at or datetime.now(timezone.utc)
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise PlanError("generated_at must be offset-aware")
 
     rooms_source = room_model.get("rooms")
     if not isinstance(rooms_source, list) or not rooms_source:
@@ -76,35 +98,55 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
         if room.get("valid") is not True:
             raise PlanError(f"room is not valid: {key}")
 
+        current = _require_dict(room.get("current"), f"{key}.current")
         baseline = _require_dict(room.get("baseline"), f"{key}.baseline")
+        actual = _number(current.get("temperature_C"), f"{key}.current.temperature_C")
+        current_target = _number(baseline.get("currentTarget_C"), f"{key}.baseline.currentTarget_C")
+        future_target = _number(baseline.get("nextTarget_C"), f"{key}.baseline.nextTarget_C")
         direction = baseline.get("direction")
         if direction not in {"UP", "DOWN", "NONE"}:
             raise PlanError(f"invalid baseline direction for {key}: {direction}")
-        change_at = _aware_timestamp(
-            baseline.get("nextChangeAt"), f"{key}.baseline.nextChangeAt"
-        )
-        target = _number(baseline.get("nextTarget_C"), f"{key}.baseline.nextTarget_C")
+        change_dt = _aware_datetime(baseline.get("nextChangeAt"), f"{key}.baseline.nextChangeAt")
 
-        eligible = direction == "UP"
+        in_scope = key in SCOPED_ROOMS
+        seconds_to_change = (change_dt - now).total_seconds()
+        within_window = 0 <= seconds_to_change <= MAX_ADVANCE.total_seconds()
+        heat_demand = actual < future_target - 1e-9
+
+        if not in_scope:
+            status, reason = "NOT_ELIGIBLE", "ROOM_OUT_OF_PREHEAT_SCOPE"
+        elif direction != "UP":
+            status, reason = "NOT_ELIGIBLE", f"BASELINE_{direction}"
+        elif not within_window:
+            status, reason = "NOT_ELIGIBLE", "OUTSIDE_MAX_ADVANCE_WINDOW"
+        elif not heat_demand:
+            status, reason = "NOT_ELIGIBLE", "NO_HEAT_DEMAND_AT_CURRENT_TEMPERATURE"
+        else:
+            status, reason = "ELIGIBLE_UP_TRANSITION", "AWAITING_PV_OPPORTUNITY_EVALUATION"
+
+        steps = _candidate_steps(current_target, future_target, actual) if status == "ELIGIBLE_UP_TRANSITION" else []
+        group = next((name for name, members in ROOM_GROUPS.items() if key in members), None)
         rooms.append({
             "key": key,
             "displayName": room.get("displayName") or key,
+            "preheatScope": in_scope,
+            "group": group,
+            "current": {"temperature_C": actual},
             "baseline": {
-                "changeAt": change_at,
-                "targetTemperature_C": target,
+                "currentTargetTemperature_C": current_target,
+                "changeAt": baseline.get("nextChangeAt"),
+                "targetTemperature_C": future_target,
                 "direction": direction,
             },
             "candidate": {
-                "status": "ELIGIBLE_UP_TRANSITION" if eligible else "NOT_ELIGIBLE",
+                "status": status,
+                "earliestStartAt": (change_dt - MAX_ADVANCE).isoformat(),
                 "startAt": None,
-                "targetTemperature_C": target,
-                "reason": "AWAITING_OPPORTUNITY_EVALUATION" if eligible else f"BASELINE_{direction}",
+                "targetTemperature_C": future_target,
+                "steps_C": steps,
+                "reason": reason,
             },
         })
-
-    now = generated_at or datetime.now(timezone.utc)
-    if now.tzinfo is None or now.utcoffset() is None:
-        raise PlanError("generated_at must be offset-aware")
 
     return {
         "schema": OUTPUT_SCHEMA,
@@ -114,7 +156,15 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
         "timezone": HOME_TZ_NAME,
         "baselineAuthority": "HONEYWELL",
         "sourceRoomModelSchema": SOURCE_SCHEMA,
-        "sourceRoomModelGeneratedAt": source_generated_at,
+        "sourceRoomModelGeneratedAt": source_generated_at.isoformat(),
+        "policy": {
+            "maxAdvanceMinutes": 180,
+            "maxStep_C": MAX_STEP_C,
+            "pvAllocationOwner": "DYNAMIC_PI_PLANNER",
+            "intentionalGridImportAllowed": False,
+            "scopedRooms": sorted(SCOPED_ROOMS),
+            "roomGroups": ROOM_GROUPS,
+        },
         "roomCount": len(rooms),
         "rooms": rooms,
     }
