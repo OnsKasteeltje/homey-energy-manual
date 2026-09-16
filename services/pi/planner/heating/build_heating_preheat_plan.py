@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build EMS_HEATING_PREHEAT_PLAN_V0.1 from the canonical heating room model.
 
-Contract-only shadow planner: identifies upcoming Honeywell UP transitions but does
-not yet select an earlier start time or consume PV/opportunity data.
+Shadow candidate builder only. It identifies upcoming Honeywell UP transitions but
+does not select PV slots. PV allocation belongs to the joint Dynamic Pi Planner.
 """
 
 from __future__ import annotations
@@ -55,6 +55,10 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
     if room_model.get("valid") is not True:
         raise PlanError("room model is not valid")
 
+    source_generated_at = _aware_timestamp(
+        room_model.get("generatedAt"), "room model generatedAt"
+    )
+
     rooms_source = room_model.get("rooms")
     if not isinstance(rooms_source, list) or not rooms_source:
         raise PlanError("room model rooms must be a non-empty array")
@@ -76,7 +80,9 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
         direction = baseline.get("direction")
         if direction not in {"UP", "DOWN", "NONE"}:
             raise PlanError(f"invalid baseline direction for {key}: {direction}")
-        change_at = _aware_timestamp(baseline.get("nextChangeAt"), f"{key}.baseline.nextChangeAt")
+        change_at = _aware_timestamp(
+            baseline.get("nextChangeAt"), f"{key}.baseline.nextChangeAt"
+        )
         target = _number(baseline.get("nextTarget_C"), f"{key}.baseline.nextTarget_C")
 
         eligible = direction == "UP"
@@ -108,7 +114,7 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
         "timezone": HOME_TZ_NAME,
         "baselineAuthority": "HONEYWELL",
         "sourceRoomModelSchema": SOURCE_SCHEMA,
-        "sourceRoomModelGeneratedAt": room_model.get("generatedAt"),
+        "sourceRoomModelGeneratedAt": source_generated_at,
         "roomCount": len(rooms),
         "rooms": rooms,
     }

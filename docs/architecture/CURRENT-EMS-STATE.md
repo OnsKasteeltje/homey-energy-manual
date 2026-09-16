@@ -4,7 +4,7 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-09-15  
+**Status date:** 2026-09-16  
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis and 2026-09-15 Honeywell read-only schedule recovery/validation  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
@@ -30,11 +30,13 @@ Honeywell/Resideo remains the comfort and schedule authority. The canonical vend
 
 The first canonical EMS interpretation layer is `services/pi/state/heating/build_heating_room_model.py`, schema `EMS_HEATING_ROOM_MODEL_V0.1`. It joins schedule and current room state by stable canonical room key, preserves the actual Honeywell target separately from the scheduled baseline, and classifies the next baseline transition as `UP`, `DOWN` or `NONE` using the scheduled current/next targets only. All EMS-facing schedule timestamps are offset-aware in `Europe/Amsterdam`.
 
-The first canonical heating planner layer is `services/pi/planner/heating/build_heating_preheat_plan.py`, schema `EMS_HEATING_PREHEAT_PLAN_V0.1`. It remains **READ_ONLY / SHADOW**. A valid upcoming Honeywell `UP` transition becomes `ELIGIBLE_UP_TRANSITION`; `DOWN` and `NONE` remain `NOT_ELIGIBLE`. The candidate target is exactly the later Honeywell baseline target and `candidate.startAt` remains `null` until a separately validated opportunity-selection increment exists. This V0.1 planner consumes no PV forecast, tariff or actuator input and performs no physical writes.
+The canonical heating planner layer is `services/pi/planner/heating/build_heating_preheat_plan.py`, schema `EMS_HEATING_PREHEAT_PLAN_V0.1`, and remains **READ_ONLY / SHADOW**. A valid upcoming Honeywell `UP` transition is the only transition eligible for advancement; `DOWN` and `NONE` remain `NOT_ELIGIBLE`. The candidate target is always exactly the later Honeywell baseline target and `candidate.startAt` remains `null` in this layer.
 
-Both heating V0.1 layers fail closed on invalid source/time semantics. Honeywell remains the comfort authority. Future PV preheat may only advance an `UP` transition and may never exceed the later Honeywell target; any later guarded execution belongs under `services/pi/control/heating/` and requires a separately validated adapter/gate/actuator boundary.
+The heating planner does not own or create a separate PV-opportunity schema and does not independently select a PV slot. Normal Honeywell schedule heating remains baseline comfort demand. Only the possible earlier heating represented by an eligible `UP` candidate is flexible demand. Forecast PV-export potential and any eventual allocation between flexible WW, heating-preheat and EV demand belong to the existing Dynamic Pi Planner. No thermal power, heat-up duration, COP, building heat loss or room-response assumption is invented by this V0.1 heating layer.
 
-A live 2026-09-15 Honeywell schedule collection validated all eight mapped room keys and the exact source representation. For `woonkamer`, the observed baseline moved from 19.0 °C at 19:30 local time to 15.5 °C at 22:00 local time; the room model therefore classifies that transition as `DOWN`. A future energy optimizer must never advance a scheduled reduction.
+Both heating V0.1 layers fail closed on invalid source/time semantics. `sourceRoomModelGeneratedAt` is required to be offset-aware, but V0.1 defines no maximum-age threshold. Honeywell remains the comfort authority. Future PV preheat may only advance an `UP` transition, may never exceed the later Honeywell target and must not intentionally create grid import merely to preheat a room. Any later guarded execution belongs under `services/pi/control/heating/` and requires a separately validated adapter/gate/actuator boundary.
+
+A live 2026-09-15 Honeywell schedule collection validated all eight mapped room keys and the exact source representation. For `woonkamer`, the observed baseline moved from 19.0 °C at 19:30 local time to 15.5 °C at 22:00 local time; the room model therefore classifies that transition as `DOWN`. The energy optimizer must never advance a scheduled reduction.
 
 Honeywell runtime deployment is a mixed managed/runtime-state directory. Repository-managed source may be refreshed, but host-local `.venv/`, `config/account.env`, `cache/oauth-token.json` and last valid generated outputs must survive normal source deployment. Secrets, OAuth cache and generated runtime output remain outside GitHub. On 2026-09-15 the Honeywell venv/credential/cache chain was recovered after the repository/runtime relocation and a fresh read-only schedule collection completed successfully.
 
@@ -435,7 +437,8 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - planner-history capture must use planner-owned frozen decision output and must not re-read mutable live state after plan generation;
 - new Pi history code is placed under the target `services/pi/history/` structure and included in deployment/drift validation;
 - new canonical room-heating interpretation is placed under `services/pi/state/heating/` and remains read-only/shadow until separately validated planning/control layers exist;
-- new canonical room-heating planning is placed under `services/pi/planner/heating/`, remains read-only/shadow, and may only expose advancement candidates for Honeywell `UP` transitions until a separately validated opportunity-selection/control layer exists;
+- new canonical room-heating planning is placed under `services/pi/planner/heating/`, remains read-only/shadow, and may only expose advancement candidates for Honeywell `UP` transitions; it must not independently select PV slots, advance `DOWN`/`NONE`, raise the Honeywell target or write physical devices;
+- forecast PV-export potential and any joint flexible-load allocation remain owned by the Dynamic Pi Planner; heating must not introduce a parallel PV-opportunity forecast/schema;
 - the standardized `ems-performance` command uses both canonical histories and explicitly distinguishes unconstrained upper-bound benchmarking from a future constrained replay optimum;
 - no automatic production timers for legacy Homey Insights/day-history polling;
 - no automatic Pi-side Homey control publisher while the Homey PI Bridge owns `/control/current` consumption.
