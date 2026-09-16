@@ -102,6 +102,13 @@ def test_naive_baseline_timestamp_is_rejected():
         build(model)
 
 
+def test_naive_source_generated_at_is_rejected():
+    model = room_model()
+    model["generatedAt"] = "2026-09-15T20:00:00"
+    with pytest.raises(module.PlanError, match="room model generatedAt must be offset-aware"):
+        build(model)
+
+
 def test_invalid_direction_is_rejected():
     model = room_model(direction="EARLY")
     with pytest.raises(module.PlanError, match="invalid baseline direction"):
