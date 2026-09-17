@@ -314,8 +314,30 @@ def evaluate(db_path, contracts_path, state_path, mode, now=None):
         candidate = "KEEP_CURRENT"
 
     prior_candidate = prior.get("candidate")
-    prior_streak = int(prior.get("confirmation", {}).get("streakDays", 0) or 0)
-    streak = (prior_streak + 1) if candidate != "KEEP_CURRENT" and candidate == prior_candidate else (1 if candidate != "KEEP_CURRENT" else 0)
+    prior_confirmation = prior.get("confirmation", {})
+    prior_streak = int(prior_confirmation.get("streakDays", 0) or 0)
+    prior_counted_date = prior_confirmation.get("lastCountedAsOfDate")
+    current_counted_date = as_of.isoformat()
+
+    if candidate == "KEEP_CURRENT":
+        streak = 0
+        last_counted_date = None
+    elif candidate != prior_candidate:
+        streak = 1
+        last_counted_date = current_counted_date
+    elif prior_counted_date is None:
+        # Legacy state has no proof which analysis date was counted.
+        # Restart conservatively instead of carrying an ambiguous streak.
+        streak = 1
+        last_counted_date = current_counted_date
+    elif prior_counted_date == current_counted_date:
+        # Idempotent rerun of the same analysis day.
+        streak = prior_streak
+        last_counted_date = prior_counted_date
+    else:
+        streak = prior_streak + 1
+        last_counted_date = current_counted_date
+
     confirmed = streak >= CONFIRM_DAYS
     advice = candidate if confirmed else "KEEP_CURRENT"
 
@@ -324,7 +346,7 @@ def evaluate(db_path, contracts_path, state_path, mode, now=None):
         "advice": advice,
         "candidate": candidate,
         "reason": "confirmed economic switch" if confirmed else ("candidate awaiting confirmation" if candidate != "KEEP_CURRENT" else "difference within hysteresis/current source remains preferable"),
-        "confirmation": {"streakDays": streak, "requiredDays": CONFIRM_DAYS, "confirmed": confirmed},
+        "confirmation": {"streakDays": streak, "requiredDays": CONFIRM_DAYS, "confirmed": confirmed, "lastCountedAsOfDate": last_counted_date},
         "analysis": {
             "asOfDate": as_of.isoformat(),
             "windowStartDate": window_start.isoformat(),
