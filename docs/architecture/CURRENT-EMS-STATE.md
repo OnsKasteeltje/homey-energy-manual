@@ -150,6 +150,8 @@ Tesla charging remains split between Pi planning and Homey guarded execution. Op
 
 WW comfort remains a hard constraint above optimization. The Pi schedules remaining required heating before the comfort deadline and prefers useful PV periods. Homey translates the Power Intent through the WW adapter/gate chain; the guarded Warm Water Actuator remains the physical boiler writer. Source mode, kill switch, freshness and current device state are checked before writes.
 
+The Pi WW Seasonal Source Advisor is read-only and manual-switch-only. It runs daily at 20:30 Europe/Amsterdam against canonical Pi-local history. It has no dependency on the retired `ems-day-history.service` or other Homey Insights polling; source-switch advice requires the configured multi-day confirmation before notification and never performs a physical source switch.
+
 ## 9. Live cutover validation
 
 The controlled 2026-09-12 cutover validated Pi→Homey→Tesla and Pi→Homey→boiler end-to-end. The Homey→Pi state direction was validated in production on 2026-09-13 using genuinely fresh Homey Core state. Synthetic freshness must not be used as production evidence.
