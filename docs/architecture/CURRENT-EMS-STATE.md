@@ -4,8 +4,8 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-09-16  
-**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation  
+**Status date:** 2026-09-17  
+**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, and 2026-09-17 energy-state website publication recovery  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
 
@@ -97,6 +97,14 @@ Pi forecasts + history + fixed-contract policy
 
 The Pi is the active planner authority. Homey is the realtime state, executor and local safety layer. The planner itself never writes physical devices. `EM2_Planner_Authority` remains the single HOMEY↔PI authority gate; dual planner authority or dual independent writers are forbidden.
 
+### 2.3 GitHub / website observability publication
+
+The Pi may publish derived snapshots to GitHub for website and human-facing observability. This is a one-way egress integration and is not part of either live runtime direction above.
+
+The canonical energy-state publication integration is `services/pi/integrations/github/publish_energy_state.py`. It reads `/home/jeroen/ems/data/energy-state-v2.json` and publishes `docs/data/energy-state-v2.json`. Production scheduling is owned by `ems-energy-state-publication.timer` at a 15-minute cadence.
+
+GitHub publication is **observability only**: failure or staleness of this publication must not interrupt Homey→Pi state ingest, local history, planning, `/control/current`, Homey execution or any actuator. The publisher must never create `EM2_Power_Intent`, call the control endpoint or write physical devices. The former legacy source `src/pi/ems-runtime/publisher/publish_energy_state.py` is retired under the touch-it-place-it-correctly rule.
+
 ## 3. Production contract policy
 
 Production remains locked to the fixed three-year ENGIE contract:
@@ -148,11 +156,15 @@ The 2026-09-14 history incident demonstrated that a separate Homey Insights pull
 
 Heating Preheat V0.2 remains shadow-only. No Honeywell, Homey or Quatt physical control is introduced by this release, so no heating-control cutover is claimed.
 
+The 2026-09-17 energy-state website incident was isolated to the GitHub observability publication path: canonical local Pi state remained fresh while `docs/data/energy-state-v2.json` stopped updating after 2026-09-14 20:03 local time. Restoring this publisher must not restore the retired Pi→Homey control-push timer.
+
 ## 10. Failure behavior
 
 If Homey Core publication stops, local Pi state ages and planner freshness checks eventually fail closed. Freshness limits must not be relaxed merely to keep planning alive. History-only failures are observable but must not turn fresh live state or a valid planner output into a control-path outage.
 
 If the Pi plan or `/control/current` becomes stale or invalid, the Homey PI bridge must reject production readiness and downstream adapter/gate/actuator logic remains fail closed. Loss of GitHub availability must not interrupt the live Homey↔Pi runtime transport.
+
+Failure of `ems-energy-state-publication.service` affects website observability only. It must be visible as stale publication data but must not be treated as a runtime/control outage.
 
 ## 11. Runtime / repository discipline
 
@@ -168,6 +180,8 @@ services/pi/integrations/quatt/       # Quatt telemetry acquisition
 services/pi/state/heating/             # canonical Heating Room Model / future thermal state learning
 services/pi/planner/heating/           # READ_ONLY/SHADOW preheat candidate construction
 ```
+
+GitHub website publication is an external Pi egress integration and belongs under `services/pi/integrations/github/`; production scheduling belongs under `deploy/systemd/`.
 
 The touched legacy `src/pi/ems-runtime/thermal/` subsystem is removed in this release. Its Quatt collector moves to the canonical integration boundary and its duplicate thermal observer is retired. The active general planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path is a separate high-risk migration and is explicitly outside this release.
 
@@ -196,6 +210,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - no second independent planner-generation owner or physical writer;
 - no GitHub dependency in the live Homey↔Pi state/control path;
 - target-structure placement for touched Pi code;
+- GitHub energy-state publication remains observability-only under `services/pi/integrations/github/` and must not reintroduce the retired Pi→Homey control-push path;
 - Honeywell remains baseline/comfort authority;
 - canonical room-heating interpretation remains under `services/pi/state/heating/`;
 - canonical preheat candidate construction remains under `services/pi/planner/heating/`, READ_ONLY/SHADOW;
