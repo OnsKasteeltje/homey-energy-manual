@@ -140,6 +140,8 @@ The Pi exposes `POST /state/energy` for authenticated Homey→Pi state ingestion
 
 Legacy Homey Insights/day-history polling may remain only as explicit backfill/diagnostic tooling and must not run as an automatic production history transport.
 
+Derived operational history is rebuilt locally from canonical `measurements` and is deliberately independent from live state ingest and control. `services/pi/history/build_15m_history.py` owns deterministic raw-to-quarter-hour aggregation into `measurements_15m`; `services/pi/history/build_daily_energy_history.py` owns raw-to-daily boiler energy aggregation into `daily_energy_history`. Production scheduling is owned by independent `ems-history-15m.timer` and `ems-history-daily.timer` units. Failure of either derived-history builder must remain observable but must not block Homey→Pi state ingest, planning, `/control/current` or Homey execution. These builders must not poll Homey or create an alternative raw-history writer.
+
 ## 7. Tesla production chain
 
 Tesla charging remains split between Pi planning and Homey guarded execution. Opportunity charging uses residual PV subject to executable Easee limits; explicit deadline charging is a hard requirement and may use grid energy when required. Homey may trim within the Pi envelope but must not become a second independent planner. The guarded EV actuator remains the sole automatic physical Easee writer in the production EV chain.

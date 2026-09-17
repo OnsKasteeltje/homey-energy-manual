@@ -97,6 +97,28 @@ pass "Homey ingress/egress repository boundary documented"
 for legacy_unit in deploy/systemd/ems-day-history.service deploy/systemd/ems-day-history.timer deploy/systemd/ems-homey-insights.service deploy/systemd/ems-homey-insights.timer deploy/systemd/ems-pi-control-publish.service deploy/systemd/ems-pi-control-publish.timer; do [[ ! -e "$legacy_unit" ]] || fail "legacy production unit must not be deployable: $legacy_unit"; done
 pass "legacy Homey polling/control-push units absent from production deploy set"
 
+HISTORY_15M="services/pi/history/build_15m_history.py"
+HISTORY_DAILY="services/pi/history/build_daily_energy_history.py"
+
+[[ -f "$HISTORY_15M" ]] || fail "canonical 15-minute history builder missing"
+[[ -f "$HISTORY_DAILY" ]] || fail "canonical daily history builder missing"
+
+for unit in   deploy/systemd/ems-history-15m.service   deploy/systemd/ems-history-15m.timer   deploy/systemd/ems-history-daily.service   deploy/systemd/ems-history-daily.timer
+do
+  [[ -f "$unit" ]] || fail "canonical local history unit missing: $unit"
+done
+
+grep -q '/home/jeroen/ems/runtime/history/build_15m_history.py'   deploy/systemd/ems-history-15m.service   || fail "15-minute history service does not use canonical runtime/history source"
+
+grep -q '/home/jeroen/ems/runtime/history/build_daily_energy_history.py'   deploy/systemd/ems-history-daily.service   || fail "daily history service does not use canonical runtime/history source"
+
+if grep -Eq 'collect_homey_insights|collect_boiler_insights|fetch_day_history|import_em2_day_history'   deploy/systemd/ems-history-15m.service   deploy/systemd/ems-history-daily.service
+then
+  fail "canonical derived-history services must not poll Homey or use legacy history ingress"
+fi
+
+pass "canonical local derived-history pipeline present and isolated from legacy polling"
+
 if [[ -n "$BASE_REF" ]]; then
   git rev-parse --verify "$BASE_REF^{commit}" >/dev/null 2>&1 || fail "base ref $BASE_REF is not a commit"
   CHANGED="$(git diff --name-only "$BASE_REF"..HEAD)"

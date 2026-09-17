@@ -1,6 +1,6 @@
 # EMS Software Architecture - Live As-Is
 
-**Datum:** 13 september 2026  
+**Datum:** 17 september 2026
 **Status:** Live-code synopsis  
 **Scope:** Raspberry Pi runtime + actieve Homey flows + actuele GitHub-architectuur  
 **Doel:** Vastleggen van de actuele softwarearchitectuur na cross-check van live Homey, Pi-controlarchitectuur en GitHub `main`.
@@ -86,6 +86,8 @@ UI/PUBLISH   -> website / GitHub artifacts
 ## 4. Raspberry Pi is de rolling-horizon optimization engine
 
 De Pi combineert runtime-state, forecasts en historie en optimaliseert flexibele verbruikers in kwartieren.
+
+De canonical operationele historie staat in `/home/jeroen/ems/data/ems-history.sqlite`. Geaccepteerde Homey Core pushes schrijven de raw `measurements`; automatische Homey Insights/day-history polling is geen production transport. Afgeleide historie wordt uitsluitend lokaal op de Pi opgebouwd: `services/pi/history/build_15m_history.py` schrijft `measurements_15m` en `services/pi/history/build_daily_energy_history.py` schrijft `daily_energy_history`. Beide builders hebben een eigen systemd timer en zijn failure-isolated van realtime state ingest en control.
 
 Hoofdobjectief:
 

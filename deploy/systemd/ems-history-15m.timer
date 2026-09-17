@@ -1,0 +1,10 @@
+[Unit]
+Description=Build canonical EMS 15-minute measurement history after each quarter-hour
+
+[Timer]
+OnCalendar=*-*-* *:02,17,32,47:00
+Persistent=true
+Unit=ems-history-15m.service
+
+[Install]
+WantedBy=timers.target
