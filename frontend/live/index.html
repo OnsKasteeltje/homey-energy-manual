@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>EMS · Live V2</title>
+  <link rel="stylesheet" href="./styles/live.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./">EMS <span>V2 preview</span></a>
+    <nav aria-label="Hoofdnavigatie">
+      <a class="active" href="./">Live</a>
+      <span aria-disabled="true">Invoer</span>
+      <span aria-disabled="true">Historie</span>
+      <a href="../../planner/">Planner</a>
+      <a href="../../groepen-fasen/">Groepen & fasen</a>
+    </nav>
+    <div id="freshness" class="freshness">Laden…</div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">ENERGIEMANAGER · NU</p>
+        <h1 id="manager-title">Live energiestroom</h1>
+        <p id="manager-reason" class="muted">Actuele toestand wordt geladen.</p>
+      </div>
+      <div id="manager-priority" class="priority">—</div>
+    </section>
+
+    <section class="flow-card" aria-label="Actuele energiestroom">
+      <div class="source-stack">
+        <article class="node"><span>☀︎</span><div><small>PV</small><strong id="pv-power">—</strong></div></article>
+        <article class="node"><span>↔</span><div><small>Net</small><strong id="grid-power">—</strong><em id="grid-direction">—</em></div></article>
+      </div>
+
+      <div class="flow-line" aria-hidden="true"></div>
+
+      <article class="home-node">
+        <small>HUIS</small>
+        <strong id="house-power">—</strong>
+        <span id="balance-state">Live</span>
+      </article>
+
+      <div class="flow-line" aria-hidden="true"></div>
+
+      <div class="load-stack">
+        <article class="node"><span>⚡</span><div><small>Tesla</small><strong id="tesla-power">—</strong><em id="tesla-state">—</em></div></article>
+        <article class="node"><span>◉</span><div><small>Warm water</small><strong id="ww-power">—</strong><em id="ww-state">—</em></div></article>
+        <article class="node"><span>⌂</span><div><small>Ruimteverwarming</small><strong id="heat-power">—</strong><em id="heat-state">—</em></div></article>
+        <article class="node"><span>•••</span><div><small>Overig</small><strong id="other-power">—</strong><em>residu</em></div></article>
+      </div>
+    </section>
+
+    <section class="cards">
+      <article class="status-card"><small>NET</small><strong id="kpi-grid">—</strong><span id="kpi-grid-sub">—</span></article>
+      <article class="status-card"><small>PV</small><strong id="kpi-pv">—</strong><span>actuele productie</span></article>
+      <article class="status-card"><small>TESLA</small><strong id="kpi-tesla">—</strong><span id="kpi-tesla-sub">—</span></article>
+      <article class="status-card"><small>WARM WATER</small><strong id="kpi-ww">—</strong><span id="kpi-ww-sub">—</span></article>
+    </section>
+
+    <section class="decision-card">
+      <div><p class="eyebrow">EMS BESLISSING</p><h2 id="decision">—</h2><p id="decision-reason" class="muted">—</p></div>
+      <div id="decision-priority" class="decision-pill">—</div>
+    </section>
+
+    <p class="preview-note">Frontend V2 preview · read-only · geen apparaat- of Homey-writes</p>
+  </main>
+
+  <script type="module" src="./render/live.js"></script>
+</body>
+</html>
