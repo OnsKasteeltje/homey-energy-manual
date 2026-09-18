@@ -12,7 +12,7 @@ function render(s) {
   set("tesla-power", formatPower(s.tesla));
   set("tesla-state", s.teslaCharging ? `laden${s.teslaRequestedA ? ` · ${s.teslaRequestedA} A` : ""}` : s.teslaConnected ? "aangesloten" : "niet aangesloten");
   set("ww-power", formatPower(s.ww));
-  set("ww-state", s.wwOn ? "verwarmen" : (s.wwAction || "uit"));
+  set("ww-state", s.wwBoilerMode ? (s.wwOn ? "Boiler · verwarmen" : "Boiler") : "CV · warm water");
   set("heat-power", formatPower(s.heat));
   set("heat-state", s.heatOn ? "warmtevraag" : "stand-by");
   set("other-power", formatPower(s.other));
