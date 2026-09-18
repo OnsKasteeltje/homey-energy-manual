@@ -170,3 +170,53 @@ Additional acceptance criteria:
 **RUNTIME CUTOVER: NOT STARTED**
 
 No publisher is disabled by this architecture decision.
+
+## 11. Completed prerequisite — planner state-source separation
+
+On 18 September 2026 an active runtime divergence was found during the
+publisher inventory: the warm-water planner and quarter-hour shadow-load
+planner still consumed the GitHub working-tree publication artifact
+`docs/data/energy-state-v2.json`.
+
+That artifact is derived website/observability output and is not a canonical
+runtime input. At discovery it was materially behind the accepted local Pi
+state, so retaining this dependency could expose planner logic to stale Tesla
+`connected` and `charging` state.
+
+This dependency has been removed:
+
+- warm-water planner input: `/home/jeroen/ems/data/energy-state-v2.json`;
+- quarter-hour shadow-load planner input: `/home/jeroen/ems/data/energy-state-v2.json`;
+- source correction: commit `666d921ec`;
+- isolated 96-slot builder validation: PASS;
+- deployed runtime is byte-identical to committed source: PASS;
+- normal `ems-forecast-chain.service` run at 20:33 CEST: PASS;
+- `build_ww_plan.py`: `0/SUCCESS`;
+- `build_shadow_load_plan.py`: `0/SUCCESS`;
+- downstream dynamic planner, archive and website-shadow generation: PASS.
+
+The resulting boundary is:
+
+    accepted Homey Core state
+            |
+            v
+    /home/jeroen/ems/data/energy-state-v2.json
+            |
+            +--> warm-water planner
+            +--> quarter-hour shadow-load planner
+            +--> other Pi runtime consumers
+            |
+            +--> transitional website publisher
+                       |
+                       v
+              GitHub docs/data/energy-state-v2.json
+                       |
+                       v
+                  legacy website
+
+Therefore `docs/data/energy-state-v2.json` is no longer an input to these
+planner components. Its remaining publication must not be retired until the
+website consumer has been migrated and the retirement conditions in section 7
+have passed.
+
+**PREREQUISITE STATE-SOURCE SEPARATION: PASS**
