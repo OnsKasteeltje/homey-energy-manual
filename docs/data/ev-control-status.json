@@ -1,33 +1,31 @@
 {
   "schema": "EM2_EV_CONTROL_STATUS_V0.4",
-  "publishedAt": "2026-09-18T16:57:02.920Z",
+  "publishedAt": "2026-09-18T16:58:02.960Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
-  "targetW": 0,
-  "evStatus": "IDLE",
-  "requestedA": 0,
+  "targetW": 6900,
+  "evStatus": "NUMERIC_DEADLINE_TARGET",
+  "requestedA": 10,
   "controlRevision": "",
-  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":0,\"evStatus\":\"IDLE\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
-  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":0,\"evStatus\":\"IDLE\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":6900,\"evStatus\":\"NUMERIC_DEADLINE_TARGET\",\"evSource\":\"REMAINING_KWH_OVER_TIME_TO_DEADLINE\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":6900,\"evStatus\":\"NUMERIC_DEADLINE_TARGET\",\"evSource\":\"REMAINING_KWH_OVER_TIME_TO_DEADLINE\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
   "sourceRevisions": {
     "intent": 8370,
-    "adapter": 8328,
-    "adapterState": 8328,
-    "core": 8370
+    "adapter": 8370,
+    "adapterState": 8370,
+    "core": 8371
   },
   "adapter": {
-    "valid": false,
-    "status": "STALE_CHARGER_STATE",
-    "reason": "Core/Easee context stale",
-    "generatedAt": "2026-09-18T16:04:00.453Z",
-    "stateAgeSec": 240,
+    "valid": true,
+    "status": "EXECUTABLE",
+    "reason": "6900 W → 10 A",
+    "generatedAt": "2026-09-18T16:58:00.417Z",
+    "stateAgeSec": 60,
     "intentAgeSec": 0
   },
   "gate": {
-    "status": "FAIL",
-    "errors": [
-      "TRANSLATION"
-    ],
+    "status": "PASS",
+    "errors": [],
     "checks": {
       "schema": true,
       "controlRevisionAligned": true,
@@ -35,26 +33,26 @@
       "coreSafety": true,
       "electrical": true,
       "commandRange": true,
-      "translation": false
+      "translation": true
     },
-    "coreRevision": 8370,
-    "updatedAt": "2026-09-18T16:56:02.434Z"
+    "coreRevision": 8371,
+    "updatedAt": "2026-09-18T16:58:02.394Z"
   },
   "actuator": {
-    "status": "LIVE_FAIL_CLOSED",
-    "reason": "ADAPTER_CONTRACT_INVALID",
+    "status": "READY_SESSION_CONTROL",
+    "reason": null,
     "live": true,
     "physicalWritePerformed": false,
-    "targetA": 0,
-    "previousA": 0,
-    "controlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":0,\"evStatus\":\"IDLE\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
-    "coreRevision": 8370
+    "targetA": 10,
+    "previousA": null,
+    "controlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":6900,\"evStatus\":\"NUMERIC_DEADLINE_TARGET\",\"evSource\":\"REMAINING_KWH_OVER_TIME_TO_DEADLINE\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+    "coreRevision": 8371
   },
   "deviceHealth": {
     "status": "OK",
     "reason": "FRESH_TELEMETRY",
     "chargeState": "plugged_in_paused",
-    "telemetryAgeSec": 109
+    "telemetryAgeSec": 169
   },
   "coherent": false
 }
