@@ -27,7 +27,7 @@ cd "$REPO" || {
     exit 2
 }
 
-EXPECTED_REV="$(git rev-parse --short=8 HEAD)"
+EXPECTED_REV="$(git rev-parse --short=9 HEAD)"
 echo "expected revision: $EXPECTED_REV"
 echo
 
