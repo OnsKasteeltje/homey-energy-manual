@@ -24,7 +24,14 @@ export function normalize(raw) {
   const tesla = number(raw?.tesla?.power_w);
   const ww = number(raw?.hot_water?.boiler_power_w);
   const heat = number(raw?.quatt?.power_w);
-  const house = number(raw?.energy_budget?.house_load_w);
+  // Prefer the canonical derived house load. When that derivation is invalid
+  // (for example because a PV source is stale after sunset), do not display a
+  // physical zero. The balance contract still exposes physical_house_candidate_w
+  // from fresh P1 + currently published PV; use it as an explicitly limited
+  // display fallback while preserving balanceValid=false.
+  const canonicalHouse = number(raw?.energy_budget?.house_load_w);
+  const houseCandidate = number(raw?.balance?.physical_house_candidate_w);
+  const house = canonicalHouse ?? houseCandidate;
   const known = [tesla, ww, heat].filter((v) => v !== null).reduce((a,b) => a+b, 0);
   const other = house === null ? null : Math.max(0, house - known);
   const deadline = formatLocalTime(raw?.tesla?.deadline_at);
