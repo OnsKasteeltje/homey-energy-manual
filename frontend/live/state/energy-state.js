@@ -1,6 +1,10 @@
 const SOURCE = "../../data/energy-state-v2.json";
 
-const number = (value) => Number.isFinite(Number(value)) ? Number(value) : null;
+const number = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 export function formatPower(value) {
   const w = number(value);
@@ -24,14 +28,12 @@ export function normalize(raw) {
   const tesla = number(raw?.tesla?.power_w);
   const ww = number(raw?.hot_water?.boiler_power_w);
   const heat = number(raw?.quatt?.power_w);
-  // Prefer the canonical derived house load. When that derivation is invalid
-  // (for example because a PV source is stale after sunset), do not display a
-  // physical zero. The balance contract still exposes physical_house_candidate_w
-  // from fresh P1 + currently published PV; use it as an explicitly limited
-  // display fallback while preserving balanceValid=false.
+  // House load is a derived value and is only shown when the canonical
+  // Homey Core balance is valid. Fresh P1 remains authoritative for grid
+  // import/export even when stale PV telemetry makes house load unknown.
   const canonicalHouse = number(raw?.energy_budget?.house_load_w);
-  const houseCandidate = number(raw?.balance?.physical_house_candidate_w);
-  const house = canonicalHouse ?? houseCandidate;
+  const balanceValid = raw?.balance?.valid === true;
+  const house = balanceValid ? canonicalHouse : null;
   const known = [tesla, ww, heat].filter((v) => v !== null).reduce((a,b) => a+b, 0);
   const other = house === null ? null : Math.max(0, house - known);
   const deadline = formatLocalTime(raw?.tesla?.deadline_at);
@@ -39,7 +41,7 @@ export function normalize(raw) {
   return {
     generatedAt: raw?.meta?.generated_at ?? null,
     stateAgeSec: number(raw?.meta?.state_age_sec),
-    balanceValid: raw?.balance?.valid === true,
+    balanceValid,
     grid, pv, house, tesla, ww, heat, other,
     gridDirection: grid === null ? "onbekend" : grid > 0 ? "import" : grid < 0 ? "export" : "in balans",
     teslaConnected: raw?.tesla?.connected === true,
