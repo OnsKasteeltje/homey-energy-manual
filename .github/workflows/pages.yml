@@ -35,12 +35,14 @@ permissions:
   pages: write
   id-token: write
 
-# Pages is a rolling view. Relevant publication artifacts trigger this workflow
-# directly, so a separate 5-minute cron rebuild is redundant. A stale queued
-# build has no value once a newer commit exists, so deploy only the latest.
+# Pages is a rolling view. Keep the currently running deployment alive:
+# runtime JSON commits arrive frequently and must not continuously cancel a
+# build before it can publish. GitHub concurrency still keeps at most one
+# pending run for this group; a newer pending run replaces an older pending
+# run, so this does not create an unbounded deployment backlog.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
