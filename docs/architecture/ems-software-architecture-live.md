@@ -334,3 +334,26 @@ Runtimecode en GitHub moeten aantoonbaar synchroon blijven. Architectuurgevoelig
 
 **Documentstatus:** Live As-Is architectuur, opnieuw gecrosscheckt op 13 september 2026.  
 **Canonical current-state:** `docs/architecture/CURRENT-EMS-STATE.md`.
+
+
+## 18. Runtime publication separation target
+
+GitHub `main` remains the canonical source for software, configuration, schemas, tests and architecture/documentation. Automatic publication of operational telemetry, planner snapshots, status or history into `docs/data/*.json` on `main` is transitional technical debt and is not the target architecture.
+
+The target publication boundary is:
+
+```text
+Homey -> Pi runtime -> planning/control -> Homey
+                  |
+                  +-> dedicated read-only web data interface -> website
+
+GitHub main -> software/configuration/schemas/tests/documentation
+```
+
+The website remains presentation plus explicit command input only. Current state, planner output and history must ultimately be consumed from the Pi operational-data boundary without a Git commit or Pages rebuild. Historical web queries derive from canonical Pi history rather than Git history.
+
+User commands use a separate authenticated command interface and must not turn GitHub into a command bus.
+
+Migration is artifact-by-artifact and fail-safe: inventory -> equivalent read-only resource -> parallel comparison -> consumer cutover -> validation -> only then stop that artifact's `main` mutation. No runtime publisher may be disabled merely to quiet `main`; all consumers and rollback requirements must first be proven.
+
+Canonical migration decision and publisher/consumer matrix: `docs/architecture/runtime-publication-separation.md`.
