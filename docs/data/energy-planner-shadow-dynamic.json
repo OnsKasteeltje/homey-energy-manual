@@ -1,13 +1,13 @@
 {
   "schema": "EMS_PI_DYNAMIC_PLANNER_SHADOW_PUBLISH_V0.2",
-  "publishedAt": "2026-09-18T15:48:06.326Z",
+  "publishedAt": "2026-09-18T16:03:06.154Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
   "sourceRevision": null,
-  "generatedAt": "2026-09-18T15:48:06.326Z",
+  "generatedAt": "2026-09-18T16:03:06.154Z",
   "plan": {
     "schema": "EMS_PI_DYNAMIC_ENERGY_PLAN_24H_V0.2",
-    "generatedAt": "2026-09-18T15:48:06.326Z",
+    "generatedAt": "2026-09-18T16:03:06.154Z",
     "controlMode": "PURE_SHADOW",
     "readOnly": true,
     "physicalWritePerformed": false,
@@ -53,13 +53,9 @@
       "horizonPolicy": "MILD_PRIOR_ONLY_MAX_8_PERCENT_24H"
     },
     "realtime": {
-      "actualP1ExportW": 288,
-      "recentLocalAccuracy": 0.807,
+      "actualP1ExportW": 0,
+      "recentLocalAccuracy": 0.839,
       "recentP1ExportSamples": [
-        {
-          "ts": "2026-09-18T15:18:05.998494Z",
-          "exportW": 587.0
-        },
         {
           "ts": "2026-09-18T15:33:06.158456Z",
           "exportW": 319.0
@@ -67,13 +63,17 @@
         {
           "ts": "2026-09-18T15:48:06.123479Z",
           "exportW": 288.0
+        },
+        {
+          "ts": "2026-09-18T16:03:05.962312Z",
+          "exportW": 0.0
         }
       ],
       "p1CorrectionPolicy": "MEDIAN_TREND_CLOUD_STABILITY_ADAPTIVE"
     },
     "deadlinePlan": {
       "active": false,
-      "connected": false,
+      "connected": true,
       "remainingKWh": 3.564,
       "deadlineAt": "2026-09-13T22:30:00.000Z",
       "latestStartAtInput": "2026-09-13T22:10:37.826Z",
@@ -104,53 +104,6 @@
       "actions": [
         {
           "i": 0,
-          "start": "2026-09-18T15:45:00.000Z",
-          "end": "2026-09-18T16:00:00.000Z",
-          "localDate": "2026-09-18",
-          "localQuarter": 71,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 706,
-          "pvForecastW": 1440,
-          "netBeforeFlexW": -734,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 734,
-          "correctedExportBeforeFlexW": 514,
-          "confidence": 0.841,
-          "confidenceComponents": {
-            "forecastConsistency": 0.906,
-            "cloudStability": 0.788,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 1.0,
-            "liveP1Weight": 0.45
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "RUN",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 1900,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "DYNAMIC_COMFORT_PV_SLOT"
-          }
-        },
-        {
-          "i": 1,
           "start": "2026-09-18T16:00:00.000Z",
           "end": "2026-09-18T16:15:00.000Z",
           "localDate": "2026-09-18",
@@ -162,14 +115,14 @@
           "netBeforeFlexW": -233,
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 233,
-          "correctedExportBeforeFlexW": 238,
-          "confidence": 0.81,
+          "correctedExportBeforeFlexW": 223,
+          "confidence": 0.94,
           "confidenceComponents": {
-            "forecastConsistency": 0.822,
-            "cloudStability": 0.799,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.999,
-            "liveP1Weight": 0.432
+            "forecastConsistency": 1.0,
+            "cloudStability": 0.96,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 1.0,
+            "liveP1Weight": 0.401
           },
           "forecastQuality": {
             "baseLoad": "PI_HISTORY_MODEL",
@@ -186,9 +139,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -197,7 +150,7 @@
           }
         },
         {
-          "i": 2,
+          "i": 1,
           "start": "2026-09-18T16:15:00.000Z",
           "end": "2026-09-18T16:30:00.000Z",
           "localDate": "2026-09-18",
@@ -209,14 +162,14 @@
           "netBeforeFlexW": 9,
           "importBeforeFlexW": 9,
           "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 97,
-          "confidence": 0.777,
+          "correctedExportBeforeFlexW": 75,
+          "confidence": 0.94,
           "confidenceComponents": {
-            "forecastConsistency": 0.731,
-            "cloudStability": 0.811,
-            "recentLocalAccuracy": 0.807,
+            "forecastConsistency": 1.0,
+            "cloudStability": 0.963,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.999,
-            "liveP1Weight": 0.399
+            "liveP1Weight": 0.362
           },
           "forecastQuality": {
             "baseLoad": "PI_HISTORY_MODEL",
@@ -233,9 +186,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -244,7 +197,7 @@
           }
         },
         {
-          "i": 3,
+          "i": 2,
           "start": "2026-09-18T16:30:00.000Z",
           "end": "2026-09-18T16:45:00.000Z",
           "localDate": "2026-09-18",
@@ -256,14 +209,14 @@
           "netBeforeFlexW": 191,
           "importBeforeFlexW": 191,
           "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 88,
-          "confidence": 0.786,
+          "correctedExportBeforeFlexW": 65,
+          "confidence": 0.94,
           "confidenceComponents": {
-            "forecastConsistency": 0.64,
+            "forecastConsistency": 1.0,
             "cloudStability": 0.966,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.998,
-            "liveP1Weight": 0.36
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.999,
+            "liveP1Weight": 0.312
           },
           "forecastQuality": {
             "baseLoad": "PI_HISTORY_MODEL",
@@ -280,9 +233,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -291,7 +244,7 @@
           }
         },
         {
-          "i": 4,
+          "i": 3,
           "start": "2026-09-18T16:45:00.000Z",
           "end": "2026-09-18T17:00:00.000Z",
           "localDate": "2026-09-18",
@@ -303,14 +256,14 @@
           "netBeforeFlexW": 272,
           "importBeforeFlexW": 272,
           "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 74,
-          "confidence": 0.778,
+          "correctedExportBeforeFlexW": 54,
+          "confidence": 0.95,
           "confidenceComponents": {
-            "forecastConsistency": 0.595,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.997,
-            "liveP1Weight": 0.301
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.998,
+            "liveP1Weight": 0.261
           },
           "forecastQuality": {
             "baseLoad": "PI_HISTORY_MODEL",
@@ -327,9 +280,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -338,7 +291,7 @@
           }
         },
         {
-          "i": 5,
+          "i": 4,
           "start": "2026-09-18T17:00:00.000Z",
           "end": "2026-09-18T17:15:00.000Z",
           "localDate": "2026-09-18",
@@ -350,14 +303,14 @@
           "netBeforeFlexW": 287,
           "importBeforeFlexW": 287,
           "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 55,
-          "confidence": 0.786,
+          "correctedExportBeforeFlexW": 44,
+          "confidence": 0.949,
           "confidenceComponents": {
-            "forecastConsistency": 0.617,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.996,
-            "liveP1Weight": 0.226
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.997,
+            "liveP1Weight": 0.211
           },
           "forecastQuality": {
             "baseLoad": "PI_HISTORY_MODEL",
@@ -374,9 +327,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -385,7 +338,7 @@
           }
         },
         {
-          "i": 6,
+          "i": 5,
           "start": "2026-09-18T17:15:00.000Z",
           "end": "2026-09-18T17:30:00.000Z",
           "localDate": "2026-09-18",
@@ -397,14 +350,14 @@
           "netBeforeFlexW": 246,
           "importBeforeFlexW": 246,
           "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 37,
-          "confidence": 0.802,
+          "correctedExportBeforeFlexW": 34,
+          "confidence": 0.948,
           "confidenceComponents": {
-            "forecastConsistency": 0.66,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.995,
-            "liveP1Weight": 0.151
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.996,
+            "liveP1Weight": 0.161
           },
           "forecastQuality": {
             "baseLoad": "PI_HISTORY_MODEL",
@@ -421,9 +374,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -432,7 +385,7 @@
           }
         },
         {
-          "i": 7,
+          "i": 6,
           "start": "2026-09-18T17:30:00.000Z",
           "end": "2026-09-18T17:45:00.000Z",
           "localDate": "2026-09-18",
@@ -444,14 +397,14 @@
           "netBeforeFlexW": 443,
           "importBeforeFlexW": 443,
           "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 17,
-          "confidence": 0.886,
+          "correctedExportBeforeFlexW": 23,
+          "confidence": 0.947,
           "confidenceComponents": {
-            "forecastConsistency": 0.872,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.994,
-            "liveP1Weight": 0.07
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.995,
+            "liveP1Weight": 0.111
           },
           "forecastQuality": {
             "baseLoad": "PI_HISTORY_MODEL",
@@ -468,9 +421,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -479,7 +432,7 @@
           }
         },
         {
-          "i": 8,
+          "i": 7,
           "start": "2026-09-18T17:45:00.000Z",
           "end": "2026-09-18T18:00:00.000Z",
           "localDate": "2026-09-18",
@@ -491,14 +444,14 @@
           "netBeforeFlexW": 634,
           "importBeforeFlexW": 634,
           "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 3,
-          "confidence": 0.923,
+          "correctedExportBeforeFlexW": 13,
+          "confidence": 0.946,
           "confidenceComponents": {
-            "forecastConsistency": 0.968,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.994,
-            "liveP1Weight": 0.011
+            "liveP1Weight": 0.061
           },
           "forecastQuality": {
             "baseLoad": "PI_HISTORY_MODEL",
@@ -515,9 +468,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -526,7 +479,7 @@
           }
         },
         {
-          "i": 9,
+          "i": 8,
           "start": "2026-09-18T18:00:00.000Z",
           "end": "2026-09-18T18:15:00.000Z",
           "localDate": "2026-09-18",
@@ -538,12 +491,59 @@
           "netBeforeFlexW": 653,
           "importBeforeFlexW": 653,
           "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 0,
-          "confidence": 0.935,
+          "correctedExportBeforeFlexW": 2,
+          "confidence": 0.946,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.994,
+            "liveP1Weight": 0.01
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "HOLD"
+          }
+        },
+        {
+          "i": 9,
+          "start": "2026-09-18T18:15:00.000Z",
+          "end": "2026-09-18T18:30:00.000Z",
+          "localDate": "2026-09-18",
+          "localQuarter": 81,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 628,
+          "pvForecastW": 0,
+          "netBeforeFlexW": 628,
+          "importBeforeFlexW": 628,
+          "pvSurplusBeforeFlexW": 0,
+          "correctedExportBeforeFlexW": 0,
+          "confidence": 0.945,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.993,
             "liveP1Weight": 0.0
           },
@@ -562,9 +562,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -574,23 +574,23 @@
         },
         {
           "i": 10,
-          "start": "2026-09-18T18:15:00.000Z",
-          "end": "2026-09-18T18:30:00.000Z",
+          "start": "2026-09-18T18:30:00.000Z",
+          "end": "2026-09-18T18:45:00.000Z",
           "localDate": "2026-09-18",
-          "localQuarter": 81,
+          "localQuarter": 82,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 628,
+          "baseLoadForecastW": 649,
           "pvForecastW": 0,
-          "netBeforeFlexW": 628,
-          "importBeforeFlexW": 628,
+          "netBeforeFlexW": 649,
+          "importBeforeFlexW": 649,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.934,
+          "confidence": 0.944,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.992,
             "liveP1Weight": 0.0
           },
@@ -609,9 +609,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -621,23 +621,23 @@
         },
         {
           "i": 11,
-          "start": "2026-09-18T18:30:00.000Z",
-          "end": "2026-09-18T18:45:00.000Z",
+          "start": "2026-09-18T18:45:00.000Z",
+          "end": "2026-09-18T19:00:00.000Z",
           "localDate": "2026-09-18",
-          "localQuarter": 82,
+          "localQuarter": 83,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 649,
+          "baseLoadForecastW": 645,
           "pvForecastW": 0,
-          "netBeforeFlexW": 649,
-          "importBeforeFlexW": 649,
+          "netBeforeFlexW": 645,
+          "importBeforeFlexW": 645,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.934,
+          "confidence": 0.943,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.991,
             "liveP1Weight": 0.0
           },
@@ -656,9 +656,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -668,23 +668,23 @@
         },
         {
           "i": 12,
-          "start": "2026-09-18T18:45:00.000Z",
-          "end": "2026-09-18T19:00:00.000Z",
+          "start": "2026-09-18T19:00:00.000Z",
+          "end": "2026-09-18T19:15:00.000Z",
           "localDate": "2026-09-18",
-          "localQuarter": 83,
+          "localQuarter": 84,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 645,
+          "baseLoadForecastW": 697,
           "pvForecastW": 0,
-          "netBeforeFlexW": 645,
-          "importBeforeFlexW": 645,
+          "netBeforeFlexW": 697,
+          "importBeforeFlexW": 697,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.933,
+          "confidence": 0.942,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.99,
             "liveP1Weight": 0.0
           },
@@ -703,9 +703,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -715,53 +715,6 @@
         },
         {
           "i": 13,
-          "start": "2026-09-18T19:00:00.000Z",
-          "end": "2026-09-18T19:15:00.000Z",
-          "localDate": "2026-09-18",
-          "localQuarter": 84,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 697,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 697,
-          "importBeforeFlexW": 697,
-          "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 0,
-          "confidence": 0.932,
-          "confidenceComponents": {
-            "forecastConsistency": 1.0,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.989,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "HOLD"
-          }
-        },
-        {
-          "i": 14,
           "start": "2026-09-18T19:15:00.000Z",
           "end": "2026-09-18T19:30:00.000Z",
           "localDate": "2026-09-18",
@@ -774,11 +727,11 @@
           "importBeforeFlexW": 614,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.931,
+          "confidence": 0.942,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.989,
             "liveP1Weight": 0.0
           },
@@ -797,9 +750,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -808,7 +761,7 @@
           }
         },
         {
-          "i": 15,
+          "i": 14,
           "start": "2026-09-18T19:30:00.000Z",
           "end": "2026-09-18T19:45:00.000Z",
           "localDate": "2026-09-18",
@@ -821,11 +774,58 @@
           "importBeforeFlexW": 546,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.931,
+          "confidence": 0.941,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.989,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "HOLD"
+          }
+        },
+        {
+          "i": 15,
+          "start": "2026-09-18T19:45:00.000Z",
+          "end": "2026-09-18T20:00:00.000Z",
+          "localDate": "2026-09-18",
+          "localQuarter": 87,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 522,
+          "pvForecastW": 0,
+          "netBeforeFlexW": 522,
+          "importBeforeFlexW": 522,
+          "pvSurplusBeforeFlexW": 0,
+          "correctedExportBeforeFlexW": 0,
+          "confidence": 0.94,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.988,
             "liveP1Weight": 0.0
           },
@@ -844,9 +844,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -856,23 +856,23 @@
         },
         {
           "i": 16,
-          "start": "2026-09-18T19:45:00.000Z",
-          "end": "2026-09-18T20:00:00.000Z",
+          "start": "2026-09-18T20:00:00.000Z",
+          "end": "2026-09-18T20:15:00.000Z",
           "localDate": "2026-09-18",
-          "localQuarter": 87,
+          "localQuarter": 88,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 522,
+          "baseLoadForecastW": 501,
           "pvForecastW": 0,
-          "netBeforeFlexW": 522,
-          "importBeforeFlexW": 522,
+          "netBeforeFlexW": 501,
+          "importBeforeFlexW": 501,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.93,
+          "confidence": 0.939,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.987,
             "liveP1Weight": 0.0
           },
@@ -891,9 +891,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -903,23 +903,23 @@
         },
         {
           "i": 17,
-          "start": "2026-09-18T20:00:00.000Z",
-          "end": "2026-09-18T20:15:00.000Z",
+          "start": "2026-09-18T20:15:00.000Z",
+          "end": "2026-09-18T20:30:00.000Z",
           "localDate": "2026-09-18",
-          "localQuarter": 88,
+          "localQuarter": 89,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 501,
+          "baseLoadForecastW": 456,
           "pvForecastW": 0,
-          "netBeforeFlexW": 501,
-          "importBeforeFlexW": 501,
+          "netBeforeFlexW": 456,
+          "importBeforeFlexW": 456,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.929,
+          "confidence": 0.938,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.986,
             "liveP1Weight": 0.0
           },
@@ -938,9 +938,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -950,23 +950,23 @@
         },
         {
           "i": 18,
-          "start": "2026-09-18T20:15:00.000Z",
-          "end": "2026-09-18T20:30:00.000Z",
+          "start": "2026-09-18T20:30:00.000Z",
+          "end": "2026-09-18T20:45:00.000Z",
           "localDate": "2026-09-18",
-          "localQuarter": 89,
+          "localQuarter": 90,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 456,
+          "baseLoadForecastW": 396,
           "pvForecastW": 0,
-          "netBeforeFlexW": 456,
-          "importBeforeFlexW": 456,
+          "netBeforeFlexW": 396,
+          "importBeforeFlexW": 396,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.928,
+          "confidence": 0.938,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.985,
             "liveP1Weight": 0.0
           },
@@ -985,9 +985,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -997,53 +997,6 @@
         },
         {
           "i": 19,
-          "start": "2026-09-18T20:30:00.000Z",
-          "end": "2026-09-18T20:45:00.000Z",
-          "localDate": "2026-09-18",
-          "localQuarter": 90,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 396,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 396,
-          "importBeforeFlexW": 396,
-          "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 0,
-          "confidence": 0.927,
-          "confidenceComponents": {
-            "forecastConsistency": 1.0,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.984,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "HOLD"
-          }
-        },
-        {
-          "i": 20,
           "start": "2026-09-18T20:45:00.000Z",
           "end": "2026-09-18T21:00:00.000Z",
           "localDate": "2026-09-18",
@@ -1056,11 +1009,11 @@
           "importBeforeFlexW": 384,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.927,
+          "confidence": 0.937,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.984,
             "liveP1Weight": 0.0
           },
@@ -1079,9 +1032,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1090,7 +1043,7 @@
           }
         },
         {
-          "i": 21,
+          "i": 20,
           "start": "2026-09-18T21:00:00.000Z",
           "end": "2026-09-18T21:15:00.000Z",
           "localDate": "2026-09-18",
@@ -1103,11 +1056,58 @@
           "importBeforeFlexW": 370,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.926,
+          "confidence": 0.936,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.984,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "HOLD"
+          }
+        },
+        {
+          "i": 21,
+          "start": "2026-09-18T21:15:00.000Z",
+          "end": "2026-09-18T21:30:00.000Z",
+          "localDate": "2026-09-18",
+          "localQuarter": 93,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 410,
+          "pvForecastW": 0,
+          "netBeforeFlexW": 410,
+          "importBeforeFlexW": 410,
+          "pvSurplusBeforeFlexW": 0,
+          "correctedExportBeforeFlexW": 0,
+          "confidence": 0.935,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.983,
             "liveP1Weight": 0.0
           },
@@ -1126,9 +1126,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1138,23 +1138,23 @@
         },
         {
           "i": 22,
-          "start": "2026-09-18T21:15:00.000Z",
-          "end": "2026-09-18T21:30:00.000Z",
+          "start": "2026-09-18T21:30:00.000Z",
+          "end": "2026-09-18T21:45:00.000Z",
           "localDate": "2026-09-18",
-          "localQuarter": 93,
+          "localQuarter": 94,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 410,
+          "baseLoadForecastW": 392,
           "pvForecastW": 0,
-          "netBeforeFlexW": 410,
-          "importBeforeFlexW": 410,
+          "netBeforeFlexW": 392,
+          "importBeforeFlexW": 392,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.925,
+          "confidence": 0.934,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.982,
             "liveP1Weight": 0.0
           },
@@ -1173,9 +1173,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1185,23 +1185,23 @@
         },
         {
           "i": 23,
-          "start": "2026-09-18T21:30:00.000Z",
-          "end": "2026-09-18T21:45:00.000Z",
+          "start": "2026-09-18T21:45:00.000Z",
+          "end": "2026-09-18T22:00:00.000Z",
           "localDate": "2026-09-18",
-          "localQuarter": 94,
+          "localQuarter": 95,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 392,
+          "baseLoadForecastW": 311,
           "pvForecastW": 0,
-          "netBeforeFlexW": 392,
-          "importBeforeFlexW": 392,
+          "netBeforeFlexW": 311,
+          "importBeforeFlexW": 311,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.924,
+          "confidence": 0.934,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.981,
             "liveP1Weight": 0.0
           },
@@ -1220,9 +1220,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1232,23 +1232,23 @@
         },
         {
           "i": 24,
-          "start": "2026-09-18T21:45:00.000Z",
-          "end": "2026-09-18T22:00:00.000Z",
-          "localDate": "2026-09-18",
-          "localQuarter": 95,
+          "start": "2026-09-18T22:00:00.000Z",
+          "end": "2026-09-18T22:15:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 0,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 311,
+          "baseLoadForecastW": 378,
           "pvForecastW": 0,
-          "netBeforeFlexW": 311,
-          "importBeforeFlexW": 311,
+          "netBeforeFlexW": 378,
+          "importBeforeFlexW": 378,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.923,
+          "confidence": 0.933,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.98,
             "liveP1Weight": 0.0
           },
@@ -1267,9 +1267,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1279,53 +1279,6 @@
         },
         {
           "i": 25,
-          "start": "2026-09-18T22:00:00.000Z",
-          "end": "2026-09-18T22:15:00.000Z",
-          "localDate": "2026-09-19",
-          "localQuarter": 0,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 378,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 378,
-          "importBeforeFlexW": 378,
-          "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 0,
-          "confidence": 0.923,
-          "confidenceComponents": {
-            "forecastConsistency": 1.0,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.979,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "HOLD"
-          }
-        },
-        {
-          "i": 26,
           "start": "2026-09-18T22:15:00.000Z",
           "end": "2026-09-18T22:30:00.000Z",
           "localDate": "2026-09-19",
@@ -1338,11 +1291,11 @@
           "importBeforeFlexW": 301,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.922,
+          "confidence": 0.932,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.979,
             "liveP1Weight": 0.0
           },
@@ -1361,9 +1314,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1372,7 +1325,7 @@
           }
         },
         {
-          "i": 27,
+          "i": 26,
           "start": "2026-09-18T22:30:00.000Z",
           "end": "2026-09-18T22:45:00.000Z",
           "localDate": "2026-09-19",
@@ -1385,11 +1338,58 @@
           "importBeforeFlexW": 333,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.921,
+          "confidence": 0.931,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.979,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "HOLD"
+          }
+        },
+        {
+          "i": 27,
+          "start": "2026-09-18T22:45:00.000Z",
+          "end": "2026-09-18T23:00:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 3,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 376,
+          "pvForecastW": 0,
+          "netBeforeFlexW": 376,
+          "importBeforeFlexW": 376,
+          "pvSurplusBeforeFlexW": 0,
+          "correctedExportBeforeFlexW": 0,
+          "confidence": 0.93,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.978,
             "liveP1Weight": 0.0
           },
@@ -1408,9 +1408,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1420,23 +1420,23 @@
         },
         {
           "i": 28,
-          "start": "2026-09-18T22:45:00.000Z",
-          "end": "2026-09-18T23:00:00.000Z",
+          "start": "2026-09-18T23:00:00.000Z",
+          "end": "2026-09-18T23:15:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 3,
+          "localQuarter": 4,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 376,
+          "baseLoadForecastW": 351,
           "pvForecastW": 0,
-          "netBeforeFlexW": 376,
-          "importBeforeFlexW": 376,
+          "netBeforeFlexW": 351,
+          "importBeforeFlexW": 351,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.92,
+          "confidence": 0.93,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.977,
             "liveP1Weight": 0.0
           },
@@ -1455,9 +1455,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1467,23 +1467,23 @@
         },
         {
           "i": 29,
-          "start": "2026-09-18T23:00:00.000Z",
-          "end": "2026-09-18T23:15:00.000Z",
+          "start": "2026-09-18T23:15:00.000Z",
+          "end": "2026-09-18T23:30:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 4,
+          "localQuarter": 5,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 351,
+          "baseLoadForecastW": 283,
           "pvForecastW": 0,
-          "netBeforeFlexW": 351,
-          "importBeforeFlexW": 351,
+          "netBeforeFlexW": 283,
+          "importBeforeFlexW": 283,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.92,
+          "confidence": 0.929,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.976,
             "liveP1Weight": 0.0
           },
@@ -1502,9 +1502,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1514,23 +1514,23 @@
         },
         {
           "i": 30,
-          "start": "2026-09-18T23:15:00.000Z",
-          "end": "2026-09-18T23:30:00.000Z",
+          "start": "2026-09-18T23:30:00.000Z",
+          "end": "2026-09-18T23:45:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 5,
+          "localQuarter": 6,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 283,
+          "baseLoadForecastW": 301,
           "pvForecastW": 0,
-          "netBeforeFlexW": 283,
-          "importBeforeFlexW": 283,
+          "netBeforeFlexW": 301,
+          "importBeforeFlexW": 301,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.919,
+          "confidence": 0.928,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.975,
             "liveP1Weight": 0.0
           },
@@ -1549,9 +1549,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1561,53 +1561,6 @@
         },
         {
           "i": 31,
-          "start": "2026-09-18T23:30:00.000Z",
-          "end": "2026-09-18T23:45:00.000Z",
-          "localDate": "2026-09-19",
-          "localQuarter": 6,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 301,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 301,
-          "importBeforeFlexW": 301,
-          "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 0,
-          "confidence": 0.918,
-          "confidenceComponents": {
-            "forecastConsistency": 1.0,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.974,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "HOLD"
-          }
-        },
-        {
-          "i": 32,
           "start": "2026-09-18T23:45:00.000Z",
           "end": "2026-09-19T00:00:00.000Z",
           "localDate": "2026-09-19",
@@ -1620,11 +1573,11 @@
           "importBeforeFlexW": 316,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.917,
+          "confidence": 0.927,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.974,
             "liveP1Weight": 0.0
           },
@@ -1643,9 +1596,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1654,7 +1607,7 @@
           }
         },
         {
-          "i": 33,
+          "i": 32,
           "start": "2026-09-19T00:00:00.000Z",
           "end": "2026-09-19T00:15:00.000Z",
           "localDate": "2026-09-19",
@@ -1667,11 +1620,58 @@
           "importBeforeFlexW": 259,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.916,
+          "confidence": 0.927,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.974,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "HOLD"
+          }
+        },
+        {
+          "i": 33,
+          "start": "2026-09-19T00:15:00.000Z",
+          "end": "2026-09-19T00:30:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 9,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 297,
+          "pvForecastW": 0,
+          "netBeforeFlexW": 297,
+          "importBeforeFlexW": 297,
+          "pvSurplusBeforeFlexW": 0,
+          "correctedExportBeforeFlexW": 0,
+          "confidence": 0.926,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.973,
             "liveP1Weight": 0.0
           },
@@ -1690,9 +1690,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1702,10 +1702,10 @@
         },
         {
           "i": 34,
-          "start": "2026-09-19T00:15:00.000Z",
-          "end": "2026-09-19T00:30:00.000Z",
+          "start": "2026-09-19T00:30:00.000Z",
+          "end": "2026-09-19T00:45:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 9,
+          "localQuarter": 10,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 297,
@@ -1714,11 +1714,11 @@
           "importBeforeFlexW": 297,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.916,
+          "confidence": 0.925,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.972,
             "liveP1Weight": 0.0
           },
@@ -1737,9 +1737,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1749,23 +1749,23 @@
         },
         {
           "i": 35,
-          "start": "2026-09-19T00:30:00.000Z",
-          "end": "2026-09-19T00:45:00.000Z",
+          "start": "2026-09-19T00:45:00.000Z",
+          "end": "2026-09-19T01:00:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 10,
+          "localQuarter": 11,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 297,
+          "baseLoadForecastW": 309,
           "pvForecastW": 0,
-          "netBeforeFlexW": 297,
-          "importBeforeFlexW": 297,
+          "netBeforeFlexW": 309,
+          "importBeforeFlexW": 309,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.915,
+          "confidence": 0.924,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.971,
             "liveP1Weight": 0.0
           },
@@ -1784,9 +1784,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1796,23 +1796,23 @@
         },
         {
           "i": 36,
-          "start": "2026-09-19T00:45:00.000Z",
-          "end": "2026-09-19T01:00:00.000Z",
+          "start": "2026-09-19T01:00:00.000Z",
+          "end": "2026-09-19T01:15:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 11,
+          "localQuarter": 12,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 309,
+          "baseLoadForecastW": 250,
           "pvForecastW": 0,
-          "netBeforeFlexW": 309,
-          "importBeforeFlexW": 309,
+          "netBeforeFlexW": 250,
+          "importBeforeFlexW": 250,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.914,
+          "confidence": 0.923,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.97,
             "liveP1Weight": 0.0
           },
@@ -1831,9 +1831,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1843,53 +1843,6 @@
         },
         {
           "i": 37,
-          "start": "2026-09-19T01:00:00.000Z",
-          "end": "2026-09-19T01:15:00.000Z",
-          "localDate": "2026-09-19",
-          "localQuarter": 12,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 250,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 250,
-          "importBeforeFlexW": 250,
-          "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 0,
-          "confidence": 0.913,
-          "confidenceComponents": {
-            "forecastConsistency": 1.0,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.969,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "HOLD"
-          }
-        },
-        {
-          "i": 38,
           "start": "2026-09-19T01:15:00.000Z",
           "end": "2026-09-19T01:30:00.000Z",
           "localDate": "2026-09-19",
@@ -1902,11 +1855,11 @@
           "importBeforeFlexW": 339,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.912,
+          "confidence": 0.923,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.969,
             "liveP1Weight": 0.0
           },
@@ -1925,9 +1878,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1936,7 +1889,7 @@
           }
         },
         {
-          "i": 39,
+          "i": 38,
           "start": "2026-09-19T01:30:00.000Z",
           "end": "2026-09-19T01:45:00.000Z",
           "localDate": "2026-09-19",
@@ -1949,11 +1902,58 @@
           "importBeforeFlexW": 276,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.912,
+          "confidence": 0.922,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.969,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "HOLD"
+          }
+        },
+        {
+          "i": 39,
+          "start": "2026-09-19T01:45:00.000Z",
+          "end": "2026-09-19T02:00:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 15,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 322,
+          "pvForecastW": 0,
+          "netBeforeFlexW": 322,
+          "importBeforeFlexW": 322,
+          "pvSurplusBeforeFlexW": 0,
+          "correctedExportBeforeFlexW": 0,
+          "confidence": 0.921,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.968,
             "liveP1Weight": 0.0
           },
@@ -1972,9 +1972,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -1984,23 +1984,23 @@
         },
         {
           "i": 40,
-          "start": "2026-09-19T01:45:00.000Z",
-          "end": "2026-09-19T02:00:00.000Z",
+          "start": "2026-09-19T02:00:00.000Z",
+          "end": "2026-09-19T02:15:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 15,
+          "localQuarter": 16,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 322,
+          "baseLoadForecastW": 351,
           "pvForecastW": 0,
-          "netBeforeFlexW": 322,
-          "importBeforeFlexW": 322,
+          "netBeforeFlexW": 351,
+          "importBeforeFlexW": 351,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.911,
+          "confidence": 0.92,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.967,
             "liveP1Weight": 0.0
           },
@@ -2019,9 +2019,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2031,23 +2031,23 @@
         },
         {
           "i": 41,
-          "start": "2026-09-19T02:00:00.000Z",
-          "end": "2026-09-19T02:15:00.000Z",
+          "start": "2026-09-19T02:15:00.000Z",
+          "end": "2026-09-19T02:30:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 16,
+          "localQuarter": 17,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 351,
+          "baseLoadForecastW": 349,
           "pvForecastW": 0,
-          "netBeforeFlexW": 351,
-          "importBeforeFlexW": 351,
+          "netBeforeFlexW": 349,
+          "importBeforeFlexW": 349,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.91,
+          "confidence": 0.919,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.966,
             "liveP1Weight": 0.0
           },
@@ -2066,9 +2066,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2078,23 +2078,23 @@
         },
         {
           "i": 42,
-          "start": "2026-09-19T02:15:00.000Z",
-          "end": "2026-09-19T02:30:00.000Z",
+          "start": "2026-09-19T02:30:00.000Z",
+          "end": "2026-09-19T02:45:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 17,
+          "localQuarter": 18,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 349,
+          "baseLoadForecastW": 249,
           "pvForecastW": 0,
-          "netBeforeFlexW": 349,
-          "importBeforeFlexW": 349,
+          "netBeforeFlexW": 249,
+          "importBeforeFlexW": 249,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.909,
+          "confidence": 0.919,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.965,
             "liveP1Weight": 0.0
           },
@@ -2113,9 +2113,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2125,53 +2125,6 @@
         },
         {
           "i": 43,
-          "start": "2026-09-19T02:30:00.000Z",
-          "end": "2026-09-19T02:45:00.000Z",
-          "localDate": "2026-09-19",
-          "localQuarter": 18,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 249,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 249,
-          "importBeforeFlexW": 249,
-          "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 0,
-          "confidence": 0.909,
-          "confidenceComponents": {
-            "forecastConsistency": 1.0,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.964,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "HOLD"
-          }
-        },
-        {
-          "i": 44,
           "start": "2026-09-19T02:45:00.000Z",
           "end": "2026-09-19T03:00:00.000Z",
           "localDate": "2026-09-19",
@@ -2184,11 +2137,11 @@
           "importBeforeFlexW": 267,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.908,
+          "confidence": 0.918,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.964,
             "liveP1Weight": 0.0
           },
@@ -2207,9 +2160,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2218,7 +2171,7 @@
           }
         },
         {
-          "i": 45,
+          "i": 44,
           "start": "2026-09-19T03:00:00.000Z",
           "end": "2026-09-19T03:15:00.000Z",
           "localDate": "2026-09-19",
@@ -2231,11 +2184,58 @@
           "importBeforeFlexW": 254,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.907,
+          "confidence": 0.917,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.964,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "HOLD"
+          }
+        },
+        {
+          "i": 45,
+          "start": "2026-09-19T03:15:00.000Z",
+          "end": "2026-09-19T03:30:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 21,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 286,
+          "pvForecastW": 0,
+          "netBeforeFlexW": 286,
+          "importBeforeFlexW": 286,
+          "pvSurplusBeforeFlexW": 0,
+          "correctedExportBeforeFlexW": 0,
+          "confidence": 0.916,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.963,
             "liveP1Weight": 0.0
           },
@@ -2254,9 +2254,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2266,23 +2266,23 @@
         },
         {
           "i": 46,
-          "start": "2026-09-19T03:15:00.000Z",
-          "end": "2026-09-19T03:30:00.000Z",
+          "start": "2026-09-19T03:30:00.000Z",
+          "end": "2026-09-19T03:45:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 21,
+          "localQuarter": 22,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 286,
+          "baseLoadForecastW": 274,
           "pvForecastW": 0,
-          "netBeforeFlexW": 286,
-          "importBeforeFlexW": 286,
+          "netBeforeFlexW": 274,
+          "importBeforeFlexW": 274,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.906,
+          "confidence": 0.915,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.962,
             "liveP1Weight": 0.0
           },
@@ -2301,9 +2301,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2313,23 +2313,23 @@
         },
         {
           "i": 47,
-          "start": "2026-09-19T03:30:00.000Z",
-          "end": "2026-09-19T03:45:00.000Z",
+          "start": "2026-09-19T03:45:00.000Z",
+          "end": "2026-09-19T04:00:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 22,
+          "localQuarter": 23,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 274,
+          "baseLoadForecastW": 294,
           "pvForecastW": 0,
-          "netBeforeFlexW": 274,
-          "importBeforeFlexW": 274,
+          "netBeforeFlexW": 294,
+          "importBeforeFlexW": 294,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.905,
+          "confidence": 0.915,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.961,
             "liveP1Weight": 0.0
           },
@@ -2348,9 +2348,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2360,23 +2360,23 @@
         },
         {
           "i": 48,
-          "start": "2026-09-19T03:45:00.000Z",
-          "end": "2026-09-19T04:00:00.000Z",
+          "start": "2026-09-19T04:00:00.000Z",
+          "end": "2026-09-19T04:15:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 23,
+          "localQuarter": 24,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 294,
+          "baseLoadForecastW": 312,
           "pvForecastW": 0,
-          "netBeforeFlexW": 294,
-          "importBeforeFlexW": 294,
+          "netBeforeFlexW": 312,
+          "importBeforeFlexW": 312,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.905,
+          "confidence": 0.914,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.96,
             "liveP1Weight": 0.0
           },
@@ -2395,9 +2395,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2407,53 +2407,6 @@
         },
         {
           "i": 49,
-          "start": "2026-09-19T04:00:00.000Z",
-          "end": "2026-09-19T04:15:00.000Z",
-          "localDate": "2026-09-19",
-          "localQuarter": 24,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 312,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 312,
-          "importBeforeFlexW": 312,
-          "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 0,
-          "confidence": 0.904,
-          "confidenceComponents": {
-            "forecastConsistency": 1.0,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.959,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "HOLD"
-          }
-        },
-        {
-          "i": 50,
           "start": "2026-09-19T04:15:00.000Z",
           "end": "2026-09-19T04:30:00.000Z",
           "localDate": "2026-09-19",
@@ -2466,11 +2419,11 @@
           "importBeforeFlexW": 299,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.903,
+          "confidence": 0.913,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.959,
             "liveP1Weight": 0.0
           },
@@ -2489,9 +2442,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2500,7 +2453,7 @@
           }
         },
         {
-          "i": 51,
+          "i": 50,
           "start": "2026-09-19T04:30:00.000Z",
           "end": "2026-09-19T04:45:00.000Z",
           "localDate": "2026-09-19",
@@ -2513,11 +2466,58 @@
           "importBeforeFlexW": 257,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.902,
+          "confidence": 0.912,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.959,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "HOLD"
+          }
+        },
+        {
+          "i": 51,
+          "start": "2026-09-19T04:45:00.000Z",
+          "end": "2026-09-19T05:00:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 27,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 331,
+          "pvForecastW": 0,
+          "netBeforeFlexW": 331,
+          "importBeforeFlexW": 331,
+          "pvSurplusBeforeFlexW": 0,
+          "correctedExportBeforeFlexW": 0,
+          "confidence": 0.911,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.958,
             "liveP1Weight": 0.0
           },
@@ -2536,9 +2536,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2548,23 +2548,23 @@
         },
         {
           "i": 52,
-          "start": "2026-09-19T04:45:00.000Z",
-          "end": "2026-09-19T05:00:00.000Z",
+          "start": "2026-09-19T05:00:00.000Z",
+          "end": "2026-09-19T05:15:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 27,
+          "localQuarter": 28,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 331,
+          "baseLoadForecastW": 431,
           "pvForecastW": 0,
-          "netBeforeFlexW": 331,
-          "importBeforeFlexW": 331,
+          "netBeforeFlexW": 431,
+          "importBeforeFlexW": 431,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.901,
+          "confidence": 0.911,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.957,
             "liveP1Weight": 0.0
           },
@@ -2583,9 +2583,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2595,23 +2595,23 @@
         },
         {
           "i": 53,
-          "start": "2026-09-19T05:00:00.000Z",
-          "end": "2026-09-19T05:15:00.000Z",
+          "start": "2026-09-19T05:15:00.000Z",
+          "end": "2026-09-19T05:30:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 28,
+          "localQuarter": 29,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 431,
+          "baseLoadForecastW": 403,
           "pvForecastW": 0,
-          "netBeforeFlexW": 431,
-          "importBeforeFlexW": 431,
+          "netBeforeFlexW": 403,
+          "importBeforeFlexW": 403,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.901,
+          "confidence": 0.91,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.956,
             "liveP1Weight": 0.0
           },
@@ -2630,9 +2630,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2642,23 +2642,23 @@
         },
         {
           "i": 54,
-          "start": "2026-09-19T05:15:00.000Z",
-          "end": "2026-09-19T05:30:00.000Z",
+          "start": "2026-09-19T05:30:00.000Z",
+          "end": "2026-09-19T05:45:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 29,
+          "localQuarter": 30,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 403,
+          "baseLoadForecastW": 343,
           "pvForecastW": 0,
-          "netBeforeFlexW": 403,
-          "importBeforeFlexW": 403,
+          "netBeforeFlexW": 343,
+          "importBeforeFlexW": 343,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.9,
+          "confidence": 0.909,
           "confidenceComponents": {
             "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.955,
             "liveP1Weight": 0.0
           },
@@ -2677,9 +2677,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2689,53 +2689,6 @@
         },
         {
           "i": 55,
-          "start": "2026-09-19T05:30:00.000Z",
-          "end": "2026-09-19T05:45:00.000Z",
-          "localDate": "2026-09-19",
-          "localQuarter": 30,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 343,
-          "pvForecastW": 0,
-          "netBeforeFlexW": 343,
-          "importBeforeFlexW": 343,
-          "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 0,
-          "confidence": 0.899,
-          "confidenceComponents": {
-            "forecastConsistency": 1.0,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.954,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "HOLD"
-          }
-        },
-        {
-          "i": 56,
           "start": "2026-09-19T05:45:00.000Z",
           "end": "2026-09-19T06:00:00.000Z",
           "localDate": "2026-09-19",
@@ -2748,11 +2701,11 @@
           "importBeforeFlexW": 410,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.892,
+          "confidence": 0.908,
           "confidenceComponents": {
-            "forecastConsistency": 0.984,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.954,
             "liveP1Weight": 0.0
           },
@@ -2771,9 +2724,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2782,7 +2735,7 @@
           }
         },
         {
-          "i": 57,
+          "i": 56,
           "start": "2026-09-19T06:00:00.000Z",
           "end": "2026-09-19T06:15:00.000Z",
           "localDate": "2026-09-19",
@@ -2795,11 +2748,58 @@
           "importBeforeFlexW": 244,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.85,
+          "confidence": 0.907,
           "confidenceComponents": {
-            "forecastConsistency": 0.876,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.954,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "HOLD"
+          }
+        },
+        {
+          "i": 57,
+          "start": "2026-09-19T06:15:00.000Z",
+          "end": "2026-09-19T06:30:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 33,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 438,
+          "pvForecastW": 149,
+          "netBeforeFlexW": 289,
+          "importBeforeFlexW": 289,
+          "pvSurplusBeforeFlexW": 0,
+          "correctedExportBeforeFlexW": 0,
+          "confidence": 0.907,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.953,
             "liveP1Weight": 0.0
           },
@@ -2818,9 +2818,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2830,23 +2830,23 @@
         },
         {
           "i": 58,
-          "start": "2026-09-19T06:15:00.000Z",
-          "end": "2026-09-19T06:30:00.000Z",
+          "start": "2026-09-19T06:30:00.000Z",
+          "end": "2026-09-19T06:45:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 33,
+          "localQuarter": 34,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 438,
-          "pvForecastW": 149,
-          "netBeforeFlexW": 289,
-          "importBeforeFlexW": 289,
+          "baseLoadForecastW": 375,
+          "pvForecastW": 202,
+          "netBeforeFlexW": 173,
+          "importBeforeFlexW": 173,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.811,
+          "confidence": 0.906,
           "confidenceComponents": {
-            "forecastConsistency": 0.776,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.952,
             "liveP1Weight": 0.0
           },
@@ -2865,9 +2865,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2877,23 +2877,23 @@
         },
         {
           "i": 59,
-          "start": "2026-09-19T06:30:00.000Z",
-          "end": "2026-09-19T06:45:00.000Z",
+          "start": "2026-09-19T06:45:00.000Z",
+          "end": "2026-09-19T07:00:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 34,
+          "localQuarter": 35,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 375,
-          "pvForecastW": 202,
-          "netBeforeFlexW": 173,
-          "importBeforeFlexW": 173,
+          "baseLoadForecastW": 353,
+          "pvForecastW": 264,
+          "netBeforeFlexW": 89,
+          "importBeforeFlexW": 89,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.773,
+          "confidence": 0.905,
           "confidenceComponents": {
-            "forecastConsistency": 0.676,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.951,
             "liveP1Weight": 0.0
           },
@@ -2912,9 +2912,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2924,23 +2924,23 @@
         },
         {
           "i": 60,
-          "start": "2026-09-19T06:45:00.000Z",
-          "end": "2026-09-19T07:00:00.000Z",
+          "start": "2026-09-19T07:00:00.000Z",
+          "end": "2026-09-19T07:15:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 35,
+          "localQuarter": 36,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 353,
-          "pvForecastW": 264,
-          "netBeforeFlexW": 89,
-          "importBeforeFlexW": 89,
-          "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 0,
-          "confidence": 0.729,
+          "baseLoadForecastW": 172,
+          "pvForecastW": 338,
+          "netBeforeFlexW": -166,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 166,
+          "correctedExportBeforeFlexW": 166,
+          "confidence": 0.904,
           "confidenceComponents": {
-            "forecastConsistency": 0.562,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.95,
             "liveP1Weight": 0.0
           },
@@ -2959,9 +2959,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -2971,53 +2971,6 @@
         },
         {
           "i": 61,
-          "start": "2026-09-19T07:00:00.000Z",
-          "end": "2026-09-19T07:15:00.000Z",
-          "localDate": "2026-09-19",
-          "localQuarter": 36,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 172,
-          "pvForecastW": 338,
-          "netBeforeFlexW": -166,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 166,
-          "correctedExportBeforeFlexW": 166,
-          "confidence": 0.676,
-          "confidenceComponents": {
-            "forecastConsistency": 0.426,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.949,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "HOLD"
-          }
-        },
-        {
-          "i": 62,
           "start": "2026-09-19T07:15:00.000Z",
           "end": "2026-09-19T07:30:00.000Z",
           "localDate": "2026-09-19",
@@ -3030,11 +2983,11 @@
           "importBeforeFlexW": 66,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.661,
+          "confidence": 0.904,
           "confidenceComponents": {
-            "forecastConsistency": 0.388,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.949,
             "liveP1Weight": 0.0
           },
@@ -3053,9 +3006,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3064,7 +3017,7 @@
           }
         },
         {
-          "i": 63,
+          "i": 62,
           "start": "2026-09-19T07:30:00.000Z",
           "end": "2026-09-19T07:45:00.000Z",
           "localDate": "2026-09-19",
@@ -3077,12 +3030,12 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 123,
           "correctedExportBeforeFlexW": 123,
-          "confidence": 0.671,
+          "confidence": 0.903,
           "confidenceComponents": {
-            "forecastConsistency": 0.414,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.948,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.949,
             "liveP1Weight": 0.0
           },
           "forecastQuality": {
@@ -3100,9 +3053,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3111,7 +3064,7 @@
           }
         },
         {
-          "i": 64,
+          "i": 63,
           "start": "2026-09-19T07:45:00.000Z",
           "end": "2026-09-19T08:00:00.000Z",
           "localDate": "2026-09-19",
@@ -3124,11 +3077,58 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 362,
           "correctedExportBeforeFlexW": 362,
-          "confidence": 0.662,
+          "confidence": 0.902,
           "confidenceComponents": {
-            "forecastConsistency": 0.392,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.948,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "RUN",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 1900,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "DYNAMIC_COMFORT_PV_SLOT"
+          }
+        },
+        {
+          "i": 64,
+          "start": "2026-09-19T08:00:00.000Z",
+          "end": "2026-09-19T08:15:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 40,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 0,
+          "pvForecastW": 376,
+          "netBeforeFlexW": -376,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 376,
+          "correctedExportBeforeFlexW": 376,
+          "confidence": 0.901,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.947,
             "liveP1Weight": 0.0
           },
@@ -3147,9 +3147,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3159,53 +3159,6 @@
         },
         {
           "i": 65,
-          "start": "2026-09-19T08:00:00.000Z",
-          "end": "2026-09-19T08:15:00.000Z",
-          "localDate": "2026-09-19",
-          "localQuarter": 40,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 0,
-          "pvForecastW": 376,
-          "netBeforeFlexW": -376,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 376,
-          "correctedExportBeforeFlexW": 376,
-          "confidence": 0.707,
-          "confidenceComponents": {
-            "forecastConsistency": 0.514,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.946,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "RUN",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 1900,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "DYNAMIC_COMFORT_PV_SLOT"
-          }
-        },
-        {
-          "i": 66,
           "start": "2026-09-19T08:15:00.000Z",
           "end": "2026-09-19T08:30:00.000Z",
           "localDate": "2026-09-19",
@@ -3218,12 +3171,12 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 346,
           "correctedExportBeforeFlexW": 346,
-          "confidence": 0.8,
+          "confidence": 0.9,
           "confidenceComponents": {
-            "forecastConsistency": 0.76,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.945,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.946,
             "liveP1Weight": 0.0
           },
           "forecastQuality": {
@@ -3241,9 +3194,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3252,7 +3205,7 @@
           }
         },
         {
-          "i": 67,
+          "i": 66,
           "start": "2026-09-19T08:30:00.000Z",
           "end": "2026-09-19T08:45:00.000Z",
           "localDate": "2026-09-19",
@@ -3265,12 +3218,12 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 391,
           "correctedExportBeforeFlexW": 391,
-          "confidence": 0.883,
+          "confidence": 0.9,
           "confidenceComponents": {
-            "forecastConsistency": 0.982,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.944,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.945,
             "liveP1Weight": 0.0
           },
           "forecastQuality": {
@@ -3288,9 +3241,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3299,7 +3252,7 @@
           }
         },
         {
-          "i": 68,
+          "i": 67,
           "start": "2026-09-19T08:45:00.000Z",
           "end": "2026-09-19T09:00:00.000Z",
           "localDate": "2026-09-19",
@@ -3312,11 +3265,11 @@
           "importBeforeFlexW": 83,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.798,
+          "confidence": 0.899,
           "confidenceComponents": {
-            "forecastConsistency": 0.76,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.944,
             "liveP1Weight": 0.0
           },
@@ -3335,9 +3288,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3346,7 +3299,7 @@
           }
         },
         {
-          "i": 69,
+          "i": 68,
           "start": "2026-09-19T09:00:00.000Z",
           "end": "2026-09-19T09:15:00.000Z",
           "localDate": "2026-09-19",
@@ -3359,12 +3312,12 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 424,
           "correctedExportBeforeFlexW": 424,
-          "confidence": 0.775,
+          "confidence": 0.898,
           "confidenceComponents": {
-            "forecastConsistency": 0.7,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.943,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.944,
             "liveP1Weight": 0.0
           },
           "forecastQuality": {
@@ -3382,9 +3335,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3393,7 +3346,7 @@
           }
         },
         {
-          "i": 70,
+          "i": 69,
           "start": "2026-09-19T09:15:00.000Z",
           "end": "2026-09-19T09:30:00.000Z",
           "localDate": "2026-09-19",
@@ -3406,12 +3359,12 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 196,
           "correctedExportBeforeFlexW": 196,
-          "confidence": 0.765,
+          "confidence": 0.897,
           "confidenceComponents": {
-            "forecastConsistency": 0.674,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.942,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.943,
             "liveP1Weight": 0.0
           },
           "forecastQuality": {
@@ -3429,9 +3382,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3440,7 +3393,7 @@
           }
         },
         {
-          "i": 71,
+          "i": 70,
           "start": "2026-09-19T09:30:00.000Z",
           "end": "2026-09-19T09:45:00.000Z",
           "localDate": "2026-09-19",
@@ -3453,12 +3406,12 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 461,
           "correctedExportBeforeFlexW": 461,
-          "confidence": 0.751,
+          "confidence": 0.896,
           "confidenceComponents": {
-            "forecastConsistency": 0.639,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.941,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.942,
             "liveP1Weight": 0.0
           },
           "forecastQuality": {
@@ -3476,9 +3429,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3487,7 +3440,7 @@
           }
         },
         {
-          "i": 72,
+          "i": 71,
           "start": "2026-09-19T09:45:00.000Z",
           "end": "2026-09-19T10:00:00.000Z",
           "localDate": "2026-09-19",
@@ -3500,12 +3453,12 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 278,
           "correctedExportBeforeFlexW": 278,
-          "confidence": 0.722,
+          "confidence": 0.896,
           "confidenceComponents": {
-            "forecastConsistency": 0.566,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.94,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.941,
             "liveP1Weight": 0.0
           },
           "forecastQuality": {
@@ -3523,9 +3476,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3534,7 +3487,7 @@
           }
         },
         {
-          "i": 73,
+          "i": 72,
           "start": "2026-09-19T10:00:00.000Z",
           "end": "2026-09-19T10:15:00.000Z",
           "localDate": "2026-09-19",
@@ -3547,12 +3500,12 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 634,
           "correctedExportBeforeFlexW": 634,
-          "confidence": 0.683,
+          "confidence": 0.895,
           "confidenceComponents": {
-            "forecastConsistency": 0.461,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.939,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.94,
             "liveP1Weight": 0.0
           },
           "forecastQuality": {
@@ -3570,9 +3523,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3581,7 +3534,7 @@
           }
         },
         {
-          "i": 74,
+          "i": 73,
           "start": "2026-09-19T10:15:00.000Z",
           "end": "2026-09-19T10:30:00.000Z",
           "localDate": "2026-09-19",
@@ -3594,11 +3547,11 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 633,
           "correctedExportBeforeFlexW": 633,
-          "confidence": 0.653,
+          "confidence": 0.894,
           "confidenceComponents": {
-            "forecastConsistency": 0.383,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.939,
             "liveP1Weight": 0.0
           },
@@ -3617,9 +3570,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3628,7 +3581,7 @@
           }
         },
         {
-          "i": 75,
+          "i": 74,
           "start": "2026-09-19T10:30:00.000Z",
           "end": "2026-09-19T10:45:00.000Z",
           "localDate": "2026-09-19",
@@ -3641,11 +3594,58 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 432,
           "correctedExportBeforeFlexW": 432,
-          "confidence": 0.633,
+          "confidence": 0.893,
           "confidenceComponents": {
-            "forecastConsistency": 0.333,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.939,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "RUN",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 1900,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "DYNAMIC_COMFORT_PV_SLOT"
+          }
+        },
+        {
+          "i": 75,
+          "start": "2026-09-19T10:45:00.000Z",
+          "end": "2026-09-19T11:00:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 51,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 0,
+          "pvForecastW": 579,
+          "netBeforeFlexW": -579,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 579,
+          "correctedExportBeforeFlexW": 579,
+          "confidence": 0.892,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.938,
             "liveP1Weight": 0.0
           },
@@ -3664,9 +3664,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3676,23 +3676,23 @@
         },
         {
           "i": 76,
-          "start": "2026-09-19T10:45:00.000Z",
-          "end": "2026-09-19T11:00:00.000Z",
+          "start": "2026-09-19T11:00:00.000Z",
+          "end": "2026-09-19T11:15:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 51,
+          "localQuarter": 52,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 0,
-          "pvForecastW": 579,
-          "netBeforeFlexW": -579,
+          "baseLoadForecastW": 127,
+          "pvForecastW": 517,
+          "netBeforeFlexW": -390,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 579,
-          "correctedExportBeforeFlexW": 579,
-          "confidence": 0.629,
+          "pvSurplusBeforeFlexW": 390,
+          "correctedExportBeforeFlexW": 390,
+          "confidence": 0.892,
           "confidenceComponents": {
-            "forecastConsistency": 0.324,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.937,
             "liveP1Weight": 0.0
           },
@@ -3711,9 +3711,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3723,53 +3723,6 @@
         },
         {
           "i": 77,
-          "start": "2026-09-19T11:00:00.000Z",
-          "end": "2026-09-19T11:15:00.000Z",
-          "localDate": "2026-09-19",
-          "localQuarter": 52,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 127,
-          "pvForecastW": 517,
-          "netBeforeFlexW": -390,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 390,
-          "correctedExportBeforeFlexW": 390,
-          "confidence": 0.636,
-          "confidenceComponents": {
-            "forecastConsistency": 0.342,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.936,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "RUN",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 1900,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "DYNAMIC_COMFORT_PV_SLOT"
-          }
-        },
-        {
-          "i": 78,
           "start": "2026-09-19T11:15:00.000Z",
           "end": "2026-09-19T11:30:00.000Z",
           "localDate": "2026-09-19",
@@ -3782,12 +3735,12 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 250,
           "correctedExportBeforeFlexW": 250,
-          "confidence": 0.655,
+          "confidence": 0.891,
           "confidenceComponents": {
-            "forecastConsistency": 0.394,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.935,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.936,
             "liveP1Weight": 0.0
           },
           "forecastQuality": {
@@ -3805,9 +3758,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3816,7 +3769,7 @@
           }
         },
         {
-          "i": 79,
+          "i": 78,
           "start": "2026-09-19T11:30:00.000Z",
           "end": "2026-09-19T11:45:00.000Z",
           "localDate": "2026-09-19",
@@ -3829,12 +3782,12 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 415,
           "correctedExportBeforeFlexW": 415,
-          "confidence": 0.717,
+          "confidence": 0.89,
           "confidenceComponents": {
-            "forecastConsistency": 0.564,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.934,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.935,
             "liveP1Weight": 0.0
           },
           "forecastQuality": {
@@ -3852,9 +3805,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3863,7 +3816,7 @@
           }
         },
         {
-          "i": 80,
+          "i": 79,
           "start": "2026-09-19T11:45:00.000Z",
           "end": "2026-09-19T12:00:00.000Z",
           "localDate": "2026-09-19",
@@ -3876,11 +3829,11 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 526,
           "correctedExportBeforeFlexW": 526,
-          "confidence": 0.848,
+          "confidence": 0.889,
           "confidenceComponents": {
-            "forecastConsistency": 0.915,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.934,
             "liveP1Weight": 0.0
           },
@@ -3899,9 +3852,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3910,7 +3863,7 @@
           }
         },
         {
-          "i": 81,
+          "i": 80,
           "start": "2026-09-19T12:00:00.000Z",
           "end": "2026-09-19T12:15:00.000Z",
           "localDate": "2026-09-19",
@@ -3923,11 +3876,58 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 514,
           "correctedExportBeforeFlexW": 514,
-          "confidence": 0.737,
+          "confidence": 0.888,
           "confidenceComponents": {
-            "forecastConsistency": 0.619,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.934,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "RUN",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 1900,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "DYNAMIC_COMFORT_PV_SLOT"
+          }
+        },
+        {
+          "i": 81,
+          "start": "2026-09-19T12:15:00.000Z",
+          "end": "2026-09-19T12:30:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 57,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 133,
+          "pvForecastW": 1078,
+          "netBeforeFlexW": -945,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 945,
+          "correctedExportBeforeFlexW": 945,
+          "confidence": 0.888,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.933,
             "liveP1Weight": 0.0
           },
@@ -3946,9 +3946,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -3958,23 +3958,23 @@
         },
         {
           "i": 82,
-          "start": "2026-09-19T12:15:00.000Z",
-          "end": "2026-09-19T12:30:00.000Z",
+          "start": "2026-09-19T12:30:00.000Z",
+          "end": "2026-09-19T12:45:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 57,
+          "localQuarter": 58,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 133,
-          "pvForecastW": 1078,
-          "netBeforeFlexW": -945,
+          "baseLoadForecastW": 0,
+          "pvForecastW": 1301,
+          "netBeforeFlexW": -1301,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 945,
-          "correctedExportBeforeFlexW": 945,
-          "confidence": 0.654,
+          "pvSurplusBeforeFlexW": 1301,
+          "correctedExportBeforeFlexW": 1301,
+          "confidence": 0.887,
           "confidenceComponents": {
-            "forecastConsistency": 0.398,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.932,
             "liveP1Weight": 0.0
           },
@@ -3993,9 +3993,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -4005,23 +4005,23 @@
         },
         {
           "i": 83,
-          "start": "2026-09-19T12:30:00.000Z",
-          "end": "2026-09-19T12:45:00.000Z",
+          "start": "2026-09-19T12:45:00.000Z",
+          "end": "2026-09-19T13:00:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 58,
+          "localQuarter": 59,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 0,
-          "pvForecastW": 1301,
-          "netBeforeFlexW": -1301,
+          "pvForecastW": 1156,
+          "netBeforeFlexW": -1156,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1301,
-          "correctedExportBeforeFlexW": 1301,
-          "confidence": 0.623,
+          "pvSurplusBeforeFlexW": 1156,
+          "correctedExportBeforeFlexW": 1156,
+          "confidence": 0.886,
           "confidenceComponents": {
-            "forecastConsistency": 0.317,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.931,
             "liveP1Weight": 0.0
           },
@@ -4040,9 +4040,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -4052,23 +4052,23 @@
         },
         {
           "i": 84,
-          "start": "2026-09-19T12:45:00.000Z",
-          "end": "2026-09-19T13:00:00.000Z",
+          "start": "2026-09-19T13:00:00.000Z",
+          "end": "2026-09-19T13:15:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 59,
+          "localQuarter": 60,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
           "baseLoadForecastW": 0,
-          "pvForecastW": 1156,
-          "netBeforeFlexW": -1156,
+          "pvForecastW": 1036,
+          "netBeforeFlexW": -1036,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1156,
-          "correctedExportBeforeFlexW": 1156,
-          "confidence": 0.622,
+          "pvSurplusBeforeFlexW": 1036,
+          "correctedExportBeforeFlexW": 1036,
+          "confidence": 0.885,
           "confidenceComponents": {
-            "forecastConsistency": 0.316,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.93,
             "liveP1Weight": 0.0
           },
@@ -4087,9 +4087,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -4099,53 +4099,6 @@
         },
         {
           "i": 85,
-          "start": "2026-09-19T13:00:00.000Z",
-          "end": "2026-09-19T13:15:00.000Z",
-          "localDate": "2026-09-19",
-          "localQuarter": 60,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 0,
-          "pvForecastW": 1036,
-          "netBeforeFlexW": -1036,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 1036,
-          "correctedExportBeforeFlexW": 1036,
-          "confidence": 0.664,
-          "confidenceComponents": {
-            "forecastConsistency": 0.431,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.929,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "RUN",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 1900,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "DYNAMIC_COMFORT_PV_SLOT"
-          }
-        },
-        {
-          "i": 86,
           "start": "2026-09-19T13:15:00.000Z",
           "end": "2026-09-19T13:30:00.000Z",
           "localDate": "2026-09-19",
@@ -4158,11 +4111,11 @@
           "importBeforeFlexW": 0,
           "pvSurplusBeforeFlexW": 205,
           "correctedExportBeforeFlexW": 205,
-          "confidence": 0.787,
+          "confidence": 0.884,
           "confidenceComponents": {
-            "forecastConsistency": 0.765,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.929,
             "liveP1Weight": 0.0
           },
@@ -4181,9 +4134,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -4192,7 +4145,7 @@
           }
         },
         {
-          "i": 87,
+          "i": 86,
           "start": "2026-09-19T13:30:00.000Z",
           "end": "2026-09-19T13:45:00.000Z",
           "localDate": "2026-09-19",
@@ -4205,11 +4158,58 @@
           "importBeforeFlexW": 361,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.72,
+          "confidence": 0.884,
           "confidenceComponents": {
-            "forecastConsistency": 0.586,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.929,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "HOLD"
+          }
+        },
+        {
+          "i": 87,
+          "start": "2026-09-19T13:45:00.000Z",
+          "end": "2026-09-19T14:00:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 63,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 0,
+          "pvForecastW": 140,
+          "netBeforeFlexW": -140,
+          "importBeforeFlexW": 0,
+          "pvSurplusBeforeFlexW": 140,
+          "correctedExportBeforeFlexW": 140,
+          "confidence": 0.883,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.928,
             "liveP1Weight": 0.0
           },
@@ -4228,9 +4228,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -4240,23 +4240,23 @@
         },
         {
           "i": 88,
-          "start": "2026-09-19T13:45:00.000Z",
-          "end": "2026-09-19T14:00:00.000Z",
+          "start": "2026-09-19T14:00:00.000Z",
+          "end": "2026-09-19T14:15:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 63,
+          "localQuarter": 64,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 0,
-          "pvForecastW": 140,
-          "netBeforeFlexW": -140,
+          "baseLoadForecastW": 128,
+          "pvForecastW": 154,
+          "netBeforeFlexW": -26,
           "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 140,
-          "correctedExportBeforeFlexW": 140,
-          "confidence": 0.64,
+          "pvSurplusBeforeFlexW": 26,
+          "correctedExportBeforeFlexW": 26,
+          "confidence": 0.882,
           "confidenceComponents": {
-            "forecastConsistency": 0.37,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.927,
             "liveP1Weight": 0.0
           },
@@ -4275,9 +4275,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -4287,23 +4287,23 @@
         },
         {
           "i": 89,
-          "start": "2026-09-19T14:00:00.000Z",
-          "end": "2026-09-19T14:15:00.000Z",
+          "start": "2026-09-19T14:15:00.000Z",
+          "end": "2026-09-19T14:30:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 64,
+          "localQuarter": 65,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 128,
-          "pvForecastW": 154,
-          "netBeforeFlexW": -26,
-          "importBeforeFlexW": 0,
-          "pvSurplusBeforeFlexW": 26,
-          "correctedExportBeforeFlexW": 26,
-          "confidence": 0.692,
+          "baseLoadForecastW": 643,
+          "pvForecastW": 265,
+          "netBeforeFlexW": 378,
+          "importBeforeFlexW": 378,
+          "pvSurplusBeforeFlexW": 0,
+          "correctedExportBeforeFlexW": 0,
+          "confidence": 0.881,
           "confidenceComponents": {
-            "forecastConsistency": 0.514,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.926,
             "liveP1Weight": 0.0
           },
@@ -4322,9 +4322,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -4334,23 +4334,23 @@
         },
         {
           "i": 90,
-          "start": "2026-09-19T14:15:00.000Z",
-          "end": "2026-09-19T14:30:00.000Z",
+          "start": "2026-09-19T14:30:00.000Z",
+          "end": "2026-09-19T14:45:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 65,
+          "localQuarter": 66,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 643,
-          "pvForecastW": 265,
-          "netBeforeFlexW": 378,
-          "importBeforeFlexW": 378,
+          "baseLoadForecastW": 637,
+          "pvForecastW": 345,
+          "netBeforeFlexW": 292,
+          "importBeforeFlexW": 292,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.782,
+          "confidence": 0.881,
           "confidenceComponents": {
-            "forecastConsistency": 0.758,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.925,
             "liveP1Weight": 0.0
           },
@@ -4369,9 +4369,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -4381,53 +4381,6 @@
         },
         {
           "i": 91,
-          "start": "2026-09-19T14:30:00.000Z",
-          "end": "2026-09-19T14:45:00.000Z",
-          "localDate": "2026-09-19",
-          "localQuarter": 66,
-          "price_eur_kwh": null,
-          "priceClass": "FIXED",
-          "baseLoadForecastW": 637,
-          "pvForecastW": 345,
-          "netBeforeFlexW": 292,
-          "importBeforeFlexW": 292,
-          "pvSurplusBeforeFlexW": 0,
-          "correctedExportBeforeFlexW": 0,
-          "confidence": 0.854,
-          "confidenceComponents": {
-            "forecastConsistency": 0.954,
-            "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
-            "horizonFactor": 0.924,
-            "liveP1Weight": 0.0
-          },
-          "forecastQuality": {
-            "baseLoad": "PI_HISTORY_MODEL",
-            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
-          },
-          "battery": "HOLD",
-          "tesla": "HOLD",
-          "warmWater": "HOLD",
-          "targets": {
-            "evTargetW": 0,
-            "sourceEvTargetW": 0,
-            "wwTargetW": 0,
-            "batteryTargetW": 0
-          },
-          "teslaPlan": {
-            "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
-            "deadlineOverlay": false,
-            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
-          },
-          "warmWaterPlan": {
-            "reason": "HOLD"
-          }
-        },
-        {
-          "i": 92,
           "start": "2026-09-19T14:45:00.000Z",
           "end": "2026-09-19T15:00:00.000Z",
           "localDate": "2026-09-19",
@@ -4440,11 +4393,11 @@
           "importBeforeFlexW": 34,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.804,
+          "confidence": 0.88,
           "confidenceComponents": {
-            "forecastConsistency": 0.82,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.924,
             "liveP1Weight": 0.0
           },
@@ -4463,9 +4416,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -4474,7 +4427,7 @@
           }
         },
         {
-          "i": 93,
+          "i": 92,
           "start": "2026-09-19T15:00:00.000Z",
           "end": "2026-09-19T15:15:00.000Z",
           "localDate": "2026-09-19",
@@ -4487,11 +4440,58 @@
           "importBeforeFlexW": 137,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.759,
+          "confidence": 0.879,
           "confidenceComponents": {
-            "forecastConsistency": 0.702,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
+            "horizonFactor": 0.924,
+            "liveP1Weight": 0.0
+          },
+          "forecastQuality": {
+            "baseLoad": "PI_HISTORY_MODEL",
+            "pv": "PI_DYNAMIC_CONFIDENCE_PV_FORECAST"
+          },
+          "battery": "HOLD",
+          "tesla": "HOLD",
+          "warmWater": "HOLD",
+          "targets": {
+            "evTargetW": 0,
+            "sourceEvTargetW": 0,
+            "wwTargetW": 0,
+            "batteryTargetW": 0
+          },
+          "teslaPlan": {
+            "mode": "HOLD",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
+            "deadlineOverlay": false,
+            "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
+          },
+          "warmWaterPlan": {
+            "reason": "HOLD"
+          }
+        },
+        {
+          "i": 93,
+          "start": "2026-09-19T15:15:00.000Z",
+          "end": "2026-09-19T15:30:00.000Z",
+          "localDate": "2026-09-19",
+          "localQuarter": 69,
+          "price_eur_kwh": null,
+          "priceClass": "FIXED",
+          "baseLoadForecastW": 538,
+          "pvForecastW": 353,
+          "netBeforeFlexW": 185,
+          "importBeforeFlexW": 185,
+          "pvSurplusBeforeFlexW": 0,
+          "correctedExportBeforeFlexW": 0,
+          "confidence": 0.878,
+          "confidenceComponents": {
+            "forecastConsistency": 1.0,
+            "cloudStability": 1.0,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.923,
             "liveP1Weight": 0.0
           },
@@ -4510,9 +4510,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -4522,23 +4522,23 @@
         },
         {
           "i": 94,
-          "start": "2026-09-19T15:15:00.000Z",
-          "end": "2026-09-19T15:30:00.000Z",
+          "start": "2026-09-19T15:30:00.000Z",
+          "end": "2026-09-19T15:45:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 69,
+          "localQuarter": 70,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 538,
-          "pvForecastW": 353,
-          "netBeforeFlexW": 185,
-          "importBeforeFlexW": 185,
+          "baseLoadForecastW": 862,
+          "pvForecastW": 309,
+          "netBeforeFlexW": 553,
+          "importBeforeFlexW": 553,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.755,
+          "confidence": 0.877,
           "confidenceComponents": {
-            "forecastConsistency": 0.692,
+            "forecastConsistency": 1.0,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.922,
             "liveP1Weight": 0.0
           },
@@ -4557,9 +4557,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
@@ -4569,23 +4569,23 @@
         },
         {
           "i": 95,
-          "start": "2026-09-19T15:30:00.000Z",
-          "end": "2026-09-19T15:45:00.000Z",
+          "start": "2026-09-19T15:45:00.000Z",
+          "end": "2026-09-19T16:00:00.000Z",
           "localDate": "2026-09-19",
-          "localQuarter": 70,
+          "localQuarter": 71,
           "price_eur_kwh": null,
           "priceClass": "FIXED",
-          "baseLoadForecastW": 862,
-          "pvForecastW": 309,
-          "netBeforeFlexW": 553,
-          "importBeforeFlexW": 553,
+          "baseLoadForecastW": 453,
+          "pvForecastW": 264,
+          "netBeforeFlexW": 189,
+          "importBeforeFlexW": 189,
           "pvSurplusBeforeFlexW": 0,
           "correctedExportBeforeFlexW": 0,
-          "confidence": 0.757,
+          "confidence": 0.766,
           "confidenceComponents": {
             "forecastConsistency": 0.7,
             "cloudStability": 1.0,
-            "recentLocalAccuracy": 0.807,
+            "recentLocalAccuracy": 0.839,
             "horizonFactor": 0.921,
             "liveP1Weight": 0.0
           },
@@ -4604,9 +4604,9 @@
           },
           "teslaPlan": {
             "mode": "HOLD",
-            "reason": "NOT_CONNECTED",
-            "availableForecast": false,
-            "availabilitySource": "NOT_CONNECTED",
+            "reason": "NO_QUALIFIED_PV_WINDOW",
+            "availableForecast": true,
+            "availabilitySource": "LIVE_CONNECTED_CURRENT_STATE",
             "deadlineOverlay": false,
             "controlImpact": "NONE_WEBSITE_SHADOW_ONLY"
           },
