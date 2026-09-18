@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - 'frontend-version.txt'
+      - 'frontend/**'
+      - 'scripts/build_frontend_v2.py'
       - 'mkdocs.yml'
       - 'scripts/build_frontend_bundles.py'
       - 'scripts/sync_energy_contract.py'
@@ -109,9 +111,15 @@ jobs:
           while IFS= read -r -d '' file; do
             node --check "$file"
           done < <(find docs/javascripts -type f -name '*.js' ! -name 'frontend-bundle-*.js' -print0)
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find frontend -type f -name '*.js' -print0)
 
       - name: Build legacy frontend bundles
         run: python scripts/build_frontend_bundles.py
+
+      - name: Build isolated Frontend V2 preview
+        run: python scripts/build_frontend_v2.py
 
       - name: Validate generated frontend artifact
         run: python scripts/validate_frontend_artifact.py
@@ -144,6 +152,9 @@ jobs:
           test -s site/data/energy-planner-shadow.json
           test -s site/data/energy-day-series-7d.json
           test -s site/data/energy-daily-history.json
+          test -s site/v2/live/index.html
+          test -s site/v2/live/render/live.js
+          test -s site/v2/live/styles/live.css
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
