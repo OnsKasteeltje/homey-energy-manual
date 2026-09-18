@@ -50,6 +50,7 @@ export function normalize(raw) {
     teslaDeadline: deadline,
     teslaDeadlineActive: raw?.tesla?.deadline_active === true,
     teslaNeed: raw?.tesla?.need ?? null,
+    teslaRemainingKWh: number(raw?.tesla?.remaining_kwh),
     wwOn: raw?.hot_water?.boiler_on === true,
     wwAction: raw?.hot_water?.control?.action ?? null,
     heatOn: raw?.quatt?.thermostat_heating_on === true,
