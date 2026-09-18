@@ -4,8 +4,8 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-09-17  
-**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, and 2026-09-17 energy-state website publication recovery  
+**Status date:** 2026-09-18  
+**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
 
@@ -150,7 +150,7 @@ Tesla charging remains split between Pi planning and Homey guarded execution. Op
 
 WW comfort remains a hard constraint above optimization. The Pi schedules remaining required heating before the comfort deadline and prefers useful PV periods. Homey translates the Power Intent through the WW adapter/gate chain; the guarded Warm Water Actuator remains the physical boiler writer. Source mode, kill switch, freshness and current device state are checked before writes.
 
-The Pi WW Seasonal Source Advisor is read-only and manual-switch-only. It runs daily at 20:30 Europe/Amsterdam against canonical Pi-local history. It has no dependency on the retired `ems-day-history.service` or other Homey Insights polling; source-switch advice requires the configured multi-day confirmation before notification and never performs a physical source switch. Confirmation is counted once per unique analysis `asOfDate`; reruns, restarts and persistent-timer catch-up executions for the same analysis day are idempotent and must not advance the confirmation streak.
+The Pi WW Seasonal Source Advisor is read-only and manual-switch-only. It runs daily at 00:05 Europe/Amsterdam against canonical Pi-local history, so the just-completed local calendar day is immediately eligible for `completeDaysOnly` analysis. It has no dependency on the retired `ems-day-history.service` or other Homey Insights polling; source-switch advice requires the configured multi-day confirmation before notification and never performs a physical source switch. Confirmation is counted once per unique analysis `asOfDate`; reruns, restarts and persistent-timer catch-up executions for the same analysis day are idempotent and must not advance the confirmation streak. On 2026-09-18 the manual BOILER→CV change was validated end-to-end: Homey `WW_Boilermodus=false` resolved to Pi `currentMode=CV`, the advisor retained `KEEP_CURRENT` because CV was economically preferable, and the prior switch-to-CV confirmation streak reset to 0 without any automatic source write.
 
 ## 9. Live cutover validation
 

@@ -55,6 +55,8 @@ The webhook path was manually validated on 2026-09-07 with a successful mobile p
 
 On 2026-09-07 the production systemd service completed successfully with Homey mode `BOILER`. The advisor reported `WARMUP_INSUFFICIENT_HISTORY` with 6/7 valid counterfactual days, reference boiler input 5.733 kWh and 10 reference boiler days. No notification was sent, as intended.
 
-The timer was enabled successfully. It originally ran daily at 20:30 CEST; on 2026-09-08 the schedule was moved to 00:05 local time so a completed calendar day is incorporated without nearly a full-day delay.
+The timer was enabled successfully. It originally ran daily at 20:30 CEST. A documentation/runtime drift was discovered on 2026-09-18: the intended 00:05 schedule had been documented but the deployed and repository timer still remained at 20:30. The canonical timer and advisor cadence are now aligned to 00:05 Europe/Amsterdam so the just-completed calendar day is incorporated without nearly a full-day delay.
+
+On 2026-09-18 the manual BOILER → CV source change was validated end-to-end: Homey `WW_Boilermodus=false` was resolved by the Pi runner as `currentMode=CV`; the advisor returned `KEEP_CURRENT`, reset the previous CV-switch confirmation streak to 0, and performed no automatic source switch.
 
 The previous Homey v0.3 Seasonal Source Advisor was subsequently disabled manually. The Homey webhook push Flow remains enabled.

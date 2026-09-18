@@ -236,7 +236,7 @@ def evaluate(db_path, contracts_path, state_path, mode, now=None):
             "minValidDays": MIN_VALID_DAYS,
             "confirmDays": CONFIRM_DAYS,
             "hysteresisEurPerUsableKWh": HYSTERESIS_EUR_USEFUL_KWH,
-            "analysisCadence": "DAILY_20:30_EUROPE_AMSTERDAM",
+            "analysisCadence": "DAILY_00:05_EUROPE_AMSTERDAM",
             "completeDaysOnly": True,
             "freshnessHours": FRESHNESS_HOURS,
             "boilerSimulationWindow": "09:30-19:00",
