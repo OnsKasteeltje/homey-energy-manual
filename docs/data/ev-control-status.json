@@ -1,51 +1,54 @@
 {
   "schema": "EM2_EV_CONTROL_STATUS_V0.4",
-  "publishedAt": "2026-09-18T12:30:21.593Z",
+  "publishedAt": "2026-09-18T12:34:04.709Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
-  "targetW": 4830,
-  "evStatus": "NUMERIC_REALTIME_PV_TARGET",
-  "requestedA": 7,
+  "targetW": 4140,
+  "evStatus": "PI_NUMERIC_TARGET",
+  "requestedA": 0,
   "controlRevision": "",
-  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":4830,\"evStatus\":\"NUMERIC_REALTIME_PV_TARGET\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
-  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":4830,\"evStatus\":\"NUMERIC_REALTIME_PV_TARGET\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":4140,\"evStatus\":\"PI_NUMERIC_TARGET\",\"evSource\":\"PI_DYNAMIC_PLANNER_V0.3\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":4140,\"evStatus\":\"PI_NUMERIC_TARGET\",\"evSource\":\"PI_DYNAMIC_PLANNER_V0.3\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
   "sourceRevisions": {
-    "intent": 8285,
-    "adapter": 8285,
+    "intent": 8286,
+    "adapter": 8286,
     "adapterState": 8286,
     "core": 8286
   },
   "adapter": {
-    "valid": true,
-    "status": "EXECUTABLE",
-    "reason": "4830 W → 7 A",
-    "generatedAt": "2026-09-18T12:30:01.213Z",
-    "stateAgeSec": 1,
+    "valid": false,
+    "status": "STALE_CHARGER_STATE",
+    "reason": "Core/Easee context stale",
+    "generatedAt": "2026-09-18T12:34:00.598Z",
+    "stateAgeSec": 241,
     "intentAgeSec": 0
   },
   "gate": {
-    "status": "PASS",
-    "errors": [],
+    "status": "FAIL",
+    "errors": [
+      "CORESAFETY",
+      "TRANSLATION"
+    ],
     "checks": {
       "schema": true,
       "controlRevisionAligned": true,
       "safety": true,
-      "coreSafety": true,
+      "coreSafety": false,
       "electrical": true,
       "commandRange": true,
-      "translation": true
+      "translation": false
     },
     "coreRevision": 8286,
-    "updatedAt": "2026-09-18T12:30:03.174Z"
+    "updatedAt": "2026-09-18T12:34:02.567Z"
   },
   "actuator": {
-    "status": "WRITE_OK_POST_SESSION",
-    "reason": null,
+    "status": "LIVE_FAIL_CLOSED",
+    "reason": "ADAPTER_CONTRACT_INVALID",
     "live": true,
     "physicalWritePerformed": true,
-    "targetA": 7,
-    "previousA": 32,
-    "controlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":4830,\"evStatus\":\"NUMERIC_REALTIME_PV_TARGET\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+    "targetA": 0,
+    "previousA": 7,
+    "controlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":4140,\"evStatus\":\"PI_NUMERIC_TARGET\",\"evSource\":\"PI_DYNAMIC_PLANNER_V0.3\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
     "coreRevision": 8286
   },
   "deviceHealth": {
