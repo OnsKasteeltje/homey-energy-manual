@@ -186,6 +186,7 @@ rsync -a --delete \
     --exclude='status-api/' \
     --exclude='tools/' \
     --exclude='homey-deploy/' \
+    --exclude='planner/warm-water/' \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     --exclude='*.bak*' \
