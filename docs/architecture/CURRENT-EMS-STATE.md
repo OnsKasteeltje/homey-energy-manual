@@ -185,6 +185,14 @@ services/pi/state/heating/             # canonical Heating Room Model / future t
 services/pi/planner/heating/           # READ_ONLY/SHADOW preheat candidate construction
 ```
 
+Canonical warm-water planner placement is now:
+
+```text
+services/pi/planner/warm-water/        # WW planning + Seasonal Source Advisor
+```
+
+The production runtime path remains `/home/jeroen/ems/runtime/planner/warm-water/`. Repository placement and runtime placement are deliberately decoupled: deployment maps the target-structure source to this stable runtime path, and drift/integrity validation checks that mapping. The WW migration therefore changes repository ownership without changing systemd execution paths or runtime control ownership.
+
 GitHub website publication is an external Pi egress integration and belongs under `services/pi/integrations/github/`; production scheduling belongs under `deploy/systemd/`.
 
 The touched legacy `src/pi/ems-runtime/thermal/` subsystem is removed in this release. Its Quatt collector moves to the canonical integration boundary and its duplicate thermal observer is retired. The active general planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path is a separate high-risk migration and is explicitly outside this release.

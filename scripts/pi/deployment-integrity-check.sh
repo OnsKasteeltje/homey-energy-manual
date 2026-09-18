@@ -70,6 +70,27 @@ done < <(
         -print | sort
 )
 
+# Target-structure WW planner source -> stable runtime path.
+while IFS= read -r src; do
+    rel="${src#"$REPO/services/pi/planner/warm-water/"}"
+    dst="$RUNTIME/planner/warm-water/$rel"
+
+    if [ ! -f "$dst" ]; then
+        fail "WW runtime file missing: $rel"
+        continue
+    fi
+
+    if cmp -s "$src" "$dst"; then
+        pass "WW runtime matches source: $rel"
+    else
+        fail "WW runtime differs from source: $rel"
+    fi
+done < <(
+    find "$REPO/services/pi/planner/warm-water" \
+        -type f \
+        -print | sort
+)
+
 # ------------------------------------------------------------
 # 3. Canonical planner axis
 # ------------------------------------------------------------

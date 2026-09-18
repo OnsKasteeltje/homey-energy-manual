@@ -68,7 +68,7 @@ flowchart TD
 
 ## WW / boiler planning logic
 
-Source of planning logic: `src/pi/ems-runtime/planner/warm-water/build_ww_plan.py`.
+Source of planning logic: `services/pi/planner/warm-water/build_ww_plan.py`.
 
 ```mermaid
 flowchart TD

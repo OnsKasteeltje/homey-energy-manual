@@ -6,6 +6,9 @@ RUNTIME="/home/jeroen/ems/runtime"
 SOURCE="$REPO/src/pi/ems-runtime"
 TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
+
+TARGET_WW_SOURCE="$REPO/services/pi/planner/warm-water"
+TARGET_WW_RUNTIME="$RUNTIME/planner/warm-water"
 TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
 TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
 TARGET_HOMEY_INGRESS_FILE="$REPO/services/pi/integrations/homey/ingress/state_ingest.py"
@@ -73,6 +76,7 @@ UNMANAGED="$(
             -not -path './data/*' \
             -not -path './logs/*' \
             -not -path './history/*' \
+            -not -path './planner/warm-water/*' \
             -not -path './status-api/*' \
             -not -path './tools/honeywell/*' \
             -not -path './homey-deploy/publish_pi_control_intent.py' \
@@ -187,6 +191,12 @@ rsync -a --delete \
     --exclude='*.bak*' \
     --exclude='*.before-*' \
     "$SOURCE/" "$RUNTIME/"
+
+mkdir -p "$TARGET_WW_RUNTIME"
+rsync -a --delete \
+    --exclude='__pycache__/' \
+    --exclude='*.pyc' \
+    "$TARGET_WW_SOURCE/" "$TARGET_WW_RUNTIME/"
 
 mkdir -p "$TARGET_HISTORY_RUNTIME"
 rsync -a --delete \

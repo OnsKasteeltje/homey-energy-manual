@@ -6,6 +6,9 @@ RUNTIME="/home/jeroen/ems/runtime"
 SOURCE="$REPO/src/pi/ems-runtime"
 TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
+
+TARGET_WW_SOURCE="$REPO/services/pi/planner/warm-water"
+TARGET_WW_RUNTIME="$RUNTIME/planner/warm-water"
 TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
 TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
 TARGET_HOMEY_INGRESS_FILE="$REPO/services/pi/integrations/homey/ingress/state_ingest.py"
@@ -20,6 +23,7 @@ echo "=== EMS PI DRIFT CHECK ==="
 echo "Repo:      $REPO"
 echo "Source:    $SOURCE"
 echo "History:   $TARGET_HISTORY_SOURCE"
+echo "WW planner:$TARGET_WW_SOURCE"
 echo "Honeywell: $TARGET_HONEYWELL_SOURCE"
 echo "Homey in:  $TARGET_HOMEY_INGRESS_FILE"
 echo "Homey out: $TARGET_HOMEY_EGRESS_SOURCE"
@@ -52,6 +56,36 @@ done < <(
 )
 
 echo
+echo "=== TARGET-STRUCTURE WW PLANNER FILES ==="
+
+if [[ ! -d "$TARGET_WW_RUNTIME" ]]; then
+    echo "MISSING: $TARGET_WW_RUNTIME"
+    FAIL=1
+else
+    while IFS= read -r rel; do
+        src="$TARGET_WW_SOURCE/$rel"
+        dst="$TARGET_WW_RUNTIME/$rel"
+
+        if [[ ! -f "$dst" ]]; then
+            echo "MISSING: planner/warm-water/$rel"
+            FAIL=1
+            continue
+        fi
+
+        if ! cmp -s "$src" "$dst"; then
+            echo "DRIFT:   planner/warm-water/$rel"
+            FAIL=1
+        fi
+    done < <(
+        cd "$TARGET_WW_SOURCE" && find . -type f \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort
+    )
+fi
+
+echo
+
 echo "=== TARGET-STRUCTURE HISTORY FILES ==="
 while IFS= read -r rel; do
     src="$TARGET_HISTORY_SOURCE/$rel"

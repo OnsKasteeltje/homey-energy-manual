@@ -8,7 +8,7 @@ The Pi planner builds a 96 × 15-minute horizon from PV forecast, Quatt forecast
 
 Current implementation:
 
-- `src/pi/ems-runtime/planner/warm-water/build_ww_plan.py` — `EMS_PI_WW_PLAN_V0.6`;
+- `services/pi/planner/warm-water/build_ww_plan.py` — `EMS_PI_WW_PLAN_V0.6`;
 - `src/pi/ems-runtime/planner/quarter-hour-plan/build_shadow_load_plan.py` — `EMS_PI_SHADOW_LOAD_PLAN_V0.6`;
 - `src/pi/ems-runtime/planner/quarter-hour-plan/build_website_shadow.py` — `EMS_PI_ENERGY_PLAN_24H_V0.2` / `EMS_PI_PLANNER_SHADOW_PUBLISH_V0.2`.
 
