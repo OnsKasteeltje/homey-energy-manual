@@ -1,33 +1,31 @@
 {
   "schema": "EM2_EV_CONTROL_STATUS_V0.4",
-  "publishedAt": "2026-09-18T19:45:08.461Z",
+  "publishedAt": "2026-09-18T19:46:03.000Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
-  "targetW": 0,
-  "evStatus": "IDLE",
-  "requestedA": 0,
+  "targetW": 6900,
+  "evStatus": "NUMERIC_DEADLINE_TARGET",
+  "requestedA": 10,
   "controlRevision": "",
-  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":0,\"evStatus\":\"IDLE\",\"evSource\":\"PI_DYNAMIC_PLANNER_V0.3\",\"wwTargetOn\":false,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
-  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":0,\"evStatus\":\"IDLE\",\"evSource\":\"PI_DYNAMIC_PLANNER_V0.3\",\"wwTargetOn\":false,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":6900,\"evStatus\":\"NUMERIC_DEADLINE_TARGET\",\"evSource\":\"REMAINING_KWH_OVER_TIME_TO_DEADLINE\",\"wwTargetOn\":false,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":6900,\"evStatus\":\"NUMERIC_DEADLINE_TARGET\",\"evSource\":\"REMAINING_KWH_OVER_TIME_TO_DEADLINE\",\"wwTargetOn\":false,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
   "sourceRevisions": {
-    "intent": 8425,
-    "adapter": 8418,
-    "adapterState": 8418,
+    "intent": 8427,
+    "adapter": 8427,
+    "adapterState": 8427,
     "core": 8427
   },
   "adapter": {
-    "valid": false,
-    "status": "STALE_CHARGER_STATE",
-    "reason": "Core/Easee context stale",
-    "generatedAt": "2026-09-18T19:04:00.449Z",
-    "stateAgeSec": 240,
+    "valid": true,
+    "status": "EXECUTABLE",
+    "reason": "6900 W → 10 A",
+    "generatedAt": "2026-09-18T19:46:00.497Z",
+    "stateAgeSec": 59,
     "intentAgeSec": 0
   },
   "gate": {
-    "status": "FAIL",
-    "errors": [
-      "TRANSLATION"
-    ],
+    "status": "PASS",
+    "errors": [],
     "checks": {
       "schema": true,
       "controlRevisionAligned": true,
@@ -35,26 +33,26 @@
       "coreSafety": true,
       "electrical": true,
       "commandRange": true,
-      "translation": false
+      "translation": true
     },
     "coreRevision": 8427,
-    "updatedAt": "2026-09-18T19:45:03.241Z"
+    "updatedAt": "2026-09-18T19:46:02.435Z"
   },
   "actuator": {
-    "status": "LIVE_FAIL_CLOSED",
-    "reason": "ADAPTER_CONTRACT_INVALID",
+    "status": "READY_SESSION_CONTROL",
+    "reason": null,
     "live": true,
     "physicalWritePerformed": false,
-    "targetA": 0,
-    "previousA": 0,
-    "controlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":0,\"evStatus\":\"IDLE\",\"evSource\":\"PI_DYNAMIC_PLANNER_V0.3\",\"wwTargetOn\":false,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+    "targetA": 10,
+    "previousA": null,
+    "controlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":6900,\"evStatus\":\"NUMERIC_DEADLINE_TARGET\",\"evSource\":\"REMAINING_KWH_OVER_TIME_TO_DEADLINE\",\"wwTargetOn\":false,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
     "coreRevision": 8427
   },
   "deviceHealth": {
     "status": "STALE",
     "reason": "EASEE_TELEMETRY_STALE",
     "chargeState": "plugged_in_paused",
-    "telemetryAgeSec": 587
+    "telemetryAgeSec": 646
   },
   "coherent": false
 }
