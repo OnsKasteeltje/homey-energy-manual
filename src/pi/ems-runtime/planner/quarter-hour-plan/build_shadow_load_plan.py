@@ -11,7 +11,7 @@ BASE_FILE = Path("/home/jeroen/ems/data/base-load-forecast.json")
 WW_FILE = Path("/home/jeroen/ems/data/ww-plan.json")
 PRICE_FILE = Path("/home/jeroen/ems/data/price-forecast.json")
 AXIS_FILE = Path("/home/jeroen/ems/data/planner-axis.json")
-ENERGY_STATE_FILE = Path("/home/jeroen/ems/repo/homey-energy-manual/docs/data/energy-state-v2.json")
+ENERGY_STATE_FILE = Path("/home/jeroen/ems/data/energy-state-v2.json")
 OUTPUT = Path("/home/jeroen/ems/data/shadow-load-plan.json")
 
 TZ = ZoneInfo("Europe/Amsterdam")

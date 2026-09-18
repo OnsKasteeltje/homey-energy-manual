@@ -9,7 +9,7 @@ WW_INPUT = Path("/home/jeroen/ems/data/ww-input.json")
 PV_FILE = Path("/home/jeroen/ems/data/pv-forecast.json")
 QUATT_FILE = Path("/home/jeroen/ems/data/quatt-forecast.json")
 BASE_FILE = Path("/home/jeroen/ems/data/base-load-forecast.json")
-ENERGY_STATE_FILE = Path("/home/jeroen/ems/repo/homey-energy-manual/docs/data/energy-state-v2.json")
+ENERGY_STATE_FILE = Path("/home/jeroen/ems/data/energy-state-v2.json")
 OUTPUT = Path("/home/jeroen/ems/data/ww-plan.json")
 
 TZ = ZoneInfo("Europe/Amsterdam")
