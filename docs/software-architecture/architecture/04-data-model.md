@@ -3,7 +3,7 @@ title: Energy State v2 datamodel
 version: 2.12
 status: active
 architecture_status: validated
-last_verified: 2026-08-25
+last_verified: 2026-09-18
 source:
   - Homey Advanced Flow: EM v2 | 04 Publisher | v1.0.4 (Tesla lifecycle)
   - docs/data/energy-state-v2.json
@@ -87,6 +87,14 @@ Het formele JSON Schema vereist momenteel `meta`, `balance`, `grid`, `pv`, `batt
 - `fail_closed_flex_budget`: wordt alleen waar wanneer de P1/grid-gate faalt.
 
 Daardoor mag stale of asynchrone PV-data diagnostische `Huis/Overig`-weergave blokkeren zonder verse P1-export-opportunity automatisch te blokkeren.
+
+### Held-zero PV-reconstructie (Core v0.11o)
+
+Wanneer een PV-omvormer niet meer ververst nadat hij expliciet numeriek `0 W` heeft gemeld, mag Core die bron uitsluitend voor de afgeleide huis/PV-reconstructie als `heldZero=true` en `usableForReconstruction=true` behandelen. Dit voorkomt dat normale nachtelijke inverter-shutdown de huisbalans onnodig ongeldig maakt.
+
+De bestaande source-timingsemantiek blijft bewust ongewijzigd: `valid`, `fresh`, `synchronized` en `skewSec` blijven de strikte bronfreshness/timing beschrijven. Additieve velden `reconstructionValid`, `reconstructionSynchronized` en `reconstructionSkewSec` beschrijven de reconstructiegeldigheid. Een stale bron met null, leeg, niet-numeriek of niet-nul vermogen is nooit held-zero. P1-freshness en de control-gate worden hierdoor niet versoepeld.
+
+Runtime-validatie op 2026-09-18 gaf met drie stale expliciete 0-W PV-bronnen: `reconstructionValid=true`, `balance.valid=true`, `derived_house_balance_valid=true`, terwijl de strikte `source_timing.valid/fresh/synchronized` terecht `false` bleven.
 
 ## 7. Frontend-consumptie
 
