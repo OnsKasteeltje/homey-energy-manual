@@ -184,3 +184,21 @@ Frontend-specific validation additionally proves:
 The first implementation is **Live V2**.
 
 It is read-only and may reuse canonical field semantics and validated calculations from the current Live implementation. It must be implemented as a new single-owner V2 render chain rather than by modifying or stacking onto the current `live-energy-*` render layers.
+
+
+## 13. Invoer V2 — explicit command semantics
+
+Invoer V2 MUST make a strict visual and semantic distinction between **observed/current state** and **user-entered command values**.
+
+For Tesla deadline input in particular:
+
+- `Huidige SOC` and `Doel-SOC` MUST NOT mix placeholder semantics and persisted/input-value semantics in visually indistinguishable fields.
+- A visible number in an editable field MUST have one unambiguous meaning: either it is the actual command value that will be submitted, or it is clearly styled and labelled as non-submitted reference information.
+- Current/observed SOC SHOULD be presented separately from the editable command fields when this removes ambiguity.
+- Typing into an empty command field MUST behave as normal replacement/input; a user MUST NOT need to know whether an existing-looking number is a placeholder or a real value.
+- Before submission, the UI MUST make the complete command unambiguous: local deadline time, current SOC used for the command, target SOC and maximum charging current.
+- After a successful write, the UI MUST show the exact accepted command, for example: `Deadline 21:57 · 21% → 40% · max 10 A`.
+- User-facing deadline times are entered and confirmed in Europe/Amsterdam local time; canonical timestamps may remain UTC internally.
+- The command interface MUST be validated independently before Invoer V2 replaces the legacy Tesla input.
+
+The legacy Tesla input is intentionally not modified solely to correct this usability issue; the requirement is carried into the clean-room Invoer V2 implementation to avoid adding another compatibility patch to the legacy frontend.
