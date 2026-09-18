@@ -118,9 +118,6 @@ jobs:
       - name: Build legacy frontend bundles
         run: python scripts/build_frontend_bundles.py
 
-      - name: Build isolated Frontend V2 preview
-        run: python scripts/build_frontend_v2.py
-
       - name: Validate generated frontend artifact
         run: python scripts/validate_frontend_artifact.py
 
@@ -140,6 +137,11 @@ jobs:
 
       - name: Build MkDocs strictly
         run: mkdocs build --strict
+
+      # V2 is an isolated static app and is deliberately not interpreted by
+      # MkDocs. Stage it only after MkDocs has finished constructing site/.
+      - name: Stage isolated Frontend V2 preview
+        run: python scripts/build_frontend_v2.py
 
       - name: Verify built site references active frontend
         shell: bash
