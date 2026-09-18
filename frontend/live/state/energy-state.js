@@ -53,6 +53,7 @@ export function normalize(raw) {
     teslaRemainingKWh: number(raw?.tesla?.remaining_kwh),
     wwOn: raw?.hot_water?.boiler_on === true,
     wwAction: raw?.hot_water?.control?.action ?? null,
+    wwBoilerMode: raw?.hot_water?.mode === true,
     heatOn: raw?.quatt?.thermostat_heating_on === true,
     managerDecision: raw?.manager?.decision ?? null,
     managerReason: raw?.manager?.reason ?? null,
