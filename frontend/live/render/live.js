@@ -21,13 +21,11 @@ function render(s) {
   set("kpi-grid-sub", s.gridDirection);
   set("kpi-pv", formatPower(s.pv));
   set("kpi-tesla", s.teslaCharging ? "Laden" : s.teslaConnected ? "Aangesloten" : "Niet aangesloten");
-  set("kpi-tesla-sub", s.teslaDeadlineActive && s.teslaDeadline ? `deadline ${s.teslaDeadline}` : (s.teslaNeed || "geen deadline actief"));
+  set("kpi-tesla-sub", s.teslaDeadlineActive
+    ? [s.teslaDeadline ? `deadline ${s.teslaDeadline}` : null, s.teslaRemainingKWh !== null ? `${s.teslaRemainingKWh.toFixed(2).replace(".", ",")} kWh resterend` : null].filter(Boolean).join(" · ")
+    : (s.teslaNeed || "geen deadline actief"));
   set("kpi-ww", s.wwOn ? "Aan" : "Uit");
   set("kpi-ww-sub", s.wwAction || "—");
-
-  set("decision", s.managerDecision || "Geen actieve beslissing");
-  set("decision-reason", s.managerReason || "—");
-  set("decision-priority", s.managerPriority || "—");
   set("manager-priority", s.managerPriority || "—");
   set("manager-title", s.managerDecision ? s.managerDecision.replaceAll("_", " ") : "Live energiestroom");
   set("manager-reason", s.managerReason || "Actuele EMS-toestand");
