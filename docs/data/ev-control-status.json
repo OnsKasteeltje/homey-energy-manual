@@ -1,31 +1,33 @@
 {
   "schema": "EM2_EV_CONTROL_STATUS_V0.4",
-  "publishedAt": "2026-09-18T20:53:07.815Z",
+  "publishedAt": "2026-09-18T20:54:02.926Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
-  "targetW": 8970,
-  "evStatus": "NUMERIC_DEADLINE_TARGET",
-  "requestedA": 13,
+  "targetW": 0,
+  "evStatus": "FAIL_CLOSED_PI_UNAVAILABLE",
+  "requestedA": 0,
   "controlRevision": "",
-  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":8970,\"evStatus\":\"NUMERIC_DEADLINE_TARGET\",\"evSource\":\"REMAINING_KWH_OVER_TIME_TO_DEADLINE\",\"wwTargetOn\":false,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
-  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":8970,\"evStatus\":\"NUMERIC_DEADLINE_TARGET\",\"evSource\":\"REMAINING_KWH_OVER_TIME_TO_DEADLINE\",\"wwTargetOn\":false,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":false,\"status\":\"PI_BRIDGE_ERROR\",\"evTargetW\":0,\"evStatus\":\"FAIL_CLOSED_PI_UNAVAILABLE\",\"evSource\":\"PI_FAIL_CLOSED\",\"wwTargetOn\":false,\"wwStatus\":\"FAIL_CLOSED_PI_UNAVAILABLE\",\"authority\":\"PI\"}",
+  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.3.0_REALTIME_PV_DEADLINE_GUARD\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":false,\"status\":\"PI_BRIDGE_ERROR\",\"evTargetW\":0,\"evStatus\":\"FAIL_CLOSED_PI_UNAVAILABLE\",\"evSource\":\"PI_FAIL_CLOSED\",\"wwTargetOn\":false,\"wwStatus\":\"FAIL_CLOSED_PI_UNAVAILABLE\",\"authority\":\"PI\"}",
   "sourceRevisions": {
-    "intent": 8467,
-    "adapter": 8435,
-    "adapterState": 8435,
+    "intent": 8468,
+    "adapter": 8468,
+    "adapterState": 8468,
     "core": 8468
   },
   "adapter": {
-    "valid": true,
-    "status": "EXECUTABLE",
-    "reason": "8970 W → 13 A",
-    "generatedAt": "2026-09-18T19:56:00.783Z",
+    "valid": false,
+    "status": "SEMANTIC_TOKEN_OR_SCHEMA_MISMATCH",
+    "reason": "Power Intent semantic token/schema invalid",
+    "generatedAt": "2026-09-18T20:54:00.435Z",
     "stateAgeSec": 60,
     "intentAgeSec": 0
   },
   "gate": {
-    "status": "PASS",
-    "errors": [],
+    "status": "FAIL",
+    "errors": [
+      "TRANSLATION"
+    ],
     "checks": {
       "schema": true,
       "controlRevisionAligned": true,
@@ -33,10 +35,10 @@
       "coreSafety": true,
       "electrical": true,
       "commandRange": true,
-      "translation": true
+      "translation": false
     },
     "coreRevision": 8468,
-    "updatedAt": "2026-09-18T20:53:02.392Z"
+    "updatedAt": "2026-09-18T20:54:02.397Z"
   },
   "actuator": {
     "status": "NOOP_DEGRADED_DEADLINE_AUTHORITY",
@@ -52,7 +54,7 @@
     "status": "STALE",
     "reason": "EASEE_TELEMETRY_STALE",
     "chargeState": "plugged_in_charging",
-    "telemetryAgeSec": 652
+    "telemetryAgeSec": 712
   },
   "coherent": false
 }
