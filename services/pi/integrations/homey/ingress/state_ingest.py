@@ -20,7 +20,7 @@ TOKEN_ENV = "EMS_STATE_INGEST_TOKEN"
 MAX_BODY_BYTES = 256 * 1024
 MAX_SOURCE_SAMPLE_AGE_SECONDS = 20 * 60
 MAX_FUTURE_SKEW_SECONDS = 60
-EXPECTED_SCHEMA_VERSION = "2.12"
+COMPATIBLE_SCHEMA_VERSIONS = {"2.12", "2.13"}
 PUBLISHER_PREFIX = "EM2_CORE_STATE_"
 REQUIRED_OBJECTS = ("meta", "grid", "tesla", "hot_water")
 
@@ -54,7 +54,7 @@ def _validate(payload):
             raise ValueError(f"STATE_MISSING_{key.upper()}")
 
     meta = payload["meta"]
-    if meta.get("schema_version") != EXPECTED_SCHEMA_VERSION:
+    if meta.get("schema_version") not in COMPATIBLE_SCHEMA_VERSIONS:
         raise ValueError("STATE_SCHEMA_VERSION")
 
     publisher = meta.get("publisher_version")
