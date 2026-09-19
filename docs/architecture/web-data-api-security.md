@@ -271,6 +271,25 @@ Frontend V2 / Live
 
 Schema: `EMS_WEB_STATE_CURRENT_V1`. Only fields consumed by the Live V2 state adapter are exposed. The API does not serialize the complete canonical runtime document and does not derive EMS policy. GitHub `docs/data/energy-state-v2.json` is not a runtime fallback for the private V2 site.
 
+## 15.1 Current command-state resource
+
+Invoer V2 uses a separate read-only command-state projection:
+
+```text
+docs/data/tesla-deadline-command.json + docs/data/ems-settings-command.json
+                 |
+                 v
+allowlisted Web Data API projection
+                 |
+                 v
+GET /web/commands/current
+                 |
+                 v
+Frontend V2 / Invoer
+```
+
+Schema: `EMS_WEB_COMMANDS_CURRENT_V1`. This endpoint exposes only the last accepted command fields required by Invoer. It does not write commands, does not convert command state into runtime state, and does not alter the existing authenticated command route. Missing or malformed command sources fail closed with the standard generic resource-unavailable response.
+
 ## 16. Planned resource families
 
 This first endpoint establishes the boundary for the entire website. Expected resource families include:
