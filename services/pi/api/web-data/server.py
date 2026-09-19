@@ -272,7 +272,7 @@ def history_resource(kind, value):
     start_local, end_local, bucket_kind = _history_period(kind, value)
     start_utc, end_utc = _utc_text(start_local), _utc_text(end_local)
 
-    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro&immutable=1", uri=True) as db:
         rows = db.execute(
             """
             SELECT start_ts_utc,end_ts_utc,duration_seconds,import_kwh,export_kwh,
