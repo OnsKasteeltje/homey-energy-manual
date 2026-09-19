@@ -86,5 +86,46 @@ class StateCurrentResourceTest(unittest.TestCase):
             server.state_current_resource()
 
 
+class CommandsCurrentResourceTest(unittest.TestCase):
+    def write_source(self, payload):
+        handle = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False)
+        json.dump(payload, handle)
+        handle.close()
+        self.addCleanup(lambda: Path(handle.name).unlink(missing_ok=True))
+        return handle.name
+
+    def test_command_projection_is_allowlisted(self):
+        server.TESLA_COMMAND_FILE = self.write_source({
+            "requestId": "tesla-1", "active": True, "currentSoc": 38, "targetSoc": 51,
+            "deadline": "2026-09-19T10:00", "maxA": 7, "goalKWh": 7.15, "secret": "no",
+        })
+        server.EMS_SETTINGS_COMMAND_FILE = self.write_source({
+            "requestId": "settings-1", "contractType": "FIXED", "hotWaterSource": "CV",
+            "secret": "no",
+        })
+        result = server.commands_current_resource()
+        self.assertEqual(result["schema"], "EMS_WEB_COMMANDS_CURRENT_V1")
+        self.assertEqual(result["tesla"], {
+            "active": True, "currentSoc": 38, "targetSoc": 51,
+            "deadline": "2026-09-19T10:00", "maxA": 7, "requestId": "tesla-1",
+        })
+        self.assertEqual(result["settings"], {
+            "contractType": "FIXED", "hotWaterSource": "CV", "requestId": "settings-1",
+        })
+        self.assertNotIn("goalKWh", result["tesla"])
+        self.assertNotIn("secret", result["settings"])
+
+    def test_invalid_command_state_fails_closed(self):
+        server.TESLA_COMMAND_FILE = self.write_source({
+            "requestId": "tesla-1", "active": True, "currentSoc": 51, "targetSoc": 38,
+            "deadline": "2026-09-19T10:00", "maxA": 7,
+        })
+        server.EMS_SETTINGS_COMMAND_FILE = self.write_source({
+            "requestId": "settings-1", "contractType": "FIXED", "hotWaterSource": "CV",
+        })
+        with self.assertRaises(ValueError):
+            server.commands_current_resource()
+
+
 if __name__ == "__main__":
     unittest.main()
