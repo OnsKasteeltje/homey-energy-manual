@@ -75,7 +75,9 @@ def build(db_path=DB):
         for row in rows:
             ts, *values = row
             if any(value is None for value in values):
-                previous = None
+                # Cumulative counters allow safe bridging across incomplete snapshots.
+                # Keep the last complete snapshot; the resulting interval is quality-marked
+                # as a gap when it exceeds MAX_NORMAL_GAP_SECONDS.
                 continue
             values = tuple(float(value) for value in values)
 
