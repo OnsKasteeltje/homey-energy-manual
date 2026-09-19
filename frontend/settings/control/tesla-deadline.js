@@ -2,6 +2,7 @@ const CONFIG="../../data/tesla-control-config.json";
 
 const $=id=>document.getElementById(id);
 let saving=false;
+let savedValues=null;
 
 async function loadConfig(){
   const r=await fetch(`${CONFIG}?t=${Date.now()}`,{cache:"no-store"});
@@ -24,9 +25,19 @@ function validate(v){
   if(!Number.isFinite(v.maxA)||v.maxA<6||v.maxA>16)return "Maximale laadstroom moet 6–16 A zijn.";
   return "";
 }
+function sameValues(a,b){
+  return Boolean(a&&b)&&a.currentSoc===b.currentSoc&&a.targetSoc===b.targetSoc&&a.deadline===b.deadline&&a.maxA===b.maxA;
+}
+function updateSaveButton(){
+  const b=$("tesla-save");if(!b)return;
+  if(saving){b.disabled=true;b.textContent="Opslaan…";return;}
+  const unchanged=sameValues(values(),savedValues);
+  b.disabled=unchanged;
+  b.textContent=unchanged?"Opgeslagen":"Opslaan";
+}
 function setBusy(on){
   saving=on;
-  const b=$("tesla-save"); if(b){b.disabled=on;b.textContent=on?"Opslaan…":"Opslaan";}
+  updateSaveButton();
 }
 function message(text,state=""){
   const e=$("tesla-message");if(!e)return;e.textContent=text;e.dataset.state=state;
@@ -56,8 +67,16 @@ async function save(){
     const j=await r.json().catch(()=>({}));
     if(!r.ok||j?.ok!==true)throw new Error(j?.error||`HTTP ${r.status}`);
     accepted(j.command);
+    savedValues=values();
+    updateSaveButton();
     message("Opgeslagen · opdracht geaccepteerd door write-route.","ok");
   }catch(e){message(`Opslaan mislukt: ${e.message||e}`,"error");}
   finally{setBusy(false);}
 }
 $("tesla-save")?.addEventListener("click",save);
+["current-soc","target-soc","deadline","max-a"].forEach(id=>{
+  $(id)?.addEventListener("input",()=>{
+    updateSaveButton();
+    if(savedValues&&!sameValues(values(),savedValues))message("Wijzigingen nog niet opgeslagen.","pending");
+  });
+});
