@@ -1,4 +1,4 @@
-const SOURCE = "../../data/energy-state-v2.json";
+const SOURCE = "/web/state/current";
 
 const number = (value) => {
   if (value === null || value === undefined || value === "") return null;
