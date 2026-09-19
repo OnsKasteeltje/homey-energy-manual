@@ -209,6 +209,8 @@ Live V2 runtime-data migration is now repository-defined through `GET /web/state
 
 Private V2 browser validation established that Web Data API resources reject query strings by design. Frontend read adapters use the stable same-origin resource URL together with `cache: "no-store"`; cache-busting query parameters are forbidden because they convert an otherwise valid resource read into HTTP 400. This preserves the fail-closed API contract without weakening it.
 
+Invoer V2 now reads its operational runtime slice (state timestamp and current WW source) from the same private `GET /web/state/current` boundary as Live V2. Transitional Tesla-deadline and EMS-settings command-state reads remain separate command/publication inputs during migration; they are not reclassified as runtime state. The current canonical energy-state has no `contract` runtime section, so Invoer MUST NOT invent or expose a `contract.mode` runtime field.
+
 The touched legacy `src/pi/ems-runtime/thermal/` subsystem is removed in this release. Its Quatt collector moves to the canonical integration boundary and its duplicate thermal observer is retired. The active general planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path is a separate high-risk migration and is explicitly outside this release.
 
 ## 12. Battery boundary
