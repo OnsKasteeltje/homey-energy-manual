@@ -7,8 +7,13 @@ function render(s) {
   set("pv-power", formatPower(s.pv));
   set("grid-power", formatPower(s.grid === null ? null : Math.abs(s.grid)));
   set("grid-direction", s.gridDirection);
+  const gridFlow = $("grid-flow");
+  if (gridFlow) {
+    gridFlow.classList.toggle("export", s.grid !== null && s.grid < 0);
+    gridFlow.classList.toggle("balanced", s.grid === null || s.grid === 0);
+  }
   set("house-power", formatPower(s.house));
-  set("balance-state", s.balanceValid ? "balans geldig" : "balans beperkt");
+  set("balance-state", s.balanceValid ? "P1 actueel" : "P1 niet actueel");
   set("tesla-power", formatPower(s.tesla));
   set("tesla-state", s.teslaCharging ? `laden${s.teslaRequestedA ? ` · ${s.teslaRequestedA} A` : ""}` : s.teslaConnected ? "aangesloten" : "niet aangesloten");
   set("ww-power", formatPower(s.ww));
