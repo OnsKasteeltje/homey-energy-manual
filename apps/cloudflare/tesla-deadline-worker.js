@@ -3,12 +3,15 @@ const REPO = 'homey-energy-manual';
 const BRANCH = 'main';
 const TESLA_PATH = 'docs/data/tesla-deadline-command.json';
 const EMS_SETTINGS_PATH = 'docs/data/ems-settings-command.json';
-const ALLOWED_ORIGIN = 'https://onskasteeltje.github.io';
+const ALLOWED_ORIGINS = new Set([
+  'https://onskasteeltje.github.io',
+  'http://192.168.1.42'
+]);
 const KWH_PER_SOC_PERCENT = 0.55; // conservative interim calibration; first valid measured session = 0.5246 kWh/%
 
 function cors(origin) {
   return {
-    'Access-Control-Allow-Origin': origin === ALLOWED_ORIGIN ? ALLOWED_ORIGIN : 'null',
+    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.has(origin) ? origin : 'null',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, X-Tesla-Control-Pin',
     'Access-Control-Max-Age': '86400',
@@ -83,11 +86,11 @@ export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
     if (request.method === 'OPTIONS') {
-      if (origin !== ALLOWED_ORIGIN) return json({ ok: false, error: 'origin_not_allowed' }, 403, origin);
+      if (!ALLOWED_ORIGINS.has(origin)) return json({ ok: false, error: 'origin_not_allowed' }, 403, origin);
       return new Response(null, { status: 204, headers: cors(origin) });
     }
     if (request.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405, origin);
-    if (origin !== ALLOWED_ORIGIN) return json({ ok: false, error: 'origin_not_allowed' }, 403, origin);
+    if (!ALLOWED_ORIGINS.has(origin)) return json({ ok: false, error: 'origin_not_allowed' }, 403, origin);
 
     const pin = request.headers.get('X-Tesla-Control-Pin') || '';
     if (!env.WRITE_PIN || pin !== env.WRITE_PIN) return json({ ok: false, error: 'unauthorized' }, 401, origin);

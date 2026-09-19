@@ -13,6 +13,8 @@ Detailed bidirectional runtime chain: `docs/architecture/homey-pi-runtime-datafl
 
 Canonical diagnostic source-of-truth and mandatory root-cause documentation rule: `docs/architecture/diagnostic-source-of-truth.md`. End-to-end troubleshooting MUST first identify the canonical source at each boundary; when root cause is established, reusable chain knowledge MUST be captured there before the investigation is considered architecturally complete.
 
+- The Tesla/EMS authenticated command Worker source is canonical under `apps/cloudflare/` (migrated from legacy top-level `cloudflare/` under the repository “touch it, place it correctly” rule). Its explicit browser-origin allowlist contains the transitional GitHub Pages origin and the private LAN V2 origin `http://192.168.1.42`; wildcard CORS is forbidden. Cloudflare Git build configuration must use root directory `/apps/cloudflare` and include/watch only `apps/cloudflare/**`, so generated `docs/data/*` runtime-publication commits cannot consume Worker build capacity.
+
 ## 1. Source of truth
 
 - GitHub `main` is authoritative for Pi runtime source, deployment definitions and architecture documentation.

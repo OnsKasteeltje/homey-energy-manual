@@ -147,7 +147,34 @@ Shortest safe recurrence check:
 
 If step 2 succeeds but step 4 returns HTTP 400, inspect URL construction before changing API, Caddy, renderer or runtime state.
 
-## 7. Related canonical architecture
+## 7. Private V2 command-Worker diagnostic sequence
+
+The authenticated Tesla/EMS command path begins:
+
+```text
+private V2 browser
+ -> same-origin static Worker config
+ -> browser CORS preflight (OPTIONS)
+ -> authenticated Cloudflare Worker POST
+ -> GitHub command JSON
+ -> Homey adapter/Core
+ -> canonical Pi runtime state
+```
+
+If the config loads and the PIN prompt appears but browser submission reports a generic network/load failure, test the Worker boundary before inspecting GitHub, Homey or Pi:
+
+```text
+1. GET the Worker URL only to prove network reachability; HTTP 405 is expected for a POST/OPTIONS-only Worker.
+2. Send OPTIONS with the exact browser Origin, requested POST method and requested headers.
+3. Require HTTP 2xx and Access-Control-Allow-Origin equal to that exact trusted origin.
+4. Only then perform an authenticated POST/write test.
+```
+
+A 403 `origin_not_allowed` with `Access-Control-Allow-Origin: null` proves the first failing boundary is the Worker CORS allowlist; it does not indicate a Worker outage and no command write has occurred. Fix the explicit trusted-origin allowlist; do not weaken it to `*`.
+
+The canonical Worker source is `apps/cloudflare/`. Cloudflare Git deployment must watch only `apps/cloudflare/**`; generated runtime/publication commits elsewhere in the repository are not Worker deployment inputs.
+
+## 8. Related canonical architecture
 
 - `docs/architecture/CURRENT-EMS-STATE.md`
 - `docs/architecture/homey-pi-runtime-dataflow.md`
