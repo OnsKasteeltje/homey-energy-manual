@@ -71,3 +71,28 @@ def test_counter_decrease_is_discontinuity_not_negative_energy(tmp_path):
       discontinuity_reason FROM house_energy_intervals""").fetchone()
     con.close()
     assert row == (None,None,None,"discontinuity","COUNTER_DECREASE")
+
+
+def test_incomplete_snapshot_bridges_from_last_complete_snapshot(tmp_path):
+    db = tmp_path / "h.sqlite"
+    con = _db(db)
+    _snapshot(con,"2026-09-19T20:00:00Z",100,50,1000,2000,3000)
+    con.execute("INSERT INTO measurements VALUES (?,?,?,?)",
+                ("2026-09-19T20:10:00Z",1,1,100.2))
+    con.commit()
+    _snapshot(con,"2026-09-19T20:20:00Z",100.4,50.1,1000.2,2000.3,3000.1)
+    con.close()
+    _load().build(db)
+    con = sqlite3.connect(db)
+    rows = con.execute("""SELECT start_ts_utc,end_ts_utc,import_kwh,pv_total_kwh,
+      house_kwh,quality,discontinuity_reason FROM house_energy_intervals
+      ORDER BY end_ts_utc""").fetchall()
+    con.close()
+    assert len(rows) == 1
+    row = rows[0]
+    assert row[0] == "2026-09-19T20:00:00Z"
+    assert row[1] == "2026-09-19T20:20:00Z"
+    assert abs(row[2]-0.4) < 1e-9
+    assert abs(row[3]-0.6) < 1e-9
+    assert abs(row[4]-0.9) < 1e-9
+    assert row[5:] == ("gap",None)
