@@ -3,7 +3,7 @@ title: Energy State v2 datamodel
 version: 2.12
 status: active
 architecture_status: validated
-last_verified: 2026-09-18
+last_verified: 2026-09-19
 source:
   - Homey Advanced Flow: EM v2 | 04 Publisher | v1.0.4 (Tesla lifecycle)
   - docs/data/energy-state-v2.json
@@ -64,7 +64,7 @@ De live schema-2.12 payload bevat de volgende belangrijke secties:
 | Sectie | Rol |
 |---|---|
 | `meta` | schema, timestamps, revisions, publisher- en freshnessmetadata |
-| `balance` | afgeleide huisbalans, source timing en control gates |
+| `balance` | afgeleide load-reconstructie, source timing en control gates; definieert niet de KPI `Huis` |
 | `grid` | P1 netvermogen en fasevermogens |
 | `pv` | totale en inverter-specifieke PV-productie |
 | `battery` | toekomstige/actuele batterijstatus; nu `integrated=false` |
@@ -80,17 +80,29 @@ Het formele JSON Schema vereist momenteel `meta`, `balance`, `grid`, `pv`, `batt
 
 ## 6. Balance/control-gate semantiek
 
-`balance.valid` en `energy_budget.balance_valid` zijn backwards-compatible aliases voor de geldigheid van de afgeleide huis/PV-reconstructie. Voor control is de belangrijke scheiding:
+### Canonieke definitie van Huis
 
-- `grid_measurement_valid`: P1/netmeting is bruikbaar voor import/export en flexbudget;
-- `derived_house_balance_valid`: reconstructie van huis/rest/PV is bruikbaar;
+Voor het EMS is **P1/netmeting de bron van waarheid voor `Huis`**. De gebruikersgerichte KPI `Huis` betekent het actuele netto-effect van de volledige woning op het elektriciteitsnet en wordt daarom rechtstreeks uit `grid.power_w` gelezen zolang de P1-meting geldig/vers is.
+
+- positief `grid.power_w` = netto import door Huis;
+- negatief `grid.power_w` = netto export door Huis;
+- nul = netto in balans.
+
+PV is een afzonderlijke energiestroom en wordt niet bij P1 opgeteld om de KPI `Huis` te vormen. Ook mag PV-freshness of inverter-synchronisatie de KPI `Huis` niet onderdrukken zolang P1 geldig is.
+
+De bestaande velden `physical_house_candidate_w`, `energy_budget.house_load_w`, `other_house_load_w` en `derived_house_balance_valid` behoren tot een historische **afgeleide load-reconstructie**. Zij definiëren niet de canonieke KPI `Huis`. Deze velden blijven voorlopig bestaan voor backwards compatibility totdat producer- en consumerimpact gecontroleerd is gemigreerd.
+
+Voor control blijft de belangrijke scheiding:
+
+- `grid_measurement_valid`: P1/netmeting is bruikbaar voor Huis, import/export en flexbudget;
+- `derived_house_balance_valid`: uitsluitend geldigheid van de legacy afgeleide load-reconstructie; niet de geldigheid van Huis;
 - `fail_closed_flex_budget`: wordt alleen waar wanneer de P1/grid-gate faalt.
 
-Daardoor mag stale of asynchrone PV-data diagnostische `Huis/Overig`-weergave blokkeren zonder verse P1-export-opportunity automatisch te blokkeren.
+Stale of asynchrone PV-data mag dus afgeleide reconstructievelden blokkeren, maar nooit een verse P1-gebaseerde `Huis`-weergave of P1-export-opportunity.
 
 ### Held-zero PV-reconstructie (Core v0.11o)
 
-Wanneer een PV-omvormer niet meer ververst nadat hij expliciet numeriek `0 W` heeft gemeld, mag Core die bron uitsluitend voor de afgeleide huis/PV-reconstructie als `heldZero=true` en `usableForReconstruction=true` behandelen. Dit voorkomt dat normale nachtelijke inverter-shutdown de huisbalans onnodig ongeldig maakt.
+Wanneer een PV-omvormer niet meer ververst nadat hij expliciet numeriek `0 W` heeft gemeld, mag Core die bron uitsluitend voor de afgeleide huis/PV-reconstructie als `heldZero=true` en `usableForReconstruction=true` behandelen. Dit voorkomt dat normale nachtelijke inverter-shutdown de legacy load-reconstructie onnodig ongeldig maakt. Deze regel heeft geen invloed op de canonieke P1-gebaseerde KPI `Huis`.
 
 De bestaande source-timingsemantiek blijft bewust ongewijzigd: `valid`, `fresh`, `synchronized` en `skewSec` blijven de strikte bronfreshness/timing beschrijven. Additieve velden `reconstructionValid`, `reconstructionSynchronized` en `reconstructionSkewSec` beschrijven de reconstructiegeldigheid. Een stale bron met null, leeg, niet-numeriek of niet-nul vermogen is nooit held-zero. P1-freshness en de control-gate worden hierdoor niet versoepeld.
 
@@ -118,7 +130,7 @@ Runtime-validatie op 2026-09-18 gaf met drie stale expliciete 0-W PV-bronnen: `r
 - `quatt.*`;
 - `loads.washer`, `loads.dryer`, `loads.quooker`, `loads.dishwasher`.
 
-Direct gemeten apparaatvermogens blijven geldig onafhankelijk van de afgeleide P1/PV-huisbalans. Alleen afgeleide `Huis/Overig`-waarden worden onderdrukt wanneer `derived_house_balance_valid=false`.
+Direct gemeten apparaatvermogens blijven geldig onafhankelijk van de afgeleide load-reconstructie. De KPI `Huis` leest `grid.power_w` en wordt alleen door P1-validiteit/freshness bepaald. Legacy afgeleide reconstructiewaarden, waaronder `other_house_load_w`, mogen worden onderdrukt wanneer `derived_house_balance_valid=false`.
 
 ## 8. Load extensibility
 
