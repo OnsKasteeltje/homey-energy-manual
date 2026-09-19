@@ -84,6 +84,17 @@ The API origin remains bound to localhost by default. The preferred remote-acces
 
 The V2 website itself is hosted on the Pi. GitHub remains source/configuration/documentation and transitional publication infrastructure during migration; GitHub Pages is not the target host for private V2 runtime operation.
 
+The current private ingress design is deliberately interface-specific:
+
+- Caddy serves V2 on wired LAN address `192.168.1.42` only;
+- the Wi-Fi address `192.168.1.45` is not a V2 ingress;
+- wildcard binding (`0.0.0.0`) is forbidden for the V2 web ingress;
+- Docker interfaces are not V2 ingress;
+- `/web/*` is reverse-proxied same-origin to `127.0.0.1:3200`;
+- Tailscale remote access is a separate private ingress and MUST NOT use Funnel.
+
+The LAN addresses are router-reserved for the Pi. A future address/interface change requires deliberate deployment and architecture review rather than widening the listener.
+
 ## 5. Transport and authentication requirements
 
 1. Remote access outside the trusted home LAN MUST traverse the private Tailscale tailnet.
