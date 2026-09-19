@@ -164,12 +164,19 @@ Additional acceptance criteria:
 
 ## 10. Current status
 
-**ARCHITECTURE DECISION: PASS**  
-**PUBLISHER INVENTORY: PARTIAL / repository evidence PASS, live Pi/Homey cross-check still required**  
-**IMPLEMENTATION: NOT STARTED**  
-**RUNTIME CUTOVER: NOT STARTED**
+**ARCHITECTURE DECISION: PASS**
+**ENERGY-STATE CONSUMER MIGRATION: PASS**
+**ENERGY-STATE RUNTIME CUTOVER: PASS**
+**ENERGY-STATE GITHUB PUBLISHER: DISABLED / RETIRED FROM PRODUCTION**
+**LEGACY REPOSITORY CLEANUP: PENDING**
 
-No publisher is disabled by this architecture decision.
+On 19 September 2026 the private Pi-hosted frontend became the production EMS website for Live and Invoer. `GET /web/state/current` is the canonical production Live data boundary.
+
+Runtime validation confirmed fresh canonical Pi state through both the localhost Web Data API and the same-origin Caddy path while `ems-energy-state-publication.timer` was disabled and inactive. Local state and control continued independently.
+
+The MkDocs/GitHub Pages Live view is retired from production. Planner, History and Groups/Phases remain temporary legacy functions until equivalent production-frontend resources are migrated.
+
+`docs/data/energy-state-v2.json` and its publisher implementation are retained temporarily as rollback/repository-cleanup artifacts. They are no longer an allowed production Live dependency.
 
 ## 11. Completed prerequisite — planner state-source separation
 
