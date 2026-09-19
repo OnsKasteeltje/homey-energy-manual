@@ -38,12 +38,22 @@ export function normalize(raw) {
   // from the P1-net House KPI.
   const other = number(raw?.energy_budget?.other_house_load_w);
   const deadline = formatLocalTime(raw?.tesla?.deadline_at);
+  const pvSources = [
+    {key: "solarEdge", label: "SolarEdge", power: number(raw?.pv?.solaredge_w)},
+    {key: "goodWe4200", label: "GoodWe 4200", power: number(raw?.pv?.goodwe_4200_w)},
+    {key: "goodWe2000", label: "GoodWe 2000", power: number(raw?.pv?.goodwe_2000_w)}
+  ].map((source) => ({
+    ...source,
+    fresh: raw?.pv?.sources?.[source.key]?.fresh === true,
+    ageSec: number(raw?.pv?.sources?.[source.key]?.age_sec),
+    maxAgeSec: number(raw?.pv?.sources?.[source.key]?.max_age_sec)
+  }));
 
   return {
     generatedAt: raw?.meta?.generated_at ?? null,
     stateAgeSec: number(raw?.meta?.state_age_sec),
     balanceValid,
-    grid, pv, house, tesla, ww, heat, other,
+    grid, pv, pvSources, house, tesla, ww, heat, other,
     gridDirection: grid === null ? "onbekend" : grid > 0 ? "import" : grid < 0 ? "export" : "in balans",
     teslaConnected: raw?.tesla?.connected === true,
     teslaCharging: raw?.tesla?.charging === true,
