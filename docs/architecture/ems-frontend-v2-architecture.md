@@ -206,6 +206,7 @@ The EMS currently has no Tesla interface that observes the vehicle SOC. Therefor
 - Typing into an empty command field MUST behave as normal replacement/input.
 - Before submission, the UI MUST make the complete command unambiguous: manually entered current SOC, target SOC, Europe/Amsterdam deadline date/time and maximum charging current.
 - After a successful write, the UI MUST show the exact accepted command, for example: `21% → 40% · uiterlijk 21:57 · max 10 A`.
+- After the state adapter renders the last accepted Tesla command, it MUST initialize the single Tesla controller with those exact rendered command values. Unchanged loaded values therefore render as `Opgeslagen` with the save action disabled; only an explicit field edit makes `Opslaan` active. This initialization is a state handoff to the existing controller, not a second render owner.
 - User-facing deadline times are entered and confirmed in Europe/Amsterdam local time; canonical timestamps may remain UTC internally.
 - The planner may use the accepted four-field command for deadline allocation, but the frontend MUST NOT invent Tesla telemetry that does not exist.
 - The command interface MUST be validated independently before Invoer V2 replaces the legacy Tesla input.
