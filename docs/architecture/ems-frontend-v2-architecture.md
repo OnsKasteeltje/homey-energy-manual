@@ -238,3 +238,18 @@ A V2 page migration MUST reuse this visual baseline rather than introducing its 
 
 Frontend V2 operational read data migrates to the single secured Web Data API boundary defined by `docs/architecture/web-data-api-security.md`. V2 is a private Pi-hosted application: local access is limited to the trusted home LAN and remote access to the private Tailscale tailnet. It is not a public website target. The preferred browser/API deployment is same-origin through the Pi private web ingress while the API itself remains localhost-scoped. GitHub Pages may remain transitional during migration but is not the target V2 runtime host. This contract applies across Live, Invoer read-state/advice, Energiehistorie, Planner and future V2 observability. Frontend code MUST NOT contain API secrets, bypass the approved API resource contracts, or turn the read-only boundary into a command path. Explicit user commands remain on their separate authenticated command interface.
 
+
+
+## 16. Live V2 PV observability and freshness
+
+Live V2 keeps realtime grid authority and PV observability deliberately separate.
+
+- P1/net measurement remains authoritative for realtime grid import/export and flex control.
+- Inverter freshness or source skew MUST NOT invalidate an otherwise fresh P1 measurement or block P1-authoritative flex opportunities.
+- Derived physical House/Other reconstruction may be suppressed when P1 and PV sources are stale, missing or insufficiently synchronized.
+- The Live PV presentation may expose the three canonical inverter observations (SolarEdge, GoodWe 4200 and GoodWe 2000) together with per-source freshness/age as read-only observability.
+- Per-inverter freshness is presentation/diagnostic information only; the frontend MUST NOT create alternative stale-data policy or control gating.
+- `GET /web/state/current` remains the allowlisted boundary. It projects the already canonical per-inverter power and source-timing freshness fields; the frontend does not poll inverter devices directly.
+- Unknown/stale inverter data MUST NOT silently be converted into a trustworthy physical House reconstruction.
+
+Runtime validation on 2026-09-19 confirmed the private Web Data API exposes aggregate PV plus all three inverter powers and per-source freshness/age. The private Caddy-served Live V2 deployment was then validated end-to-end with the PV details markup present on the production route.
