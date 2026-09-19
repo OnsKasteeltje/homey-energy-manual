@@ -211,3 +211,20 @@ The EMS currently has no Tesla interface that observes the vehicle SOC. Therefor
 - The command interface MUST be validated independently before Invoer V2 replaces the legacy Tesla input.
 
 The legacy Tesla input is intentionally not modified solely to correct this usability issue; the requirement is carried into the clean-room Invoer V2 implementation to avoid adding another compatibility patch to the legacy frontend.
+
+## 14. Shared V2 visual language
+
+V2 uses one coherent visual language across all migrated pages. Page-specific styles may define layout, but MUST NOT independently define a conflicting site palette.
+
+The current visual baseline is a light Tesla/Victron-inspired interface:
+
+- light blue/white page background;
+- white primary panels;
+- dark navy primary text;
+- muted blue-grey secondary text;
+- blue as the primary interaction/selection accent;
+- subtle blue-grey borders and restrained shadows;
+- consistent navigation, badges, radii and state styling across Live, Invoer and future V2 pages.
+
+A V2 page migration MUST reuse this visual baseline rather than introducing its own dark/light theme. Future implementation SHOULD move these shared visual tokens and shell styles into `frontend/shared/` so there is one technical source of truth; this consolidation MUST NOT create an additional render layer or change page ownership.
+
