@@ -28,14 +28,15 @@ export function normalize(raw) {
   const tesla = number(raw?.tesla?.power_w);
   const ww = number(raw?.hot_water?.boiler_power_w);
   const heat = number(raw?.quatt?.power_w);
-  // House load is a derived value and is only shown when the canonical
-  // Homey Core balance is valid. Fresh P1 remains authoritative for grid
-  // import/export even when stale PV telemetry makes house load unknown.
-  const canonicalHouse = number(raw?.energy_budget?.house_load_w);
-  const balanceValid = raw?.balance?.valid === true;
-  const house = balanceValid ? canonicalHouse : null;
-  const known = [tesla, ww, heat].filter((v) => v !== null).reduce((a,b) => a+b, 0);
-  const other = house === null ? null : Math.max(0, house - known);
+  // Canonical House semantics: P1/net power is the source of truth.
+  // Positive = net import, negative = net export. PV is a separate flow and
+  // must never gate or alter the House KPI.
+  const p1Valid = raw?.balance?.control_gate?.grid_measurement_valid === true;
+  const house = p1Valid ? grid : null;
+  const balanceValid = p1Valid;
+  // "Other" remains a legacy derived reconstruction and must not be derived
+  // from the P1-net House KPI.
+  const other = number(raw?.energy_budget?.other_house_load_w);
   const deadline = formatLocalTime(raw?.tesla?.deadline_at);
 
   return {
