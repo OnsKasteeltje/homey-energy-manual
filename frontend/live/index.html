@@ -23,20 +23,21 @@
   <main>
 
     <section class="flow-card" aria-label="Actuele energiestroom">
-      <div class="source-stack">
-        <article class="node"><span>☀︎</span><div><small>PV</small><strong id="pv-power">—</strong></div></article>
-        <article class="node"><span>↔</span><div><small>Net</small><strong id="grid-power">—</strong><em id="grid-direction">—</em></div></article>
+      <article class="node grid-node"><span>↔</span><div><small>Net</small><strong id="grid-power">—</strong><em id="grid-direction">—</em></div></article>
+
+      <div id="grid-flow" class="flow-line grid-flow" aria-hidden="true"></div>
+
+      <div class="house-stack">
+        <article class="node pv-node"><span>☀︎</span><div><small>PV</small><strong id="pv-power">—</strong><em>productie naar huis</em></div></article>
+        <div class="pv-flow" aria-hidden="true"></div>
+        <article class="home-node">
+          <small>HUIS · P1 NETTO</small>
+          <strong id="house-power">—</strong>
+          <span id="balance-state">Live</span>
+        </article>
       </div>
 
-      <div class="flow-line" aria-hidden="true"></div>
-
-      <article class="home-node">
-        <small>HUIS</small>
-        <strong id="house-power">—</strong>
-        <span id="balance-state">Live</span>
-      </article>
-
-      <div class="flow-line" aria-hidden="true"></div>
+      <div class="flow-line load-flow" aria-hidden="true"></div>
 
       <div class="load-stack">
         <article class="node"><span>⚡</span><div><small>Tesla</small><strong id="tesla-power">—</strong><em id="tesla-state">—</em></div></article>
