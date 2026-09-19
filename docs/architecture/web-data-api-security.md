@@ -1,6 +1,6 @@
 # EMS Web Data API — Security and interface contract
 
-**Status:** Canonical target architecture / mandatory security baseline  
+**Status:** Canonical private target architecture / mandatory security baseline  
 **Date:** 2026-09-19  
 **Scope:** Entire Frontend V2 read-only operational-data interface  
 **Governance:** `ems-architecture-governance.md`, `architectuur-guardrails.md`, `repository-structure.md`, `runtime-publication-separation.md`, `ems-frontend-v2-architecture.md`
@@ -55,40 +55,44 @@ Tests belong under the matching canonical test boundary. Production implementati
 
 Every material change remains subject to **Touch it, place it correctly** and `tools/validation/repository_structure_gate.sh`.
 
-## 4. External security boundary
+## 4. Private access boundary
 
-The Pi API MUST NOT be exposed by router port-forwarding or by a directly publicly routable listener.
+Frontend V2 and the Web Data API are private household services. They MUST NOT be made publicly reachable from the internet.
 
-Target external path:
+Target access paths:
 
 ```text
-Browser
-  |
-  | HTTPS
-  v
-Cloudflare security boundary
-  |  Access policy / authentication
-  |  rate limiting / abuse protection
-  v
-Cloudflare Tunnel
-  |  Access token validation before origin forwarding
-  v
-Pi Web Data API
+local device on trusted home LAN
+          |
+          v
+   Pi-hosted Frontend V2
+          |
+          v
+ localhost Web Data API
+
+remote trusted device
+          |
+          | Tailscale tailnet
+          v
+   Pi-hosted Frontend V2
+          |
+          v
+ localhost Web Data API
 ```
 
-The tunnel is outbound-only from the private network. A public hostname MUST NOT be activated before its Cloudflare Access policy is in place.
+The API origin remains bound to localhost by default. The preferred remote-access boundary is Tailscale; Tailscale Funnel is forbidden. Router port-forwarding, a public listener, Cloudflare Tunnel/public ingress, or any other public internet exposure is outside the current architecture.
 
-Cloudflare Access validation MUST be enforced at the tunnel/origin boundary ("Protect with Access" or equivalent cryptographic JWT validation). CORS and the Origin header are defense-in-depth browser controls and MUST NOT be treated as authentication.
+The V2 website itself is hosted on the Pi. GitHub remains source/configuration/documentation and transitional publication infrastructure during migration; GitHub Pages is not the target host for private V2 runtime operation.
 
 ## 5. Transport and authentication requirements
 
-1. Public client traffic is HTTPS-only.
-2. No secrets, credentials, API keys or tokens in URLs/query strings.
-3. Authentication/authorization is checked before protected data reaches the browser.
-4. Authentication secrets MUST NOT be embedded in Frontend V2 JavaScript or committed to GitHub.
-5. Access policies use least privilege.
-6. Management/debug endpoints are not exposed through the public website hostname.
-7. The origin listener is private/local-network scoped; public reachability exists only through the approved secured boundary.
+1. Remote access outside the trusted home LAN MUST traverse the private Tailscale tailnet.
+2. Tailscale access uses least privilege and only authorized tailnet identities/devices.
+3. The Web Data API remains localhost-scoped unless a later documented design explicitly changes that boundary.
+4. No secrets, credentials, API keys or tokens are embedded in Frontend V2 JavaScript or committed to GitHub.
+5. No router port-forward, public DNS ingress, Tailscale Funnel or other public exposure is permitted.
+6. Management/debug endpoints are not exposed beyond the private management boundary.
+7. Where HTTPS is used for remote browser access, termination is provided by the approved private ingress (for example Tailscale Serve), not by exposing the API directly.
 8. Access failures fail closed.
 
 ## 6. HTTP surface
@@ -107,15 +111,17 @@ The Web Data API is read-only.
 
 User commands are outside this API.
 
-## 7. CORS
+## 7. Browser origin policy
 
-CORS is minimal and explicit.
+The preferred deployment is same-origin: the Pi-hosted V2 frontend reaches the Web Data API through the same private web origin/reverse-proxy boundary. In that design no browser CORS permission is required.
 
-- Never use `Access-Control-Allow-Origin: *` for protected EMS operational data.
-- Allow only the exact production Frontend V2 origin(s) required.
-- Do not blindly reflect arbitrary `Origin` values.
-- CORS does not replace authentication or authorization.
-- If deployment later becomes same-origin, unnecessary CORS support should be removed.
+If a temporary migration step requires cross-origin access, CORS MUST be minimal and explicit:
+
+- never use `Access-Control-Allow-Origin: *` for EMS operational data;
+- allow only the exact private V2 origin(s) required;
+- do not blindly reflect arbitrary `Origin` values;
+- CORS is a browser control, not an authentication mechanism;
+- remove temporary CORS support when same-origin migration is complete.
 
 ## 8. Response minimization and schemas
 
@@ -147,9 +153,9 @@ Freshness is part of the resource contract, not silently inferred by a renderer.
 
 ## 10. Abuse and resource protection
 
-The public security boundary and origin use bounded resource consumption.
+The private web boundary and origin use bounded resource consumption.
 
-- Rate limiting is applied at the external boundary.
+- Rate limiting may be applied at the private ingress where useful; bounded origin behavior remains mandatory.
 - Request size, parameter ranges and history windows are bounded.
 - No unbounded history/export query is permitted.
 - Expensive resources must have explicit maximum ranges and/or pagination.
@@ -163,7 +169,7 @@ JSON responses explicitly use `Content-Type: application/json` and `X-Content-Ty
 
 Protected/user-specific responses default to conservative caching (`Cache-Control: no-store`) unless a resource is deliberately classified safe for bounded shared caching.
 
-The external HTTPS boundary owns HSTS. Additional browser security headers may be applied centrally where appropriate.
+The private HTTPS ingress owns HSTS where HTTPS is enabled. Additional browser security headers may be applied centrally where appropriate.
 
 ## 12. Logging and observability
 
@@ -258,7 +264,7 @@ Each existing GitHub runtime publication migrates independently:
 inventory
  -> define versioned API contract
  -> implement read-only resource
- -> secure external route
+ -> secure private route
  -> parallel comparison
  -> switch one frontend consumer
  -> validate values/freshness/failure behavior
@@ -272,13 +278,13 @@ No existing publisher or website consumer is disabled as part of creating the AP
 
 Before any Web Data API resource is considered production-ready, prove at minimum:
 
-- no direct public Pi port;
-- HTTPS public path;
-- Access policy active before route exposure;
-- Access/JWT validation enforced before origin;
-- unauthorized request rejected;
+- no direct public Pi port, router port-forward, Funnel or other public ingress;
+- API origin remains localhost-scoped;
+- local V2 access is limited to the trusted LAN;
+- remote V2 access is limited to authorized Tailscale clients;
+- unauthorized/non-tailnet remote access is unavailable;
 - unsupported write methods rejected;
-- exact CORS origin behavior validated;
+- same-origin browser access is preferred; any temporary CORS origin behavior is exact and validated;
 - no secrets in frontend/repository/URLs/responses/logs;
 - response field allowlist validated;
 - malformed/stale source fails safely;
