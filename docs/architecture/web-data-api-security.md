@@ -252,7 +252,26 @@ Frontend presentation maps canonical advisor output to exactly:
 
 The frontend MUST NOT calculate the economic recommendation itself.
 
-## 15. Planned resource families
+## 15. Current State resource
+
+The Live V2 migration uses:
+
+```text
+/home/jeroen/ems/data/energy-state-v2.json
+                 |
+                 v
+allowlisted Web Data API projection
+                 |
+                 v
+GET /web/state/current
+                 |
+                 v
+Frontend V2 / Live
+```
+
+Schema: `EMS_WEB_STATE_CURRENT_V1`. Only fields consumed by the Live V2 state adapter are exposed. The API does not serialize the complete canonical runtime document and does not derive EMS policy. GitHub `docs/data/energy-state-v2.json` is not a runtime fallback for the private V2 site.
+
+## 16. Planned resource families
 
 This first endpoint establishes the boundary for the entire website. Expected resource families include:
 
@@ -267,7 +286,7 @@ This first endpoint establishes the boundary for the entire website. Expected re
 
 Exact schemas are defined independently before each cutover. No resource is migrated merely because this list exists.
 
-## 16. Migration and rollback
+## 17. Migration and rollback
 
 Each existing GitHub runtime publication migrates independently:
 
@@ -285,7 +304,7 @@ inventory
 
 No existing publisher or website consumer is disabled as part of creating the API foundation.
 
-## 17. Security validation gate
+## 18. Security validation gate
 
 Before any Web Data API resource is considered production-ready, prove at minimum:
 
@@ -303,7 +322,7 @@ Before any Web Data API resource is considered production-ready, prove at minimu
 - API outage has zero control impact;
 - repository structure gate PASS.
 
-## 18. Definition of Done
+## 19. Definition of Done
 
 A Web Data API change is complete only when:
 
