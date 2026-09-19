@@ -4,8 +4,8 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-09-18  
-**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment  
+**Status date:** 2026-09-19  
+**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
 
@@ -59,7 +59,7 @@ There are two deliberately separate runtime directions.
 ```text
 Homey devices / P1 / PV / Easee / boiler / Quatt
                     ↓
-        Homey Core v0.11n
+        Homey Core v0.11p
                     ↓
             EM2_Public_State
                     ↓
@@ -77,6 +77,8 @@ EM v2 | 05 Transport | Homey→Pi State Push v0.1
 ```
 
 The state path is push-based. The Pi must not poll Homey merely to reconstruct canonical Core state. Accepted state is written atomically to `/home/jeroen/ems/data/energy-state-v2.json`; accepted payloads are also archived locally to operational history. Freshness and ordering use source timestamps and monotonic revision semantics; stale, future-skewed, replayed or malformed payloads fail closed.
+
+Homey Core v0.11p publishes state schema 2.13. Schema 2.13 adds cumulative counters `grid.energy_import_kwh`, `grid.energy_export_kwh`, `pv.solaredge_energy_kwh`, `pv.goodwe_4200_energy_kwh` and `pv.goodwe_2000_energy_kwh`. The Homey→Pi transport is intentionally not the semantic schema-compatibility owner: it requires a present schema identifier and valid publisher family but does not pin one exact schema version. Canonical Pi `services/pi/integrations/homey/ingress/state_ingest.py` owns compatibility and currently accepts the explicitly reviewed set `{2.12, 2.13}`; unknown versions remain fail-closed. Runtime validation on 2026-09-19 accepted a genuine v0.11p/schema-2.13 push with HTTP 202 and `stateWritten=true`, and the five cumulative counters were present in canonical `energy-state-v2.json`.
 
 ### 2.2 Control direction — Pi → Homey
 
@@ -142,7 +144,7 @@ The Pi exposes `GET /control/current`. A valid production response uses schema `
 
 ## 6. Current state ingest and history endpoint
 
-The Pi exposes `POST /state/energy` for authenticated Homey→Pi state ingestion. Missing/incorrect authentication, malformed state, stale state and replayed state fail closed for current-state acceptance. Operational history insertion is idempotent; a local history-archive failure must not invalidate otherwise fresh accepted live state.
+The Pi exposes `POST /state/energy` for authenticated Homey→Pi state ingestion. Missing/incorrect authentication, malformed state, stale state, replayed state and non-approved schema versions fail closed for current-state acceptance. Exact schema-version compatibility is owned here rather than in the transport layer; the current approved set is `{2.12, 2.13}`. Operational history insertion is idempotent; a local history-archive failure must not invalidate otherwise fresh accepted live state.
 
 Legacy Homey Insights/day-history polling may remain only as explicit backfill/diagnostic tooling and must not run as an automatic production history transport.
 
