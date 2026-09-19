@@ -1,13 +1,13 @@
 {
   "schema": "EM2_PLANNER_SHADOW_PUBLISH_V0.4",
-  "publishedAt": "2026-09-19T13:30:47.740Z",
+  "publishedAt": "2026-09-19T13:34:11.208Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
-  "sourceRevision": 8756,
-  "generatedAt": "2026-09-19T13:30:45.314Z",
+  "sourceRevision": 8757,
+  "generatedAt": "2026-09-19T13:34:08.767Z",
   "plan": {
     "schema": "EM2_ENERGY_PLAN_24H_V0.5.5",
-    "generatedAt": "2026-09-19T13:30:45.314Z",
+    "generatedAt": "2026-09-19T13:34:08.767Z",
     "controlMode": "SHADOW",
     "readOnly": true,
     "physicalWritePerformed": false,
@@ -28,7 +28,7 @@
       "usableWindowKWh": 10.08
     },
     "inputs": {
-      "sourceRevision": 8756,
+      "sourceRevision": 8757,
       "contract": "FIXED",
       "price": {
         "quality": "GOOD",
@@ -59,20 +59,20 @@
           "longitude": 5.10003,
           "variable": "shortwave_radiation",
           "resolutionMinutes": 15,
-          "retrievedAt": "2026-09-19T13:30:45.518Z"
+          "retrievedAt": "2026-09-19T13:34:08.970Z"
         },
         "gridHeadroom": "NOT_MODELED_PHASE_AWARE"
       },
       "tesla": {
-        "deadlineActive": false,
-        "remainingKWh": 1.583,
-        "deadlineAt": "2026-09-19T12:10:00.000Z",
-        "latestStart": "2026-09-19T12:00:10.062Z",
+        "deadlineActive": true,
+        "remainingKWh": 9.35,
+        "deadlineAt": "2026-09-19T13:45:00.000Z",
+        "latestStart": "2026-09-19T12:46:55.527Z",
         "maxA": 14,
         "maxPowerW": 9660,
         "slotEnergyKWh": 2.415,
-        "requiredDeadlineSlots": 0,
-        "deadlineCatchUp": false,
+        "requiredDeadlineSlots": 4,
+        "deadlineCatchUp": true,
         "throughputModel": "NOT_ASSUMED",
         "opportunityPolicy": "PV_SURPLUS_START_CONTINUE_MIN_RUN",
         "opportunityStartMinW": 4140,
@@ -139,10 +139,10 @@
             "pv": "WEATHER_HAUWERT_THEORETICAL_SCALE"
           },
           "battery": "HOLD",
-          "tesla": "HOLD",
+          "tesla": "DEADLINE_REQUIRED",
           "warmWater": "MUST_CATCHUP",
           "targets": {
-            "evTargetW": 0,
+            "evTargetW": 9660,
             "wwTargetW": 1900,
             "batteryTargetW": 0
           },
@@ -4555,23 +4555,87 @@
         "overlapsBefore": 0,
         "wwSlotsRelocated": 0,
         "unresolvedShouldOverlaps": 0,
-        "wwMustOverlapsPreserved": 0,
+        "wwMustOverlapsPreserved": 1,
         "hardWWDeadlineLocal": "19:00"
       },
       "tesla": {
-        "preferredSlots": [],
-        "deadlinePreferredSlots": [],
+        "preferredSlots": [
+          {
+            "i": 0,
+            "start": "2026-09-19T13:30:00.000Z",
+            "end": "2026-09-19T13:45:00.000Z",
+            "localDate": "2026-09-19",
+            "localQuarter": 62,
+            "price_eur_kwh": null,
+            "priceClass": "FIXED",
+            "baseLoadForecastW": 359,
+            "baseForecastTrace": {
+              "basis": "CLEAN_GLOBAL_MEDIAN",
+              "sampleCount": 0,
+              "sampleValuesW": [],
+              "sampleTimestamps": [],
+              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+              "washerActiveSamples": 0,
+              "dryerActiveSamples": 0,
+              "globalCleanSampleCount": 176,
+              "rejectedHighLoadSamples": 11,
+              "rejectedKnownApplianceSamples": 0
+            },
+            "pvForecastW": 296,
+            "netBeforeFlexW": 63,
+            "importBeforeFlexW": 63,
+            "pvSurplusBeforeFlexW": 0,
+            "gridHeadroomW": null,
+            "forecastQuality": {
+              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+              "pv": "WEATHER_HAUWERT_THEORETICAL_SCALE"
+            }
+          }
+        ],
+        "deadlinePreferredSlots": [
+          {
+            "i": 0,
+            "start": "2026-09-19T13:30:00.000Z",
+            "end": "2026-09-19T13:45:00.000Z",
+            "localDate": "2026-09-19",
+            "localQuarter": 62,
+            "price_eur_kwh": null,
+            "priceClass": "FIXED",
+            "baseLoadForecastW": 359,
+            "baseForecastTrace": {
+              "basis": "CLEAN_GLOBAL_MEDIAN",
+              "sampleCount": 0,
+              "sampleValuesW": [],
+              "sampleTimestamps": [],
+              "likelyContributor": "STRUCTURAL_CLEAN_BASE",
+              "washerActiveSamples": 0,
+              "dryerActiveSamples": 0,
+              "globalCleanSampleCount": 176,
+              "rejectedHighLoadSamples": 11,
+              "rejectedKnownApplianceSamples": 0
+            },
+            "pvForecastW": 296,
+            "netBeforeFlexW": 63,
+            "importBeforeFlexW": 63,
+            "pvSurplusBeforeFlexW": 0,
+            "gridHeadroomW": null,
+            "forecastQuality": {
+              "baseLoad": "CLEAN_GLOBAL_MEDIAN",
+              "pv": "WEATHER_HAUWERT_THEORETICAL_SCALE"
+            }
+          }
+        ],
         "pvOpportunitySlots": [],
         "pvOpportunityRuns": [],
-        "obligationKWh": 0,
-        "deadlineAt": "2026-09-19T12:10:00.000Z",
-        "allocatedKWh": 0,
-        "unallocatedKWh": 1.583,
+        "obligationKWh": 9.35,
+        "deadlineAt": "2026-09-19T13:45:00.000Z",
+        "allocatedKWh": 2.415,
+        "unallocatedKWh": 6.935,
         "maxA": 14,
         "maxPowerW": 9660,
-        "requiredDeadlineSlots": 0,
-        "deadlineCatchUp": false,
-        "allocationPolicy": "PV_START_4830W_CONTINUE_4140W_MIN_30MIN_NO_PRICE_TRIGGER"
+        "requiredDeadlineSlots": 4,
+        "deadlineCatchUp": true,
+        "allocationPolicy": "PV_SURPLUS_THEN_CHEAPEST_REQUIRED_GRID_SLOTS"
       },
       "warmWater": {
         "allocatedSlots": [
@@ -8672,7 +8736,7 @@
   },
   "status": {
     "status": "READY_SHADOW_V0.5.5",
-    "at": "2026-09-19T13:30:45.314Z",
+    "at": "2026-09-19T13:34:08.767Z",
     "version": "EM2_ENERGY_PLAN_24H_V0.5.5",
     "contract": "FIXED",
     "slots": 96,
@@ -8688,16 +8752,16 @@
     "observedBaseBins": 59,
     "slotsWithNetForecast": 96,
     "traceableBaseLoad": true,
-    "teslaObligation": false,
+    "teslaObligation": true,
     "teslaOpportunitySlots": 0,
     "teslaOpportunityRuns": 0,
-    "teslaAllocationPolicy": "PV_START_4830W_CONTINUE_4140W_MIN_30MIN_NO_PRICE_TRIGGER",
+    "teslaAllocationPolicy": "PV_SURPLUS_THEN_CHEAPEST_REQUIRED_GRID_SLOTS",
     "teslaMaxA": 14,
     "teslaMaxPowerW": 9660,
-    "teslaRequiredSlots": 0,
-    "teslaAllocatedSlots": 0,
-    "teslaUnallocatedKWh": 1.583,
-    "teslaDeadlineCatchUp": false,
+    "teslaRequiredSlots": 4,
+    "teslaAllocatedSlots": 1,
+    "teslaUnallocatedKWh": 6.935,
+    "teslaDeadlineCatchUp": true,
     "wwObligation": true,
     "wwDayBoundaryAware": true,
     "wwPlanningDates": [
@@ -8718,7 +8782,7 @@
       "overlapsBefore": 0,
       "wwSlotsRelocated": 0,
       "unresolvedShouldOverlaps": 0,
-      "wwMustOverlapsPreserved": 0,
+      "wwMustOverlapsPreserved": 1,
       "hardWWDeadlineLocal": "19:00"
     },
     "noActuatorWrites": true,
