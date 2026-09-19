@@ -1,15 +1,17 @@
 # Energy Core v0.10.4 — gescheiden meetvaliditeit
 
-_Status: actief en gevalideerd op 20 augustus 2026._
+_Status: actief; semantiek verduidelijkt op 19 september 2026. Oorspronkelijke runtimevalidatie: 20 augustus 2026._
 
 ## Doel
 
 Vanaf `EM v2 | 00 Core Tick | v0.10.4 (split grid/derived validity)` worden twee verschillende soorten geldigheid expliciet gescheiden:
 
 - `gridMeasurementValid`: geldigheid van de actuele P1/netmeting. Dit is de autoritatieve gate voor netimport, netexport en het flex-exportbudget.
-- `derivedHouseBalanceValid`: geldigheid van de gereconstrueerde huis/PV-balans op basis van P1 plus inverterbronnen. Dit bestuurt uitsluitend afgeleide huisbelasting, residual/Overig en bijbehorende diagnostiek.
+- `derivedHouseBalanceValid`: geldigheid van de legacy afgeleide load-reconstructie op basis van P1 plus inverterbronnen. Dit bestuurt uitsluitend reconstructievelden zoals residual/Overig en bijbehorende diagnostiek; het definieert niet de KPI `Huis`.
 
 `balanceValid` blijft tijdelijk bestaan als backward-compatible alias van `derivedHouseBalanceValid`.
+
+De canonieke gebruikersgerichte KPI **`Huis` = P1 netto (`grid.power_w`)** zolang de P1-meting geldig is. PV is een afzonderlijke stroom en PV-freshness mag `Huis` niet onderdrukken.
 
 ## Harde invariant
 
@@ -22,8 +24,9 @@ P1 vers/geldig
 P1 niet geldig
     -> flex_export_budget = 0 W (fail-closed)
 
-Afgeleide huis/PV-balans ongeldig
-    -> house_load/residual/Overig niet als betrouwbaar publiceren
+Legacy load-reconstructie ongeldig
+    -> reconstructievelden zoals house_load/residual/Overig niet als betrouwbaar publiceren
+    -> canonieke KPI Huis blijft P1 netto zolang P1 geldig is
     -> P1-gebaseerde flexbesluiten NIET blokkeren
 ```
 
@@ -61,7 +64,7 @@ Warmwater-Control, Decision en Shadow publiceren beide validiteiten zodat downst
 Manager constraints gebruiken voortaan:
 
 - `GRID_MEASUREMENT_INVALID_P1_STALE` wanneer de P1/netmeting niet bruikbaar is;
-- `DERIVED_BALANCE_INVALID_<reason>` wanneer alleen de afgeleide huis/PV-balans ongeldig is.
+- `DERIVED_BALANCE_INVALID_<reason>` wanneer alleen de legacy load-reconstructie ongeldig is.
 
 ## Validatie 20 augustus 2026
 
@@ -78,7 +81,7 @@ De eerste handmatige tick van v0.10.4 publiceerde:
 - manager constraint `DERIVED_BALANCE_INVALID_SOURCE_SKEW`;
 - geen fysieke boiler-, Tesla- of Quatt-write; Control blijft `SHADOW`.
 
-Dit is het gewenste bewijsgeval: een vertraagde PV-bron degradeert de reconstructie, maar blokkeert een verse en betrouwbare P1-netmeting niet.
+Dit is het gewenste bewijsgeval: een vertraagde PV-bron degradeert uitsluitend de legacy load-reconstructie, maar blokkeert een verse en betrouwbare P1-netmeting, de P1-gebaseerde KPI `Huis` of P1-gebaseerde control niet.
 
 ## Rollback
 
