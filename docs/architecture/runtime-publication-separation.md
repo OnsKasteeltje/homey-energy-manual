@@ -220,3 +220,7 @@ website consumer has been migrated and the retirement conditions in section 7
 have passed.
 
 **PREREQUISITE STATE-SOURCE SEPARATION: PASS**
+## 12. Mandatory Web Data API security baseline
+
+All implementation and migration of the dedicated read-only operational-data interface MUST follow `docs/architecture/web-data-api-security.md`. That contract applies to the entire Frontend V2 data boundary, not only the first WW Seasonal Advice resource. Security validation is a release gate: no direct public Pi port, authenticated/authorized HTTPS access through the approved external boundary, strict read-only method/resource allowlists, minimal CORS, bounded queries, response-field minimization and failure isolation from control.
+
