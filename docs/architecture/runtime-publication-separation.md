@@ -33,7 +33,7 @@ Repository history on 18 September 2026 proves multiple automatic runtime public
 | rolling Planner Shadow publisher | `docs/data/energy-planner-shadow.json` | ~1 min | rolling Homey/shadow plan snapshot | observability only |
 | Dynamic Pi Planner shadow publisher | `docs/data/energy-planner-shadow-dynamic.json` | observed ~15 min | Pi dynamic planner/forecast snapshot | PURE_SHADOW / none |
 | Pi Planner shadow publisher | `docs/data/energy-planner-shadow-pi.json` | observed | Pi planner snapshot | observability/shadow |
-| EV control-status publisher | `docs/data/ev-control-status.json` | multiple writes/min observed | EV execution/status observability | none |
+| EV control-status publisher | `docs/data/ev-control-status.json` | disabled 19 Sep 2026 | EV execution/status observability; retired from production | none |
 | day-series publication | `docs/data/energy-day-v2.json` | observed 30 min | current-day history series | history/presentation |
 
 The inventory is evidence-based, but not yet a claim that this is the complete set of all Pi/Homey timers. Live Pi systemd/Homey configuration must be cross-checked before retirement of any publisher.
@@ -49,7 +49,7 @@ The current website has explicit dependencies on repository runtime artifacts:
 | Energy history — current day | `docs/data/energy-day-v2.json` |
 | Energy history — compact archive | `docs/data/energy-daily-history.json` |
 | Energy history — full-resolution 7-day archive | `docs/data/energy-day-series-7d.json` |
-| EV status / diagnostics | `docs/data/ev-control-status.json` where consumed by legacy frontend |
+| EV status / diagnostics | no active frontend consumer; former `docs/data/ev-control-status.json` publication retired from production |
 
 The Pages workflow currently triggers on these runtime JSON paths. Runtime publication therefore causes source-branch mutations and potentially site rebuild/deploy activity. This is transitional technical debt, not the target architecture.
 
@@ -122,7 +122,7 @@ No force-push is permitted. Existing history is left intact.
 | `energy-planner-shadow-dynamic.json` | planner-current API | Planner consumer uses API; 96-slot/schema/timezone parity PASS |
 | `energy-planner-shadow-pi.json` | planner diagnostics API or retire if duplicate | consumer inventory proves requirement; equivalent available or consumer removed |
 | `energy-planner-shadow.json` | legacy planner diagnostics API or retire | all consumers identified and migrated/retired |
-| `ev-control-status.json` | EV status API | status/diagnostic consumers migrated; no control dependency confirmed |
+| `ev-control-status.json` | retire unless a future EV diagnostics UI requires an API | PASS: repository-wide consumer inventory found no runtime/frontend consumer; no control dependency; Homey publisher disabled 19 Sep 2026 |
 | `energy-day-v2.json` | day-history API | current-day graph/KPIs parity PASS |
 | `energy-daily-history.json` | daily-history API | historical day/week/month/year views use canonical history API |
 | `energy-day-series-7d.json` | bounded history API | full-resolution history consumer migrated and recovery semantics validated |
@@ -168,7 +168,11 @@ Additional acceptance criteria:
 **ENERGY-STATE CONSUMER MIGRATION: PASS**
 **ENERGY-STATE RUNTIME CUTOVER: PASS**
 **ENERGY-STATE GITHUB PUBLISHER: DISABLED / RETIRED FROM PRODUCTION**
+**EV CONTROL-STATUS GITHUB PUBLISHER: DISABLED / RETIRED FROM PRODUCTION**
+
 **LEGACY REPOSITORY CLEANUP: PENDING**
+
+On 19 September 2026 the Homey flow `EM v2 | 81 Observability | EV Control Status v0.4 CONTROL-REVISION` was disabled. Repository-wide consumer inventory found no runtime or frontend consumer of `docs/data/ev-control-status.json`; remaining references are documentation or historical evidence. Post-disable validation confirmed the Pi control endpoint remained `READY`, with Pi as planner owner, Homey as executor, fixed contract `ENGIE_3Y_2026_2029`, deadline control active and all control safety gates intact. The JSON artifact is retained temporarily as a frozen rollback/evidence snapshot and is no longer an allowed production dependency.
 
 On 19 September 2026 the private Pi-hosted frontend became the production EMS website for Live and Invoer. `GET /web/state/current` is the canonical production Live data boundary.
 
