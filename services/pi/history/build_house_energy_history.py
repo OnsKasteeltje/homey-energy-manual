@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Build household-energy intervals from cumulative Homey Core counters."""
 
+import argparse
 import sqlite3
 from pathlib import Path
 
 DB = Path("/home/jeroen/ems/data/ems-history.sqlite")
 MAX_NORMAL_GAP_SECONDS = 900
+COUNTER_DECREASE_EPSILON_KWH = 1e-6
+GAP_MULTIPLIER = 1.5
 
 COUNTERS = (
     ("grid_p1", "energy_import_kwh", "import_kwh"),
@@ -26,7 +29,7 @@ def _counter_rows(con):
         )
         args.extend((device_key, metric_key))
     sql = f"""
-        SELECT x.ts_utc, {", ".join(parts)}
+        SELECT x.ts_utc, MAX(x.source_resolution_seconds), {", ".join(parts)}
         FROM measurements x
         JOIN devices d ON d.id=x.device_id
         JOIN metrics m ON m.id=x.metric_id
@@ -73,19 +76,19 @@ def build(db_path=DB):
         previous = None
 
         for row in rows:
-            ts, *values = row
+            ts, source_resolution_seconds, *values = row
             if any(value is None for value in values):
-                # Cumulative counters allow safe bridging across incomplete snapshots.
-                # Keep the last complete snapshot; the resulting interval is quality-marked
-                # as a gap when it exceeds MAX_NORMAL_GAP_SECONDS.
+                # Cumulative counters permit bridging incomplete intermediate snapshots.
+                # Retain the last complete baseline; the next complete point forms the
+                # interval and is quality-marked as a gap when it exceeds 1.5x the expected source resolution.
                 continue
             values = tuple(float(value) for value in values)
 
             if previous is None:
-                previous = (ts, values)
+                previous = (ts, source_resolution_seconds, values)
                 continue
 
-            prev_ts, prev_values = previous
+            prev_ts, prev_resolution, prev_values = previous
             seconds = int(con.execute(
                 "SELECT CAST((julianday(?) - julianday(?)) * 86400 AS INTEGER)",
                 (ts, prev_ts),
@@ -97,10 +100,12 @@ def build(db_path=DB):
             output = deltas
             if seconds <= 0:
                 reason = "NON_FORWARD_TIME"
-            elif any(delta < -1e-9 for delta in deltas):
+            elif any(delta < -COUNTER_DECREASE_EPSILON_KWH for delta in deltas):
                 reason = "COUNTER_DECREASE"
-            elif seconds > MAX_NORMAL_GAP_SECONDS:
-                quality = "gap"
+            else:
+                expected_resolution = max(MAX_NORMAL_GAP_SECONDS, int(source_resolution_seconds or prev_resolution or MAX_NORMAL_GAP_SECONDS))
+                if seconds > expected_resolution * GAP_MULTIPLIER:
+                    quality = "gap"
 
             if reason:
                 quality = "discontinuity"
@@ -134,7 +139,7 @@ def build(db_path=DB):
             """, (prev_ts, ts, seconds, imp, exp, se, gw42, gw20,
                   pv_total, house, quality, reason))
             written += 1
-            previous = (ts, values)
+            previous = (ts, source_resolution_seconds, values)
 
         con.commit()
         return {"rows": written, "counter_snapshots": len(rows)}
@@ -143,7 +148,10 @@ def build(db_path=DB):
 
 
 def main():
-    result = build()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--db", default=str(DB))
+    args = parser.parse_args()
+    result = build(Path(args.db))
     print(f"PASS: house_energy_intervals={result['rows']} counter_snapshots={result['counter_snapshots']}")
 
 

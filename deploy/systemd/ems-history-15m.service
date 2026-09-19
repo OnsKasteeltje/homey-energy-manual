@@ -1,8 +1,9 @@
 [Unit]
-Description=Build canonical EMS 15-minute measurement history
+Description=Build canonical EMS derived energy history
 After=local-fs.target
 
 [Service]
 Type=oneshot
 User=jeroen
 ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/history/build_15m_history.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/history/build_house_energy_history.py

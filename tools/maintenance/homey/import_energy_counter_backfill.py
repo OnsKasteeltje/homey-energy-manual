@@ -57,6 +57,8 @@ def import_file(input_path, db_path=DB):
     try:
         target_ids = {name: ids(con, *target) for name, target in SERIES.items()}
         for name, entries in data.items():
+            if isinstance(entries, dict):
+                entries = entries.get("entries")
             if not isinstance(entries, list):
                 raise ValueError(f"SERIES_INVALID:{name}")
             device_id, metric_id = target_ids[name]
@@ -71,7 +73,7 @@ def import_file(input_path, db_path=DB):
                 con.execute(
                     """INSERT OR IGNORE INTO measurements
                        (ts_utc,device_id,metric_id,value_real,quality,
-                        source_resolution_seconds,collected_at)
+                        source_resolution_seconds,collected_at_utc)
                        VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)""",
                     (ts, device_id, metric_id, float(value), "backfill", resolution),
                 )
