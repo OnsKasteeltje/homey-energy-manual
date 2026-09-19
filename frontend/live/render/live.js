@@ -16,8 +16,10 @@ function render(s) {
   set("balance-state", s.balanceValid ? "P1 actueel" : "P1 niet actueel");
   set("tesla-power", formatPower(s.tesla));
   set("tesla-state", s.teslaCharging ? `laden${s.teslaRequestedA ? ` · ${s.teslaRequestedA} A` : ""}` : s.teslaConnected ? "aangesloten" : "niet aangesloten");
+  const wwFlowNode = $("ww-flow-node");
+  if (wwFlowNode) wwFlowNode.hidden = !s.wwBoilerMode;
   set("ww-power", formatPower(s.ww));
-  set("ww-state", s.wwBoilerMode ? (s.wwOn ? "Boiler · verwarmen" : "Boiler") : "CV · warm water");
+  set("ww-state", s.wwOn ? "Boiler · verwarmen" : "Boiler");
   set("heat-power", formatPower(s.heat));
   set("heat-state", s.heatOn ? "warmtevraag" : "stand-by");
   set("other-power", formatPower(s.other));
