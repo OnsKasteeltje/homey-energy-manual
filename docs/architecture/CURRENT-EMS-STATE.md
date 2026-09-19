@@ -203,6 +203,8 @@ The Web Data API security baseline is mandatory and canonical in `docs/architect
 
 Runtime validation on 2026-09-19 confirmed the initial Web Data API service on Pi localhost `127.0.0.1:3200`: the WW Seasonal Advice resource returned the canonical advisor projection, unsupported POST returned HTTP 405, and no LAN/public listener was introduced. The systemd unit intentionally contains no repository-relative `Documentation=` directive; canonical documentation remains repository-owned rather than encoded as an invalid systemd URL.
 
+The next private V2 hosting boundary is repository-defined but not yet deployed: Caddy serves the Pi-local V2 files on the router-reserved wired LAN address `192.168.1.42` only and proxies `/web/*` to the localhost Web Data API. The reserved Wi-Fi address `192.168.1.45`, Docker interfaces and wildcard listeners are intentionally excluded. Remote browser access is to be added separately through Tailscale without Funnel. Deployment source is `deploy/caddy/ems-frontend-v2.Caddyfile`; staging helper is `deploy/install/install_private_frontend_v2.sh`. No Caddy package/service or Tailscale Serve configuration is activated by this repository change.
+
 The touched legacy `src/pi/ems-runtime/thermal/` subsystem is removed in this release. Its Quatt collector moves to the canonical integration boundary and its duplicate thermal observer is retired. The active general planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path is a separate high-risk migration and is explicitly outside this release.
 
 ## 12. Battery boundary
