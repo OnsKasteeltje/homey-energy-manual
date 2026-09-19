@@ -290,15 +290,29 @@ def history_resource(kind, value):
         "pvGoodWe2000KWh", "pvKWh", "houseKWh",
     )
     buckets = {}
-    cursor = _bucket_start(start_local, bucket_kind)
-    while cursor < end_local:
-        nxt = _next_bucket(cursor, bucket_kind)
-        buckets[_utc_text(cursor)] = {
-            "start": cursor.isoformat(), "end": nxt.isoformat(),
-            **{name: 0.0 for name in fields},
-            "coveredSeconds": 0, "gapCount": 0, "discontinuityCount": 0,
-        }
-        cursor = nxt
+    if bucket_kind == "hour":
+        cursor_utc = start_local.astimezone(timezone.utc)
+        end_cursor_utc = end_local.astimezone(timezone.utc)
+        while cursor_utc < end_cursor_utc:
+            nxt_utc = min(cursor_utc + timedelta(hours=1), end_cursor_utc)
+            cursor = cursor_utc.astimezone(LOCAL_TZ)
+            nxt = nxt_utc.astimezone(LOCAL_TZ)
+            buckets[_utc_text(cursor)] = {
+                "start": cursor.isoformat(), "end": nxt.isoformat(),
+                **{name: 0.0 for name in fields},
+                "coveredSeconds": 0, "gapCount": 0, "discontinuityCount": 0,
+            }
+            cursor_utc = nxt_utc
+    else:
+        cursor = _bucket_start(start_local, bucket_kind)
+        while cursor < end_local:
+            nxt = _next_bucket(cursor, bucket_kind)
+            buckets[_utc_text(cursor)] = {
+                "start": cursor.isoformat(), "end": nxt.isoformat(),
+                **{name: 0.0 for name in fields},
+                "coveredSeconds": 0, "gapCount": 0, "discontinuityCount": 0,
+            }
+            cursor = nxt
 
     valid_seconds = 0
     gaps = 0
