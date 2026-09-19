@@ -16,6 +16,8 @@ TARGET_HOMEY_EGRESS_SOURCE="$REPO/services/pi/integrations/homey/egress"
 TARGET_HOMEY_EGRESS_RUNTIME="$RUNTIME/homey-deploy"
 TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
 TARGET_STATUS_RUNTIME="$RUNTIME/status-api"
+TARGET_WEB_DATA_SOURCE="$REPO/services/pi/api/web-data"
+TARGET_WEB_DATA_RUNTIME="$RUNTIME/web-data-api"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 SYSTEMD="$REPO/deploy/systemd"
 
@@ -28,6 +30,7 @@ echo "Honeywell: $TARGET_HONEYWELL_SOURCE"
 echo "Homey in:  $TARGET_HOMEY_INGRESS_FILE"
 echo "Homey out: $TARGET_HOMEY_EGRESS_SOURCE"
 echo "Status API:$TARGET_STATUS_SOURCE"
+echo "Web API:   $TARGET_WEB_DATA_SOURCE"
 echo "Runtime:   $RUNTIME"
 echo
 
@@ -211,6 +214,32 @@ else
 fi
 
 echo
+echo
+echo "=== TARGET-STRUCTURE WEB DATA API FILES ==="
+if [[ ! -d "$TARGET_WEB_DATA_RUNTIME" ]]; then
+    echo "MISSING: $TARGET_WEB_DATA_RUNTIME"
+    FAIL=1
+else
+    while IFS= read -r rel; do
+        src="$TARGET_WEB_DATA_SOURCE/$rel"
+        dst="$TARGET_WEB_DATA_RUNTIME/$rel"
+        if [[ ! -f "$dst" ]]; then
+            echo "MISSING: web-data-api/$rel"
+            FAIL=1
+            continue
+        fi
+        if ! cmp -s "$src" "$dst"; then
+            echo "DRIFT:   web-data-api/$rel"
+            FAIL=1
+        fi
+    done < <(
+        cd "$TARGET_WEB_DATA_SOURCE" && find . -type f \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort
+    )
+fi
+
 echo "=== EMS PERFORMANCE COMMAND ==="
 if [[ ! -L "$PERFORMANCE_COMMAND" ]]; then
     echo "MISSING: $PERFORMANCE_COMMAND symlink"
