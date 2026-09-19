@@ -190,6 +190,11 @@ class HistoryResourceTest(unittest.TestCase):
         self.assertTrue(result["period"]["start"].startswith("2026-09-14T00:00:00"))
         self.assertEqual(len(result["series"]), 7)
 
+    def test_day_bucket_count_follows_amsterdam_dst(self):
+        server.HISTORY_DB = self.make_db([])
+        self.assertEqual(len(server.history_resource("day", "2026-03-29")["series"]), 23)
+        self.assertEqual(len(server.history_resource("day", "2026-10-25")["series"]), 25)
+
     def test_invalid_period_fails_closed(self):
         server.HISTORY_DB = self.make_db([])
         with self.assertRaises(ValueError):
