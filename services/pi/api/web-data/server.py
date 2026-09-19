@@ -100,7 +100,7 @@ def state_current_resource():
     allowed_top = {
         "meta": ("generated_at", "state_age_sec"),
         "grid": ("power_w",),
-        "pv": ("total_w",),
+        "pv": ("total_w", "solaredge_w", "goodwe_4200_w", "goodwe_2000_w"),
         "quatt": ("power_w", "thermostat_heating_on"),
         "energy_budget": ("other_house_load_w",),
         "tesla": (
@@ -120,12 +120,26 @@ def state_current_resource():
 
     balance = source.get("balance")
     gate = balance.get("control_gate") if isinstance(balance, dict) else None
+    source_timing = balance.get("source_timing") if isinstance(balance, dict) else None
+    freshness = source_timing.get("freshness") if isinstance(source_timing, dict) else None
     result["balance"] = {
         "control_gate": {
             "grid_measurement_valid": gate.get("grid_measurement_valid")
             if isinstance(gate, dict) else None
         }
     }
+    result["pv"]["sources"] = {}
+    for api_name, source_name in (
+        ("solarEdge", "solarEdge"),
+        ("goodWe4200", "goodWe4200"),
+        ("goodWe2000", "goodWe2000"),
+    ):
+        quality = freshness.get(source_name) if isinstance(freshness, dict) else None
+        result["pv"]["sources"][api_name] = {
+            "fresh": quality.get("fresh") if isinstance(quality, dict) else None,
+            "age_sec": quality.get("ageSec") if isinstance(quality, dict) else None,
+            "max_age_sec": quality.get("maxAgeSec") if isinstance(quality, dict) else None,
+        }
 
     hot_water = source.get("hot_water")
     control = hot_water.get("control") if isinstance(hot_water, dict) else None
