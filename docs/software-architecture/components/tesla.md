@@ -192,3 +192,31 @@ end-to-end PASS vereist live device validation
 ```
 
 Legacy automatische Tesla-flows mogen niet parallel physical writes uitvoeren. Handmatige flows mogen alleen bestaan wanneer zij expliciet handmatig zijn en niet concurreren met automatic control.
+
+
+## Live validation 2026-09-19: deadline command propagation and infeasibility observability
+
+A live V2 deadline update from current SOC 43% to target SOC 70%, deadline 17:45 Europe/Amsterdam and maximum 14 A validated the command/state/planner/execution chain.
+
+Observed canonical Pi state after command acceptance:
+
+- `remaining_kwh = 14.85`, consistent with 27 percentage points at the configured 0.55 kWh/% calibration;
+- `deadline_at = 2026-09-19T15:45:00Z` (17:45 CEST);
+- `latest_start_at = 2026-09-19T14:12:45.838Z` (16:12:45 CEST);
+- `deadline_max_a = 14`;
+- manager intent `TESLA_CHARGE_DEADLINE` with priority `MUST`;
+- physical charging approximately 9.9 kW at 3x14 A.
+
+The 16:33 forecast-chain run rebuilt the dynamic plan and website shadow. The resulting `deadlinePlan` correctly contained `remainingKWh = 14.85`, the updated `latestStartAtInput`, `inferredMaxA = 14`, `reserveNeedKWh = 14.85`, five remaining deadline slots and `reserveAddedKWh = 12.075`. Because the latest safe start had already passed, `feasibleWithinVisibleHorizon = false` was correct: the remaining planner horizon could no longer allocate the full requested energy before the deadline.
+
+This validation establishes several diagnostic rules:
+
+1. A previously published planner/website snapshot may legitimately show an older deadline target until the next forecast-chain rebuild. Compare `generatedAt` before diagnosing stale-input failure.
+2. Canonical runtime truth for the active EV requirement is `/home/jeroen/ems/data/energy-state-v2.json`; website/shadow artifacts are derived observability outputs and are not control authority.
+3. `/control/current` exposes deadline execution semantics in the realtime EV envelope (for example `deadlineActive`, `deadlineMax_A` and `deadlineRequiredSlot`); absence of a convenient top-level deadline object is not evidence that the deadline was lost.
+4. When a deadline becomes infeasible after a late target increase, realtime/Homey execution must continue maximum safe deadline catch-up. Planner infeasibility is an observability/planning result, not a reason to stop charging.
+5. Diagnosis must distinguish `remainingKWh` (total unmet requirement) from `reserveAddedKWh` (energy still schedulable in remaining visible slots).
+
+### Observability improvement
+
+Frontend/planner presentation should explicitly expose deadline infeasibility instead of only a boolean. When `feasibleWithinVisibleHorizon = false`, presentation should communicate that maximum catch-up charging is active and show the expected shortfall where it can be derived safely. Useful fields include required remaining kWh, schedulable/reserved kWh, estimated deficit kWh and, where the calibration contract is available, an estimated SOC shortfall. This is presentation/observability only and must not introduce a second deadline policy or execution owner.
