@@ -20,9 +20,18 @@ ENERGY_STATE_FILE = os.environ.get(
     "EMS_ENERGY_STATE_FILE",
     "/home/jeroen/ems/data/energy-state-v2.json",
 )
+TESLA_COMMAND_FILE = os.environ.get(
+    "EMS_TESLA_COMMAND_FILE",
+    "/home/jeroen/ems/repo/homey-energy-manual/docs/data/tesla-deadline-command.json",
+)
+EMS_SETTINGS_COMMAND_FILE = os.environ.get(
+    "EMS_SETTINGS_COMMAND_FILE",
+    "/home/jeroen/ems/repo/homey-energy-manual/docs/data/ems-settings-command.json",
+)
 
 API_SCHEMA = "EMS_WEB_WW_SEASONAL_ADVICE_V1"
 STATE_API_SCHEMA = "EMS_WEB_STATE_CURRENT_V1"
+COMMANDS_API_SCHEMA = "EMS_WEB_COMMANDS_CURRENT_V1"
 ALLOWED_ADVICE = {
     "KEEP_CURRENT",
     "ADVISE_SWITCH_TO_CV",
@@ -126,6 +135,61 @@ def state_current_resource():
     return result
 
 
+def commands_current_resource():
+    """Return the allowlisted last-accepted command state required by Invoer V2."""
+    tesla = load_json(TESLA_COMMAND_FILE)
+    settings = load_json(EMS_SETTINGS_COMMAND_FILE)
+
+    current_soc = tesla.get("currentSoc")
+    target_soc = tesla.get("targetSoc")
+    max_a = tesla.get("maxA")
+    deadline = tesla.get("deadline")
+    request_id = tesla.get("requestId")
+    active = tesla.get("active")
+
+    if not isinstance(active, bool):
+        raise ValueError("TESLA_ACTIVE_INVALID")
+    if not isinstance(current_soc, (int, float)) or isinstance(current_soc, bool) or not 0 <= current_soc <= 99:
+        raise ValueError("TESLA_CURRENT_SOC_INVALID")
+    if not isinstance(target_soc, (int, float)) or isinstance(target_soc, bool) or not 1 <= target_soc <= 100:
+        raise ValueError("TESLA_TARGET_SOC_INVALID")
+    if target_soc <= current_soc:
+        raise ValueError("TESLA_TARGET_SOC_INVALID")
+    if not isinstance(max_a, (int, float)) or isinstance(max_a, bool) or not 6 <= max_a <= 16:
+        raise ValueError("TESLA_MAX_A_INVALID")
+    if not isinstance(deadline, str) or not deadline:
+        raise ValueError("TESLA_DEADLINE_INVALID")
+    if not isinstance(request_id, str) or not request_id:
+        raise ValueError("TESLA_REQUEST_ID_INVALID")
+
+    contract_type = settings.get("contractType")
+    hot_water_source = settings.get("hotWaterSource")
+    settings_request_id = settings.get("requestId")
+    if contract_type not in {"FIXED", "DYNAMIC"}:
+        raise ValueError("SETTINGS_CONTRACT_TYPE_INVALID")
+    if hot_water_source not in {"CV", "BOILER"}:
+        raise ValueError("SETTINGS_HOT_WATER_SOURCE_INVALID")
+    if not isinstance(settings_request_id, str) or not settings_request_id:
+        raise ValueError("SETTINGS_REQUEST_ID_INVALID")
+
+    return {
+        "schema": COMMANDS_API_SCHEMA,
+        "tesla": {
+            "active": active,
+            "currentSoc": current_soc,
+            "targetSoc": target_soc,
+            "deadline": deadline,
+            "maxA": max_a,
+            "requestId": request_id,
+        },
+        "settings": {
+            "contractType": contract_type,
+            "hotWaterSource": hot_water_source,
+            "requestId": settings_request_id,
+        },
+    }
+
+
 def send_json(handler, status, payload, extra_headers=None):
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     handler.send_response(status)
@@ -154,6 +218,17 @@ class Handler(BaseHTTPRequestHandler):
         if path.path == "/web/state/current":
             try:
                 send_json(self, 200, state_current_resource())
+            except (OSError, json.JSONDecodeError, ValueError):
+                send_json(self, 503, {
+                    "schema": "EMS_WEB_ERROR_V1",
+                    "status": "UNAVAILABLE",
+                    "reason": "RESOURCE_UNAVAILABLE",
+                })
+            return
+
+        if path.path == "/web/commands/current":
+            try:
+                send_json(self, 200, commands_current_resource())
             except (OSError, json.JSONDecodeError, ValueError):
                 send_json(self, 503, {
                     "schema": "EMS_WEB_ERROR_V1",
