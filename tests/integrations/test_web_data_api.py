@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -125,6 +126,76 @@ class CommandsCurrentResourceTest(unittest.TestCase):
         })
         with self.assertRaises(ValueError):
             server.commands_current_resource()
+
+
+class HistoryResourceTest(unittest.TestCase):
+    def make_db(self, rows):
+        handle = tempfile.NamedTemporaryFile(delete=False)
+        handle.close()
+        path = handle.name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+        with sqlite3.connect(path) as db:
+            db.execute("""
+                CREATE TABLE house_energy_intervals (
+                    start_ts_utc TEXT NOT NULL,
+                    end_ts_utc TEXT NOT NULL PRIMARY KEY,
+                    duration_seconds INTEGER NOT NULL,
+                    import_kwh REAL, export_kwh REAL,
+                    pv_solaredge_kwh REAL, pv_goodwe4200_kwh REAL, pv_goodwe2000_kwh REAL,
+                    pv_total_kwh REAL, house_kwh REAL,
+                    quality TEXT NOT NULL, discontinuity_reason TEXT,
+                    updated_at_utc TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            db.executemany("""
+                INSERT INTO house_energy_intervals
+                (start_ts_utc,end_ts_utc,duration_seconds,import_kwh,export_kwh,
+                 pv_solaredge_kwh,pv_goodwe4200_kwh,pv_goodwe2000_kwh,
+                 pv_total_kwh,house_kwh,quality,discontinuity_reason)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            """, rows)
+        return path
+
+    def test_day_splits_coarse_interval_and_preserves_formula_components(self):
+        server.HISTORY_DB = self.make_db([
+            ("2026-01-01T00:00:00.000Z", "2026-01-01T06:00:00.000Z", 21600,
+             6.0, 1.0, 3.0, 1.2, 1.8, 6.0, 11.0, "observed", None),
+        ])
+        result = server.history_resource("day", "2026-01-01")
+        self.assertEqual(result["schema"], "EMS_WEB_HISTORY_V1")
+        self.assertEqual(result["period"]["timezone"], "Europe/Amsterdam")
+        self.assertEqual(result["period"]["bucket"], "hour")
+        self.assertEqual(len(result["series"]), 24)
+        self.assertAlmostEqual(result["summary"]["houseKWh"], 11.0)
+        self.assertAlmostEqual(result["summary"]["pvKWh"], 6.0)
+        self.assertAlmostEqual(result["summary"]["pvSolarEdgeKWh"], 3.0)
+        self.assertAlmostEqual(result["summary"]["pvGoodWe4200KWh"], 1.2)
+        self.assertAlmostEqual(result["summary"]["pvGoodWe2000KWh"], 1.8)
+        populated = [x for x in result["series"] if x["houseKWh"] > 0]
+        self.assertEqual(len(populated), 6)
+
+    def test_discontinuity_is_not_counted_as_energy(self):
+        server.HISTORY_DB = self.make_db([
+            ("2026-01-01T10:00:00.000Z", "2026-01-01T11:00:00.000Z", 3600,
+             None, None, None, None, None, None, None, "discontinuity", "counter_decrease"),
+        ])
+        result = server.history_resource("day", "2026-01-01")
+        self.assertEqual(result["summary"]["houseKWh"], 0.0)
+        self.assertEqual(result["quality"]["discontinuityCount"], 1)
+        self.assertLess(result["quality"]["coverage"], 1.0)
+
+    def test_week_uses_monday_as_local_calendar_start(self):
+        server.HISTORY_DB = self.make_db([])
+        result = server.history_resource("week", "2026-09-19")
+        self.assertTrue(result["period"]["start"].startswith("2026-09-14T00:00:00"))
+        self.assertEqual(len(result["series"]), 7)
+
+    def test_invalid_period_fails_closed(self):
+        server.HISTORY_DB = self.make_db([])
+        with self.assertRaises(ValueError):
+            server.history_resource("day", "2026-02-30")
+        with self.assertRaises(ValueError):
+            server.history_resource("month", "2026-13")
 
 
 if __name__ == "__main__":
