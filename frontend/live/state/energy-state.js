@@ -63,7 +63,7 @@ export function normalize(raw) {
 }
 
 export async function loadState() {
-  const response = await fetch(`${SOURCE}?t=${Date.now()}`, {cache: "no-store"});
+  const response = await fetch(SOURCE, {cache: "no-store"});
   if (!response.ok) throw new Error(`energy-state HTTP ${response.status}`);
   return normalize(await response.json());
 }
