@@ -7,7 +7,6 @@ control/device write path.
 import json
 import os
 import sqlite3
-from calendar import monthrange
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -333,28 +332,31 @@ def history_resource(kind, value):
         if quality == "gap":
             gaps += 1
 
-        local_end = (clipped_end - timedelta(microseconds=1)).astimezone(LOCAL_TZ)
-        key = _utc_text(_bucket_start(local_end, bucket_kind))
-        bucket = buckets.get(key)
-        if bucket is None:
-            continue
-        if quality == "gap":
-            bucket["gapCount"] += 1
-        if quality == "discontinuity":
-            bucket["discontinuityCount"] += 1
-            continue
-
-        # Intervals normally fit a presentation bucket. If one spans a boundary,
-        # apportion its energy by overlap to avoid double counting.
         row_seconds = max(1.0, (row_end - row_start).total_seconds())
-        fraction = min(1.0, overlap / row_seconds)
-        bucket["coveredSeconds"] += int(round(overlap))
-        for name, index in column_map.items():
-            value_num = row[index]
-            if value_num is not None:
-                amount = float(value_num) * fraction
-                bucket[name] += amount
-                totals[name] += amount
+        segment_start = clipped_start
+        while segment_start < clipped_end:
+            local_segment = segment_start.astimezone(LOCAL_TZ)
+            bucket_local = _bucket_start(local_segment, bucket_kind)
+            bucket_end_utc = _next_bucket(bucket_local, bucket_kind).astimezone(timezone.utc)
+            segment_end = min(clipped_end, bucket_end_utc)
+            segment_seconds = max(0.0, (segment_end - segment_start).total_seconds())
+            key = _utc_text(bucket_local)
+            bucket = buckets.get(key)
+            if bucket is not None:
+                if quality == "gap":
+                    bucket["gapCount"] += 1
+                if quality == "discontinuity":
+                    bucket["discontinuityCount"] += 1
+                else:
+                    bucket["coveredSeconds"] += int(round(segment_seconds))
+                    fraction = segment_seconds / row_seconds
+                    for name, index in column_map.items():
+                        value_num = row[index]
+                        if value_num is not None:
+                            amount = float(value_num) * fraction
+                            bucket[name] += amount
+                            totals[name] += amount
+            segment_start = segment_end
 
     requested_seconds = (end_local.astimezone(timezone.utc) - start_local.astimezone(timezone.utc)).total_seconds()
     series = []
