@@ -216,7 +216,7 @@ The legacy Tesla input is intentionally not modified solely to correct this usab
 
 ### 13.1 Invoer V2 read-state separation
 
-Invoer V2 keeps operational runtime state separate from command state. Current runtime timestamp and WW source are read from the private same-origin `GET /web/state/current` resource. Tesla deadline command values and EMS settings command values remain transitional command-state inputs until their own private read resources are deliberately migrated. The frontend MUST NOT infer a runtime contract mode from command state, and MUST NOT invent a `contract.mode` field when the canonical energy-state contract does not provide one.
+Invoer V2 keeps operational runtime state separate from command state. Current runtime timestamp and WW source are read from the private same-origin `GET /web/state/current` resource. Last accepted Tesla deadline and EMS settings command values are read from the private same-origin read-only `GET /web/commands/current` resource; that resource projects the existing canonical command-transfer files and does not accept writes. The existing authenticated Worker remains the Tesla command write boundary. Its non-secret browser configuration is staged as a static deployment asset for private V2. The frontend MUST NOT infer a runtime contract mode from command state, and MUST NOT invent a `contract.mode` field when the canonical energy-state contract does not provide one.
 
 ## 14. Shared V2 visual language
 
