@@ -5,7 +5,6 @@
 const STATE_VAR_ID = 'b0d68d98-efdb-41e4-be72-3bd6bdcc19eb'; // EM2_Public_State
 const TOKEN_VAR_ID = '33d0c297-0760-4fd1-810c-00ef4303974b'; // EM2_PI_State_Ingest_Token
 const PI_STATE_URL = 'http://192.168.1.42:3100/state/energy';
-const EXPECTED_SCHEMA = '2.12';
 const EXPECTED_PUBLISHER_PREFIX = 'EM2_CORE_STATE_';
 
 const [stateVar, tokenVar] = await Promise.all([
@@ -27,7 +26,7 @@ try {
 }
 
 if (!payload || typeof payload !== 'object') throw new Error('PI_STATE_PUSH_STATE_INVALID');
-if (payload?.meta?.schema_version !== EXPECTED_SCHEMA) throw new Error('PI_STATE_PUSH_SCHEMA_MISMATCH');
+if (!payload?.meta || typeof payload.meta.schema_version !== 'string' || !payload.meta.schema_version.trim()) throw new Error('PI_STATE_PUSH_SCHEMA_MISSING');
 if (!String(payload?.meta?.publisher_version ?? '').startsWith(EXPECTED_PUBLISHER_PREFIX)) {
   throw new Error('PI_STATE_PUSH_PUBLISHER_MISMATCH');
 }
