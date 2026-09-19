@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SOURCE = Path(__file__).resolve().parents[3] / "services/pi/api/web-data/server.py"
+SOURCE = Path(__file__).resolve().parents[2] / "services/pi/api/web-data/server.py"
 SPEC = importlib.util.spec_from_file_location("ems_web_data_server", SOURCE)
 server = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(server)
