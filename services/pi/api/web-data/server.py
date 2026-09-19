@@ -6,7 +6,10 @@ control/device write path.
 
 import json
 import os
-from datetime import datetime, timezone
+import sqlite3
+from calendar import monthrange
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
@@ -28,10 +31,13 @@ EMS_SETTINGS_COMMAND_FILE = os.environ.get(
     "EMS_SETTINGS_COMMAND_FILE",
     "/home/jeroen/ems/repo/homey-energy-manual/docs/data/ems-settings-command.json",
 )
+HISTORY_DB = os.environ.get("EMS_HISTORY_DB", "/home/jeroen/ems/data/ems-history.sqlite")
+LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
 API_SCHEMA = "EMS_WEB_WW_SEASONAL_ADVICE_V1"
 STATE_API_SCHEMA = "EMS_WEB_STATE_CURRENT_V1"
 COMMANDS_API_SCHEMA = "EMS_WEB_COMMANDS_CURRENT_V1"
+HISTORY_API_SCHEMA = "EMS_WEB_HISTORY_V1"
 ALLOWED_ADVICE = {
     "KEEP_CURRENT",
     "ADVISE_SWITCH_TO_CV",
@@ -204,6 +210,182 @@ def commands_current_resource():
     }
 
 
+
+def _history_period(kind, value):
+    """Resolve a strict path period to Europe/Amsterdam calendar boundaries."""
+    try:
+        if kind == "day":
+            if len(value) != 10:
+                raise ValueError
+            start = datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=LOCAL_TZ)
+            end = start + timedelta(days=1)
+            bucket = "hour"
+        elif kind == "week":
+            if len(value) != 10:
+                raise ValueError
+            anchor = datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=LOCAL_TZ)
+            start = anchor - timedelta(days=anchor.weekday())
+            end = start + timedelta(days=7)
+            bucket = "day"
+        elif kind == "month":
+            if len(value) != 7:
+                raise ValueError
+            start = datetime.strptime(value, "%Y-%m").replace(tzinfo=LOCAL_TZ)
+            end = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
+            bucket = "day"
+        elif kind == "year":
+            if len(value) != 4:
+                raise ValueError
+            start = datetime.strptime(value, "%Y").replace(tzinfo=LOCAL_TZ)
+            end = start.replace(year=start.year + 1)
+            bucket = "month"
+        else:
+            raise ValueError
+    except (TypeError, ValueError):
+        raise ValueError("HISTORY_PERIOD_INVALID")
+    return start, end, bucket
+
+
+def _utc_text(value):
+    return value.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _bucket_start(local_dt, bucket):
+    if bucket == "hour":
+        return local_dt.replace(minute=0, second=0, microsecond=0)
+    if bucket == "day":
+        return local_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    return local_dt.replace(month=local_dt.month, day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _next_bucket(local_dt, bucket):
+    if bucket == "hour":
+        return local_dt + timedelta(hours=1)
+    if bucket == "day":
+        return local_dt + timedelta(days=1)
+    if local_dt.month == 12:
+        return local_dt.replace(year=local_dt.year + 1, month=1)
+    return local_dt.replace(month=local_dt.month + 1)
+
+
+def history_resource(kind, value):
+    """Return bounded, read-only household energy history for Frontend V2."""
+    start_local, end_local, bucket_kind = _history_period(kind, value)
+    start_utc, end_utc = _utc_text(start_local), _utc_text(end_local)
+
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
+        rows = db.execute(
+            """
+            SELECT start_ts_utc,end_ts_utc,duration_seconds,import_kwh,export_kwh,
+                   pv_solaredge_kwh,pv_goodwe4200_kwh,pv_goodwe2000_kwh,
+                   pv_total_kwh,house_kwh,quality,discontinuity_reason
+            FROM house_energy_intervals
+            WHERE end_ts_utc > ? AND start_ts_utc < ?
+            ORDER BY end_ts_utc
+            """,
+            (start_utc, end_utc),
+        ).fetchall()
+
+    fields = (
+        "importKWh", "exportKWh", "pvSolarEdgeKWh", "pvGoodWe4200KWh",
+        "pvGoodWe2000KWh", "pvKWh", "houseKWh",
+    )
+    buckets = {}
+    cursor = _bucket_start(start_local, bucket_kind)
+    while cursor < end_local:
+        nxt = _next_bucket(cursor, bucket_kind)
+        buckets[_utc_text(cursor)] = {
+            "start": cursor.isoformat(), "end": nxt.isoformat(),
+            **{name: 0.0 for name in fields},
+            "coveredSeconds": 0, "gapCount": 0, "discontinuityCount": 0,
+        }
+        cursor = nxt
+
+    valid_seconds = 0
+    gaps = 0
+    discontinuities = 0
+    first_data = None
+    last_data = None
+    totals = {name: 0.0 for name in fields}
+    column_map = {
+        "importKWh": 3, "exportKWh": 4, "pvSolarEdgeKWh": 5,
+        "pvGoodWe4200KWh": 6, "pvGoodWe2000KWh": 7,
+        "pvKWh": 8, "houseKWh": 9,
+    }
+
+    for row in rows:
+        row_start = parse_timestamp(row[0])
+        row_end = parse_timestamp(row[1])
+        if row_start is None or row_end is None:
+            continue
+        clipped_start = max(row_start, start_local.astimezone(timezone.utc))
+        clipped_end = min(row_end, end_local.astimezone(timezone.utc))
+        overlap = max(0.0, (clipped_end - clipped_start).total_seconds())
+        if overlap <= 0:
+            continue
+        quality = row[10]
+        if quality == "discontinuity":
+            discontinuities += 1
+        else:
+            valid_seconds += overlap
+            first_data = min(first_data, clipped_start) if first_data else clipped_start
+            last_data = max(last_data, clipped_end) if last_data else clipped_end
+        if quality == "gap":
+            gaps += 1
+
+        local_end = (clipped_end - timedelta(microseconds=1)).astimezone(LOCAL_TZ)
+        key = _utc_text(_bucket_start(local_end, bucket_kind))
+        bucket = buckets.get(key)
+        if bucket is None:
+            continue
+        if quality == "gap":
+            bucket["gapCount"] += 1
+        if quality == "discontinuity":
+            bucket["discontinuityCount"] += 1
+            continue
+
+        # Intervals normally fit a presentation bucket. If one spans a boundary,
+        # apportion its energy by overlap to avoid double counting.
+        row_seconds = max(1.0, (row_end - row_start).total_seconds())
+        fraction = min(1.0, overlap / row_seconds)
+        bucket["coveredSeconds"] += int(round(overlap))
+        for name, index in column_map.items():
+            value_num = row[index]
+            if value_num is not None:
+                amount = float(value_num) * fraction
+                bucket[name] += amount
+                totals[name] += amount
+
+    requested_seconds = (end_local.astimezone(timezone.utc) - start_local.astimezone(timezone.utc)).total_seconds()
+    series = []
+    for bucket in buckets.values():
+        item = dict(bucket)
+        for name in fields:
+            item[name] = round(item[name], 6)
+        bucket_start = datetime.fromisoformat(item["start"])
+        bucket_end = datetime.fromisoformat(item["end"])
+        bucket_seconds = (bucket_end.astimezone(timezone.utc) - bucket_start.astimezone(timezone.utc)).total_seconds()
+        item["coverage"] = round(min(1.0, item.pop("coveredSeconds") / bucket_seconds), 6)
+        series.append(item)
+
+    return {
+        "schema": HISTORY_API_SCHEMA,
+        "period": {
+            "kind": kind, "requested": value, "timezone": "Europe/Amsterdam",
+            "start": start_local.isoformat(), "end": end_local.isoformat(),
+            "bucket": bucket_kind,
+        },
+        "summary": {name: round(value_num, 6) for name, value_num in totals.items()},
+        "series": series,
+        "quality": {
+            "coverage": round(min(1.0, valid_seconds / requested_seconds), 6),
+            "gapCount": gaps,
+            "discontinuityCount": discontinuities,
+            "firstDataAt": _utc_text(first_data) if first_data else None,
+            "lastDataAt": _utc_text(last_data) if last_data else None,
+        },
+    }
+
 def send_json(handler, status, payload, extra_headers=None):
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     handler.send_response(status)
@@ -227,6 +409,20 @@ class Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path)
         if path.query:
             send_json(self, 400, {"schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "QUERY_NOT_ALLOWED"})
+            return
+
+        parts = path.path.strip("/").split("/")
+        if len(parts) == 4 and parts[:2] == ["web", "history"] and parts[2] in {"day", "week", "month", "year"}:
+            try:
+                send_json(self, 200, history_resource(parts[2], parts[3]))
+            except ValueError:
+                send_json(self, 400, {
+                    "schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "HISTORY_PERIOD_INVALID",
+                })
+            except (OSError, sqlite3.Error):
+                send_json(self, 503, {
+                    "schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "RESOURCE_UNAVAILABLE",
+                })
             return
 
         if path.path == "/web/state/current":
