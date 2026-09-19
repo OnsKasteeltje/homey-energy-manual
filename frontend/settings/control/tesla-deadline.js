@@ -1,4 +1,4 @@
-const CONFIG="../config/tesla-control-config.json";
+const CONFIG="/settings/config/tesla-control-config.json";
 
 const $=id=>document.getElementById(id);
 let saving=false;
