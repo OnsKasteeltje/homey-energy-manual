@@ -207,6 +207,8 @@ Private V2 hosting is in controlled commissioning. The first runtime attempt pro
 
 Live V2 runtime-data migration is now repository-defined through `GET /web/state/current` (schema `EMS_WEB_STATE_CURRENT_V1`). The endpoint is an explicit allowlisted projection of canonical Pi `/home/jeroen/ems/data/energy-state-v2.json`; Live V2 reads this same-origin resource and has no GitHub runtime-data fallback. The existing GitHub energy-state publication remains transitional observability until runtime deployment/parallel validation and a deliberate retirement step are complete.
 
+Private V2 browser validation established that Web Data API resources reject query strings by design. Frontend read adapters use the stable same-origin resource URL together with `cache: "no-store"`; cache-busting query parameters are forbidden because they convert an otherwise valid resource read into HTTP 400. This preserves the fail-closed API contract without weakening it.
+
 The touched legacy `src/pi/ems-runtime/thermal/` subsystem is removed in this release. Its Quatt collector moves to the canonical integration boundary and its duplicate thermal observer is retired. The active general planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path is a separate high-risk migration and is explicitly outside this release.
 
 ## 12. Battery boundary
