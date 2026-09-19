@@ -1,0 +1,24 @@
+[Unit]
+Description=EMS read-only Web Data API
+After=network.target
+Documentation=docs/architecture/web-data-api-security.md
+
+[Service]
+Type=simple
+User=jeroen
+WorkingDirectory=/home/jeroen/ems/runtime/web-data-api
+Environment=EMS_WEB_DATA_HOST=127.0.0.1
+Environment=EMS_WEB_DATA_PORT=3200
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/web-data-api/server.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/home/jeroen/ems/data
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
