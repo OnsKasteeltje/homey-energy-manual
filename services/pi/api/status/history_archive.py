@@ -58,6 +58,34 @@ POWER_DEVICES = {
     },
 }
 
+COUNTER_DEVICES = {
+    "grid_p1": {
+        "spec": POWER_DEVICES["grid_p1"],
+        "metrics": {
+            "energy_import_kwh": ("grid", "energy_import_kwh"),
+            "energy_export_kwh": ("grid", "energy_export_kwh"),
+        },
+    },
+    "pv_solaredge": {
+        "spec": POWER_DEVICES["pv_solaredge"],
+        "metrics": {
+            "energy_produced_kwh": ("pv", "solaredge_energy_kwh"),
+        },
+    },
+    "pv_goodwe4200": {
+        "spec": POWER_DEVICES["pv_goodwe4200"],
+        "metrics": {
+            "energy_produced_kwh": ("pv", "goodwe_4200_energy_kwh"),
+        },
+    },
+    "pv_goodwe2000": {
+        "spec": POWER_DEVICES["pv_goodwe2000"],
+        "metrics": {
+            "energy_produced_kwh": ("pv", "goodwe_2000_energy_kwh"),
+        },
+    },
+}
+
 STATE_DEVICES = {
     "washer": {
         "source_device_id": "em2:washer",
@@ -192,6 +220,25 @@ def archive_state_history(payload, db_path=HISTORY_DB):
             "SELECT id FROM metrics WHERE metric_key='active'"
         ).fetchone()[0]
 
+        counter_metric_ids = {}
+        for metric_key, description in (
+            ("energy_import_kwh", "Cumulative lifetime grid import"),
+            ("energy_export_kwh", "Cumulative lifetime grid export"),
+            ("energy_produced_kwh", "Cumulative lifetime energy production"),
+        ):
+            con.execute(
+                """
+                INSERT OR IGNORE INTO metrics
+                (metric_key, unit, value_type, description)
+                VALUES (?, 'kWh', 'number', ?)
+                """,
+                (metric_key, description),
+            )
+            counter_metric_ids[metric_key] = con.execute(
+                "SELECT id FROM metrics WHERE metric_key=?",
+                (metric_key,),
+            ).fetchone()[0]
+
         inserted = 0
         skipped = 0
 
@@ -215,6 +262,26 @@ def archive_state_history(payload, db_path=HISTORY_DB):
                 (ts, device_id, power_metric_id, value, quality, resolution),
             )
             inserted += cur.rowcount
+
+        for device_key, counter_spec in COUNTER_DEVICES.items():
+            device_id = _ensure_device(con, device_key, counter_spec["spec"])
+            for metric_key, path in counter_spec["metrics"].items():
+                value = _number(_value_at(payload, path))
+                if value is None or value < 0:
+                    skipped += 1
+                    continue
+                cur = con.execute(
+                    """
+                    INSERT OR IGNORE INTO measurements
+                    (
+                        ts_utc, device_id, metric_id, value_real,
+                        quality, source_resolution_seconds
+                    )
+                    VALUES (?, ?, ?, ?, 'observed', ?)
+                    """,
+                    (ts, device_id, counter_metric_ids[metric_key], value, resolution),
+                )
+                inserted += cur.rowcount
 
         for device_key, spec in STATE_DEVICES.items():
             value = _value_at(payload, spec["path"])
