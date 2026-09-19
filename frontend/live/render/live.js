@@ -3,8 +3,23 @@ import {loadState, formatPower, formatLocalTime} from "../state/energy-state.js"
 const $ = (id) => document.getElementById(id);
 const set = (id, value) => { const el=$(id); if (el) el.textContent=value ?? "—"; };
 
+function pvAge(source) {
+  if (source.ageSec === null) return "geen tijdstempel";
+  const age = source.ageSec < 60 ? `${Math.round(source.ageSec)} s geleden` : `${Math.round(source.ageSec / 60)} min geleden`;
+  return source.fresh ? age : `${age} · vertraagd`;
+}
+
 function render(s) {
   set("pv-power", formatPower(s.pv));
+  const pvByKey = Object.fromEntries(s.pvSources.map((source) => [source.key, source]));
+  set("pv-se", formatPower(pvByKey.solarEdge?.power));
+  set("pv-se-age", pvByKey.solarEdge ? pvAge(pvByKey.solarEdge) : "—");
+  set("pv-gw42", formatPower(pvByKey.goodWe4200?.power));
+  set("pv-gw42-age", pvByKey.goodWe4200 ? pvAge(pvByKey.goodWe4200) : "—");
+  set("pv-gw20", formatPower(pvByKey.goodWe2000?.power));
+  set("pv-gw20-age", pvByKey.goodWe2000 ? pvAge(pvByKey.goodWe2000) : "—");
+  const freshCount = s.pvSources.filter((source) => source.fresh).length;
+  set("pv-summary", `${freshCount}/${s.pvSources.length} bronnen actueel`);
   set("grid-power", formatPower(s.grid === null ? null : Math.abs(s.grid)));
   set("grid-direction", s.gridDirection);
   const gridFlow = $("grid-flow");
