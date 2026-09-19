@@ -188,17 +188,26 @@ It is read-only and may reuse canonical field semantics and validated calculatio
 
 ## 13. Invoer V2 — explicit command semantics
 
-Invoer V2 MUST make a strict visual and semantic distinction between **observed/current state** and **user-entered command values**.
+Invoer V2 MUST make a strict visual and semantic distinction between **runtime state** and **user-entered command values**.
 
-For Tesla deadline input in particular:
+For a Tesla deadline command, all four command fields are explicitly entered by the user:
 
-- `Huidige SOC` and `Doel-SOC` MUST NOT mix placeholder semantics and persisted/input-value semantics in visually indistinguishable fields.
-- A visible number in an editable field MUST have one unambiguous meaning: either it is the actual command value that will be submitted, or it is clearly styled and labelled as non-submitted reference information.
-- Current/observed SOC SHOULD be presented separately from the editable command fields when this removes ambiguity.
-- Typing into an empty command field MUST behave as normal replacement/input; a user MUST NOT need to know whether an existing-looking number is a placeholder or a real value.
-- Before submission, the UI MUST make the complete command unambiguous: local deadline time, current SOC used for the command, target SOC and maximum charging current.
-- After a successful write, the UI MUST show the exact accepted command, for example: `Deadline 21:57 · 21% → 40% · max 10 A`.
+1. `Huidige SOC` — manually entered start SOC (%).
+2. `Doel-SOC` — manually entered target SOC (%).
+3. `Deadline` — manually entered local date/time.
+4. `Maximale laadstroom` — manually entered maximum charging current (A).
+
+The EMS currently has no Tesla interface that observes the vehicle SOC. Therefore:
+
+- `Huidige SOC` MUST NOT be presented or described as observed, measured or automatically retrieved Tesla state.
+- The four values above together form one explicit Tesla deadline command.
+- No command field may be silently replaced by an assumed, derived or purportedly observed value.
+- A visible number in an editable field MUST be the actual command value that will be submitted; placeholder/reference values MUST NOT be visually indistinguishable from command values.
+- Typing into an empty command field MUST behave as normal replacement/input.
+- Before submission, the UI MUST make the complete command unambiguous: manually entered current SOC, target SOC, Europe/Amsterdam deadline date/time and maximum charging current.
+- After a successful write, the UI MUST show the exact accepted command, for example: `21% → 40% · uiterlijk 21:57 · max 10 A`.
 - User-facing deadline times are entered and confirmed in Europe/Amsterdam local time; canonical timestamps may remain UTC internally.
+- The planner may use the accepted four-field command for deadline allocation, but the frontend MUST NOT invent Tesla telemetry that does not exist.
 - The command interface MUST be validated independently before Invoer V2 replaces the legacy Tesla input.
 
 The legacy Tesla input is intentionally not modified solely to correct this usability issue; the requirement is carried into the clean-room Invoer V2 implementation to avoid adding another compatibility patch to the legacy frontend.
