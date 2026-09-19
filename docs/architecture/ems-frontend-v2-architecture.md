@@ -252,4 +252,6 @@ Live V2 keeps realtime grid authority and PV observability deliberately separate
 - `GET /web/state/current` remains the allowlisted boundary. It projects the already canonical per-inverter power and source-timing freshness fields; the frontend does not poll inverter devices directly.
 - Unknown/stale inverter data MUST NOT silently be converted into a trustworthy physical House reconstruction.
 
+Energiehistorie V2 uses the same private read-only boundary with schema `EMS_WEB_HISTORY_V1`: `/web/history/day/YYYY-MM-DD`, `/week/YYYY-MM-DD`, `/month/YYYY-MM`, and `/year/YYYY`. Calendar interpretation is Europe/Amsterdam. The frontend receives house consumption, grid import/export, aggregate PV and SolarEdge/GoodWe 4200/GoodWe 2000 contributions together with explicit coverage/gap/discontinuity metadata; it must not infer missing history as zero. Day renders hourly buckets, week/month daily buckets and year monthly buckets. Query strings remain forbidden.
+
 Runtime validation on 2026-09-19 confirmed the private Web Data API exposes aggregate PV plus all three inverter powers and per-source freshness/age. The private Caddy-served Live V2 deployment was then validated end-to-end with the PV details markup present on the production route.
