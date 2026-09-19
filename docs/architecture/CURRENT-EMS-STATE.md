@@ -11,6 +11,8 @@
 
 Detailed bidirectional runtime chain: `docs/architecture/homey-pi-runtime-dataflow.md`.
 
+Canonical diagnostic source-of-truth and mandatory root-cause documentation rule: `docs/architecture/diagnostic-source-of-truth.md`. End-to-end troubleshooting MUST first identify the canonical source at each boundary; when root cause is established, reusable chain knowledge MUST be captured there before the investigation is considered architecturally complete.
+
 ## 1. Source of truth
 
 - GitHub `main` is authoritative for Pi runtime source, deployment definitions and architecture documentation.
