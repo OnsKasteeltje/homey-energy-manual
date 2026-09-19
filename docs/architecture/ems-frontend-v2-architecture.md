@@ -212,6 +212,12 @@ The EMS currently has no Tesla interface that observes the vehicle SOC. Therefor
 
 The legacy Tesla input is intentionally not modified solely to correct this usability issue; the requirement is carried into the clean-room Invoer V2 implementation to avoid adding another compatibility patch to the legacy frontend.
 
+
+
+### 13.1 Invoer V2 read-state separation
+
+Invoer V2 keeps operational runtime state separate from command state. Current runtime timestamp and WW source are read from the private same-origin `GET /web/state/current` resource. Tesla deadline command values and EMS settings command values remain transitional command-state inputs until their own private read resources are deliberately migrated. The frontend MUST NOT infer a runtime contract mode from command state, and MUST NOT invent a `contract.mode` field when the canonical energy-state contract does not provide one.
+
 ## 14. Shared V2 visual language
 
 V2 uses one coherent visual language across all migrated pages. Page-specific styles may define layout, but MUST NOT independently define a conflicting site palette.
