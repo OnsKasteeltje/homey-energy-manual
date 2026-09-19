@@ -118,7 +118,36 @@ Root cause of the apparent mismatch: a lagging GitHub website-publication artifa
 
 Reusable rule: after the Tesla command-transfer boundary, validate ingestion against Homey/Core and direct Pi runtime state. Do not use `docs/data/energy-state-v2.json` to decide whether Homey -> Pi runtime ingestion succeeded.
 
-## 6. Related canonical architecture
+
+
+## 6. Private V2 web-data diagnostic sequence
+
+The private Pi-hosted V2 read path is:
+
+```text
+canonical Pi runtime JSON
+ -> localhost Web Data API
+ -> Caddy same-origin /web/*
+ -> V2 state adapter
+ -> renderer
+```
+
+For a V2 page that loads but shows unavailable data, verify the chain in that order. A successful direct API response does not prove the browser request is accepted.
+
+The Web Data API intentionally rejects query strings. V2 adapters therefore MUST use the stable resource path with browser `cache: "no-store"`; they MUST NOT append cache-busting query parameters. Caddy and the API already return no-store semantics where applicable.
+
+Shortest safe recurrence check:
+
+```text
+1. curl http://127.0.0.1:3200/web/<resource>
+2. curl http://192.168.1.42/web/<resource>
+3. inspect the deployed adapter SOURCE
+4. request the exact URL constructed by that adapter
+```
+
+If step 2 succeeds but step 4 returns HTTP 400, inspect URL construction before changing API, Caddy, renderer or runtime state.
+
+## 7. Related canonical architecture
 
 - `docs/architecture/CURRENT-EMS-STATE.md`
 - `docs/architecture/homey-pi-runtime-dataflow.md`
