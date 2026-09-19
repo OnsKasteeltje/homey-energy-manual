@@ -10,7 +10,8 @@
 # No public ingress, router port-forward, or Tailscale Funnel is permitted.
 
 http://192.168.1.42 {
-    root * /home/jeroen/ems/runtime/frontend-v2
+    bind 192.168.1.42
+    root * /var/www/ems-frontend-v2
 
     handle /web/* {
         reverse_proxy 127.0.0.1:3200
