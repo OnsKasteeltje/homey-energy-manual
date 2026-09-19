@@ -16,8 +16,13 @@ WW_SEASONAL_FILE = os.environ.get(
     "EMS_WW_SEASONAL_FILE",
     "/home/jeroen/ems/data/ww-seasonal-advisor.json",
 )
+ENERGY_STATE_FILE = os.environ.get(
+    "EMS_ENERGY_STATE_FILE",
+    "/home/jeroen/ems/data/energy-state-v2.json",
+)
 
 API_SCHEMA = "EMS_WEB_WW_SEASONAL_ADVICE_V1"
+STATE_API_SCHEMA = "EMS_WEB_STATE_CURRENT_V1"
 ALLOWED_ADVICE = {
     "KEEP_CURRENT",
     "ADVISE_SWITCH_TO_CV",
@@ -75,6 +80,52 @@ def seasonal_advice_resource():
     }
 
 
+
+def state_current_resource():
+    """Return the allowlisted Live V2 projection of canonical Pi energy state."""
+    source = load_json(ENERGY_STATE_FILE)
+    meta = source.get("meta")
+    if not isinstance(meta, dict) or parse_timestamp(meta.get("generated_at")) is None:
+        raise ValueError("SOURCE_GENERATED_AT_INVALID")
+
+    allowed_top = {
+        "meta": ("generated_at", "state_age_sec"),
+        "grid": ("power_w",),
+        "pv": ("total_w",),
+        "quatt": ("power_w", "thermostat_heating_on"),
+        "energy_budget": ("other_house_load_w",),
+        "tesla": (
+            "connected", "charging", "power_w", "requested_a", "deadline_at",
+            "deadline_active", "need", "remaining_kwh",
+        ),
+        "hot_water": ("boiler_on", "boiler_power_w", "mode"),
+        "manager": ("decision", "reason", "priority"),
+    }
+
+    result = {"schema": STATE_API_SCHEMA}
+    for section, fields in allowed_top.items():
+        value = source.get(section)
+        if not isinstance(value, dict):
+            value = {}
+        result[section] = {name: value.get(name) for name in fields}
+
+    balance = source.get("balance")
+    gate = balance.get("control_gate") if isinstance(balance, dict) else None
+    result["balance"] = {
+        "control_gate": {
+            "grid_measurement_valid": gate.get("grid_measurement_valid")
+            if isinstance(gate, dict) else None
+        }
+    }
+
+    hot_water = source.get("hot_water")
+    control = hot_water.get("control") if isinstance(hot_water, dict) else None
+    result["hot_water"]["control"] = {
+        "action": control.get("action") if isinstance(control, dict) else None
+    }
+    return result
+
+
 def send_json(handler, status, payload, extra_headers=None):
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     handler.send_response(status)
@@ -98,6 +149,17 @@ class Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path)
         if path.query:
             send_json(self, 400, {"schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "QUERY_NOT_ALLOWED"})
+            return
+
+        if path.path == "/web/state/current":
+            try:
+                send_json(self, 200, state_current_resource())
+            except (OSError, json.JSONDecodeError, ValueError):
+                send_json(self, 503, {
+                    "schema": "EMS_WEB_ERROR_V1",
+                    "status": "UNAVAILABLE",
+                    "reason": "RESOURCE_UNAVAILABLE",
+                })
             return
 
         if path.path == "/web/ww/seasonal-advice":
