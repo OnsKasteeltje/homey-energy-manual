@@ -180,6 +180,8 @@ Historical persistence is intentionally **best-effort relative to live state acc
 
 The legacy `EM2_Day_History` / Homey Insights pull path remains useful only for explicit backfill or diagnostics. It is not a production live-history transport and must not have an automatic production timer.
 
+From Homey Core schema 2.13 onward, the same accepted push also archives cumulative lifetime energy observations in the canonical `measurements` table. P1 stores `energy_import_kwh` and `energy_export_kwh`; each of SolarEdge, GoodWe 4200 and GoodWe 2000 stores `energy_produced_kwh`. These observations are not interval energy. Historical day/week/month/year energy is derived later from validated counter deltas, with resets/replacements/rollovers represented as discontinuities and never as negative consumption/production. The three PV sources remain separate so aggregate PV and per-inverter PV detail/hover can be produced without reconstructing source contributions from an aggregate series.
+
 ### 2.7 Publication cadence
 
 The state path is push-based, not poll-based.
