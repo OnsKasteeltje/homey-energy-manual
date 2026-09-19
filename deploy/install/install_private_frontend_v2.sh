@@ -11,6 +11,8 @@ fi
 
 sudo install -d -o root -g root -m 0755 "$TARGET"
 sudo rsync -a --delete --chmod=D755,F644 "$ROOT/frontend/" "$TARGET/"
+sudo install -d -o root -g root -m 0755 "$TARGET/settings/config"
+sudo install -o root -g root -m 0644 "$ROOT/docs/data/tesla-control-config.json" "$TARGET/settings/config/tesla-control-config.json"
 sudo chown -R root:root "$TARGET"
 sudo install -D -m 0644 "$ROOT/deploy/caddy/ems-frontend-v2.Caddyfile" /etc/caddy/Caddyfile
 
