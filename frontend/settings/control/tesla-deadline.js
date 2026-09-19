@@ -74,6 +74,11 @@ async function save(){
   finally{setBusy(false);}
 }
 $("tesla-save")?.addEventListener("click",save);
+window.addEventListener("ems:tesla-command-rendered",()=>{
+  savedValues=values();
+  updateSaveButton();
+});
+
 ["current-soc","target-soc","deadline","max-a"].forEach(id=>{
   $(id)?.addEventListener("input",()=>{
     updateSaveButton();
