@@ -1,6 +1,6 @@
 # EMS Software Architecture - Live As-Is
 
-**Datum:** 17 september 2026
+**Datum:** 19 september 2026
 **Status:** Live-code synopsis  
 **Scope:** Raspberry Pi runtime + actieve Homey flows + actuele GitHub-architectuur  
 **Doel:** Vastleggen van de actuele softwarearchitectuur na cross-check van live Homey, Pi-controlarchitectuur en GitHub `main`.
@@ -12,7 +12,7 @@
 ```text
 HOMEY DEVICES / P1 / PV / EASEE / BOILER / QUATT
                          ↓
-                  HOMEY CORE v0.11n
+                  HOMEY CORE v0.11p
                          ↓
                 canonical Homey state
                          ↓
@@ -49,7 +49,7 @@ GitHub = canonical source voor software + architectuurdocumentatie
 
 ## 2. Homey Core is realtime state- en safety-contextlaag
 
-De actieve flow `EM v2 | 00 Core Tick | v0.11n PINNED SOURCE` leest en normaliseert onder andere:
+De actieve flow `EM v2 | 00 Core Tick | v0.11p PINNED SOURCE` leest en normaliseert onder andere:
 
 - P1/netmeting;
 - Tesla/Easee;
@@ -74,7 +74,9 @@ Homey blijft daarmee de realtime observatie-, normalisatie- en lokale safetylaag
 
 ## 3. Runtime data loopt rechtstreeks Homey → Pi
 
-De actieve `Pi State Push v2.0 DIRECT RUNTIME` verstuurt actuele state rechtstreeks naar de Pi-runtime. GitHub zit niet in de realtime control loop.
+De actieve `EM v2 | 05 Transport | Homey→Pi State Push v0.1` verstuurt `EM2_Public_State` rechtstreeks naar de Pi-runtime. De transportlaag vereist een aanwezige schema-identificatie en geldige publisher-family, maar bezit geen exacte schema-versiepolicy. De Pi-ingress is de semantische contractgrens: schema 2.13 is de actuele Homey Core-versie en de expliciet gereviewde compatibele ingest-set is `{2.12, 2.13}`; onbekende schema's worden fail-closed geweigerd. GitHub zit niet in de realtime control loop.
+
+Schema 2.13 voegt cumulatieve energietellers toe voor P1 import/export en SolarEdge/GoodWe-productie. Deze counters worden via dezelfde canonical state push naar de Pi gebracht en vormen de betrouwbare bron voor verdere Energiehistorie V2-opbouw; de transportlaag interpreteert deze velden niet.
 
 ```text
 CODE / DOCS  -> GitHub
@@ -332,7 +334,7 @@ Runtimecode en GitHub moeten aantoonbaar synchroon blijven. Architectuurgevoelig
 
 ---
 
-**Documentstatus:** Live As-Is architectuur, opnieuw gecrosscheckt op 13 september 2026.  
+**Documentstatus:** Live As-Is architectuur, opnieuw gecrosscheckt op 19 september 2026.  
 **Canonical current-state:** `docs/architecture/CURRENT-EMS-STATE.md`.
 
 
