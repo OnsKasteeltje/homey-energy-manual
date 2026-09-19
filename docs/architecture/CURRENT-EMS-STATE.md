@@ -197,6 +197,10 @@ The production runtime path remains `/home/jeroen/ems/runtime/planner/warm-water
 
 GitHub website publication is an external Pi egress integration and belongs under `services/pi/integrations/github/`; production scheduling belongs under `deploy/systemd/`.
 
+The target Frontend V2 operational-data boundary is the dedicated read-only EMS Web Data API under `services/pi/api/web-data/`. It is separate in responsibility and failure behaviour from the existing runtime/control status API. The Web Data API is presentation transport only: it has no EMS policy, optimizer, Homey/device write or actuator path. The initial resource is WW Seasonal Advice; the same boundary is intended to serve later Live, Planner, History and observability resources through explicitly versioned allowlisted contracts.
+
+The Web Data API security baseline is mandatory and canonical in `docs/architecture/web-data-api-security.md`. The origin is private and binds locally by default; no direct public Pi port or router port-forward is permitted. External browser access may be enabled only through the approved HTTPS security boundary with authentication/authorization enforced before origin forwarding. User command/write interfaces remain separate. Creating this foundation does not disable any existing GitHub runtime publication or change the live Homey↔Pi control path.
+
 The touched legacy `src/pi/ems-runtime/thermal/` subsystem is removed in this release. Its Quatt collector moves to the canonical integration boundary and its duplicate thermal observer is retired. The active general planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path is a separate high-risk migration and is explicitly outside this release.
 
 ## 12. Battery boundary
