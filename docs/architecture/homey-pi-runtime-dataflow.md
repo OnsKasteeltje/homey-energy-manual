@@ -4,7 +4,7 @@
 >
 > This document defines the two one-way runtime chains between Homey and the Raspberry Pi. The chains are deliberately asymmetric: Homey publishes observed state to the Pi; the Pi exposes bounded control commands for Homey to consume. Neither side may bypass the defined ownership boundary.
 
-**Status date:** 2026-09-14  
+**Status date:** 2026-09-19  
 **Repository:** `OnsKasteeltje/homey-energy-manual`
 
 ## 1. Architectural rule
@@ -57,7 +57,7 @@ Canonical chain:
 ```text
 Homey devices / P1 / PV / Easee / boiler / Quatt
                     ↓
-          Homey Core v0.11n
+          Homey Core v0.11p
                     ↓
             EM2_Public_State
                     ↓
@@ -93,11 +93,7 @@ Pi write endpoint:
 
 `POST /state/energy`
 
-Implemented by:
-
-- `src/pi/ems-runtime/status-api/server.py`
-- `src/pi/ems-runtime/status-api/state_ingest.py`
-- `src/pi/ems-runtime/status-api/history_archive.py`
+Canonical ingest implementation is under `services/pi/integrations/homey/ingress/`; deployment maps it to the stable runtime directory `/home/jeroen/ems/runtime/status-api/`. The live `state_ingest.py` must match the canonical repository source.
 
 Runtime service:
 
@@ -127,12 +123,14 @@ Required top-level objects:
 - `tesla`
 - `hot_water`
 
-Current required schema:
+Current state-contract compatibility:
 
-- `meta.schema_version = 2.12`
-- `meta.publisher_version` starts with `EM2_CORE_STATE_`
+- Homey Core v0.11p publishes `meta.schema_version = 2.13`;
+- Pi ingest explicitly accepts the reviewed compatible schema set `{2.12, 2.13}` and rejects unknown schema versions fail-closed;
+- `meta.publisher_version` must start with `EM2_CORE_STATE_`;
+- the Homey transport validates that a schema identifier is present, but deliberately does not own exact schema-version compatibility. Semantic compatibility is owned by Pi `state_ingest.py`.
 
-The canonical payload also carries the operational fields needed for local history, including P1, the three PV inverter powers, Tesla charging power, boiler power, Quatt electrical power and appliance state.
+Schema 2.13 adds cumulative energy counters used as the canonical basis for household energy history: P1 lifetime import/export and lifetime production counters for SolarEdge, GoodWe 4200 and GoodWe 2000. The payload continues to carry the operational fields needed for local history, including P1, the three PV inverter powers, Tesla charging power, boiler power, Quatt electrical power and appliance state.
 
 Freshness and ordering use:
 
@@ -363,7 +361,7 @@ Production planner generation should resume only after a genuinely fresh Homey C
 The Homey → Pi state direction is production-validated with genuine Core state:
 
 ```text
-Homey Core v0.11n
+Homey Core v0.11p / schema 2.13
   → EM2_Public_State
   → EM v2 | 05 Transport | Homey→Pi State Push v0.1
   → POST /state/energy
