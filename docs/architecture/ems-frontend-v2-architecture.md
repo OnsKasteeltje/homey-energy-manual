@@ -227,4 +227,7 @@ The current visual baseline is a light Tesla/Victron-inspired interface:
 - consistent navigation, badges, radii and state styling across Live, Invoer and future V2 pages.
 
 A V2 page migration MUST reuse this visual baseline rather than introducing its own dark/light theme. Future implementation SHOULD move these shared visual tokens and shell styles into `frontend/shared/` so there is one technical source of truth; this consolidation MUST NOT create an additional render layer or change page ownership.
+## 15. Web Data API security boundary
+
+Frontend V2 operational read data migrates to the single secured Web Data API boundary defined by `docs/architecture/web-data-api-security.md`. This contract applies across Live, Invoer read-state/advice, Energiehistorie, Planner and future V2 observability. Frontend code MUST NOT contain API secrets, treat CORS as authentication, bypass the approved API resource contracts, or turn the read-only boundary into a command path. Explicit user commands remain on their separate authenticated command interface.
 
