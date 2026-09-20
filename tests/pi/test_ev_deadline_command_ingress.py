@@ -27,7 +27,7 @@ VALID = {
 
 class TestDeadlineCommandIngress(unittest.TestCase):
     def test_amsterdam_local_deadline_is_valid(self):
-        self.assertIs(m.validate(dict(VALID)), VALID)
+        self.assertEqual(m.validate(dict(VALID)), VALID)
 
     def test_invalid_command_rejected(self):
         bad = dict(VALID, maxA=20)
