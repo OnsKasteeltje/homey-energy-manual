@@ -76,6 +76,13 @@ class TestEvDeadlineShadowState(unittest.TestCase):
         out = m.build(CMD, state("2026-09-20T00:01:00Z", power=5579, charging=True), first, NOW)
         self.assertEqual(out["deliveredKWh"], 0.0)
 
+    def test_watchdog_refresh_same_telemetry_does_not_double_integrate(self):
+        first = m.build(CMD, state("2026-09-20T00:00:00Z", power=5579, charging=True), {}, NOW)
+        second = m.build(CMD, state("2026-09-20T00:05:00Z", power=5579, charging=True), first, NOW)
+        refreshed = m.build(CMD, state("2026-09-20T00:05:00Z", power=5579, charging=True), second, NOW)
+        self.assertEqual(refreshed["deliveredKWh"], second["deliveredKWh"])
+        self.assertEqual(refreshed["lastTelemetryAt"], second["lastTelemetryAt"])
+
     def test_same_request_keeps_immutable_baseline(self):
         first = m.build(CMD, state("2026-09-20T00:00:00Z", meter=100.0), {}, NOW)
         out = m.build(CMD, state("2026-09-20T00:01:00Z", meter=102.5), first, NOW)
