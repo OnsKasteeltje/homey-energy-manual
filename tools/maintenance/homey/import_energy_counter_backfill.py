@@ -56,6 +56,19 @@ def import_file(input_path, db_path=DB):
     inserted = refined = skipped = 0
     try:
         target_ids = {name: ids(con, *target) for name, target in SERIES.items()}
+
+        # Backfill is authoritative only before canonical live observation starts.
+        # Homey Insights values are downsampled historical estimates and must not
+        # overlap the observed archive as if they were exact counter readings.
+        observed_starts = {}
+        for name, (device_id, metric_id) in target_ids.items():
+            row = con.execute(
+                """SELECT MIN(ts_utc) FROM measurements
+                   WHERE device_id=? AND metric_id=? AND quality='observed'""",
+                (device_id, metric_id),
+            ).fetchone()
+            observed_starts[name] = row[0] if row and row[0] else None
+
         for name, entries in data.items():
             if isinstance(entries, dict):
                 entries = entries.get("entries")
@@ -69,6 +82,10 @@ def import_file(input_path, db_path=DB):
                 value = entry.get("v")
                 if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
                     raise ValueError(f"VALUE_INVALID:{name}:{ts}")
+                observed_start = observed_starts[name]
+                if observed_start is not None and ts >= observed_start:
+                    skipped += 1
+                    continue
                 existing = con.execute(
                     """SELECT id,quality,source_resolution_seconds
                        FROM measurements
