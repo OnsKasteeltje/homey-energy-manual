@@ -7,6 +7,7 @@ UNIT_DIR="$ROOT_DIR/deploy/systemd"
 for unit in \
   ems-ev-deadline-state.service \
   ems-ev-deadline-state.path \
+  ems-ev-deadline-state.timer \
   ems-ev-deadline-command.service \
   ems-ev-deadline-command.timer \
   ems-ev-deadline-command.path
