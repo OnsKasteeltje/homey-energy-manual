@@ -69,6 +69,38 @@ def import_file(input_path, db_path=DB):
             ).fetchone()
             observed_starts[name] = row[0] if row and row[0] else None
 
+        # If the final backfill anchor immediately before live observation is
+        # already above the first observed counter value, that anchor is not a
+        # valid exact boundary reading. Exclude it from future imports as well.
+        conflicting_boundary = {}
+        for name, (device_id, metric_id) in target_ids.items():
+            observed_start = observed_starts[name]
+            conflicting_boundary[name] = None
+            if observed_start is None:
+                continue
+            first_observed = con.execute(
+                """SELECT value_real FROM measurements
+                   WHERE device_id=? AND metric_id=? AND quality='observed'
+                     AND ts_utc=?
+                   ORDER BY id LIMIT 1""",
+                (device_id, metric_id, observed_start),
+            ).fetchone()
+            previous_backfill = con.execute(
+                """SELECT ts_utc,value_real FROM measurements
+                   WHERE device_id=? AND metric_id=? AND quality='backfill'
+                     AND ts_utc < ?
+                   ORDER BY ts_utc DESC LIMIT 1""",
+                (device_id, metric_id, observed_start),
+            ).fetchone()
+            if (
+                first_observed
+                and previous_backfill
+                and previous_backfill[1] is not None
+                and first_observed[0] is not None
+                and previous_backfill[1] > first_observed[0]
+            ):
+                conflicting_boundary[name] = previous_backfill[0]
+
         for name, entries in data.items():
             if isinstance(entries, dict):
                 entries = entries.get("entries")
@@ -83,7 +115,10 @@ def import_file(input_path, db_path=DB):
                 if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
                     raise ValueError(f"VALUE_INVALID:{name}:{ts}")
                 observed_start = observed_starts[name]
-                if observed_start is not None and ts >= observed_start:
+                if (
+                    (observed_start is not None and ts >= observed_start)
+                    or ts == conflicting_boundary[name]
+                ):
                     skipped += 1
                     continue
                 existing = con.execute(
