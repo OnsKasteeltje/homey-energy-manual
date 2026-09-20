@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Build read-only Pi shadow state for Tesla deadline ownership migration.
 
-This component performs no Homey calls, no device writes and no control writes.
-It combines the existing website command-transfer artifact with canonical
-Homey->Pi telemetry. Until tesla.meter_kwh is deployed, it reports
-WAITING_FOR_METER_TELEMETRY and never claims deadline authority.
+Realtime deadline progress is derived from canonical Homey Core measured power.
+The Easee cumulative meter is deliberately only a session checkpoint: observed
+runtime behaviour shows that it can remain unchanged while charging and jump
+only after the session stops. This component performs no Homey calls, device
+writes or control writes.
 """
 
 import json
@@ -20,6 +21,8 @@ TZ = ZoneInfo("Europe/Amsterdam")
 EV_W_PER_A = 690
 MIN_A = 6
 MAX_A = 16
+MAX_INTEGRATION_GAP_S = 120
+MIN_CHARGE_POWER_W = 100
 
 
 def load(path, default=None):
@@ -41,6 +44,18 @@ def parse_deadline_local(value):
         return None
 
 
+def parse_utc(value):
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
 def finite_number(value):
     try:
         n = float(value)
@@ -56,11 +71,17 @@ def previous_for_request(previous, request_id):
 def build(command, energy_state, previous, now_utc=None):
     now_utc = now_utc or datetime.now(timezone.utc)
     tesla = energy_state.get("tesla") or {}
+    meta = energy_state.get("meta") or {}
     request_id = command.get("requestId")
     same = previous_for_request(previous, request_id)
 
+    meter = finite_number(tesla.get("meter_kwh"))
+    power_w = finite_number(tesla.get("power_w"))
+    telemetry_at = parse_utc(meta.get("generated_at"))
+    charging = tesla.get("charging") is True
+
     out = {
-        "schema": "EMS_PI_EV_DEADLINE_SHADOW_STATE_V0.1",
+        "schema": "EMS_PI_EV_DEADLINE_SHADOW_STATE_V0.2",
         "generatedAt": now_utc.isoformat().replace("+00:00", "Z"),
         "mode": "PURE_SHADOW",
         "readOnly": True,
@@ -76,10 +97,18 @@ def build(command, energy_state, previous, now_utc=None):
         "calibrationKWhPerPercent": command.get("calibrationKWhPerPercent"),
         "goalKWh": finite_number(command.get("goalKWh")),
         "maxA": finite_number(command.get("maxA")),
-        "meterKWh": finite_number(tesla.get("meter_kwh")),
+        "charging": charging,
+        "powerW": power_w,
+        "telemetryAt": telemetry_at.isoformat().replace("+00:00", "Z") if telemetry_at else None,
+        "lastTelemetryAt": same.get("lastTelemetryAt"),
+        "lastPowerW": finite_number(same.get("lastPowerW")),
+        "meterKWh": meter,
         "baselineMeterKWh": same.get("baselineMeterKWh"),
         "baselineCapturedAt": same.get("baselineCapturedAt"),
-        "deliveredKWh": same.get("deliveredKWh", 0.0),
+        "lastMeterCheckpointKWh": same.get("lastMeterCheckpointKWh"),
+        "lastMeterCheckpointObservedAt": same.get("lastMeterCheckpointObservedAt"),
+        "meterDeliveredKWh": same.get("meterDeliveredKWh"),
+        "deliveredKWh": finite_number(same.get("deliveredKWh")) or 0.0,
         "remainingKWh": same.get("remainingKWh"),
         "latestStartAt": same.get("latestStartAt"),
         "status": "INIT",
@@ -109,33 +138,60 @@ def build(command, energy_state, previous, now_utc=None):
         out["status"] = "INVALID_COMMAND"
         out["diagnostics"].append("MAX_A_INVALID")
         return out
-    if deadline <= now_utc:
-        out["status"] = "EXPIRED"
-        return out
-
-    meter = out["meterKWh"]
-    if meter is None:
-        if out["baselineMeterKWh"] is None:
-            out["status"] = "WAITING_FOR_METER_TELEMETRY"
-        else:
-            out["status"] = "METER_TELEMETRY_UNAVAILABLE"
-            out["diagnostics"].append("RETAINING_PREVIOUS_PROGRESS_FAIL_CLOSED")
-        return out
 
     baseline = finite_number(out["baselineMeterKWh"])
-    if baseline is None:
+    if baseline is None and meter is not None:
         baseline = meter
         out["baselineMeterKWh"] = round(baseline, 6)
         out["baselineCapturedAt"] = out["generatedAt"]
+        out["lastMeterCheckpointKWh"] = round(meter, 6)
+        out["lastMeterCheckpointObservedAt"] = out["telemetryAt"] or out["generatedAt"]
 
-    if meter + 1e-6 < baseline:
-        out["status"] = "METER_RESET_SUSPECTED"
-        out["diagnostics"].append("CURRENT_METER_BELOW_IMMUTABLE_BASELINE")
-        return out
+    # Realtime progress: integrate the PREVIOUS measured power over the bounded
+    # interval to the current canonical telemetry timestamp. This avoids using
+    # the new sample retroactively and never integrates across long/stale gaps.
+    delivered = finite_number(out["deliveredKWh"]) or 0.0
+    previous_at = parse_utc(same.get("lastTelemetryAt"))
+    previous_power = finite_number(same.get("lastPowerW"))
+    if telemetry_at and previous_at:
+        dt_s = (telemetry_at - previous_at).total_seconds()
+        if dt_s < 0:
+            out["diagnostics"].append("TELEMETRY_TIME_MOVED_BACKWARDS")
+        elif dt_s == 0:
+            pass
+        elif dt_s > MAX_INTEGRATION_GAP_S:
+            out["diagnostics"].append("TELEMETRY_GAP_NOT_INTEGRATED")
+        elif same.get("charging") is True and previous_power is not None and previous_power >= MIN_CHARGE_POWER_W:
+            delivered += previous_power * dt_s / 3_600_000.0
+    elif same and telemetry_at and not previous_at:
+        out["diagnostics"].append("PREVIOUS_TELEMETRY_TIMESTAMP_MISSING")
 
-    delivered = max(0.0, meter - baseline)
-    remaining = max(0.0, out["goalKWh"] - delivered)
-    out["deliveredKWh"] = round(delivered, 6)
+    out["deliveredKWh"] = round(max(0.0, delivered), 6)
+
+    # Easee meter is checkpoint-only. An unchanged value has no effect. A new
+    # value is recorded for validation, never used to pull realtime progress
+    # backwards or added to the power integral (which would double count).
+    if baseline is not None and meter is not None:
+        if meter + 1e-6 < baseline:
+            out["diagnostics"].append("METER_RESET_SUSPECTED_IGNORED_FOR_REALTIME_PROGRESS")
+        else:
+            meter_delivered = max(0.0, meter - baseline)
+            out["meterDeliveredKWh"] = round(meter_delivered, 6)
+            prior_checkpoint = finite_number(same.get("lastMeterCheckpointKWh"))
+            if prior_checkpoint is None or abs(meter - prior_checkpoint) > 1e-6:
+                out["lastMeterCheckpointKWh"] = round(meter, 6)
+                out["lastMeterCheckpointObservedAt"] = out["telemetryAt"] or out["generatedAt"]
+                if charging:
+                    out["diagnostics"].append("METER_CHANGED_DURING_ACTIVE_CHARGE")
+                else:
+                    out["diagnostics"].append("SESSION_END_METER_CHECKPOINT_OBSERVED")
+
+    # Persist the canonical sample for the next invocation.
+    if telemetry_at:
+        out["lastTelemetryAt"] = out["telemetryAt"]
+        out["lastPowerW"] = power_w
+
+    remaining = max(0.0, out["goalKWh"] - out["deliveredKWh"])
     out["remainingKWh"] = round(remaining, 6)
 
     max_kw = out["maxA"] * EV_W_PER_A / 1000
@@ -146,7 +202,15 @@ def build(command, energy_state, previous, now_utc=None):
 
     latest = deadline.timestamp() - hours_needed * 3600
     out["latestStartAt"] = datetime.fromtimestamp(latest, timezone.utc).isoformat().replace("+00:00", "Z")
-    out["status"] = "GOAL_COMPLETE" if remaining <= 1e-9 else "TRACKING"
+
+    if remaining <= 1e-9:
+        out["status"] = "GOAL_COMPLETE"
+    elif deadline <= now_utc:
+        out["status"] = "EXPIRED"
+    elif telemetry_at is None:
+        out["status"] = "WAITING_FOR_CANONICAL_TELEMETRY"
+    else:
+        out["status"] = "TRACKING"
     return out
 
 
