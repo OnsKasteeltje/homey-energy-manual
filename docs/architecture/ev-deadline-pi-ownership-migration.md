@@ -1,6 +1,6 @@
 # EV deadline Pi ownership — migration preparation
 
-Status: **MIGRATION IN PROGRESS — PI SHADOW, NO AUTHORITY CUTOVER**
+Status: **AUTHORITY CUTOVER COMPLETE — PI DEADLINE OWNER, HOMEY EXECUTOR/SAFETY**
 
 ## Objective
 
@@ -94,9 +94,9 @@ Pi shadow must not invent progress.
 - Expired deadline must have an explicit lifecycle state; expiry must not create a new baseline.
 - No live SoC may be inferred from delivered kWh.
 
-## Shadow parity
+## Validated migration evidence
 
-While the current Homey Goal Adapter remains authoritative, Pi shadow must compare at least:
+Before cutover, Pi shadow was compared with the historical Homey Goal Adapter across the following fields:
 
 | Field | Current Homey | Pi shadow |
 | --- | --- | --- |
@@ -109,13 +109,13 @@ While the current Homey Goal Adapter remains authoritative, Pi shadow must compa
 | deadline | Homey goal | command |
 | maxA | Homey goal | command |
 
-Cutover is blocked until real charging sessions demonstrate acceptable parity and lifecycle/failure cases have been tested.
+Cutover evidence includes the real 2026-09-20 deadline session replay, the 17-test Pi deadline suite, systemd validation, runtime command ingress/idempotency validation, and live Pi control-contract validation.
 
-## Future control contract
+## Live control contract
 
-When Pi becomes deadline owner, Homey must not continue deriving an independent deadline state. The Pi→Homey control envelope must carry the authoritative deadline execution inputs needed by the executor guard, rather than making the guard depend on duplicated Homey Logic goals.
+Pi is the deadline owner. `/control/current` publishes `EMS_PI_EV_DEADLINE_EXECUTION_V0.1` as the top-level `deadline` object. The contract is fail-closed, requires Pi authority and fresh canonical telemetry, and carries the authoritative deadline execution inputs needed by the Homey executor guard.
 
-The exact control-envelope change is deliberately **not** part of this preparation commit.
+The live Homey PI Dynamic Planner Bridge v1.3.0 consumes `cmd.deadline` and no longer derives deadline execution from `coreState.goals`. Homey remains the realtime executor/safety boundary and sole automatic Easee writer.
 
 ## Cutover sequence
 
@@ -124,17 +124,16 @@ The exact control-envelope change is deliberately **not** part of this preparati
 3. Implement Pi deadline consumer/state machine in shadow using canonical measured-power integration.
 4. Run parity over real deadline sessions.
 5. Define and validate Pi→Homey deadline execution contract (`EMS_PI_EV_DEADLINE_EXECUTION_V0.1`).
-6. Cut over deadline ownership to Pi.
-7. Disable/remove the historical Homey Goal Adapter command-processing role.
-8. Update canonical architecture state and retire obsolete documentation.
+6. **DONE 2026-09-20:** cut over deadline ownership to Pi; live Homey bridge consumes `cmd.deadline`.
+7. **DONE 2026-09-20:** historical Homey Goal Adapter v0.3 disabled (retained only for rollback; no active command-processing role).
+8. **IN PROGRESS:** update canonical architecture state and retire obsolete documentation.
 
 At every stage Homey remains the sole automatic physical Easee writer.
 
 
 ## Deprecation state
 
-The historical Homey Goal Adapter deadline derivation is **deprecated** as the target architecture. It remains temporarily present only because the current Homey exact-minute executor guard still consumes its Logic outputs. It must not be extended with new progress logic. Removal/disablement is blocked until the Pi→Homey control envelope carries the authoritative deadline execution fields and that path has been validated.
-
+The historical Homey Goal Adapter deadline derivation is **disabled as of 2026-09-20**. It is retained temporarily only as a rollback artifact and is not part of the active deadline decision chain. New deadline lifecycle/progress/planning logic belongs on Pi. The live Homey bridge consumes the Pi-owned execution contract; Homey continues to own realtime execution/safety and the sole physical Easee writer.
 
 ## Command ingress preparation
 
@@ -164,4 +163,4 @@ The prepared systemd topology is:
 - `ems-ev-deadline-state.path`: trigger derived state when canonical energy state changes;
 - `ems-ev-deadline-state.service`: one derived-state builder shared by both event sources.
 
-All units remain preparation-only until explicit Pi installation, verification and activation.
+The command/state units were installed, verified and activated on 2026-09-20. The command timer runs every 60 seconds; command and canonical-state path units trigger the shared derived-state builder.
