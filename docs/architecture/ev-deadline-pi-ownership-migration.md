@@ -1,6 +1,6 @@
 # EV deadline Pi ownership — migration preparation
 
-Status: **PREPARATION ONLY — NO RUNTIME CUTOVER**
+Status: **MIGRATION IN PROGRESS — PI SHADOW, NO AUTHORITY CUTOVER**
 
 ## Objective
 
@@ -108,7 +108,7 @@ The exact control-envelope change is deliberately **not** part of this preparati
 
 1. Prepare canonical `tesla.meter_kwh` source mapping in GitHub.
 2. Controlled minimal Core deployment and prove meter arrival on Pi.
-3. Implement Pi deadline consumer/state machine in shadow.
+3. Implement Pi deadline consumer/state machine in shadow using canonical measured-power integration.
 4. Run parity over real deadline sessions.
 5. Define and validate Pi→Homey deadline execution contract.
 6. Cut over deadline ownership to Pi.
@@ -116,3 +116,8 @@ The exact control-envelope change is deliberately **not** part of this preparati
 8. Update canonical architecture state and retire obsolete documentation.
 
 At every stage Homey remains the sole automatic physical Easee writer.
+
+
+## Deprecation state
+
+The historical Homey Goal Adapter deadline derivation is **deprecated** as the target architecture. It remains temporarily present only because the current Homey exact-minute executor guard still consumes its Logic outputs. It must not be extended with new progress logic. Removal/disablement is blocked until the Pi→Homey control envelope carries the authoritative deadline execution fields and that path has been validated.
