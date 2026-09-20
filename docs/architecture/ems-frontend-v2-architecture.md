@@ -269,3 +269,17 @@ The page presents:
 - API coverage, gaps and discontinuities as data-quality context.
 
 The canonical energy identity remains `house = import + PV - export`. Raw short-interval negative house values caused by asynchronous cumulative source counters MUST NOT be clamped or rewritten in the frontend. User-facing history uses the API presentation buckets (hour/day/month), preserving aggregate energy rather than claiming exact synchronized five-minute household consumption.
+
+
+### 17.1 Historical counter source precedence
+
+Cumulative-counter history has an explicit source boundary between Homey Insights backfill and the canonical live Pi archive.
+
+- Homey Insights backfill is historical bootstrap/refinement data only.
+- Before live observation starts, finer Homey backfill may refine coarser backfill at the same timestamp.
+- From the first `observed` live measurement for a counter onward, `observed` is authoritative and backfill MUST NOT be inserted or interleaved.
+- The final backfill anchor immediately before live observation MUST also be rejected when its cumulative value is above the first observed value, because that would create an artificial counter decrease at the source transition.
+- Existing `observed` rows are never overwritten by maintenance backfill.
+- A real temporal gap created by rejecting an invalid boundary anchor remains a gap; it MUST NOT be hidden by inventing energy, loosening counter-decrease tolerance, or clamping derived values.
+
+This precedence prevents downsampled Homey Insights values from being treated as exact point-in-time readings inside the live observed archive.
