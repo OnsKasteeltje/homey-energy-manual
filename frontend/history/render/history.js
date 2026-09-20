@@ -6,6 +6,21 @@ let kind = "day";
 let anchor = todayAmsterdam();
 let current = null;
 
+function isCurrentPeriod() {
+  const today = todayAmsterdam();
+  if (kind === "day") return anchor >= today;
+  if (kind === "month") return anchor.slice(0,7) >= today.slice(0,7);
+  if (kind === "year") return anchor.slice(0,4) >= today.slice(0,4);
+  if (kind === "week") {
+    return shiftAnchor("week", anchor, 1) > today;
+  }
+  return false;
+}
+
+function updateNavigation() {
+  $("period-next").disabled = isCurrentPeriod();
+}
+
 function kwh(value) { return `${Number(value || 0).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:2})} kWh`; }
 function pct(value) { return `${Math.round(Number(value || 0) * 100)}%`; }
 function dateLabel(data) {
@@ -61,10 +76,10 @@ function renderChart(data) {
 }
 async function refresh(){
   $("history-quality").textContent="Laden…";
-  try{current=await loadHistory(kind,anchor);renderSummary(current);renderChart(current);}
+  try{current=await loadHistory(kind,anchor);renderSummary(current);renderChart(current);updateNavigation();}
   catch(error){$("history-quality").textContent="History niet beschikbaar";$("chart-empty").hidden=false;$("chart-empty").textContent=error.message;$("history-chart").hidden=true;}
 }
 tabs.forEach(tab=>tab.addEventListener("click",()=>{kind=tab.dataset.kind;tabs.forEach(x=>x.classList.toggle("active",x===tab));refresh();}));
 $("period-prev").addEventListener("click",()=>{anchor=shiftAnchor(kind,anchor,-1);refresh();});
-$("period-next").addEventListener("click",()=>{anchor=shiftAnchor(kind,anchor,1);refresh();});
+$("period-next").addEventListener("click",()=>{if(!isCurrentPeriod()){anchor=shiftAnchor(kind,anchor,1);refresh();}});
 refresh();
