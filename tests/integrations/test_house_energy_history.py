@@ -80,7 +80,7 @@ def test_incomplete_snapshot_bridges_from_last_complete_snapshot(tmp_path):
     con.execute("INSERT INTO measurements VALUES (?,?,?,?,?)",
                 ("2026-09-19T20:10:00Z",1,1,100.2,300))
     con.commit()
-    _snapshot(con,"2026-09-19T20:20:00Z",100.4,50.1,1000.2,2000.3,3000.1)
+    _snapshot(con,"2026-09-19T20:25:00Z",100.4,50.1,1000.2,2000.3,3000.1)
     con.close()
     _load().build(db)
     con = sqlite3.connect(db)
@@ -91,7 +91,7 @@ def test_incomplete_snapshot_bridges_from_last_complete_snapshot(tmp_path):
     assert len(rows) == 1
     row = rows[0]
     assert row[0] == "2026-09-19T20:00:00Z"
-    assert row[1] == "2026-09-19T20:20:00Z"
+    assert row[1] == "2026-09-19T20:25:00Z"
     assert abs(row[2]-0.4) < 1e-9
     assert abs(row[3]-0.6) < 1e-9
     assert abs(row[4]-0.9) < 1e-9
