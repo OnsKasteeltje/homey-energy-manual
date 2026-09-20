@@ -59,9 +59,15 @@ class TestEvDeadlineShadowState(unittest.TestCase):
         self.assertEqual(out["meterDeliveredKWh"], 0.093)
         self.assertIn("SESSION_END_METER_CHECKPOINT_OBSERVED", out["diagnostics"])
 
-    def test_large_telemetry_gap_is_not_integrated(self):
+    def test_five_minute_canonical_interval_is_integrated(self):
         first = m.build(CMD, state("2026-09-20T00:00:00Z", power=5579, charging=True), {}, NOW)
         out = m.build(CMD, state("2026-09-20T00:05:00Z", power=5579, charging=True), first, NOW)
+        self.assertAlmostEqual(out["deliveredKWh"], 5579 * 300 / 3_600_000, places=6)
+        self.assertNotIn("TELEMETRY_GAP_NOT_INTEGRATED", out["diagnostics"])
+
+    def test_gap_beyond_canonical_margin_is_not_integrated(self):
+        first = m.build(CMD, state("2026-09-20T00:00:00Z", power=5579, charging=True), {}, NOW)
+        out = m.build(CMD, state("2026-09-20T00:08:00Z", power=5579, charging=True), first, NOW)
         self.assertEqual(out["deliveredKWh"], 0.0)
         self.assertIn("TELEMETRY_GAP_NOT_INTEGRATED", out["diagnostics"])
 
