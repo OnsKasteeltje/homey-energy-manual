@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh EV deadline derived state watchdog
+
+[Timer]
+OnBootSec=60s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Persistent=true
+Unit=ems-ev-deadline-state.service
+
+[Install]
+WantedBy=timers.target
