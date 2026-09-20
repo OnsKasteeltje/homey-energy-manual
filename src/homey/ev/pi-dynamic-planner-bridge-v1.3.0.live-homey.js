@@ -24,7 +24,7 @@ let realtime={schema:'EM2_EV_REALTIME_EXECUTION_V0.1',eligible:false,applied:fal
 const writeDiag=async(extra={})=>{try{if(!diagVar)diagVar=await Homey.logic.getVariable({id:IDS.diag});if(!diagVar)return;const obj={schema:'EM2_PI_BRIDGE_DIAGNOSTIC_V0.2',updatedAt:new Date().toISOString(),policyRevision:POLICY,stage,status,reason,valid,stateRevision:stateRev,plannerGeneratedAt,commandValidUntil,evTargetW:evW,evTargetStatus:evStatus,wwTargetOn:wwOn,authority:'PI',persistent:true,realtime,deadlineGuard:{active:deadlineActive,teslaConnected:deadlineTeslaConnected,chargeState:deadlineChargeState,applied:deadlineGuardApplied,deadlineAt,latestStartAt,derivedLatestStartAt,forceFromAt,remainingKWh:deadlineRemainingKWh,maxA:deadlineMaxA,overdue:deadlineOverdue},...extra};await Homey.logic.updateVariable({id:IDS.diag,variable:{value:JSON.stringify(obj)}});}catch(_){}};
 const selectorV=await Homey.logic.getVariable({id:SELECTOR_ID});
 if(!selectorV||selectorV.value!=='PI') return true;
-const writeIntent=async()=>{if(!intentVar)return false;const now=new Date().toISOString();const out={schema:'EM2_POWER_INTENT_V0.2',policyRevision:POLICY,engineVersion:ENGINE,generatedAt:now,sourceRevision:stateRev,readOnly:true,controlMode:'SHADOW',deviceWrites:false,valid,status,inputSemanticKey:JSON.stringify({stateRev,plannerGeneratedAt,commandValidUntil,evW,evStatus,wwOn,valid,stage,realtime,deadlineGuardApplied,deadlineTeslaConnected,deadlineChargeState,deadlineAt,forceFromAt,deadlineRemainingKWh,deadlineMaxA}),inputRevisions:{state:stateRev,planner:plannerGeneratedAt},policyProjection:{plannerOwner:'PI',executor:'HOMEY',authoritySelector:'PI',contractMode:'FIXED',contractId:'ENGIE_3Y_2026_2029',reason,commandValidUntil,bridgeStage:stage,realtime,deadlineGuardApplied,deadlineTeslaConnected,deadlineChargeState,deadlineAt,latestStartAt,derivedLatestStartAt,forceFromAt,deadlineRemainingKWh,deadlineMaxA},targets:{ev:{target_W:valid?evW:0,status:valid?evStatus:'FAIL_CLOSED_PI_UNAVAILABLE',source},ww:{target_W:null,target_on:valid?wwOn:false,status:valid?'PI_BINARY_TARGET':'FAIL_CLOSED_PI_UNAVAILABLE',sourceAction:wwOn===true?'BOILER_ON':wwOn===false?'BOILER_OFF':'HOLD'},battery:{target_W:0,status:'NOT_INTEGRATED'}},safety:{logicOnly:true,noDeviceWrites:true,plannerOwner:'PI',homeyRole:'EXECUTOR_SAFETY',fixedContractEnforced:true,failClosed:true,staleCommandRejected:true,singleWriterGuard:true,requiredAuthority:'PI',authorityGate:'EM2_Planner_Authority',bridgeUrls:URLS,diagnosticStage:stage,persistentDiagnostic:true,realtimeEnvelopeSchema:RT_SCHEMA,boundedRealtimePv:true,deadlineGuard:true,deadlineRequiresConnectedTesla:true,deadlineConnectivitySource:'CORE_TESLA_CHARGE_STATE',deadlineBeforeLatestStartPreservesPiTarget:true}};const value=JSON.stringify(out);if(intentVar.value!==value)await Homey.logic.updateVariable({id:IDS.intent,variable:{value}});return true;};
+const writeIntent=async()=>{if(!intentVar)return false;const now=new Date().toISOString();const out={schema:'EM2_POWER_INTENT_V0.2',policyRevision:POLICY,engineVersion:ENGINE,generatedAt:now,sourceRevision:stateRev,readOnly:true,controlMode:'SHADOW',deviceWrites:false,valid,status,inputSemanticKey:JSON.stringify({stateRev,plannerGeneratedAt,commandValidUntil,evW,evStatus,wwOn,valid,stage,realtime,deadlineGuardApplied,deadlineTeslaConnected,deadlineChargeState,deadlineAt,forceFromAt,deadlineRemainingKWh,deadlineMaxA}),inputRevisions:{state:stateRev,planner:plannerGeneratedAt},policyProjection:{plannerOwner:'PI',executor:'HOMEY',authoritySelector:'PI',contractMode:'FIXED',contractId:'ENGIE_3Y_2026_2029',reason,commandValidUntil,bridgeStage:stage,realtime,deadlineGuardApplied,deadlineTeslaConnected,deadlineChargeState,deadlineAt,latestStartAt,derivedLatestStartAt,forceFromAt,deadlineRemainingKWh,deadlineMaxA},targets:{ev:{target_W:valid?evW:0,status:valid?evStatus:'FAIL_CLOSED_PI_UNAVAILABLE',source},ww:{target_W:null,target_on:valid?wwOn:false,status:valid?'PI_BINARY_TARGET':'FAIL_CLOSED_PI_UNAVAILABLE',sourceAction:wwOn===true?'BOILER_ON':wwOn===false?'BOILER_OFF':'HOLD'},battery:{target_W:0,status:'NOT_INTEGRATED'}},safety:{logicOnly:true,noDeviceWrites:true,plannerOwner:'PI',homeyRole:'EXECUTOR_SAFETY',fixedContractEnforced:true,failClosed:true,staleCommandRejected:true,singleWriterGuard:true,requiredAuthority:'PI',authorityGate:'EM2_Planner_Authority',bridgeUrls:URLS,diagnosticStage:stage,persistentDiagnostic:true,realtimeEnvelopeSchema:RT_SCHEMA,boundedRealtimePv:true,deadlineGuard:true,deadlineRequiresConnectedTesla:true,deadlineConnectivitySource:'CORE_TESLA_CHARGE_STATE',deadlineStateSource:'PI_CONTROL_COMMAND',deadlineBeforeLatestStartPreservesPiTarget:true}};const value=JSON.stringify(out);if(intentVar.value!==value)await Homey.logic.updateVariable({id:IDS.intent,variable:{value}});return true;};
 try{
   stage='LOGIC_READ';
   const vars=await Promise.all([Homey.logic.getVariable({id:IDS.state}),Homey.logic.getVariable({id:IDS.intent}),Homey.logic.getVariable({id:IDS.diag}),Homey.logic.getVariable({id:IDS.maxA})]);
@@ -93,17 +93,22 @@ try{
     }catch(rtErr){realtime.applied=false;realtime.fallbackReason=String(rtErr?.message||rtErr);evW=plannerEvW;evStatus=evW>0?'PI_NUMERIC_TARGET':'IDLE';source='PI_DYNAMIC_PLANNER_V0.3';reason=`REALTIME_FALLBACK_${realtime.fallbackReason}`;}
   }else realtime.fallbackReason=env.allowed===true?'INVALID_PRODUCTION_ENVELOPE':(env.blockReason||'REALTIME_NOT_ALLOWED');
 
-  // Executor-side hard deadline guard runs last and always overrides opportunity logic when required.
-  const goals=coreState?.goals||{};
-  deadlineActive=bool(goals.teslaDeadlineActive);
+  // Executor-side hard deadline guard runs last. Deadline planning state is
+  // authoritative from Pi; Homey contributes only live connection/charge state
+  // and the local configured hardware cap.
+  const dl=cmd?.deadline||{};
+  const dlSchemaOK=dl.schema==='EMS_PI_EV_DEADLINE_EXECUTION_V0.1';
+  const dlAuthorityOK=dl.authority==='PI';
+  const dlValid=dl.valid===true;
+  deadlineActive=dlSchemaOK&&dlAuthorityOK&&dlValid&&dl.active===true;
   deadlineChargeState=String(coreState?.tesla?.chargeState||'unknown').toLowerCase();
   deadlineTeslaConnected=(coreState?.tesla?.connected===true)||connectedState(deadlineChargeState);
-  deadlineRemainingKWh=Math.max(0,num(goals.teslaRemainingKWh)||0);
-  deadlineAt=goals.teslaDeadline||null;latestStartAt=goals.teslaLatestStart||null;
-  const goalMax=num(goals.teslaMaxA),configMax=num(maxAVar?.value);
-  const goalCap=goalMax!==null?Math.max(0,Math.min(16,Math.floor(goalMax))):16;
+  deadlineRemainingKWh=Math.max(0,num(dl.remainingKWh)||0);
+  deadlineAt=dl.deadlineAt||null;latestStartAt=dl.latestStartAt||null;
+  const piMax=num(dl.maxA),configMax=num(maxAVar?.value);
+  const piCap=piMax!==null?Math.max(0,Math.min(16,Math.floor(piMax))):0;
   const configCap=configMax!==null?Math.max(0,Math.min(16,Math.floor(configMax))):16;
-  deadlineMaxA=Math.min(goalCap,configCap);
+  deadlineMaxA=Math.min(piCap,configCap);
   const deadlineMs=Date.parse(String(deadlineAt||'')),explicitLatestMs=Date.parse(String(latestStartAt||'')),maxKw=deadlineMaxA*0.69;
   const derivedLatestMs=Number.isFinite(deadlineMs)&&maxKw>0?deadlineMs-(deadlineRemainingKWh/maxKw)*3600000:NaN;
   derivedLatestStartAt=Number.isFinite(derivedLatestMs)?new Date(derivedLatestMs).toISOString():null;
