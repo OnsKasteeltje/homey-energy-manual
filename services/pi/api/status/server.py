@@ -104,7 +104,7 @@ def ww_plan_status(path):
     return result
 
 
-def ev_realtime_envelope(plan, current, ev_w, ww_w):
+def ev_realtime_envelope(plan, current, ev_w, ww_w, deadline):
     """Expose a bounded realtime EV opportunity envelope without changing targets.
 
     The Pi remains strategy/authority owner. The envelope answers whether Homey
@@ -125,9 +125,8 @@ def ev_realtime_envelope(plan, current, ev_w, ww_w):
         or reason == "DEADLINE_REQUIRED"
     )
 
-    deadline_plan = tesla_plan.get("deadlinePlan") or {}
-    deadline_active = deadline_plan.get("active") is True
-    deadline_max_a = deadline_plan.get("maxA")
+    deadline_active = deadline.get("valid") is True and deadline.get("active") is True
+    deadline_max_a = deadline.get("maxA") if deadline_active else None
     try:
         deadline_max_a = int(round(float(deadline_max_a))) if deadline_max_a is not None else None
     except (TypeError, ValueError):
@@ -348,7 +347,7 @@ def current_control_command():
             "battery": {"target_W": 0}
         },
         "realtime": {
-            "ev": ev_realtime_envelope(plan, current, ev_w, ww_w)
+            "ev": ev_realtime_envelope(plan, current, ev_w, ww_w, deadline)
         },
         "deadline": deadline,
         "authority": {
