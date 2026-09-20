@@ -57,3 +57,18 @@ def test_inactive_command_never_captures_baseline():
     out = m.build(cmd, {"tesla": {"meter_kwh": 100.0}}, {}, NOW)
     assert out["status"] == "INACTIVE"
     assert out["baselineMeterKWh"] is None
+
+
+def test_missing_meter_after_baseline_retains_previous_progress():
+    previous = m.build(CMD, {"tesla": {"meter_kwh": 102.5}}, {
+        "requestId": "req-1",
+        "baselineMeterKWh": 100.0,
+        "baselineCapturedAt": "2026-09-19T21:00:00Z",
+        "deliveredKWh": 2.5,
+        "remainingKWh": 10.7,
+        "latestStartAt": "2026-09-20T03:00:00Z",
+    }, NOW)
+    out = m.build(CMD, {"tesla": {}}, previous, NOW)
+    assert out["status"] == "METER_TELEMETRY_UNAVAILABLE"
+    assert out["baselineMeterKWh"] == 100.0
+    assert out["remainingKWh"] == 10.7
