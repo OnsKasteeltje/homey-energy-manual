@@ -20,7 +20,7 @@ def _db(path):
     CREATE TABLE metrics (id INTEGER PRIMARY KEY, metric_key TEXT NOT NULL);
     CREATE TABLE measurements (
       ts_utc TEXT NOT NULL, device_id INTEGER NOT NULL, metric_id INTEGER NOT NULL,
-      value_real REAL
+      value_real REAL, source_resolution_seconds INTEGER
     );
     """)
     devices = ["grid_p1","pv_solaredge","pv_goodwe4200","pv_goodwe2000"]
@@ -35,9 +35,9 @@ def _db(path):
 
 def _snapshot(con, ts, imp, exp, se, gw42, gw20):
     rows = [
-      (ts,1,1,imp),(ts,1,2,exp),(ts,2,3,se),(ts,3,3,gw42),(ts,4,3,gw20)
+      (ts,1,1,imp,300),(ts,1,2,exp,300),(ts,2,3,se,300),(ts,3,3,gw42,300),(ts,4,3,gw20,300)
     ]
-    con.executemany("INSERT INTO measurements VALUES (?,?,?,?)", rows)
+    con.executemany("INSERT INTO measurements VALUES (?,?,?,?,?)", rows)
     con.commit()
 
 
@@ -77,8 +77,8 @@ def test_incomplete_snapshot_bridges_from_last_complete_snapshot(tmp_path):
     db = tmp_path / "h.sqlite"
     con = _db(db)
     _snapshot(con,"2026-09-19T20:00:00Z",100,50,1000,2000,3000)
-    con.execute("INSERT INTO measurements VALUES (?,?,?,?)",
-                ("2026-09-19T20:10:00Z",1,1,100.2))
+    con.execute("INSERT INTO measurements VALUES (?,?,?,?,?)",
+                ("2026-09-19T20:10:00Z",1,1,100.2,300))
     con.commit()
     _snapshot(con,"2026-09-19T20:20:00Z",100.4,50.1,1000.2,2000.3,3000.1)
     con.close()
@@ -96,3 +96,65 @@ def test_incomplete_snapshot_bridges_from_last_complete_snapshot(tmp_path):
     assert abs(row[3]-0.6) < 1e-9
     assert abs(row[4]-0.9) < 1e-9
     assert row[5:] == ("gap",None)
+
+
+def test_subsecond_duplicate_is_coalesced_without_discontinuity(tmp_path):
+    db = tmp_path / "h.sqlite"
+    con = _db(db)
+    _snapshot(con,"2026-09-19T20:00:00.000Z",100,50,1000,2000,3000)
+    _snapshot(con,"2026-09-19T20:00:00.481Z",100,50,1000,2000,3000)
+    _snapshot(con,"2026-09-19T20:05:00.000Z",100.4,50.1,1000.2,2000.3,3000.1)
+    con.close()
+    _load().build(db)
+    con = sqlite3.connect(db)
+    rows = con.execute("""SELECT end_ts_utc,import_kwh,house_kwh,quality,
+      discontinuity_reason FROM house_energy_intervals ORDER BY end_ts_utc""").fetchall()
+    con.close()
+    assert len(rows) == 1
+    assert rows[0][0] == "2026-09-19T20:05:00.000Z"
+    assert abs(rows[0][1] - 0.4) < 1e-9
+    assert abs(rows[0][2] - 0.9) < 1e-9
+    assert rows[0][3:] == ("observed", None)
+
+
+def test_subsecond_counter_change_is_preserved_in_next_interval(tmp_path):
+    db = tmp_path / "h.sqlite"
+    con = _db(db)
+    _snapshot(con,"2026-09-19T21:30:00.066Z",100,50,1000,2000,3000)
+    _snapshot(con,"2026-09-19T21:30:01.048Z",100.007,50,1000,2000,3000)
+    _snapshot(con,"2026-09-19T21:35:00.000Z",100.4,50.1,1000.2,2000.3,3000.1)
+    con.close()
+    _load().build(db)
+    con = sqlite3.connect(db)
+    rows = con.execute("""SELECT start_ts_utc,end_ts_utc,import_kwh,house_kwh,
+      quality,discontinuity_reason FROM house_energy_intervals ORDER BY end_ts_utc""").fetchall()
+    con.close()
+    assert len(rows) == 1
+    assert rows[0][0] == "2026-09-19T21:30:00.066Z"
+    assert rows[0][1] == "2026-09-19T21:35:00.000Z"
+    assert abs(rows[0][2] - 0.4) < 1e-9
+    assert abs(rows[0][3] - 0.9) < 1e-9
+    assert rows[0][4:] == ("observed", None)
+
+
+def test_rebuild_removes_obsolete_derived_rows(tmp_path):
+    db = tmp_path / "h.sqlite"
+    con = _db(db)
+    _snapshot(con,"2026-09-19T20:00:00Z",100,50,1000,2000,3000)
+    _snapshot(con,"2026-09-19T20:05:00Z",100.4,50.1,1000.2,2000.3,3000.1)
+    con.close()
+    builder = _load()
+    builder.build(db)
+    con = sqlite3.connect(db)
+    con.execute("""INSERT INTO house_energy_intervals
+      (start_ts_utc,end_ts_utc,duration_seconds,quality,discontinuity_reason)
+      VALUES ('2026-09-19T20:01:00Z','2026-09-19T20:01:00.5Z',0,
+              'discontinuity','NON_FORWARD_TIME')""")
+    con.commit()
+    con.close()
+    builder.build(db)
+    con = sqlite3.connect(db)
+    count = con.execute("""SELECT COUNT(*) FROM house_energy_intervals
+      WHERE discontinuity_reason='NON_FORWARD_TIME'""").fetchone()[0]
+    con.close()
+    assert count == 0
