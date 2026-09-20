@@ -132,6 +132,8 @@ Current state-contract compatibility:
 
 Schema 2.13 adds cumulative energy counters used as the canonical basis for household energy history: P1 lifetime import/export and lifetime production counters for SolarEdge, GoodWe 4200 and GoodWe 2000. The payload continues to carry the operational fields needed for local history, including P1, the three PV inverter powers, Tesla charging power, boiler power, Quatt electrical power and appliance state.
 
+The reviewed EV deadline ownership preparation adds the already-read cumulative Easee counter as additive `tesla.meter_kwh` telemetry within schema 2.13. This is a raw Homey-owned observation, not deadline/planner state. It introduces no extra Easee read and is intended to let the Pi derive delivered and remaining deadline energy from the canonical state stream. Deployment of this field is a separate controlled Core change; its presence in repository source does not by itself constitute a runtime cutover.
+
 Freshness and ordering use:
 
 - `source_sample_at` for physical sample time;
