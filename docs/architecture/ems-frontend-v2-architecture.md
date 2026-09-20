@@ -255,3 +255,17 @@ Live V2 keeps realtime grid authority and PV observability deliberately separate
 Energiehistorie V2 uses the same private read-only boundary with schema `EMS_WEB_HISTORY_V1`: `/web/history/day/YYYY-MM-DD`, `/week/YYYY-MM-DD`, `/month/YYYY-MM`, and `/year/YYYY`. Calendar interpretation is Europe/Amsterdam. The frontend receives house consumption, grid import/export, aggregate PV and SolarEdge/GoodWe 4200/GoodWe 2000 contributions together with explicit coverage/gap/discontinuity metadata; it must not infer missing history as zero. Day renders hourly buckets, week/month daily buckets and year monthly buckets. Query strings remain forbidden.
 
 Runtime validation on 2026-09-19 confirmed the private Web Data API exposes aggregate PV plus all three inverter powers and per-source freshness/age. The private Caddy-served Live V2 deployment was then validated end-to-end with the PV details markup present on the production route.
+
+
+## 17. Energiehistorie V2 presentation boundary
+
+Energiehistorie V2 is implemented under `frontend/history/` with one state adapter and one render owner. It reads only the same-origin read-only `/web/history/{day|week|month|year}/...` resources and introduces no command or device-write path.
+
+The page presents:
+- Dag / Week / Maand / Jaar navigation;
+- house consumption as the primary KPI and graph series;
+- PV production, grid import and grid export as context;
+- per-source PV contributions in the graph hover detail;
+- API coverage, gaps and discontinuities as data-quality context.
+
+The canonical energy identity remains `house = import + PV - export`. Raw short-interval negative house values caused by asynchronous cumulative source counters MUST NOT be clamped or rewritten in the frontend. User-facing history uses the API presentation buckets (hour/day/month), preserving aggregate energy rather than claiming exact synchronized five-minute household consumption.

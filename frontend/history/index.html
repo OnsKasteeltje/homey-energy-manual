@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>EMS · Energiehistorie</title>
+  <link rel="stylesheet" href="../shared/styles/v2-shell.css">
+  <link rel="stylesheet" href="./styles/history.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../live/">EMS <span>Productie</span></a>
+  <nav aria-label="Hoofdnavigatie">
+    <a href="../live/">Live</a>
+    <a href="../settings/">Invoer</a>
+    <a class="active" href="./">Historie</a>
+    <span aria-disabled="true">Planner</span>
+    <span aria-disabled="true">Groepen & fasen</span>
+  </nav>
+  <div id="history-quality" class="freshness">Laden…</div>
+</header>
+
+<main>
+  <section class="intro">
+    <div><small>ENERGIEHISTORIE</small><h1>Huisenergie</h1><p>Geaggregeerde energie uit P1 en de drie PV-omvormers.</p></div>
+    <div class="period-tabs" role="group" aria-label="Periode">
+      <button data-kind="day" class="active">Dag</button><button data-kind="week">Week</button><button data-kind="month">Maand</button><button data-kind="year">Jaar</button>
+    </div>
+  </section>
+
+  <section class="period-nav" aria-label="Periode navigatie">
+    <button id="period-prev" aria-label="Vorige periode">‹</button>
+    <div><strong id="period-title">—</strong><span id="period-subtitle">Europe/Amsterdam</span></div>
+    <button id="period-next" aria-label="Volgende periode">›</button>
+  </section>
+
+  <section class="kpis" aria-label="Energiesamenvatting">
+    <article><small>HUISVERBRUIK</small><strong id="kpi-house">—</strong><span>import + PV − export</span></article>
+    <article><small>PV-OPWEK</small><strong id="kpi-pv">—</strong><span>3 omvormers</span></article>
+    <article><small>NETAFNAME</small><strong id="kpi-import">—</strong><span>van het net</span></article>
+    <article><small>TERUGLEVERING</small><strong id="kpi-export">—</strong><span>naar het net</span></article>
+  </section>
+
+  <section class="chart-panel">
+    <header>
+      <div><small>ENERGIE PER <span id="bucket-label">UUR</span></small><h2>Verbruik en energiestromen</h2></div>
+      <div class="legend" aria-label="Legenda"><span class="house">Huis</span><span class="pv">PV</span><span class="grid">Netafname</span><span class="export">Teruglevering</span></div>
+    </header>
+    <div id="chart-wrap" class="chart-wrap"><svg id="history-chart" role="img" aria-label="Energiehistorie grafiek"></svg><div id="chart-tooltip" class="chart-tooltip" hidden></div></div>
+    <p id="chart-empty" class="empty" hidden>Geen meetdata voor deze periode.</p>
+  </section>
+
+  <section class="quality-panel">
+    <span id="coverage">Dekking —</span><span id="gaps">Gaps —</span><span id="discontinuities">Discontinuïteiten —</span>
+  </section>
+  <p class="preview-note">EMS productie · Energiehistorie</p>
+</main>
+<script type="module" src="./render/history.js"></script>
+</body>
+</html>
