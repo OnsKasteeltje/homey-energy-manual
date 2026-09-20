@@ -21,7 +21,7 @@ TZ = ZoneInfo("Europe/Amsterdam")
 EV_W_PER_A = 690
 MIN_A = 6
 MAX_A = 16
-MAX_INTEGRATION_GAP_S = 120
+MAX_INTEGRATION_GAP_S = 420
 MIN_CHARGE_POWER_W = 100
 
 
@@ -148,7 +148,7 @@ def build(command, energy_state, previous, now_utc=None):
         out["lastMeterCheckpointObservedAt"] = out["telemetryAt"] or out["generatedAt"]
 
     # Realtime progress: integrate the PREVIOUS measured power over the bounded
-    # interval to the current canonical telemetry timestamp. This avoids using
+    # interval to the current canonical telemetry timestamp. The 420 s bound matches\n    # the intentional 5-minute canonical Homey Core cadence with 2 minutes of\n    # transport/scheduling margin. This avoids using
     # the new sample retroactively and never integrates across long/stale gaps.
     delivered = finite_number(out["deliveredKWh"]) or 0.0
     previous_at = parse_utc(same.get("lastTelemetryAt"))
