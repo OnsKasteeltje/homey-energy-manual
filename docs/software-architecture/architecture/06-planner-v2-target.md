@@ -179,6 +179,22 @@ De planner moet minimaal rekening houden met:
 
 Er komt geen afzonderlijke productie-quarter-hour-shadow-planner naast de joint planner.
 
+### WW fase 2: PV-schouders bewaren
+
+Wanneer `wwMode = BOILER` wordt elektrische warmwaterproductie een flex-load binnen dezelfde Joint Planner. Daarbij blijft het eerder geïmplementeerde allocatieprincipe expliciet behouden:
+
+> **De boiler benut bij voorkeur de schouders van de PV-exportcurve, zodat de EV de hogere PV-piek kan benutten.**
+
+Dit betekent dat WW en EV niet onafhankelijk dezelfde hoogste PV-kwartieren mogen claimen. De Joint Planner verdeelt de beschikbare PV gezamenlijk:
+
+- WW wordt waar comfort/deadline en thermische opslag dit toelaten naar geschikte PV-schouders verschoven;
+- EV krijgt bij voorkeur ruimte rond de hogere PV-piek, vanwege de fijnere vermogensregeling en directe mogelijkheid om export te absorberen;
+- opportunistisch EV-laden verlaagt de resterende EV-deadlinebehoefte;
+- de harde EV-deadline blijft altijd boven deze opportunity-optimalisatie staan;
+- de WW comfort/deadline-requirement blijft eveneens hard en mag niet door het schouderprincipe worden geschonden.
+
+Het schouderprincipe is dus een **allocatievoorkeur binnen geldige requirements**, geen afzonderlijke WW-planner en geen absolute regel die comfort of EV-deadline mag breken.
+
 ## 6. P1 is realtime authority; geen globale inputFreshness-gate
 
 Planner V2 kent **geen globale `inputFreshness.status == PASS` gate**.
