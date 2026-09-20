@@ -200,6 +200,7 @@ def ev_deadline_execution_contract(now):
     """
     state = load_json(EV_DEADLINE_STATE_FILE)
     generated = parse_utc_timestamp(state.get("generatedAt"))
+    telemetry = parse_utc_timestamp(state.get("telemetryAt"))
     deadline = parse_utc_timestamp(state.get("deadlineAt"))
     latest = parse_utc_timestamp(state.get("latestStartAt"))
     active = state.get("active") is True
@@ -221,7 +222,8 @@ def ev_deadline_execution_contract(now):
         and state.get("readOnly") is True
         and state.get("controlWrites") is False
         and generated is not None
-        and (now - generated).total_seconds() <= 120
+        and telemetry is not None
+        and 0 <= (now - telemetry).total_seconds() <= 120
         and remaining is not None
         and (not active or (
             deadline is not None
@@ -240,6 +242,7 @@ def ev_deadline_execution_contract(now):
             "status": "FAIL_CLOSED",
             "requestId": state.get("requestId"),
             "generatedAt": state.get("generatedAt"),
+            "telemetryAt": state.get("telemetryAt"),
             "deadlineAt": None,
             "remainingKWh": None,
             "latestStartAt": None,
@@ -254,6 +257,7 @@ def ev_deadline_execution_contract(now):
         "status": status,
         "requestId": state.get("requestId"),
         "generatedAt": state.get("generatedAt"),
+        "telemetryAt": state.get("telemetryAt"),
         "deadlineAt": state.get("deadlineAt"),
         "remainingKWh": round(remaining, 6),
         "latestStartAt": state.get("latestStartAt"),
