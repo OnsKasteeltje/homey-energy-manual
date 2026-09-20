@@ -160,6 +160,8 @@ Derived operational history is rebuilt locally from canonical `measurements` and
 
 Tesla charging remains split between Pi planning and Homey guarded execution. Opportunity charging uses residual PV subject to executable Easee limits; explicit deadline charging is a hard requirement and may use grid energy when required. Homey may trim within the Pi envelope but must not become a second independent planner. The guarded EV actuator remains the sole automatic physical Easee writer in the production EV chain.
 
+EV deadline lifecycle and derived progress state are Pi-owned. Canonical charging telemetry remains Homey Core push-fed; the Pi must not poll Homey to keep deadline state alive. Because accepted `energy-state-v2.json` is atomically replaced, a systemd `PathChanged=` watch is best-effort only and is not the sole liveness mechanism. A 60-second Pi-local deadline-state watchdog may re-run the read-only derived-state builder against the last accepted canonical state. Reprocessing an unchanged telemetry timestamp must integrate zero additional charging energy. Derived-state refresh age and source-telemetry freshness are separate safety concepts: the watchdog may keep derived state current, but stale canonical Homey telemetry must still fail closed under the existing telemetry-age bound.
+
 ## 8. Warm-water production chain
 
 WW comfort remains a hard constraint above optimization. The Pi schedules remaining required heating before the comfort deadline and prefers useful PV periods. Homey translates the Power Intent through the WW adapter/gate chain; the guarded Warm Water Actuator remains the physical boiler writer. Source mode, kill switch, freshness and current device state are checked before writes.
