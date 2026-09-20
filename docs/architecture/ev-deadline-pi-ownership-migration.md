@@ -160,7 +160,8 @@ The prepared systemd topology is:
 
 - `ems-ev-deadline-command.timer`: fetch command every 60 seconds;
 - `ems-ev-deadline-command.path`: trigger derived state when the runtime command changes;
-- `ems-ev-deadline-state.path`: trigger derived state when canonical energy state changes;
-- `ems-ev-deadline-state.service`: one derived-state builder shared by both event sources.
+- `ems-ev-deadline-state.path`: best-effort low-latency trigger when canonical energy state changes;
+- `ems-ev-deadline-state.timer`: 60-second Pi-local watchdog that refreshes derived deadline state from the last accepted canonical state without polling Homey;
+- `ems-ev-deadline-state.service`: one derived-state builder shared by command, path and watchdog triggers.
 
-The command/state units were installed, verified and activated on 2026-09-20. The command timer runs every 60 seconds; command and canonical-state path units trigger the shared derived-state builder.
+The command/state units were installed, verified and activated on 2026-09-20. Runtime validation later that day showed that `PathChanged=` alone is not a reliable recurring trigger because canonical `energy-state-v2.json` is atomically replaced on accepted Homey pushes. The state watchdog therefore refreshes derived deadline state every 60 seconds from the already accepted local canonical state. This does **not** create a Homey poll or faster telemetry source. Canonical telemetry remains the Homey Core push at its intentional cadence, and telemetry freshness remains independently fail-closed. Re-running the builder with the same telemetry timestamp integrates zero additional energy.
