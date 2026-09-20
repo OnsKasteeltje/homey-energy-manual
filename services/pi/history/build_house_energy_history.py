@@ -3,6 +3,7 @@
 
 import argparse
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 DB = Path("/home/jeroen/ems/data/ems-history.sqlite")
@@ -45,6 +46,10 @@ def _counter_rows(con):
     return con.execute(sql, args).fetchall()
 
 
+def _parse_utc(value):
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+
+
 def build(db_path=DB):
     con = sqlite3.connect(str(db_path), timeout=2.0)
     con.execute("PRAGMA busy_timeout=2000")
@@ -72,6 +77,9 @@ def build(db_path=DB):
         """)
 
         rows = _counter_rows(con)
+        # Fully derived: rebuild transactionally so obsolete intervals from
+        # older derivation semantics cannot survive a corrected rebuild.
+        con.execute("DELETE FROM house_energy_intervals")
         written = 0
         previous = None
 
@@ -89,22 +97,28 @@ def build(db_path=DB):
                 continue
 
             prev_ts, prev_resolution, prev_values = previous
-            seconds = int(con.execute(
-                "SELECT CAST((julianday(?) - julianday(?)) * 86400 AS INTEGER)",
-                (ts, prev_ts),
-            ).fetchone()[0] or 0)
+            elapsed_seconds = (_parse_utc(ts) - _parse_utc(prev_ts)).total_seconds()
             deltas = tuple(cur - old for cur, old in zip(values, prev_values))
 
             reason = None
             quality = "observed"
             output = deltas
-            if seconds <= 0:
+            if elapsed_seconds <= 0:
                 reason = "NON_FORWARD_TIME"
-            elif any(delta < -COUNTER_DECREASE_EPSILON_KWH for delta in deltas):
-                reason = "COUNTER_DECREASE"
+                seconds = 0
+            elif elapsed_seconds < 1:
+                # Preserve cumulative energy without inventing a one-second
+                # interval: keep the earlier baseline. The next representable
+                # interval absorbs any counter delta from this source sample.
+                continue
             else:
+                seconds = int(elapsed_seconds)
+
+            if reason is None and any(delta < -COUNTER_DECREASE_EPSILON_KWH for delta in deltas):
+                reason = "COUNTER_DECREASE"
+            elif reason is None:
                 expected_resolution = max(MAX_NORMAL_GAP_SECONDS, int(source_resolution_seconds or prev_resolution or MAX_NORMAL_GAP_SECONDS))
-                if seconds > expected_resolution * GAP_MULTIPLIER:
+                if elapsed_seconds > expected_resolution * GAP_MULTIPLIER:
                     quality = "gap"
 
             if reason:
