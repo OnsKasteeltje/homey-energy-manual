@@ -17,6 +17,7 @@ QUATT_FILE = "/home/jeroen/ems/data/quatt-forecast.json"
 WW_FILE = "/home/jeroen/ems/data/ww-plan.json"
 DYNAMIC_PLAN_FILE = "/home/jeroen/ems/data/dynamic-shadow-plan.json"
 CONTROL_POLICY_FILE = "/home/jeroen/ems/runtime/planner/control-authority.json"
+EV_DEADLINE_STATE_FILE = "/home/jeroen/ems/data/ev-deadline-shadow-state.json"
 
 STALE_AFTER_SECONDS = 25 * 60
 SLOT_MINUTES = 15
@@ -190,6 +191,76 @@ def ev_realtime_envelope(plan, current, ev_w, ww_w):
     }
 
 
+
+def ev_deadline_execution_contract(now):
+    """Return Pi-owned deadline execution state for the Homey executor.
+
+    This is an additive control-contract field. It does not itself write devices
+    and does not change Homey authority until the prepared bridge is deployed.
+    """
+    state = load_json(EV_DEADLINE_STATE_FILE)
+    generated = parse_utc_timestamp(state.get("generatedAt"))
+    deadline = parse_utc_timestamp(state.get("deadlineAt"))
+    latest = parse_utc_timestamp(state.get("latestStartAt"))
+    active = state.get("active") is True
+    status = str(state.get("status") or "UNKNOWN")
+    remaining = state.get("remainingKWh")
+    max_a = state.get("maxA")
+
+    try:
+        remaining = max(0.0, float(remaining))
+    except (TypeError, ValueError):
+        remaining = None
+    try:
+        max_a = int(round(float(max_a)))
+    except (TypeError, ValueError):
+        max_a = None
+
+    valid = (
+        state.get("schema") == "EMS_PI_EV_DEADLINE_SHADOW_STATE_V0.2"
+        and state.get("readOnly") is True
+        and state.get("controlWrites") is False
+        and generated is not None
+        and (now - generated).total_seconds() <= 120
+        and remaining is not None
+        and (not active or (
+            deadline is not None
+            and latest is not None
+            and max_a is not None
+            and EV_MIN_A <= max_a <= EV_MAX_A
+            and status in ("TRACKING", "GOAL_COMPLETE", "EXPIRED")
+        ))
+    )
+    if not valid:
+        return {
+            "schema": "EMS_PI_EV_DEADLINE_EXECUTION_V0.1",
+            "authority": "PI",
+            "valid": False,
+            "active": False,
+            "status": "FAIL_CLOSED",
+            "requestId": state.get("requestId"),
+            "generatedAt": state.get("generatedAt"),
+            "deadlineAt": None,
+            "remainingKWh": None,
+            "latestStartAt": None,
+            "maxA": None,
+        }
+
+    return {
+        "schema": "EMS_PI_EV_DEADLINE_EXECUTION_V0.1",
+        "authority": "PI",
+        "valid": True,
+        "active": active and status == "TRACKING" and remaining > 0,
+        "status": status,
+        "requestId": state.get("requestId"),
+        "generatedAt": state.get("generatedAt"),
+        "deadlineAt": state.get("deadlineAt"),
+        "remainingKWh": round(remaining, 6),
+        "latestStartAt": state.get("latestStartAt"),
+        "maxA": max_a,
+    }
+
+
 def current_control_command():
     """Return a valid Pi planner command when the planner is technically ready.
 
@@ -241,6 +312,7 @@ def current_control_command():
     command_valid_until = min(valid_until, current_end)
     ev_w = max(0, int(round(float(current.get("evPlanW") or 0))))
     ww_w = max(0, int(round(float(current.get("wwPlanW") or 0))))
+    deadline = ev_deadline_execution_contract(now)
 
     return {
         "schema": "EMS_PI_CONTROL_COMMAND_V0.1",
@@ -273,6 +345,7 @@ def current_control_command():
         "realtime": {
             "ev": ev_realtime_envelope(plan, current, ev_w, ww_w)
         },
+        "deadline": deadline,
         "authority": {
             "enforcedBy": "HOMEY_SELECTOR",
             "piPolicyPlannerOwner": policy.get("plannerOwner"),
