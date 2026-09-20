@@ -58,22 +58,35 @@ For each new `requestId`, persist at minimum:
 - status
 - updatedAt
 
-There is currently **no live Tesla SoC telemetry**. After command creation, charging progress must therefore be derived from the cumulative Easee meter.
+There is currently **no live Tesla SoC telemetry**. The command SoC is input-only and must not be treated as a live measurement.
 
-Normal calculation:
+Realtime charging progress is derived from canonical Homey Core measured `tesla.power_w`, integrated over canonical telemetry timestamps with a bounded maximum interval. The previous measured power is applied only to the elapsed interval up to the next canonical sample. Long/stale gaps are never invented.
+
+The Easee cumulative `meter_kwh` is **checkpoint/validation only**. In the observed 2026-09-20 deadline session it remained at 8024.234 kWh throughout active charging and changed to 8028.054 kWh after the session stopped. Therefore it is not a valid realtime progress source in the observed Homey/Easee configuration.
+
+Normal realtime calculation:
 
 ```text
-deliveredKWh = max(0, currentMeterKWh - baselineMeterKWh)
+deliveredKWh += previousPowerW * boundedElapsedSeconds / 3_600_000
 remainingKWh = max(0, goalKWh - deliveredKWh)
 latestStart = deadline - remainingKWh / availableDeadlinePowerKW
 ```
+
+Observed replay validation on 2026-09-20:
+
+- Pi measured-power integration: **3.764761 kWh**
+- Easee session-end meter checkpoint: **3.820000 kWh**
+- difference: **-0.055239 kWh (-1.446%)**
+- skipped telemetry gaps >120 s: **0**
+
+This validates measured-power integration as the operational realtime progress source. The meter checkpoint is never added to the power integral and never pulls realtime progress backwards.
 
 ## Fail-closed rules
 
 Pi shadow must not invent progress.
 
-- Missing/non-finite meter at baseline capture → baseline invalid; no deadline authority.
-- Current meter missing/non-finite → retain previous valid remaining energy.
+- Missing/non-finite meter at baseline capture → meter checkpoint unavailable; measured-power progress may continue.
+- Current meter missing/non-finite → measured-power progress continues; retain the previous meter checkpoint.
 - Current meter below baseline → meter reset/replacement suspected; retain previous remaining energy and raise diagnostic state.
 - New requestId → immutable new baseline capture.
 - Same requestId → baseline must never be silently replaced.
@@ -110,7 +123,7 @@ The exact control-envelope change is deliberately **not** part of this preparati
 2. Controlled minimal Core deployment and prove meter arrival on Pi.
 3. Implement Pi deadline consumer/state machine in shadow using canonical measured-power integration.
 4. Run parity over real deadline sessions.
-5. Define and validate Pi→Homey deadline execution contract.
+5. Define and validate Pi→Homey deadline execution contract (`EMS_PI_EV_DEADLINE_EXECUTION_V0.1`).
 6. Cut over deadline ownership to Pi.
 7. Disable/remove the historical Homey Goal Adapter command-processing role.
 8. Update canonical architecture state and retire obsolete documentation.
