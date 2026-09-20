@@ -179,6 +179,25 @@ De planner moet minimaal rekening houden met:
 
 Er komt geen afzonderlijke productie-quarter-hour-shadow-planner naast de joint planner.
 
+### Gezamenlijke PV-allocatie: EV, Heating en WW
+
+De **Joint Planner is de enige laag die flex-loads definitief aan kwartieren/PV-opportunity toewijst**. Dit geldt niet alleen voor EV en WW, maar nadrukkelijk ook voor het naar voren halen van kamerverwarming.
+
+Heating Flex mag op basis van Honeywell-requirements en PV Forecast geschikte preheat-kandidaten en toegestane tijdvensters afleiden, maar reserveert zelf geen PV en beslist niet zelfstandig over het uitvoeringskwartier. De Joint Planner weegt die kandidaten af tegen EV-opportunity, de harde EV-deadline en — zodra `wwMode = BOILER` — WW-flex.
+
+Daarmee geldt:
+
+- EV, Heating en WW mogen nooit onafhankelijk dezelfde verwachte PV-export claimen;
+- Honeywell blijft bepalen **welke temperatuur wanneer vereist is**;
+- Heating Flex bepaalt **welke eerdere opwarmmomenten toegestaan en zinvol zijn**;
+- PV Forecast + confidence geven de vooruitkijkende opportunity;
+- de Joint Planner bepaalt **of en in welk kwartier** preheating daadwerkelijk wordt gepland, in samenhang met de andere flex-loads;
+- realtime P1 blijft de actuele energiewaarheid tijdens uitvoering.
+
+Een verwachte PV-piek kan dus bijvoorbeeld concurreren tussen EV-laden en het eerder opwarmen van een kamer. Alleen de Joint Planner mag die gezamenlijke allocatie beslissen. Wanneer elektrische WW later wordt toegevoegd, wordt WW de derde flex-load binnen exact dezelfde allocatie.
+
+Het WW-schouderprincipe hieronder is een specifieke allocatiestrategie **binnen deze bredere gezamenlijke optimalisatie** en vormt geen afzonderlijke EV/WW-planner.
+
 ### WW fase 2: PV-schouders bewaren
 
 Wanneer `wwMode = BOILER` wordt elektrische warmwaterproductie een flex-load binnen dezelfde Joint Planner. Daarbij blijft het eerder geïmplementeerde allocatieprincipe expliciet behouden:
