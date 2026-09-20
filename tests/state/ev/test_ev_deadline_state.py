@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-MODULE = Path(__file__).parents[2] / "src/pi/ems-runtime/ev/deadline/build_deadline_shadow_state.py"
+MODULE = Path(__file__).parents[3] / "services/pi/state/ev/deadline/build_deadline_state.py"
 spec = importlib.util.spec_from_file_location("deadline_shadow", MODULE)
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)

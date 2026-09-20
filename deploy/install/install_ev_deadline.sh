@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="/home/jeroen/ems/repo/homey-energy-manual"
-UNIT_DIR="$ROOT_DIR/services/pi/ev/deadline/systemd"
+UNIT_DIR="$ROOT_DIR/deploy/systemd"
 
 for unit in \
   ems-ev-deadline-state.service \

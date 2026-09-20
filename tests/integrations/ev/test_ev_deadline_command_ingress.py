@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-MODULE = Path(__file__).parents[2] / "src/pi/ems-runtime/ev/deadline/fetch_deadline_command.py"
+MODULE = Path(__file__).parents[3] / "services/pi/integrations/github/ev/fetch_deadline_command.py"
 spec = importlib.util.spec_from_file_location("deadline_command", MODULE)
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
