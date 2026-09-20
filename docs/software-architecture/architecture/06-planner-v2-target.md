@@ -1,7 +1,7 @@
 ---
 component: planner-v2-target
 title: Planner V2 Target Architecture
-version: 0.1.0
+version: 0.2.0
 status: draft
 architecture_status: planned
 last_verified: 2026-09-20
@@ -141,6 +141,70 @@ PV Forecast voedt expliciet zowel:
 Heating Flex staat daarom **niet vóór** PV Forecast. PV Forecast is een noodzakelijke opportunity-input voor het vormen/rangschikken van heating-preheat candidates.
 
 Confidence is advisory. Lage confidence mag optimalisatie conservatiever maken, maar is geen globale stopconditie.
+
+## 3.1 PV Forecast V2 contract
+
+Planner V2 consolideert weather-, PV-model- en confidence-logica tot één read-only forecastcontract. De forecast voorspelt **PV-productie**, niet gegarandeerde huishoudelijke export.
+
+Beoogd schema: `EMS_PI_PV_FORECAST_V2`.
+
+Minimaal documentcontract:
+
+```text
+schema
+generatedAt
+mode = READ_ONLY
+slotMinutes = 15
+horizonSlots = 96
+model
+slots[]
+```
+
+Minimaal per slot:
+
+```text
+start
+pvForecastW
+confidence
+confidenceComponents
+modelBasis
+```
+
+`confidenceComponents` mag onder meer forecast-consistency, weers-/bewolkingsstabiliteit, horizon en recente lokale forecast-accuracy bevatten. Confidence is uitsluitend advisory en wordt nooit een globale execution gate.
+
+Het V2 PV-model mag bestaande bruikbare onderdelen hergebruiken, waaronder:
+
+- 15-minuten weather/radiation als modelinput;
+- array-/oriëntatie-informatie en GTI waar die aantoonbaar modelwaarde heeft;
+- de historische lokale PV-envelope/calibratie;
+- vergelijking van forecast met lokaal gemeten PV voor modelaccuracy.
+
+Weather blijft daarmee intern bronmateriaal voor PV Forecast. De Joint Planner hoeft geen losse weather-feed te consumeren voor PV-beslissingen. Buitentemperatuur mag afzonderlijk naar een toekomstig Heating Thermal Model gaan; dat maakt weather geen tweede PV-plannerinput.
+
+### Geen forecast van gegarandeerde export
+
+Planner V2 definieert niet langer:
+
+```text
+forecastExportW = pvForecastW - baseLoadForecastW - quattForecastW
+```
+
+als centrale productie-input.
+
+Historical baseload en standalone Quatt power forecast zijn geen noodzakelijke onderdelen van het PV Forecast V2-contract. Een PV Forecast van 4 kW betekent daarom: ongeveer 4 kW PV-productie wordt verwacht. Het betekent niet dat 4 kW export gegarandeerd beschikbaar zal zijn.
+
+Vooruitkijkend gebruikt de Joint Planner deze productieforecast om opportunity-kandidaten en onderlinge allocatie te organiseren. Tijdens uitvoering autoriseert de actuele P1-balans de werkelijke opportunistische energie-opname.
+
+### Relatie met P1
+
+PV Forecast en P1 hebben verschillende rollen:
+
+- **PV Forecast:** vooruitkijkende opportunity en voorbereiding;
+- **P1:** actuele import/export en realtime authority.
+
+Een slechte forecast mag dus niet verhinderen dat werkelijk gemeten P1-export wordt benut. Omgekeerd mag voorspelde PV niet zelfstandig opportunistische netimport rechtvaardigen wanneer P1 op dat moment geen overschot laat zien.
+
+De forecast mag wel gebruikt worden om stateful/traag reagerende flex vooraf voor te bereiden, zoals een geldige Heating Flex-kandidaat. De daadwerkelijke opportunistische uitvoering blijft begrensd door de P1-authorityregels en de specifieke actuator-/comfortconstraints.
 
 ## 4. Heating Flex versus Joint Planner
 
