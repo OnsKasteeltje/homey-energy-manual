@@ -60,7 +60,7 @@ For each new `requestId`, persist at minimum:
 
 There is currently **no live Tesla SoC telemetry**. The command SoC is input-only and must not be treated as a live measurement.
 
-Realtime charging progress is derived from canonical Homey Core measured `tesla.power_w`, integrated over canonical telemetry timestamps with a bounded maximum interval. The previous measured power is applied only to the elapsed interval up to the next canonical sample. Long/stale gaps are never invented.
+Realtime charging progress is derived from canonical Homey Core measured `tesla.power_w`, integrated over canonical telemetry timestamps with a bounded maximum interval. The canonical Homey Core intentionally runs on a 5-minute cadence. Deadline progress therefore accepts intervals up to 420 seconds: the normal 300-second cadence plus 120 seconds of transport/scheduling margin. The previous measured power is applied only to the elapsed interval up to the next canonical sample. Longer/stale gaps are never invented.
 
 The Easee cumulative `meter_kwh` is **checkpoint/validation only**. In the observed 2026-09-20 deadline session it remained at 8024.234 kWh throughout active charging and changed to 8028.054 kWh after the session stopped. Therefore it is not a valid realtime progress source in the observed Homey/Easee configuration.
 
@@ -77,9 +77,9 @@ Observed replay validation on 2026-09-20:
 - Pi measured-power integration: **3.764761 kWh**
 - Easee session-end meter checkpoint: **3.820000 kWh**
 - difference: **-0.055239 kWh (-1.446%)**
-- skipped telemetry gaps >120 s: **0**
+- historical replay skipped telemetry gaps >120 s: **0** (this replay used a denser history source; production canonical control telemetry is intentionally 5-minute)
 
-This validates measured-power integration as the operational realtime progress source. The meter checkpoint is never added to the power integral and never pulls realtime progress backwards.
+This validates measured-power integration as the operational progress source. Five-minute precision is sufficient for EV deadline planning; no additional fast Homey telemetry feed is required. The Pi execution contract uses the same 420-second canonical telemetry-age bound, so a normal 5-minute Core cycle remains valid while genuinely missed/stale cycles fail closed. The meter checkpoint is never added to the power integral and never pulls realtime progress backwards.
 
 ## Fail-closed rules
 
