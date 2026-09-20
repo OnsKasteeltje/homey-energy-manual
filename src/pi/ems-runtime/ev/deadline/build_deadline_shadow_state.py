@@ -115,7 +115,11 @@ def build(command, energy_state, previous, now_utc=None):
 
     meter = out["meterKWh"]
     if meter is None:
-        out["status"] = "WAITING_FOR_METER_TELEMETRY"
+        if out["baselineMeterKWh"] is None:
+            out["status"] = "WAITING_FOR_METER_TELEMETRY"
+        else:
+            out["status"] = "METER_TELEMETRY_UNAVAILABLE"
+            out["diagnostics"].append("RETAINING_PREVIOUS_PROGRESS_FAIL_CLOSED")
         return out
 
     baseline = finite_number(out["baselineMeterKWh"])
