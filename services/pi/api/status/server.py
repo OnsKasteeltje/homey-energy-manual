@@ -24,7 +24,7 @@ SLOT_MINUTES = 15
 CONTROL_POLICY_SCHEMA = "EMS_CONTROL_AUTHORITY_V1.0"
 PI_PLAN_SCHEMA = "EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3"
 EV_MIN_A = 6
-EV_MAX_A = 16
+EV_MAX_A = 16\nEV_DEADLINE_TELEMETRY_MAX_AGE_SECONDS = 420
 
 
 def git_revision():
@@ -223,7 +223,7 @@ def ev_deadline_execution_contract(now):
         and state.get("controlWrites") is False
         and generated is not None
         and telemetry is not None
-        and 0 <= (now - telemetry).total_seconds() <= 120
+        and 0 <= (now - telemetry).total_seconds() <= EV_DEADLINE_TELEMETRY_MAX_AGE_SECONDS
         and remaining is not None
         and (not active or (
             deadline is not None
