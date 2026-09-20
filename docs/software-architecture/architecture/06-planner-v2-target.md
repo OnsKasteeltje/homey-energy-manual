@@ -335,3 +335,26 @@ Minimale volgorde:
 9. pas daarna legacy retirement en verwijderen van repository-structure exceptions.
 
 De bestaande productieplanner blijft onaangetast totdat deze stappen aantoonbaar zijn doorlopen.
+
+## P1 als realtime energie-autoriteit
+
+**P1 is de canonical realtime energy authority. Forecast PV creates opportunity; measured P1 export authorizes opportunistic consumption. Forecast availability or forecast confidence must never override contradictory realtime P1 measurements.**
+
+Dit is een harde Planner V2-invariant. Forecasts zijn vooruitkijkend en helpen de Joint Planner om kansen, kandidaten en harde requirements over de horizon te organiseren. Voor opportunistisch energiegebruik op het actuele moment is de werkelijk door P1 gemeten energiestroom leidend.
+
+Daaruit volgen de volgende regels:
+
+- gemeten P1-export is de belangrijkste realtime driver voor opportunistische flex;
+- een tegenvallende of onzekere PV Forecast mag actuele P1-export niet blokkeren;
+- voorspelde PV zonder daadwerkelijk beschikbare export mag niet zelfstandig opportunistische netimport veroorzaken;
+- harde requirements, zoals een EV-deadline, mogen wel netimport veroorzaken wanneer dat nodig is om de requirement te halen;
+- P1-authority geldt voor de gezamenlijke realtime opportunity van EV, Heating en — bij `wwMode = BOILER` — WW.
+
+Per flex-load:
+
+- **EV:** mag binnen de Pi-envelope snel en numeriek op werkelijk P1-overschot moduleren. De bestaande bounded realtime EV-regeling blijft het uitgangspunt.
+- **Heating:** P1-export is de realtime opportunity-driver, maar alleen voor vooraf geldige Heating Flex-kandidaten. Een korte exportpiek mag niet zelfstandig nieuwe warmtevraag creëren of buiten Honeywell-grenzen een setpoint wijzigen. Honeywell blijft comfort- en baseline-authority.
+- **WW:** alleen bij `wwMode = BOILER` kan werkelijk P1-overschot opportunistisch boilergebruik activeren, binnen WW comfort/deadline- en technische randvoorwaarden. Bij `wwMode = CV` bestaat geen elektrische WW-flex.
+
+De Joint Planner voorkomt vooruitkijkend dat meerdere flex-loads dezelfde verwachte PV-opportunity claimen. Tijdens uitvoering bepaalt P1 hoeveel opportunistische flexibiliteit werkelijk beschikbaar is. Forecast en confidence sturen dus planning en voorbereiding; P1 autoriseert de actuele opportunistische energie-opname.
+
