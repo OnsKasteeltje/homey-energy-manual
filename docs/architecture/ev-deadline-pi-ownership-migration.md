@@ -134,3 +134,34 @@ At every stage Homey remains the sole automatic physical Easee writer.
 ## Deprecation state
 
 The historical Homey Goal Adapter deadline derivation is **deprecated** as the target architecture. It remains temporarily present only because the current Homey exact-minute executor guard still consumes its Logic outputs. It must not be extended with new progress logic. Removal/disablement is blocked until the Pi→Homey control envelope carries the authoritative deadline execution fields and that path has been validated.
+
+
+## Command ingress preparation
+
+The Pi must not use the Git working tree as mutable runtime command storage. During this migration phase the durable command source remains the website command committed by the Cloudflare Worker to GitHub `main`.
+
+Prepared command path:
+
+```text
+Website
+  -> Cloudflare Worker
+  -> GitHub main: docs/data/tesla-deadline-command.json
+  -> Pi read-only command fetcher (60 s cadence)
+  -> /home/jeroen/ems/data/tesla-deadline-command.json
+  -> Pi deadline derived-state builder
+```
+
+The fetcher validates schema 2, request identity, timestamp presence, SoC bounds, goal energy, calibration and current bounds before publication. A fetch or validation failure never replaces the last valid runtime command. Publication uses atomic replace. An unchanged `requestId` is not rewritten, avoiding unnecessary derived-state triggers.
+
+Deadline strings without an explicit offset are intentionally interpreted as `Europe/Amsterdam` by the Pi deadline engine. The Cloudflare Worker currently validates that the submitted deadline is future-dated, but that validation must not be treated as the authoritative timezone conversion for execution. Pi owns the canonical deadline interpretation.
+
+The command fetch cadence is independent of Homey telemetry. It introduces no additional Homey reads or writes. Canonical charging progress continues to use the intentional 5-minute Homey Core state cadence.
+
+The prepared systemd topology is:
+
+- `ems-ev-deadline-command.timer`: fetch command every 60 seconds;
+- `ems-ev-deadline-command.path`: trigger derived state when the runtime command changes;
+- `ems-ev-deadline-state.path`: trigger derived state when canonical energy state changes;
+- `ems-ev-deadline-state.service`: one derived-state builder shared by both event sources.
+
+All units remain preparation-only until explicit Pi installation, verification and activation.
