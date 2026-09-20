@@ -1,0 +1,17 @@
+[Unit]
+Description=EMS Pi EV deadline derived state builder
+After=local-fs.target
+ConditionPathExists=/home/jeroen/ems/data/energy-state-v2.json
+
+[Service]
+Type=oneshot
+User=jeroen
+Group=jeroen
+WorkingDirectory=/home/jeroen/ems/repo/homey-energy-manual
+ExecStart=/usr/bin/python3 /home/jeroen/ems/repo/homey-energy-manual/src/pi/ems-runtime/ev/deadline/build_deadline_shadow_state.py
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jeroen/ems/data
