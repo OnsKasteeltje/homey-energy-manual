@@ -1,0 +1,17 @@
+[Unit]
+Description=Fetch EMS EV deadline command from GitHub main
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+Group=jeroen
+WorkingDirectory=/home/jeroen/ems/repo/homey-energy-manual
+ExecStart=/usr/bin/python3 /home/jeroen/ems/repo/homey-energy-manual/src/pi/ems-runtime/ev/deadline/fetch_deadline_command.py
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jeroen/ems/data
