@@ -149,6 +149,30 @@ Voor de Easee EV Power Adapter v0.1 betekent dit aanvullend: vaste 3-fase mappin
 
 Een actuator-adapter is niet architectuurconform wanneer hij zelfstandig EMS-policy toevoegt, een upstream power intent kan verhogen, stale data als actueel behandelt, configuratie-instellingen als frequente runtime-write gebruikt of fysieke uitvoering afleidt uit alleen een API-acknowledgement.
 
+## EV deadline authority — live ownership
+
+Vanaf de gecontroleerde cutover op 2026-09-20 geldt voor EV-deadlines de volgende bindende ownership-keten:
+
+```text
+Website command
+      ↓
+Pi command ingress + deadline lifecycle/progress/planning
+      ↓
+Pi /control/current — EMS_PI_EV_DEADLINE_EXECUTION_V0.1
+      ↓
+Homey PI Dynamic Planner Bridge / executor safety
+      ↓
+EV Adapter → Gate → sole Actuator writer
+      ↓
+Easee → Tesla
+```
+
+Homey Core blijft de canonieke bron voor fysieke EV/P1-observaties. De historische Homey EV Deadline Goal Adapter is uitgeschakeld en mag niet als parallelle deadlinebeslisser worden heractiveerd zolang Pi deadline authority actief is. Easee Equalizer blijft onafhankelijke lokale hardwareveiligheid.
+
+### Acceptatiecriterium
+
+De EV-deadlineketen is alleen architectuurconform wanneer Pi de enige deadline-lifecycle/planning-authoriteit is, de Homey bridge uitsluitend het gevalideerde Pi deadline-contract uitvoert, en exact één Homey actuatorroute fysieke Easee-writes kan uitvoeren.
+
 ## Relatie met RC en toekomstige wijzigingen
 
 Deze guardrails veranderen geen bestaande RC-controlpaden op zichzelf. Zij gelden vanaf opname als verplichte architectuurtoets voor nieuwe wijzigingen en voor toekomstige herbeoordeling van bestaande integraties.
