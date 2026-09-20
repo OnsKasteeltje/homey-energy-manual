@@ -53,7 +53,7 @@ def import_file(input_path, db_path=DB):
 
     con = sqlite3.connect(str(db_path), timeout=2.0)
     con.execute("PRAGMA busy_timeout=2000")
-    inserted = skipped = 0
+    inserted = refined = skipped = 0
     try:
         target_ids = {name: ids(con, *target) for name, target in SERIES.items()}
         for name, entries in data.items():
@@ -69,20 +69,41 @@ def import_file(input_path, db_path=DB):
                 value = entry.get("v")
                 if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
                     raise ValueError(f"VALUE_INVALID:{name}:{ts}")
-                before = con.total_changes
-                con.execute(
-                    """INSERT OR IGNORE INTO measurements
-                       (ts_utc,device_id,metric_id,value_real,quality,
-                        source_resolution_seconds,collected_at_utc)
-                       VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)""",
-                    (ts, device_id, metric_id, float(value), "backfill", resolution),
-                )
-                if con.total_changes > before:
+                existing = con.execute(
+                    """SELECT id,quality,source_resolution_seconds
+                       FROM measurements
+                       WHERE ts_utc=? AND device_id=? AND metric_id=?""",
+                    (ts, device_id, metric_id),
+                ).fetchone()
+                if existing is None:
+                    con.execute(
+                        """INSERT INTO measurements
+                           (ts_utc,device_id,metric_id,value_real,quality,
+                            source_resolution_seconds,collected_at_utc)
+                           VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)""",
+                        (ts, device_id, metric_id, float(value), "backfill", resolution),
+                    )
                     inserted += 1
+                elif (
+                    existing[1] == "backfill"
+                    and isinstance(existing[2], int)
+                    and resolution < existing[2]
+                ):
+                    con.execute(
+                        """UPDATE measurements
+                           SET value_real=?,quality='backfill',
+                               source_resolution_seconds=?,
+                               collected_at_utc=CURRENT_TIMESTAMP
+                           WHERE id=?""",
+                        (float(value), resolution, existing[0]),
+                    )
+                    refined += 1
                 else:
+                    # Never overwrite observed/live data, and never replace a
+                    # backfill point with equal or coarser source resolution.
                     skipped += 1
         con.commit()
-        return {"inserted": inserted, "skipped": skipped}
+        return {"inserted": inserted, "refined": refined, "skipped": skipped}
     except Exception:
         con.rollback()
         raise
@@ -96,7 +117,7 @@ def main():
     parser.add_argument("--db", default=str(DB))
     args = parser.parse_args()
     result = import_file(args.input_json, Path(args.db))
-    print(f"PASS: inserted={result['inserted']} skipped={result['skipped']}")
+    print(f"PASS: inserted={result['inserted']} refined={result['refined']} skipped={result['skipped']}")
 
 
 if __name__ == "__main__":
