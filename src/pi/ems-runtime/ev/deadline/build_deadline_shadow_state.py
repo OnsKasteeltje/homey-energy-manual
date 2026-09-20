@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-COMMAND_FILE = Path("/home/jeroen/ems/repo/homey-energy-manual/docs/data/tesla-deadline-command.json")
+COMMAND_FILE = Path("/home/jeroen/ems/data/tesla-deadline-command.json")
 ENERGY_STATE_FILE = Path("/home/jeroen/ems/data/energy-state-v2.json")
 STATE_FILE = Path("/home/jeroen/ems/data/ev-deadline-shadow-state.json")
 TZ = ZoneInfo("Europe/Amsterdam")
