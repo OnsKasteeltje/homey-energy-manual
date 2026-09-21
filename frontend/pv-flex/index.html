@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>EMS · PV & Flex Analyse</title>
+  <link rel="stylesheet" href="../shared/styles/v2-shell.css">
+  <link rel="stylesheet" href="./styles/pv-flex.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../live/">EMS <span>Productie</span></a>
+  <nav data-ems-main-nav aria-label="Hoofdnavigatie"></nav>
+  <div id="quality" class="freshness">Laden…</div>
+</header>
+<main>
+  <section class="intro">
+    <div><small>PV FORECAST V2 · OBSERVABILITY</small><h1>PV & Flex Analyse</h1>
+      <p>Forecast → werkelijke PV → flexgebruik. P1 blijft de realtime energie-autoriteit.</p></div>
+  </section>
+  <section class="period-nav">
+    <button id="prev" aria-label="Vorige dag">‹</button>
+    <div><strong id="day-title">—</strong><span>Europe/Amsterdam · forecast op vaste 12-uurs lead</span></div>
+    <button id="next" aria-label="Volgende dag">›</button>
+  </section>
+  <section class="kpis">
+    <article><small>PV FORECAST</small><strong id="kpi-forecast">—</strong><span id="kpi-slots">—</span></article>
+    <article><small>PV WERKELIJK</small><strong id="kpi-pv">—</strong><span>P1 + omvormerhistorie</span></article>
+    <article><small>EIGEN PV-GEBRUIK</small><strong id="kpi-self">—</strong><span>PV − teruglevering</span></article>
+    <article><small>TERUGLEVERING</small><strong id="kpi-export">—</strong><span>naar het net</span></article>
+  </section>
+  <section class="panel">
+    <header><div><small>15-MINUTEN</small><h2>Forecast versus werkelijke PV</h2></div>
+      <div class="legend"><span class="forecast">Forecast</span><span class="actual">Werkelijk</span></div></header>
+    <div class="chart-wrap"><svg id="pv-chart" role="img" aria-label="PV forecast versus werkelijkheid"></svg><div id="tooltip" class="tooltip" hidden></div></div>
+    <p id="empty" class="empty" hidden>Geen meetdata voor deze dag.</p>
+  </section>
+  <section class="panel flex-panel">
+    <header><div><small>FLEX-RESOURCES</small><h2>Werkelijke inzet</h2></div><span id="heating-status" class="status">Heating Flex —</span></header>
+    <div class="lanes">
+      <div class="lane"><strong>EV</strong><div class="lane-track" id="ev-lane"></div></div>
+      <div class="lane"><strong>WW boiler</strong><div class="lane-track" id="ww-lane"></div></div>
+      <div class="lane"><strong>Heating Flex</strong><div class="lane-note" id="heating-note">Nog geen historische bron geïntegreerd.</div></div>
+    </div>
+  </section>
+  <section class="quality-panel"><span id="coverage">Dekking —</span><span id="gaps">Gaps —</span><span id="disc">Discontinuïteiten —</span></section>
+  <p class="preview-note">EMS productie · Read-only observability</p>
+</main>
+<script type="module" src="./render/pv-flex.js"></script>
+<script type="module" src="../shared/navigation.js"></script>
+</body></html>
