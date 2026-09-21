@@ -26,6 +26,8 @@ homey-energy-manual/
 ├── services/
 │   └── pi/
 │       ├── planner/
+│       ├── forecast/
+│       │   └── pv/
 │       ├── control/
 │       ├── state/
 │       ├── api/
@@ -84,7 +86,8 @@ homey-energy-manual/
 The target structure follows the operational ownership model:
 
 - **Homey** is the executor / edge-control layer.
-- **Pi** owns planning, orchestration, state processing and external integrations unless explicitly documented otherwise.
+- **Pi** owns planning, forecasting, orchestration, state processing and external integrations unless explicitly documented otherwise.
+- **Pi forecast** lives under `services/pi/forecast/`; PV forecast production, archival and validation code lives under `services/pi/forecast/pv/`. Forecasts are advisory planning inputs and do not override canonical realtime P1 energy authority.
 - **Homey ↔ Pi integration** lives under `services/pi/integrations/homey/`: ingress describes the Homey-to-Pi state boundary, while egress owns Pi-to-Homey control publication. The HTTP endpoint itself remains under `services/pi/api/` because API transport and integration semantics are separate concerns.
 - **Pi API** exposes bounded machine interfaces such as health, state ingest and planner/control status without changing the underlying runtime ownership boundaries.
 - **Website** owns presentation and human-facing observability.
