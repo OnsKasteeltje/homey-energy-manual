@@ -1,7 +1,7 @@
 ---
 component: planner-v2-target
 title: Planner V2 Target Architecture
-version: 0.2.0
+version: 0.6.0
 status: draft
 architecture_status: planned
 last_verified: 2026-09-20
@@ -205,6 +205,71 @@ PV Forecast en P1 hebben verschillende rollen:
 Een slechte forecast mag dus niet verhinderen dat werkelijk gemeten P1-export wordt benut. Omgekeerd mag voorspelde PV niet zelfstandig opportunistische netimport rechtvaardigen wanneer P1 op dat moment geen overschot laat zien.
 
 De forecast mag wel gebruikt worden om stateful/traag reagerende flex vooraf voor te bereiden, zoals een geldige Heating Flex-kandidaat. De daadwerkelijke opportunistische uitvoering blijft begrensd door de P1-authorityregels en de specifieke actuator-/comfortconstraints.
+
+### V2 commissioning history
+
+PV Forecast V2 bouwt vanaf commissioning een schone validatieset op. Iedere shadow-run wordt met zijn oorspronkelijke `generatedAt`, slot, forecast en confidence gearchiveerd. Modelaccuracy wordt niet afgeleid uit live inverter-power.
+
+Werkelijke PV voor latere validatie komt uit afgesloten, gevalideerde cumulatieve productie-intervallen. Ontbrekende, gap- of discontinuity-data leveren geen trainingspunt op. De initiële `recentLocalAccuracy` blijft een neutrale prior totdat voldoende gesloten V2-observaties beschikbaar zijn. Deze leerketen is read-only en heeft geen control-authority.
+
+## 3.2 EV Opportunity V2 — eenvoudige realtime regeling
+
+Planner V2 neemt de oude EV-opportunity-score-, window- en bufferlagen niet over. De functionele invariant is:
+
+> **Forecast kiest alleen nu-of-later in de grijze zone; P1 autoriseert de actuele opportunity; een rolling 5-minutenmeting moduleert symmetrisch; de deadline garandeert het einddoel.**
+
+### Twee opportunity-modi
+
+Bij een aangesloten/beschikbare EV gelden twee expliciete opportunity-modi:
+
+1. **GRAY_OPPORTUNITY** — actuele P1-export ligt tussen `2000 W` en het minimale 3-fase laadvermogen van 6 A (`EV_W_PER_A * 6`, nominaal circa `4140 W`). Omdat 6 A dan gedeeltelijke netimport veroorzaakt, mag deze mode alleen starten wanneer de vooruitkijkende PV Forecast binnen de relevante beschikbare/deadlinehorizon geen duidelijk betere normale PV-opportunity laat zien. Forecast heeft hier uitsluitend de rol **nu versus later**.
+2. **NORMAL_PV_OPPORTUNITY** — actuele P1-export is ten minste voldoende voor 6 A. Deze mode start direct op basis van P1; forecast-confidence is geen realtime gate.
+
+Onder `2000 W` actuele P1-export start geen opportunistische laadsessie. Harde deadline-lading staat los van deze startregels.
+
+Een actieve `GRAY_OPPORTUNITY` promoveert naar `NORMAL_PV_OPPORTUNITY` zodra de beschikbare PV-capaciteit het 6 A-minimum bereikt. Na promotie gelden de normale regels; de sessie blijft niet kunstmatig grijs.
+
+### Modulatie tijdens laden
+
+De realtime EV-opportunityregeling draait in de bestaande Homey PI Bridge op de reeds aanwezige één-minuuttrigger en introduceert geen extra polling of sub-minute control-loop. De normale Homey→Pi Core-state publicatie blijft 300 seconden; die transportcadans wordt niet versneld voor EV-modulatie.
+
+Pi bepaalt strategisch of EV-opportunity is toegestaan en publiceert daarvoor een begrensde mode/envelope (OFF, GRAY of NORMAL, naast de harde deadline-requirement). Homey wordt daarmee geen tweede planner: Homey bepaalt uitsluitend het actuele numerieke laadvermogen binnen de door Pi toegestane mode.
+
+Iedere minuut leest Homey rechtstreeks de actuele P1 `measure_power` en het werkelijke Easee/EV-vermogen. Daarbij is Homey P1 `measure_power` positief bij netimport en negatief bij netexport. Het beschikbare PV-vermogen tijdens laden wordt daarom executor-side gereconstrueerd als:
+
+    availablePvW = max(0, -p1MeasurePowerW + actualEvPowerW)
+
+Dit is equivalent aan `actualEvPowerW + p1ExportW - p1ImportW` uit het canonical state-model.
+
+    availablePvW = actualEvPowerW + p1ExportW - p1ImportW
+
+Homey bewaart hiervoor uitsluitend lokale executor-state: maximaal de laatste vijf timestamped één-minuutsamples van `availablePvW`. De modulatiewaarde is het rolling gemiddelde van die maximaal vijf samples. Deze samplebuffer is geen planner-state, creëert geen nieuwe authority en mag geen actuator schrijven buiten de bestaande `EM2_Power_Intent -> adapter -> gate -> actuator` keten.
+
+Een opportunity-start hoeft niet eerst vijf minuten te wachten: de actuele P1-meting autoriseert de start volgens de GRAY/NORMAL-startregels. Zodra de opportunity actief is, wordt het rolling gemiddelde gebruikt voor stabilisatie en symmetrische modulatie. Dat gemiddelde wordt iedere regelcyclus rechtstreeks vertaald naar het passende gehele ampèrage. De omzetting is **symmetrisch**: omhoog en omlaag gelden exact dezelfde regels; er is geen verplichte stap van 1 A per cyclus en geen aparte up/down-delay.
+
+Voor PV-opportunity geldt:
+
+- minimum laadstroom: `6 A`;
+- maximum opportunity-laadstroom: `11 A`;
+- het berekende gehele ampèrage mag in één regelcyclus direct naar een hoger of lager passend niveau binnen `6..11 A` gaan;
+- de rolling 5-minutenwaarde is de primaire demping tegen pingelen; extra gestapelde qualification windows, confidence-gates, import-penalty scoring of richtingafhankelijke buffers worden niet toegevoegd.
+
+### Verschillende ondergrens per actieve mode
+
+De stop-/vasthoudgrens hoort bij de mode waarin de opportunity zich bevindt:
+
+- `GRAY_OPPORTUNITY`: 6 A mag bewust worden vastgehouden zolang het rolling 5-minuten beschikbare PV-vermogen ten minste `2000 W` is. Onder die grens eindigt de grijze opportunity, tenzij een harde deadline laden vereist.
+- `NORMAL_PV_OPPORTUNITY`: de 2 kW-uitzondering geldt **niet**. De normale opportunity wordt alleen gedragen zolang het rolling 5-minuten beschikbare PV-vermogen ten minste het minimale 6 A-laadvermogen kan dragen. Onder die grens eindigt de normale opportunity, tenzij een harde deadline laden vereist.
+
+Hiermee kan een normale PV-opportunity niet ongemerkt veranderen in structureel gedeeltelijk netladen. Alleen een expliciet door forecast geaccepteerde grijze opportunity mag dat doen.
+
+### Deadline en safety
+
+Opportunistisch geladen energie verlaagt `remainingKWh`. Wanneer de harde deadline dit vereist, neemt deadline-laden over en mag netimport plaatsvinden. De `11 A`-limiet is uitsluitend de bovengrens voor PV-opportunity; deadline-laden blijft begrensd door de geldige deadline-`maxA`.
+
+De rolling 5-minutenregeling is optimalisatie, geen hardware-safety. Een afzonderlijke eenvoudige bescherming tegen **forse actuele onverwachte netimport** mag onmiddellijk terugregelen zonder vijf minuten op het gemiddelde te wachten. De exacte drempel voor deze bescherming wordt pas na shadow-observatie vastgelegd en mag geen tweede opportunity-optimalisatiealgoritme worden.
+
+Realtime P1 blijft canonical authority en Homey/Easee blijft de execution/safety boundary met exact één fysieke writer.
 
 ## 4. Heating Flex versus Joint Planner
 
@@ -421,4 +486,52 @@ Per flex-load:
 - **WW:** alleen bij `wwMode = BOILER` kan werkelijk P1-overschot opportunistisch boilergebruik activeren, binnen WW comfort/deadline- en technische randvoorwaarden. Bij `wwMode = CV` bestaat geen elektrische WW-flex.
 
 De Joint Planner voorkomt vooruitkijkend dat meerdere flex-loads dezelfde verwachte PV-opportunity claimen. Tijdens uitvoering bepaalt P1 hoeveel opportunistische flexibiliteit werkelijk beschikbaar is. Forecast en confidence sturen dus planning en voorbereiding; P1 autoriseert de actuele opportunistische energie-opname.
+
+## Heating Flex V2 — doellogica
+
+Heating Flex V2 optimaliseert **wanneer** een reeds door Honeywell gevraagde toekomstige temperatuurverhoging wordt gerealiseerd. Honeywell blijft de comfort-authority: Heating Flex mag geen hogere comforttemperatuur verzinnen en mag een Honeywell-doel niet verlagen of vervangen.
+
+### Thermische eenheden
+
+Voor planning en thermische analyse worden de Honeywell-ruimtes als volgt geïnterpreteerd:
+
+- **Leefzone:** woonkamer + eetkamer. Dit zijn afzonderlijke Honeywell-comfortzones, maar worden door Heating Flex als één thermisch gekoppelde eenheid beschouwd.
+- **Keuken:** zelfstandige thermische eenheid.
+- **Serre:** zelfstandige thermische eenheid.
+
+Het samenvoegen in een thermische eenheid verandert de Honeywell-zonering of regeling niet.
+
+### Beslisprincipe
+
+1. Honeywell levert per ruimte het actuele en toekomstige baseline-setpoint en het tijdstip van een toekomstige UP-transition.
+2. Heating Flex bepaalt of zo'n bestaande UP-transition thermisch zinvol eerder kan beginnen. Het toekomstige Honeywell-doel blijft de bovengrens.
+3. PV Forecast geeft vooruit aan wanneer een PV-opportunity waarschijnlijk is en ondersteunt de planning; forecast-confidence is adviserend en geen globale gate.
+4. De Joint Planner arbitreert Heating Flex samen met andere flexibele verbruikers, in het bijzonder EV, zodat dezelfde verwachte PV niet dubbel wordt geclaimd.
+5. P1 blijft de realtime energie-authority. Een vooraf geldige Heating Flex-kandidaat mag opportunistisch worden geactiveerd wanneer werkelijke P1-export de opportunity bevestigt. Een korte P1-piek mag nooit zelfstandig nieuwe warmtevraag of een hoger comfortdoel creëren.
+6. Heating Flex is een traag thermisch proces en wordt daarom niet als een minuut-tot-minuut vermogensregelaar behandeld. Na activering wordt een stabiele, vooraf begrensde verwarmingsactie uitgevoerd binnen Honeywell- en safetygrenzen.
+
+De bestaande maximale advance van drie uur en stappen van 0,5 °C zijn commissioning-grenzen uit het huidige shadow-model en worden niet als bewezen thermische eigenschappen beschouwd. V2 moet deze grenzen later onderbouwen met historische Honeywell-, Quatt- en buitentemperatuurdata.
+
+### Thermisch leermodel
+
+Per thermische eenheid moet historische analyse uiteindelijk kunnen schatten:
+
+- opwarmsnelheid bij verschillende buitentemperaturen;
+- benodigde elektrische Quatt-energie voor een relevante temperatuurstijging;
+- thermische retentie: hoeveel van een vervroegde temperatuurstijging na verloop van tijd behouden blijft;
+- zinvolle maximale vervroeging van een Honeywell UP-transition.
+
+Quatt is daarbij een energie-/responsbron voor het thermische model en **geen comfort-authority**. Honeywell blijft leidend voor gewenste ruimtetemperaturen.
+
+### Website-doel
+
+Heating Flex krijgt in Frontend V2 een eigen pagina voor commissioning, validatie en latere optimalisatie. Deze pagina toont minimaal:
+
+- tijdlijnen voor Leefzone, Keuken en Serre;
+- Honeywell baseline-schema en werkelijke ruimtetemperatuur;
+- zichtbaar onderscheid tussen baseline en een door Heating Flex vervroegd verwarmingsdeel;
+- PV Forecast, werkelijke P1 import/export en Quatt elektrisch vermogen in samenhang met de verwarmingsactie;
+- per thermische eenheid de geleerde respons, zoals opwarmtijd, gebruikte energie en thermische retentie.
+
+De Heating-pagina is observability/validation en krijgt geen zelfstandige control-authority.
 

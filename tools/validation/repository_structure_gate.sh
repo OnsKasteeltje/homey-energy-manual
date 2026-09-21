@@ -96,7 +96,7 @@ fi
 INVALID_PI="$(
   printf '%s\n' "$ADDED" |
     grep -E '^services/pi/' |
-    grep -Ev '^services/pi/(planner|control|state|api|integrations|history)/' ||
+    grep -Ev '^services/pi/(planner|forecast|control|state|api|integrations|history)/' ||
     true
 )"
 

@@ -94,6 +94,13 @@ grep -q 'services/pi/integrations/homey/ingress/state_ingest.py' "$HOMEY_DOC" ||
 grep -q 'services/pi/integrations/homey/egress/publish_pi_control_intent.py' "$HOMEY_DOC" || fail "Homey egress target repository boundary missing from integration document"
 pass "Homey ingress/egress repository boundary documented"
 
+FRONTEND_NAV="frontend/shared/navigation.js"
+FRONTEND_NAV_TEST="tests/frontend/test_v2_shared_navigation_contract.py"
+[[ -f "$FRONTEND_NAV" ]] || fail "shared Frontend V2 navigation source missing"
+[[ -f "$FRONTEND_NAV_TEST" ]] || fail "shared Frontend V2 navigation contract test missing"
+python3 "$FRONTEND_NAV_TEST" || fail "Frontend V2 shared navigation contract failed"
+pass "Frontend V2 uses one shared main-navigation source"
+
 for legacy_unit in deploy/systemd/ems-day-history.service deploy/systemd/ems-day-history.timer deploy/systemd/ems-homey-insights.service deploy/systemd/ems-homey-insights.timer deploy/systemd/ems-pi-control-publish.service deploy/systemd/ems-pi-control-publish.timer; do [[ ! -e "$legacy_unit" ]] || fail "legacy production unit must not be deployable: $legacy_unit"; done
 pass "legacy Homey polling/control-push units absent from production deploy set"
 

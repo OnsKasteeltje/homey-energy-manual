@@ -113,6 +113,14 @@ GitHub is not runtime-state transport for the production Live website. The forme
 
 The former MkDocs/GitHub Pages Live energy view is retired as the production Live frontend. Planner, History and Groups/Phases may remain temporarily available through the legacy site until equivalent production-frontend resources are migrated. This temporary legacy availability does not make GitHub an allowed production runtime-state boundary.
 
+### 2.4 Frontend V2 shared navigation governance
+
+Frontend V2 uses one shared main-navigation source: `frontend/shared/navigation.js`. Individual V2 page HTML contains only the navigation mount and must not maintain a second hardcoded menu. The Architecture Gate executes `tests/frontend/test_v2_shared_navigation_contract.py` to enforce this boundary.
+
+For frontend incidents the diagnostic chain is: **GitHub source -> deployed `/var/www/ems-frontend-v2` -> served HTTP -> browser/site data**. When source, deployed files and served HTTP agree, browser cache/site-data remediation must not trigger EMS control, Web Data API or Caddy changes.
+
+Recovery from strongly diverged Git histories must start from a proven good/current base after compare/merge-base/dependency analysis. Force-resetting a recovery branch or blindly transplanting divergent patches is not an accepted recovery method.
+
 ## 3. Production contract policy
 
 Production remains locked to the fixed three-year ENGIE contract:

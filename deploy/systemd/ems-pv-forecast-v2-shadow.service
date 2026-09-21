@@ -1,0 +1,10 @@
+[Unit]
+Description=EMS PV Forecast V2 shadow
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+User=jeroen
+WorkingDirectory=/home/jeroen/ems
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/forecast/pv/build_pv_forecast_v2.py
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/forecast/pv/archive_forecast.py
