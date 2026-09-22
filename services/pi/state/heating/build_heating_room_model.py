@@ -10,7 +10,7 @@ import argparse
 import json
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -74,6 +74,130 @@ def _transition(current: float, nxt: float) -> str:
     return "NONE"
 
 
+
+_WEEKDAYS = {
+    "monday": 0,
+    "tuesday": 1,
+    "wednesday": 2,
+    "thursday": 3,
+    "friday": 4,
+    "saturday": 5,
+    "sunday": 6,
+}
+
+
+def _weekly_switchpoints(
+    zone: dict[str, Any],
+    now: datetime,
+    key: str,
+) -> list[tuple[datetime, float]]:
+    """Resolve the Honeywell weekly baseline around now in Europe/Amsterdam."""
+
+    weekly = zone.get("weeklySchedule")
+    if not isinstance(weekly, list) or not weekly:
+        raise ModelError(f"{key}.weeklySchedule must be a non-empty array")
+
+    now_local = now.astimezone(HOME_TZ)
+    monday = now_local.date() - timedelta(days=now_local.weekday())
+
+    resolved: list[tuple[datetime, float]] = []
+
+    # Resolve previous/current/next week so that the active baseline can
+    # cross midnight and the Sunday -> Monday week boundary safely.
+    for week_offset in (-1, 0, 1):
+        week_start = monday + timedelta(days=7 * week_offset)
+
+        for day in weekly:
+            d = _require_dict(day, f"{key}.weeklySchedule.day")
+
+            day_name = d.get("day_of_week")
+            if day_name not in _WEEKDAYS:
+                raise ModelError(
+                    f"{key}.weeklySchedule invalid day_of_week: {day_name}"
+                )
+
+            switchpoints = d.get("switchpoints")
+            if not isinstance(switchpoints, list):
+                raise ModelError(
+                    f"{key}.weeklySchedule.{day_name}.switchpoints must be an array"
+                )
+
+            day_date = week_start + timedelta(days=_WEEKDAYS[day_name])
+
+            for index, switchpoint in enumerate(switchpoints):
+                sp = _require_dict(
+                    switchpoint,
+                    f"{key}.weeklySchedule.{day_name}.switchpoints[{index}]",
+                )
+
+                tod = sp.get("time_of_day")
+                if not isinstance(tod, str):
+                    raise ModelError(
+                        f"{key}.weeklySchedule.{day_name}."
+                        f"switchpoints[{index}].time_of_day missing"
+                    )
+
+                try:
+                    local_time = datetime.strptime(tod, "%H:%M:%S").time()
+                except ValueError as exc:
+                    raise ModelError(
+                        f"{key}.weeklySchedule invalid time_of_day: {tod}"
+                    ) from exc
+
+                target = _number(
+                    sp.get("heat_setpoint"),
+                    f"{key}.weeklySchedule.{day_name}."
+                    f"switchpoints[{index}].heat_setpoint",
+                )
+
+                local_dt = datetime.combine(
+                    day_date,
+                    local_time,
+                    tzinfo=HOME_TZ,
+                )
+
+                resolved.append((local_dt, target))
+
+    resolved.sort(key=lambda item: item[0])
+    return resolved
+
+
+def _resolve_baseline(
+    zone: dict[str, Any],
+    now: datetime,
+    key: str,
+) -> tuple[datetime, float, datetime, float]:
+    """Resolve the scheduled baseline active at now and its next transition."""
+
+    points = _weekly_switchpoints(zone, now, key)
+    now_local = now.astimezone(HOME_TZ)
+
+    current = None
+    upcoming = None
+
+    for point in points:
+        if point[0] <= now_local:
+            current = point
+        elif upcoming is None:
+            upcoming = point
+            break
+
+    if current is None or upcoming is None:
+        raise ModelError(
+            f"cannot resolve current/next weekly switchpoint for {key}"
+        )
+
+    current_time, current_target = current
+    next_time, next_target = upcoming
+
+    if next_time <= current_time:
+        raise ModelError(
+            f"next weekly switchpoint must be after current switchpoint for {key}"
+        )
+
+    return current_time, current_target, next_time, next_target
+
+
 def build_model(schedule: dict[str, Any], state: dict[str, Any], *, generated_at: datetime | None = None) -> dict[str, Any]:
     if schedule.get("schema") != SCHEDULE_SCHEMA:
         raise ModelError(f"unexpected schedule schema: {schedule.get('schema')}")
@@ -90,20 +214,23 @@ def build_model(schedule: dict[str, Any], state: dict[str, Any], *, generated_at
         missing_schedule = sorted(set(state_rooms) - set(schedule_rooms))
         raise ModelError(f"room key mismatch: missingState={missing_state}, missingSchedule={missing_schedule}")
 
+    now = generated_at or datetime.now(timezone.utc)
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ModelError("generated_at must be offset-aware")
+
     rooms: list[dict[str, Any]] = []
     for key, sz in schedule_rooms.items():
         if sz.get("scheduleStatus") != "OK":
             raise ModelError(f"schedule not OK for {key}: {sz.get('scheduleStatus')}")
 
-        current_sp = _require_dict(sz.get("currentSwitchpoint"), f"{key}.currentSwitchpoint")
-        next_sp = _require_dict(sz.get("nextSwitchpoint"), f"{key}.nextSwitchpoint")
-        current_time = _parse_aware(current_sp.get("time"), f"{key}.currentSwitchpoint.time").astimezone(HOME_TZ)
-        next_time = _parse_aware(next_sp.get("time"), f"{key}.nextSwitchpoint.time").astimezone(HOME_TZ)
-        if next_time <= current_time:
-            raise ModelError(f"next switchpoint must be after current switchpoint for {key}")
-
-        current_baseline = _number(current_sp.get("targetTemperature_C"), f"{key}.currentSwitchpoint.targetTemperature_C")
-        next_baseline = _number(next_sp.get("targetTemperature_C"), f"{key}.nextSwitchpoint.targetTemperature_C")
+        # The Honeywell schedule collector is deliberately low-frequency.
+        # Its resolved current/next switchpoints describe collection time and
+        # can therefore become stale before this model is rebuilt. The weekly
+        # Honeywell schedule remains the baseline authority; resolve it at
+        # model-generation time in Europe/Amsterdam.
+        current_time, current_baseline, next_time, next_baseline = (
+            _resolve_baseline(sz, now, key)
+        )
 
         st = state_rooms[key]
         temperature = _number(st.get("roomTemperature_C"), f"{key}.roomTemperature_C")
@@ -129,10 +256,6 @@ def build_model(schedule: dict[str, Any], state: dict[str, Any], *, generated_at
                 "direction": _transition(current_baseline, next_baseline),
             },
         })
-
-    now = generated_at or datetime.now(timezone.utc)
-    if now.tzinfo is None or now.utcoffset() is None:
-        raise ModelError("generated_at must be offset-aware")
 
     return {
         "schema": OUTPUT_SCHEMA,
