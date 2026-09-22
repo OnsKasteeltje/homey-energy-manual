@@ -46,6 +46,16 @@ The former legacy `src/pi/ems-runtime/thermal/build_thermal_observer.py` is reti
 
 Quatt acquisition that remains useful for thermal analysis is canonicalized under `services/pi/integrations/quatt/collect_quatt_current.py`. The production systemd unit points to this target-structure source. Quatt telemetry, canonical room state and historical measurements form the input basis for **Heating Thermal Learning**: empirical evaluation of room response, heat retention, useful advancement horizon and rebound around the original Honeywell comfort time. Thermal Learning is observational; it does not create a second comfort authority or physical writer.
 
+Canonical Thermal Learning objective: use the house only as a thermal buffer
+for already scheduled Honeywell heat demand when this can absorb otherwise
+exported own PV without material additional grid import over the complete
+thermal episode. Reduced PV export alone is not success: retained useful heat,
+later heating demand and the subsequent grid-import/export consequence must be
+evaluated together. Thermal Learning remains READ_ONLY / SHADOW and supplies
+future empirical evidence to the planner; it is not a second planner or
+comfort/control authority.
+
+
 Detailed component documentation is under `docs/software-architecture/components/space-heating.md`, `heating-room-model.md` and `heating-preheat-plan.md`.
 
 Honeywell runtime deployment remains a mixed managed/runtime-state directory. Repository-managed source may be refreshed, but host-local `.venv/`, `config/account.env`, `cache/oauth-token.json` and last valid generated outputs must survive normal source deployment. Secrets, OAuth cache and generated runtime output remain outside GitHub.

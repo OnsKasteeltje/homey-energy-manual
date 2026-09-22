@@ -35,6 +35,43 @@ Thermal Learning is not a second room model and is not a control layer. It will 
 
 Its purpose is to learn/validate room response to an advanced `+0.5 °C` target step and to test the provisional circa-three-hour preheat horizon. Until sufficient fine-grained data exists, no heat-up duration, COP, building-loss coefficient, room-response curve or `heatingPlanW` may be invented.
 
+## Optimization objective
+
+Heating Thermal Learning exists to determine whether the house can be used as
+a useful thermal buffer for otherwise exported own PV energy.
+
+The learning objective is not to maximize heating, preheat duration or
+self-consumption in isolation. It is to establish empirically whether already
+scheduled Honeywell heat demand can be advanced so that:
+
+- otherwise exported own PV is absorbed as useful heat;
+- Honeywell comfort remains the authority;
+- useful temperature advantage remains around the original comfort moment;
+- later heating demand is reduced or avoided;
+- no material additional grid import is caused over the relevant thermal
+  episode.
+
+A reduction in PV export is therefore not by itself evidence of successful
+thermal buffering. Earlier heating followed by comparable or greater
+additional grid import later must not be learned as beneficial.
+
+Episode evaluation must distinguish at least:
+
+- room-temperature response;
+- captured PV-export opportunity;
+- retained useful heat around the original Honeywell comfort moment;
+- later heating demand;
+- grid import/export consequence over the complete evaluation window.
+
+Honeywell room state and schedule are the core thermal evidence. Quatt
+telemetry, P1/grid measurements, PV production and outside temperature are
+contextual evidence. Missing or stale Quatt telemetry must not invalidate an
+otherwise valid Honeywell thermal episode.
+
+Thermal Learning remains READ_ONLY / SHADOW. It may derive empirical evidence
+for later planner use, but it does not become a comfort authority, physical
+writer or second energy planner.
+
 ## Boundary with Heating Preheat V0.2
 
 Heating Preheat V0.2 may use the canonical Heating Room Model for eligibility. Quatt telemetry is observational context for validation and future learning; it does not by itself make a room eligible and does not create new heat demand.
