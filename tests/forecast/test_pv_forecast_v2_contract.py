@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static contract checks for the shadow PV Forecast V2 builder."""
+"""Static contract checks for the shadow PV Forecast V2 builder and archive."""
 from pathlib import Path
 
 p = Path("services/pi/forecast/pv/build_pv_forecast_v2.py")
@@ -24,6 +24,14 @@ for token in required:
     assert token in s, token
 for forbidden in ("base-load-forecast", "quatt-forecast", "forecastExportW", "3680),", "4200),", "2000),"):
     assert forbidden not in s, forbidden
-print("PASS: PV Forecast V2 static contract")
-
 assert "energy-state-v2.json" not in s, "PV forecast must not use live energy state for model accuracy"
+
+archive = Path("services/pi/forecast/pv/archive_forecast.py").read_text()
+for token in (
+    "idx_pv_forecast_v2_slot_generated",
+    "ON pv_forecast_v2_archive(slot_start_utc, generated_at)",
+    "CREATE INDEX IF NOT EXISTS",
+):
+    assert token in archive, token
+
+print("PASS: PV Forecast V2 static contract")
