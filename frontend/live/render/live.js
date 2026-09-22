@@ -16,6 +16,12 @@ function pvQualityText(s) {
   return "PV-data vertraagd";
 }
 
+function pvSourceSummary(s) {
+  const total = s.pvSources.length;
+  const warning = s.freshPvSources < total ? " ⚠" : " ✓";
+  return `${s.freshPvSources}/${total} actueel${warning}`;
+}
+
 function currentPvPower(s) {
   return s.pvQuality === "MEASURED" || s.pvQuality === "NIGHT" ? s.pv : null;
 }
@@ -28,6 +34,7 @@ function sourcePowerText(source) {
 function render(s) {
   set("pv-power", formatPower(currentPvPower(s)));
   const pvByKey = Object.fromEntries(s.pvSources.map((source) => [source.key, source]));
+  set("pv-source-summary", pvSourceSummary(s));
   set("pv-se", sourcePowerText(pvByKey.solarEdge));
   set("pv-se-age", pvByKey.solarEdge ? pvAge(pvByKey.solarEdge) : "—");
   set("pv-gw42", sourcePowerText(pvByKey.goodWe4200));
