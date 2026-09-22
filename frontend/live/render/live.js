@@ -9,6 +9,13 @@ function pvAge(source) {
   return source.fresh ? age : `${age} · vertraagd`;
 }
 
+function pvQualityText(s) {
+  if (s.pvQuality === "MEASURED") return `${s.freshPvSources}/${s.pvSources.length} bronnen actueel · gemeten`;
+  if (s.pvQuality === "PARTIAL") return `${s.freshPvSources}/${s.pvSources.length} bronnen actueel · gedeeltelijk`;
+  if (s.pvQuality === "NIGHT") return "nacht · 0 W verwacht";
+  return "PV-data vertraagd";
+}
+
 function render(s) {
   set("pv-power", formatPower(s.pv));
   const pvByKey = Object.fromEntries(s.pvSources.map((source) => [source.key, source]));
@@ -18,17 +25,21 @@ function render(s) {
   set("pv-gw42-age", pvByKey.goodWe4200 ? pvAge(pvByKey.goodWe4200) : "—");
   set("pv-gw20", formatPower(pvByKey.goodWe2000?.power));
   set("pv-gw20-age", pvByKey.goodWe2000 ? pvAge(pvByKey.goodWe2000) : "—");
-  const freshCount = s.pvSources.filter((source) => source.fresh).length;
-  set("pv-summary", `${freshCount}/${s.pvSources.length} bronnen actueel`);
+  set("pv-summary", pvQualityText(s));
+
   set("grid-power", formatPower(s.grid === null ? null : Math.abs(s.grid)));
-  set("grid-direction", s.gridDirection);
+  set("grid-direction", s.p1Valid ? s.gridDirection : "P1 niet actueel");
   const gridFlow = $("grid-flow");
   if (gridFlow) {
     gridFlow.classList.toggle("export", s.grid !== null && s.grid < 0);
     gridFlow.classList.toggle("balanced", s.grid === null || s.grid === 0);
   }
+
   set("house-power", formatPower(s.house));
-  set("balance-state", s.balanceValid ? "P1 actueel" : "P1 niet actueel");
+  set("house-state", s.houseQuality === "DERIVED"
+    ? "berekend uit PV + P1"
+    : !s.p1Valid ? "P1 niet actueel" : "PV-data onvoldoende");
+
   set("tesla-power", formatPower(s.tesla));
   set("tesla-state", s.teslaCharging ? `laden${s.teslaRequestedA ? ` · ${s.teslaRequestedA} A` : ""}` : s.teslaConnected ? "aangesloten" : "niet aangesloten");
   const wwFlowNode = $("ww-flow-node");
@@ -40,17 +51,19 @@ function render(s) {
   set("other-power", formatPower(s.other));
 
   set("kpi-grid", formatPower(s.grid === null ? null : Math.abs(s.grid)));
-  set("kpi-grid-sub", s.gridDirection);
+  set("kpi-grid-sub", s.p1Valid ? `${s.gridDirection} · P1 actueel` : "P1 niet actueel");
   set("kpi-pv", formatPower(s.pv));
+  set("kpi-pv-sub", pvQualityText(s));
   set("kpi-tesla", s.teslaCharging ? "Laden" : s.teslaConnected ? "Aangesloten" : "Niet aangesloten");
   set("kpi-tesla-sub", s.teslaDeadlineActive
     ? [s.teslaDeadline ? `deadline ${s.teslaDeadline}` : null, s.teslaRemainingKWh !== null ? `${s.teslaRemainingKWh.toFixed(2).replace(".", ",")} kWh resterend` : null].filter(Boolean).join(" · ")
     : (s.teslaNeed || "geen deadline actief"));
   set("kpi-ww", s.wwBoilerMode ? "Boiler" : "CV");
   set("kpi-ww-sub", "actieve warmtebron");
-  set("manager-priority", s.managerPriority || "—");
-  set("manager-title", s.managerDecision ? s.managerDecision.replaceAll("_", " ") : "Live energiestroom");
-  set("manager-reason", s.managerReason || "Actuele EMS-toestand");
+
+  set("manager-priority", s.managerPriority || "EMS");
+  set("manager-title", s.managerDecision ? s.managerDecision.replaceAll("_", " ") : "Geen expliciete EMS-beslissing");
+  set("manager-reason", s.managerReason || "Actuele toestand; geen beslisreden gepubliceerd.");
 
   const generated = formatLocalTime(s.generatedAt);
   set("freshness", generated ? `Bijgewerkt ${generated}` : "Live");
