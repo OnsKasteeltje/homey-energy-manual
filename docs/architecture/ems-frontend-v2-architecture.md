@@ -128,6 +128,19 @@ Live code MUST NOT load on History merely because both are frontend pages. Setti
 
 Planner and Groepen & fasen may temporarily retain legacy loading dependencies until their later migration; this exception MUST NOT be used to add new V2 logic to the legacy global bundle.
 
+### 8.1 Minimal deployment rule
+
+Deployment scope MUST match change scope. A small frontend-only change MUST NOT automatically run the full Frontend V2 installer when only staged frontend assets need to be refreshed.
+
+In particular:
+- do not reinstall or overwrite Caddy configuration for an asset-only frontend change;
+- do not reload unrelated infrastructure merely because frontend source changed;
+- use the narrowest deployment action that updates the changed runtime assets;
+- run the full installer only when the change actually includes installation, ingress, Caddy, service, ownership/permission, or other deployment-contract changes;
+- validate the affected runtime surface after the minimal deployment.
+
+This rule exists to prevent presentation-only changes from unintentionally changing a previously working private LAN/Tailscale ingress configuration.
+
 ## 9. State and data rules
 
 Each page has one normalized page-state boundary:
