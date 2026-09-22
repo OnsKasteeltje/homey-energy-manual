@@ -10,6 +10,10 @@ def main():
  con.execute("""CREATE TABLE IF NOT EXISTS pv_forecast_v2_archive(
  generated_at TEXT NOT NULL, slot_start_utc TEXT NOT NULL, forecast_w REAL NOT NULL,
  confidence REAL, model_basis TEXT, PRIMARY KEY(generated_at,slot_start_utc))""")
+ # PV/Flex analysis selects a slot first and then the newest eligible forecast.
+ # Keep that read path indexed as the archive grows; this changes no forecast data.
+ con.execute("""CREATE INDEX IF NOT EXISTS idx_pv_forecast_v2_slot_generated
+ ON pv_forecast_v2_archive(slot_start_utc, generated_at)""")
  for s in d.get("slots",[]): con.execute("INSERT OR IGNORE INTO pv_forecast_v2_archive VALUES(?,?,?,?,?)",(d["generatedAt"],s["start"],s["pvForecastW"],s.get("confidence"),s.get("modelBasis")))
  con.commit(); n=con.execute("SELECT changes()").fetchone()[0]; con.close()
  print("PASS: PV Forecast V2 archived")
