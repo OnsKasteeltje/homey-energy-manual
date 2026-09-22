@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="light">
   <title>EMS · Live</title>
-  <link rel="stylesheet" href="../shared/styles/v2-shell.css">\n  <link rel="stylesheet" href="./styles/live.css">
+  <link rel="stylesheet" href="../shared/styles/v2-shell.css">
+  <link rel="stylesheet" href="./styles/live.css">
 </head>
 <body>
   <header class="topbar">
@@ -15,14 +16,12 @@
   </header>
 
   <main>
-
     <section class="flow-card" aria-label="Actuele energiestroom">
-      <article class="node grid-node"><div><small>Net</small><strong id="grid-power">—</strong><em id="grid-direction">—</em></div></article>
-
+      <article class="node grid-node"><div><small>Net · P1</small><strong id="grid-power">—</strong><em id="grid-direction">—</em></div></article>
       <div id="grid-flow" class="flow-line grid-flow" aria-hidden="true"></div>
 
       <div class="house-stack">
-        <article class="node pv-node" tabindex="0" aria-describedby="pv-details"><span>☀︎</span><div><small>PV</small><strong id="pv-power">—</strong><em id="pv-summary">productie naar huis</em></div>
+        <article class="node pv-node" tabindex="0" aria-describedby="pv-details"><span>☀︎</span><div><small>PV</small><strong id="pv-power">—</strong><em id="pv-summary">—</em></div>
           <div id="pv-details" class="pv-details" role="tooltip">
             <div><span>SolarEdge</span><strong id="pv-se">—</strong><em id="pv-se-age">—</em></div>
             <div><span>GoodWe 4200</span><strong id="pv-gw42">—</strong><em id="pv-gw42-age">—</em></div>
@@ -31,14 +30,13 @@
         </article>
         <div class="pv-flow" aria-hidden="true"></div>
         <article class="home-node">
-          <small>HUIS · P1 NETTO</small>
+          <small>HUIS · BEREKEND</small>
           <strong id="house-power">—</strong>
-          <span id="balance-state">Live</span>
+          <span id="house-state">—</span>
         </article>
       </div>
 
       <div class="flow-line load-flow" aria-hidden="true"></div>
-
       <div class="load-stack">
         <article class="node"><span>⚡</span><div><small>Tesla</small><strong id="tesla-power">—</strong><em id="tesla-state">—</em></div></article>
         <article id="ww-flow-node" class="node" hidden><span>◉</span><div><small>Warm water</small><strong id="ww-power">—</strong><em id="ww-state">—</em></div></article>
@@ -48,10 +46,15 @@
     </section>
 
     <section class="cards">
-      <article class="status-card"><small>NET</small><strong id="kpi-grid">—</strong><span id="kpi-grid-sub">—</span></article>
-      <article class="status-card"><small>PV</small><strong id="kpi-pv">—</strong><span>actuele productie</span></article>
+      <article class="status-card"><small>NET · P1</small><strong id="kpi-grid">—</strong><span id="kpi-grid-sub">—</span></article>
+      <article class="status-card"><small>PV</small><strong id="kpi-pv">—</strong><span id="kpi-pv-sub">—</span></article>
       <article class="status-card"><small>TESLA</small><strong id="kpi-tesla">—</strong><span id="kpi-tesla-sub">—</span></article>
       <article class="status-card"><small>WARM WATER</small><strong id="kpi-ww">—</strong><span id="kpi-ww-sub">—</span></article>
+    </section>
+
+    <section class="panel" aria-label="Actuele EMS-beslissing">
+      <header><div><small id="manager-priority">EMS</small><h2 id="manager-title">Actuele EMS-beslissing</h2></div></header>
+      <p id="manager-reason">Laden…</p>
     </section>
 
     <p class="preview-note">EMS productie · Live</p>
