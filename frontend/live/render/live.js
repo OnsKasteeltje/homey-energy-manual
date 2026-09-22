@@ -16,14 +16,23 @@ function pvQualityText(s) {
   return "PV-data vertraagd";
 }
 
+function currentPvPower(s) {
+  return s.pvQuality === "MEASURED" || s.pvQuality === "NIGHT" ? s.pv : null;
+}
+
+function sourcePowerText(source) {
+  if (!source) return "—";
+  return source.fresh ? formatPower(source.power) : `laatste ${formatPower(source.power)}`;
+}
+
 function render(s) {
-  set("pv-power", formatPower(s.pv));
+  set("pv-power", formatPower(currentPvPower(s)));
   const pvByKey = Object.fromEntries(s.pvSources.map((source) => [source.key, source]));
-  set("pv-se", formatPower(pvByKey.solarEdge?.power));
+  set("pv-se", sourcePowerText(pvByKey.solarEdge));
   set("pv-se-age", pvByKey.solarEdge ? pvAge(pvByKey.solarEdge) : "—");
-  set("pv-gw42", formatPower(pvByKey.goodWe4200?.power));
+  set("pv-gw42", sourcePowerText(pvByKey.goodWe4200));
   set("pv-gw42-age", pvByKey.goodWe4200 ? pvAge(pvByKey.goodWe4200) : "—");
-  set("pv-gw20", formatPower(pvByKey.goodWe2000?.power));
+  set("pv-gw20", sourcePowerText(pvByKey.goodWe2000));
   set("pv-gw20-age", pvByKey.goodWe2000 ? pvAge(pvByKey.goodWe2000) : "—");
   set("pv-summary", pvQualityText(s));
 
@@ -52,7 +61,7 @@ function render(s) {
 
   set("kpi-grid", formatPower(s.grid === null ? null : Math.abs(s.grid)));
   set("kpi-grid-sub", s.p1Valid ? `${s.gridDirection} · P1 actueel` : "P1 niet actueel");
-  set("kpi-pv", formatPower(s.pv));
+  set("kpi-pv", formatPower(currentPvPower(s)));
   set("kpi-pv-sub", pvQualityText(s));
   set("kpi-tesla", s.teslaCharging ? "Laden" : s.teslaConnected ? "Aangesloten" : "Niet aangesloten");
   set("kpi-tesla-sub", s.teslaDeadlineActive
