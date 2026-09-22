@@ -108,6 +108,28 @@ The initial evidence window is three hours before through three hours after the
 planned Honeywell UP transition. This is an observation window, not a learned
 or fixed optimal preheat duration.
 
+## Frontend and planner boundary
+
+The canonical cross-domain boundary is defined in `docs/architecture/forward-planning-vs-historical-learning.md`.
+
+Thermal Learning belongs to the historical **Analysis** perspective, not to the forward-looking **PV Flex / Planner** presentation.
+
+Raw thermal-learning episodes, historical evidence arrays, quality flags and `UNASSESSED` results are retrospective evidence. They may later be visualized on Analysis for validation of actual PV availability and export opportunity, room-temperature response, advancement of scheduled heating, retained useful heat around the original Honeywell comfort moment, later heating demand, and grid import/export over the complete thermal episode.
+
+PV Flex / Planner may show a future heating action that uses a validated learned thermal parameter, but it must show that action as a planner decision rather than mixing the historical episodes used to derive the parameter into the forward-looking timeline.
+
+The intended information flow is one-way until validation:
+
+```text
+historical thermal evidence
+    -> Thermal Learning / Analysis
+    -> validated learned parameter
+    -> forward planner
+    -> PV Flex / Planner
+```
+
+Thermal Learning remains READ_ONLY / SHADOW while its outputs are unvalidated. No raw or `UNASSESSED` learning result is a physical-control instruction.
+
 ## Boundary with Heating Preheat V0.2
 
 Heating Preheat V0.2 may use the canonical Heating Room Model for eligibility. Quatt telemetry is observational context for validation and future learning; it does not by itself make a room eligible and does not create new heat demand.
