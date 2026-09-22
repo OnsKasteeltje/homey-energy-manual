@@ -72,6 +72,42 @@ Thermal Learning remains READ_ONLY / SHADOW. It may derive empirical evidence
 for later planner use, but it does not become a comfort authority, physical
 writer or second energy planner.
 
+## Thermal Learning Episodes V0.1
+
+`services/pi/planner/heating/build_thermal_learning_episodes.py` builds
+`EMS_HEATING_THERMAL_LEARNING_EPISODES_V0.1`.
+
+This artifact is READ_ONLY / SHADOW empirical evidence for future heating
+optimization. It is not a control plan and may not write Honeywell, Homey,
+Quatt or any other physical device.
+
+Architectural invariants:
+
+- Honeywell `weeklySchedule` is the sole baseline transition authority.
+- Historical `room_setpoint_c` is evidence only and must not create planned
+  heating transitions.
+- V0.1 creates episodes only for planned Honeywell target-UP transitions in
+  the explicitly scoped rooms.
+- Equal or downward target transitions do not create target-UP episodes.
+- Honeywell room temperature and setpoint history are core thermal evidence.
+- P1 import/export and PV production provide the energy consequence.
+- Quatt telemetry is contextual evidence only; missing or stale Quatt data
+  must not invalidate an otherwise valid Honeywell episode.
+- Episode construction does not prove useful thermal buffering. New episodes
+  remain `UNASSESSED` / `RAW_EPISODE_EVIDENCE_ONLY`.
+- Reduced PV export alone is not success. Later heating demand, retained useful
+  heat and grid import/export over the complete thermal episode must eventually
+  be evaluated together.
+- Intentional additional grid import is not an optimization objective and is
+  explicitly disallowed by the V0.1 policy.
+- Physical writes are explicitly disallowed.
+- The artifact supplies evidence to future planner logic; it must not become a
+  second comfort authority, control layer or energy planner.
+
+The initial evidence window is three hours before through three hours after the
+planned Honeywell UP transition. This is an observation window, not a learned
+or fixed optimal preheat duration.
+
 ## Boundary with Heating Preheat V0.2
 
 Heating Preheat V0.2 may use the canonical Heating Room Model for eligibility. Quatt telemetry is observational context for validation and future learning; it does not by itself make a room eligible and does not create new heat demand.
