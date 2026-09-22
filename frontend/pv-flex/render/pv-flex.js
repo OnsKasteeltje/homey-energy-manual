@@ -7,10 +7,7 @@ function summary(d){
  $("day-title").textContent=new Date(d.period.start).toLocaleDateString("nl-NL",{timeZone:"Europe/Amsterdam",weekday:"long",day:"numeric",month:"long",year:"numeric"});
  $("kpi-forecast").textContent=kwh(d.summary.forecastKWh); $("kpi-slots").textContent=`${d.summary.forecastSlots}/${d.series.length} forecastkwartieren`;
  $("kpi-pv").textContent=kwh(d.summary.pvKWh); $("kpi-self").textContent=kwh(d.summary.pvSelfConsumedKWh); $("kpi-export").textContent=kwh(d.summary.exportKWh);
- $("coverage").textContent=`Dekking ${pct(d.quality.actualCoverage)}`; $("gaps").textContent=`Gaps ${d.quality.gapCount}`; $("disc").textContent=`Discontinuïteiten ${d.quality.discontinuityCount}`;
  $("quality").textContent=`Dekking ${pct(d.quality.actualCoverage)}`; $("next").disabled=day>=todayAmsterdam();
- $("heating-status").textContent=d.resources.heatingFlex.status==="SOURCE_NOT_YET_INTEGRATED"?"Heating Flex · bron volgt":"Heating Flex · beschikbaar";
- $("heating-note").textContent=d.resources.heatingFlex.note||"—";
 }
 function chart(d){
  const svg=$("pv-chart"), tip=$("tooltip"), a=d.series; svg.replaceChildren(); const has=a.some(x=>x.actual.coverage>0||x.forecast); $("empty").hidden=has; svg.hidden=!has;if(!has)return;
@@ -25,8 +22,5 @@ function chart(d){
  const hit=add("rect",{x:p.l+i*step,y:p.t,width:step,height:ih,class:"hit"});hit.addEventListener("mousemove",e=>{tip.hidden=false;tip.innerHTML=`<strong>${time(x.start)}</strong><span>PV werkelijk ${(v/1000).toFixed(2)} kW</span><span>Forecast ${x.forecast?(x.forecast.pvForecastW/1000).toFixed(2)+" kW":"—"}</span><span>Confidence ${x.forecast?.confidence!=null?Math.round(x.forecast.confidence*100)+"%":"—"}</span><span>Lead ${x.forecast?.leadMinutes??"—"} min</span><span>Export ${kwh(x.actual.exportKWh)}</span>`;const r=svg.parentElement.getBoundingClientRect();tip.style.left=`${Math.min(r.width-190,Math.max(8,e.clientX-r.left+10))}px`;tip.style.top=`${Math.max(8,e.clientY-r.top-80)}px`;});hit.addEventListener("mouseleave",()=>tip.hidden=true);});
  if(points.length>1)add("polyline",{points:points.join(" "),class:"forecast-line",fill:"none"});
 }
-function lane(id,d,key){
- const root=$(id);root.replaceChildren();d.series.forEach(x=>{const e=document.createElement("span"),v=Number(x.devices[key]||0);e.className=v>0?"on":"";e.title=`${time(x.start)} · ${v?Math.round(v)+" W":"0 W"}`;root.appendChild(e);});
-}
-async function refresh(){ $("quality").textContent="Laden…";try{const d=await loadPvFlex(day);summary(d);chart(d);lane("ev-lane",d,"evPowerW");lane("ww-lane",d,"boilerPowerW");}catch(e){$("quality").textContent="Analyse niet beschikbaar";$("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;}}
+async function refresh(){ $("quality").textContent="Laden…";try{const d=await loadPvFlex(day);summary(d);chart(d);}catch(e){$("quality").textContent="Analyse niet beschikbaar";$("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;}}
 $("prev").addEventListener("click",()=>{day=shiftDay(day,-1);refresh();});$("next").addEventListener("click",()=>{if(day<todayAmsterdam()){day=shiftDay(day,1);refresh();}});refresh();
