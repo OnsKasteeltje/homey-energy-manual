@@ -28,16 +28,12 @@ export function normalize(raw) {
   const tesla = number(raw?.tesla?.power_w);
   const ww = number(raw?.hot_water?.boiler_power_w);
   const heat = number(raw?.quatt?.power_w);
-  // Canonical House semantics: P1/net power is the source of truth.
-  // Positive = net import, negative = net export. PV is a separate flow and
-  // must never gate or alter the House KPI.
+
+  // P1 is the independent realtime grid-boundary authority. Positive signed
+  // grid power means import; negative means export. PV freshness must never
+  // invalidate P1 or realtime control.
   const p1Valid = raw?.balance?.control_gate?.grid_measurement_valid === true;
-  const house = p1Valid ? grid : null;
-  const balanceValid = p1Valid;
-  // "Other" remains a legacy derived reconstruction and must not be derived
-  // from the P1-net House KPI.
-  const other = number(raw?.energy_budget?.other_house_load_w);
-  const deadline = formatLocalTime(raw?.tesla?.deadline_at);
+
   const pvSources = [
     {key: "solarEdge", label: "SolarEdge", power: number(raw?.pv?.solaredge_w)},
     {key: "goodWe4200", label: "GoodWe 4200", power: number(raw?.pv?.goodwe_4200_w)},
@@ -49,11 +45,28 @@ export function normalize(raw) {
     maxAgeSec: number(raw?.pv?.sources?.[source.key]?.max_age_sec)
   }));
 
+  const freshPvSources = pvSources.filter((source) => source.fresh && source.power !== null).length;
+  const pvQuality = freshPvSources === pvSources.length && pv !== null
+    ? "MEASURED"
+    : freshPvSources > 0 ? "PARTIAL" : "STALE";
+
+  // Exact realtime household consumption is DERIVED, never synonymous with
+  // P1 net power. Publish it only when both P1 and aggregate PV are reliable.
+  // signed grid: +import / -export, hence house = PV + signed P1.
+  const house = p1Valid && pvQuality === "MEASURED" ? Math.max(0, pv + grid) : null;
+  const houseQuality = house === null ? "UNKNOWN" : "DERIVED";
+
+  // "Other" remains a legacy derived reconstruction. It is independent from
+  // the exact-house presentation and must not be invented from stale PV.
+  const other = number(raw?.energy_budget?.other_house_load_w);
+  const deadline = formatLocalTime(raw?.tesla?.deadline_at);
+
   return {
     generatedAt: raw?.meta?.generated_at ?? null,
     stateAgeSec: number(raw?.meta?.state_age_sec),
-    balanceValid,
-    grid, pv, pvSources, house, tesla, ww, heat, other,
+    p1Valid,
+    grid, pv, pvSources, pvQuality, freshPvSources, house, houseQuality,
+    tesla, ww, heat, other,
     gridDirection: grid === null ? "onbekend" : grid > 0 ? "import" : grid < 0 ? "export" : "in balans",
     teslaConnected: raw?.tesla?.connected === true,
     teslaCharging: raw?.tesla?.charging === true,
