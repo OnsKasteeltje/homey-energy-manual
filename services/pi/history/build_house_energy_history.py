@@ -35,6 +35,7 @@ def _counter_rows(con):
         JOIN devices d ON d.id=x.device_id
         JOIN metrics m ON m.id=x.metric_id
         WHERE x.value_real IS NOT NULL
+          AND x.quality='observed'
           AND (
             {" OR ".join("(d.device_key=? AND m.metric_key=?)" for _ in COUNTERS)}
           )
