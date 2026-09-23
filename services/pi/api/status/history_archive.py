@@ -265,6 +265,10 @@ def archive_state_history(payload, db_path=HISTORY_DB):
 
         for device_key, counter_spec in COUNTER_DEVICES.items():
             device_id = _ensure_device(con, device_key, counter_spec["spec"])
+            quality = _quality_for_power(payload, device_key)
+            if quality is None:
+                skipped += len(counter_spec["metrics"])
+                continue
             for metric_key, path in counter_spec["metrics"].items():
                 value = _number(_value_at(payload, path))
                 if value is None or value < 0:
@@ -277,9 +281,9 @@ def archive_state_history(payload, db_path=HISTORY_DB):
                         ts_utc, device_id, metric_id, value_real,
                         quality, source_resolution_seconds
                     )
-                    VALUES (?, ?, ?, ?, 'observed', ?)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (ts, device_id, counter_metric_ids[metric_key], value, resolution),
+                    (ts, device_id, counter_metric_ids[metric_key], value, quality, resolution),
                 )
                 inserted += cur.rowcount
 
