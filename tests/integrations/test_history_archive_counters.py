@@ -64,7 +64,17 @@ def test_archive_cumulative_energy_counters(tmp_path):
             "goodwe_4200_energy_kwh": 23772.8,
             "goodwe_2000_energy_kwh": 10708.9,
         },
-        "balance": {"control_gate": {"grid_measurement_valid": True}},
+        "balance": {
+            "control_gate": {"grid_measurement_valid": True},
+            "source_timing": {
+                "p1Fresh": True,
+                "freshness": {
+                    "solarEdge": {"fresh": True},
+                    "goodWe4200": {"fresh": True},
+                    "goodWe2000": {"fresh": True},
+                },
+            },
+        },
     }
     module = _load_archive()
     result = module.archive_state_history(payload, db)
@@ -87,4 +97,49 @@ def test_archive_cumulative_energy_counters(tmp_path):
         ("pv_goodwe2000", "energy_produced_kwh", 10708.9),
         ("pv_goodwe4200", "energy_produced_kwh", 23772.8),
         ("pv_solaredge", "energy_produced_kwh", 17351.444),
+    ]
+
+
+def test_archive_stale_pv_counter_is_held(tmp_path):
+    db = tmp_path / "history.sqlite"
+    _create_db(db)
+    payload = {
+        "meta": {"source_sample_at": "2026-09-23T12:00:00Z", "min_publish_interval_sec": 300},
+        "grid": {"power_w": -1000.0, "energy_import_kwh": 100.0, "energy_export_kwh": 50.0},
+        "pv": {
+            "solaredge_w": 900.0, "goodwe_4200_w": 0.0, "goodwe_2000_w": 0.0,
+            "solaredge_energy_kwh": 1000.0,
+            "goodwe_4200_energy_kwh": 2000.0,
+            "goodwe_2000_energy_kwh": 3000.0,
+        },
+        "balance": {
+            "control_gate": {"grid_measurement_valid": True},
+            "source_timing": {
+                "p1Fresh": True,
+                "freshness": {
+                    "solarEdge": {"fresh": True},
+                    "goodWe4200": {"fresh": False},
+                    "goodWe2000": {"fresh": False},
+                },
+            },
+        },
+    }
+    module = _load_archive()
+    module.archive_state_history(payload, db)
+
+    con = sqlite3.connect(db)
+    rows = con.execute("""
+        SELECT d.device_key, x.quality
+        FROM measurements x
+        JOIN devices d ON d.id=x.device_id
+        JOIN metrics m ON m.id=x.metric_id
+        WHERE m.metric_key='energy_produced_kwh'
+        ORDER BY d.device_key
+    """).fetchall()
+    con.close()
+
+    assert rows == [
+        ("pv_goodwe2000", "held"),
+        ("pv_goodwe4200", "held"),
+        ("pv_solaredge", "observed"),
     ]
