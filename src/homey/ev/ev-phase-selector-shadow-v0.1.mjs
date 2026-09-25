@@ -42,7 +42,12 @@ export function decideEvPhaseShadow(input, previous={}, nowMs=Date.now(), cfg=CO
   const prevA=Number.isInteger(previous?.requestedA)?previous.requestedA:0;
   const prevPhase=Number.isInteger(previous?.phase)?previous.phase:null;
   const prevEvW=prevMode==='3P'?prevA*3*cfg.voltageV:prevMode==='1P'?prevA*cfg.voltageV:0;
+  // P1 is measured while the EV may already be charging. Add the commanded EV load
+  // back only to estimate the counterfactual total PV surplus before EV consumption.
   const availableTotalW=Math.max(0,-p1TotalW+prevEvW);
+  // Mode fallback must react to the actual residual grid balance, otherwise adding
+  // the current 3P load back makes 3P self-sustain even after PV has collapsed.
+  const residualExportW=Math.max(0,-p1TotalW);
 
   // For 1P, estimate counterfactual per-phase surplus by adding previous 1P EV load back to its phase.
   const phaseAvailableW=phases.map((w,i)=>Math.max(0,-w+(prevMode==='1P'&&prevPhase===i+1?prevA*cfg.voltageV:0)));
@@ -58,8 +63,8 @@ export function decideEvPhaseShadow(input, previous={}, nowMs=Date.now(), cfg=CO
   let mode=prevMode, phase=prevPhase, reason='HOLD';
 
   if(prevMode==='3P') {
-    if(availableTotalW<cfg.leave3pW && modeDwellOK) {
-      if(bestPhaseW>=cfg.start1pW){mode='1P';phase=bestPhase;reason='3P_TO_1P_TOTAL_SURPLUS_LOW';}
+    if(residualExportW<cfg.leave3pW && modeDwellOK) {
+      if(bestPhaseW>=cfg.start1pW){mode='1P';phase=bestPhase;reason='3P_TO_1P_RESIDUAL_SURPLUS_LOW';}
       else {mode='OFF';phase=null;reason='3P_TO_OFF_SURPLUS_LOW';}
     }
   } else if(prevMode==='1P') {
@@ -82,7 +87,7 @@ export function decideEvPhaseShadow(input, previous={}, nowMs=Date.now(), cfg=CO
   if(mode==='3P') requestedA=clamp(Math.floor(availableTotalW/(3*cfg.voltageV)),cfg.minA,maxA);
   if(mode==='1P') requestedA=clamp(Math.floor(bestPhaseW/cfg.voltageV),cfg.minA,maxA);
 
-  return shadow(mode,requestedA,phase,reason,{...input,availableTotalW,phaseAvailableW,bestPhase,bestPhaseW},previous,nowMs,cfg);
+  return shadow(mode,requestedA,phase,reason,{...input,availableTotalW,residualExportW,phaseAvailableW,bestPhase,bestPhaseW},previous,nowMs,cfg);
 }
 
 function shadow(mode,requestedA,phase,reason,input,previous,nowMs,cfg){
