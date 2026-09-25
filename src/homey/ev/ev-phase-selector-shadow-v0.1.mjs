@@ -3,10 +3,9 @@
 // State machine: OFF <-> 1P 6..16A <-> 3P 6..16A.
 //
 // Sign convention: negative P1 = export, positive P1 = import.
-// 1P selection uses the phase with the largest sustained export.
-// 3P selection uses TOTAL net P1 power, not equal per-phase surplus.
-//
-// This module is pure and intended for replay/shadow validation before Homey LIVE integration.
+// IMPORTANT: previous SHADOW state is used only for dwell/hysteresis.
+// It must never be treated as physical EV load. Counterfactual available power
+// may add back only the fresh ACTUAL production EV command supplied by the caller.
 
 export const CONFIG = Object.freeze({
   voltageV: 230,
@@ -15,7 +14,6 @@ export const CONFIG = Object.freeze({
   onePhaseMinW: 1380,
   onePhaseMaxW: 3680,
   threePhaseMinW: 4140,
-  // Deliberate hysteresis around the 1P16A / 3P6A transition.
   enter3pW: 4400,
   leave3pW: 3600,
   start1pW: 1500,
@@ -37,20 +35,34 @@ export function decideEvPhaseShadow(input, previous={}, nowMs=Date.now(), cfg=CO
     return shadow('OFF',0,null,'BLOCKED_OR_INVALID_INPUT',input,previous,nowMs,cfg);
   }
 
-  // P1 closed-loop available power: add back only our previous commanded EV load.
   const prevMode=String(previous?.mode||'OFF');
-  const prevA=Number.isInteger(previous?.requestedA)?previous.requestedA:0;
   const prevPhase=Number.isInteger(previous?.phase)?previous.phase:null;
-  const prevEvW=prevMode==='3P'?prevA*3*cfg.voltageV:prevMode==='1P'?prevA*cfg.voltageV:0;
-  // P1 is measured while the EV may already be charging. Add the commanded EV load
-  // back only to estimate the counterfactual total PV surplus before EV consumption.
-  const availableTotalW=Math.max(0,-p1TotalW+prevEvW);
-  // Mode fallback must react to the actual residual grid balance, otherwise adding
-  // the current 3P load back makes 3P self-sustain even after PV has collapsed.
-  const residualExportW=Math.max(0,-p1TotalW);
 
-  // For 1P, estimate counterfactual per-phase surplus by adding previous 1P EV load back to its phase.
-  const phaseAvailableW=phases.map((w,i)=>Math.max(0,-w+(prevMode==='1P'&&prevPhase===i+1?prevA*cfg.voltageV:0)));
+  // Physical-load reconstruction is deliberately separate from SHADOW state.
+  // actualEvCommandA/PhaseCount/Phase must come from fresh production control authority,
+  // never from stale Easee telemetry and never from the previous SHADOW recommendation.
+  const actualA=clamp(Math.floor(Number(input?.actualEvCommandA??0)),0,cfg.maxA);
+  const actualPhaseCount=Number(input?.actualEvPhaseCount??0);
+  const actualPhase=Number.isInteger(input?.actualEvPhase)?input.actualEvPhase:null;
+  const actualShapeValid=
+    actualA===0 ||
+    actualPhaseCount===3 ||
+    (actualPhaseCount===1 && actualPhase>=1 && actualPhase<=3);
+
+  if(!actualShapeValid) {
+    return shadow('OFF',0,null,'INVALID_ACTUAL_EV_COMMAND_SHAPE',input,previous,nowMs,cfg);
+  }
+
+  const actualEvW=actualA*(actualPhaseCount===3?3:actualPhaseCount===1?1:0)*cfg.voltageV;
+  const availableTotalW=Math.max(0,-p1TotalW+actualEvW);
+
+  const phaseAvailableW=phases.map((w,i)=>{
+    const phaseNo=i+1;
+    const addBackW=actualA*cfg.voltageV*(
+      actualPhaseCount===3 || (actualPhaseCount===1 && actualPhase===phaseNo) ? 1 : 0
+    );
+    return Math.max(0,-w+addBackW);
+  });
   const bestIdx=phaseAvailableW.indexOf(Math.max(...phaseAvailableW));
   const bestPhase=bestIdx+1;
   const bestPhaseW=phaseAvailableW[bestIdx];
@@ -63,8 +75,8 @@ export function decideEvPhaseShadow(input, previous={}, nowMs=Date.now(), cfg=CO
   let mode=prevMode, phase=prevPhase, reason='HOLD';
 
   if(prevMode==='3P') {
-    if(residualExportW<cfg.leave3pW && modeDwellOK) {
-      if(bestPhaseW>=cfg.start1pW){mode='1P';phase=bestPhase;reason='3P_TO_1P_RESIDUAL_SURPLUS_LOW';}
+    if(availableTotalW<cfg.leave3pW && modeDwellOK) {
+      if(bestPhaseW>=cfg.start1pW){mode='1P';phase=bestPhase;reason='3P_TO_1P_TOTAL_SURPLUS_LOW';}
       else {mode='OFF';phase=null;reason='3P_TO_OFF_SURPLUS_LOW';}
     }
   } else if(prevMode==='1P') {
@@ -87,12 +99,19 @@ export function decideEvPhaseShadow(input, previous={}, nowMs=Date.now(), cfg=CO
   if(mode==='3P') requestedA=clamp(Math.floor(availableTotalW/(3*cfg.voltageV)),cfg.minA,maxA);
   if(mode==='1P') requestedA=clamp(Math.floor(bestPhaseW/cfg.voltageV),cfg.minA,maxA);
 
-  return shadow(mode,requestedA,phase,reason,{...input,availableTotalW,residualExportW,phaseAvailableW,bestPhase,bestPhaseW},previous,nowMs,cfg);
+  return shadow(mode,requestedA,phase,reason,{
+    ...input,
+    actualEvW,
+    availableTotalW,
+    phaseAvailableW,
+    bestPhase,
+    bestPhaseW
+  },previous,nowMs,cfg);
 }
 
 function shadow(mode,requestedA,phase,reason,input,previous,nowMs,cfg){
   const changed=mode!==String(previous?.mode||'OFF');
-  const phaseChanged=phase!== (Number.isInteger(previous?.phase)?previous.phase:null);
+  const phaseChanged=phase!==(Number.isInteger(previous?.phase)?previous.phase:null);
   return {
     schema:'EM2_EV_PHASE_SELECTOR_SHADOW_V0.1',
     generatedAt:new Date(nowMs).toISOString(),
@@ -102,8 +121,10 @@ function shadow(mode,requestedA,phase,reason,input,previous,nowMs,cfg){
     phase,
     reason,
     p1Authoritative:true,
-    threePhaseDecisionBasis:'TOTAL_P1_NET_POWER',
-    onePhaseDecisionBasis:'BEST_P1_PHASE_SURPLUS',
+    actualEvCommandSource:'PRODUCTION_CONTROL_AUTHORITY_INPUT',
+    shadowStateAffectsPhysicalReconstruction:false,
+    threePhaseDecisionBasis:'TOTAL_P1_NET_POWER_PLUS_ACTUAL_EV_COMMAND',
+    onePhaseDecisionBasis:'BEST_P1_PHASE_SURPLUS_PLUS_ACTUAL_EV_COMMAND',
     modeSinceMs:changed?nowMs:Number(previous?.modeSinceMs??nowMs),
     phaseSinceMs:phaseChanged?nowMs:Number(previous?.phaseSinceMs??nowMs),
     input,
