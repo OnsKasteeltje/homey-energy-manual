@@ -7,7 +7,7 @@ const ALLOWED_ORIGINS = new Set([
   'https://onskasteeltje.github.io',
   'http://192.168.1.42'
 ]);
-const KWH_PER_SOC_PERCENT = 0.55; // conservative interim calibration; first valid measured session = 0.5246 kWh/%
+const KWH_PER_SOC_PERCENT = 0.62; // conservative operational calibration based on deadline charging evidence
 
 function cors(origin) {
   return {

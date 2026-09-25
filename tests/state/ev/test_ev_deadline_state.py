@@ -16,7 +16,7 @@ CMD = {
     "deadline": "2026-09-20T07:00",
     "currentSoc": 66,
     "targetSoc": 90,
-    "calibrationKWhPerPercent": 0.55,
+    "calibrationKWhPerPercent": 0.62,
     "goalKWh": 13.2,
     "maxA": 8,
 }

@@ -19,7 +19,7 @@ VALID = {
     "deadline": "2026-09-20T09:00",
     "currentSoc": 88,
     "targetSoc": 95,
-    "calibrationKWhPerPercent": 0.55,
+    "calibrationKWhPerPercent": 0.62,
     "goalKWh": 3.85,
     "maxA": 8,
 }
