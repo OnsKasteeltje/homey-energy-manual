@@ -220,3 +220,50 @@ This validation establishes several diagnostic rules:
 ### Observability improvement
 
 Frontend/planner presentation should explicitly expose deadline infeasibility instead of only a boolean. When `feasibleWithinVisibleHorizon = false`, presentation should communicate that maximum catch-up charging is active and show the expected shortfall where it can be derived safely. Useful fields include required remaining kWh, schedulable/reserved kWh, estimated deficit kWh and, where the calibration contract is available, an estimated SOC shortfall. This is presentation/observability only and must not introduce a second deadline policy or execution owner.
+
+## 2026-09-25 — stale telemetry control semantics
+
+Production validation on 2026-09-25 established an important distinction between
+**control freshness** and **device telemetry freshness**.
+
+Current production EV execution chain:
+
+- `EM v2 | 60 Adapter | EV Power v0.1.9 STATE-RETRIGGER`
+- `EM v2 | 80 Validation | EV Gate v0.2.10 ADAPTER-RETRIGGER`
+- `EM v2 | 60 Actuator | EV Power v0.2.14 SEMANTIC-COHERENCE`
+
+The safety rule is:
+
+- fresh Power Intent remains required;
+- a fresh validated EV Gate remains required for physical execution;
+- schema, semantic-token/control-revision alignment, electrical mapping,
+  command range and explicit unsafe charger states remain fail-closed;
+- the EV actuator remains the sole automatic physical Easee writer;
+- delayed/stale Homey/Easee capability timestamps are observability and must
+  not, by themselves, veto an otherwise coherent command;
+- explicit unsafe/unavailable states such as `unknown`, `offline`, `error`,
+  `fault` or a genuinely disconnected vehicle remain blocking conditions.
+
+This is deliberately not implemented by merely increasing a stale timeout.
+Telemetry age and control authority are separate concepts.
+
+The Adapter may therefore report `stateFresh=false` while still producing a
+valid executable current when the current semantic charger state is safe and
+the Power Intent is fresh.
+
+The Gate validates the Adapter result and refreshes `updatedAt` on a legitimate
+trigger even when the semantic command itself has not changed. A same-semantic
+idempotency shortcut must not leave Gate authority stale.
+
+The Actuator requires fresh Intent and fresh Gate authority. Adapter/state
+timestamp freshness is retained for diagnostics but is not an independent
+physical-write veto after the Gate has validated the command.
+
+Live validation on 2026-09-25 demonstrated:
+
+`Pi 4830 W / 7 A -> Power Intent -> Adapter 7 A with stateFresh=false ->
+Gate PASS -> Actuator WRITE_OK_POST_SESSION -> Easee target/offered 7 A ->
+physical charging`.
+
+This preserves fail-closed execution while preventing delayed Easee telemetry
+from making otherwise valid PV charging impossible.
