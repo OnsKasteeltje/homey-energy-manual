@@ -42,7 +42,7 @@ Current EV ownership is defined by the 2026-09-12 baseline:
 - Adapter: `EV Power v0.1.4 DEADLINE-CAP OPPORTUNITY16 START7 RUN6`, Flow ID `953e9b18-3576-4557-b940-ed4a64eb2516`.
 - Gate: `EV Power Adapter Gate v0.2.5 OBSERVABILITY-ONLY HEALTH`, Flow ID `ec5e5d34-8205-4cf0-a661-7bf744feb6e0`.
 - Physical writer: `EV Power v0.2.6 START7 RUN6 LIVE + EASEE SESSION`, Flow ID `fea23193-a03f-49dd-9780-7e72ee48747d`.
-- Device health observer: Flow ID `18a99261-421c-4c5f-a771-36a626b7496a`; health is observability-only at the active gate.
+- Device health observer: `EM v2 | 81 Observability | EV Device Health v0.3 OBSERVABILITY-ONLY`, Advanced Flow ID `18a99261-421c-4c5f-a771-36a626b7496a`. It is enabled and has no physical-write or control-authority role; device health is diagnostic context only.
 - EV observability: Flow ID `f6edba38-ddf1-45e5-890e-c183aa2055d5`.
 
 Older EV v0.1.2 / gate v0.2.2 / actuator v0.2.3 files remain historical until explicitly reconciled or replaced by current exact live source captures.
