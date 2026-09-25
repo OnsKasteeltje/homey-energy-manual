@@ -20,7 +20,7 @@ VALID = {
     "currentSoc": 88,
     "targetSoc": 95,
     "calibrationKWhPerPercent": 0.62,
-    "goalKWh": 3.85,
+    "goalKWh": 4.34,
     "maxA": 8,
 }
 

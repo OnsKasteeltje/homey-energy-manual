@@ -72,7 +72,7 @@ Voorbeeld van de live gevalideerde opdracht van 12 september 2026:
   "deadline": "2026-09-14T05:00",
   "currentSoc": 51,
   "targetSoc": 95,
-  "calibrationKWhPerPercent": 0.62,
+  "calibrationKWhPerPercent": 0.55,
   "goalKWh": 24.2,
   "maxA": 7
 }

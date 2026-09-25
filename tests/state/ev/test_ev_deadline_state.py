@@ -17,7 +17,7 @@ CMD = {
     "currentSoc": 66,
     "targetSoc": 90,
     "calibrationKWhPerPercent": 0.62,
-    "goalKWh": 13.2,
+    "goalKWh": 14.88,
     "maxA": 8,
 }
 
@@ -43,7 +43,7 @@ class TestEvDeadlineShadowState(unittest.TestCase):
         first = m.build(CMD, state("2026-09-20T00:00:00Z", power=5579, charging=True), {}, NOW)
         out = m.build(CMD, state("2026-09-20T00:01:00Z", power=5579, charging=True), first, NOW)
         self.assertAlmostEqual(out["deliveredKWh"], 5579 / 60000, places=6)
-        self.assertAlmostEqual(out["remainingKWh"], 13.2 - 5579 / 60000, places=6)
+        self.assertAlmostEqual(out["remainingKWh"], 14.88 - 5579 / 60000, places=6)
 
     def test_stationary_meter_does_not_block_power_progress(self):
         first = m.build(CMD, state("2026-09-20T00:00:00Z", meter=100.0, power=5579, charging=True), {}, NOW)
