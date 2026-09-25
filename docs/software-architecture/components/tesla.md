@@ -267,3 +267,35 @@ physical charging`.
 
 This preserves fail-closed execution while preventing delayed Easee telemetry
 from making otherwise valid PV charging impossible.
+
+## 2026-09-25 — P1-led realtime PV feedback stop fix
+
+Realtime opportunistic EV charging uses P1 grid power as the authoritative
+feedback signal. Easee actual-power telemetry is observability and is not
+required to calculate the realtime PV correction.
+
+Bridge policy:
+`PI_DYNAMIC_PLANNER_BRIDGE_V1.3.2_P1_FEEDBACK_STOPFIX`.
+
+The controller retains its previous realtime current command and adjusts
+opportunistic charging in bounded steps inside the Pi realtime envelope:
+
+- negative P1 power means grid export;
+- positive P1 power means grid import;
+- at least one 3-phase amp (690 W) remaining export permits a +1 A step;
+- more than 250 W import permits a -1 A step;
+- at the temporary 6 A minimum, an import-driven down-step is 6 A -> 0 A;
+- starting from 0 A still requires enough export for the complete temporary
+  6 A start load;
+- fresh P1 remains mandatory;
+- the Pi realtime envelope and deadline guard remain authoritative bounds;
+- Homey Power Intent does not write the charger directly; execution remains
+  Adapter -> Gate -> sole Actuator.
+
+Production validation on 2026-09-25 demonstrated the stop path with P1 at
+approximately +5.7 kW import: planner target 0 A, realtime candidate 0 A,
+Power Intent 0 W / IDLE, followed by physical Tesla charging stop.
+
+The 6 A minimum is temporary. Dynamic 4/5/6 A low-current operation and
+additional anti-oscillation/dwell policy are intentionally separate follow-up
+work and are not part of this hotfix.
