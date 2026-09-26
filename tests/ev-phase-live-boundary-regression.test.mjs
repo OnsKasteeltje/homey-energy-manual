@@ -2,14 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const production=fs.readFileSync('src/homey/actuators/ev-power/ev-power-v0.2.15.control-authority.js','utf8');
+const production=fs.readFileSync('src/homey/actuators/ev-power/ev-power-v0.3.1.phase-authority-candidate.js','utf8');
 const transition=fs.readFileSync('src/homey/actuators/ev-power/ev-phase-transition-v0.4.mjs','utf8');
 const cloud=fs.readFileSync('src/homey/actuators/ev-power/easee-phase-cloud-v0.3.mjs','utf8');
 const bootstrap=fs.readFileSync('services/pi/commissioning/bootstrap_easee_homey_tokens.py','utf8');
 
-test('current production actuator still has no phase-mode writer',()=>{
-  assert.doesNotMatch(production,/set_phase_mode/);
-  assert.doesNotMatch(production,/phaseModeValue/);
+test('current actuator candidate is hard no-write',()=>{
+  assert.match(production,/const PHASE_EXECUTION_ENABLED=false/);
+  assert.match(production,/physicalWritePerformed:false/);
+  assert.doesNotMatch(production,/await\s+[^;\n]*setCapabilityValue\(/);
+  assert.doesNotMatch(production,/await\s+[^;\n]*runFlowCardAction\(/);
+  assert.doesNotMatch(production,/await\s+fetch\(/);
   assert.doesNotMatch(production,/commands\/set_phase_mode/);
 });
 
