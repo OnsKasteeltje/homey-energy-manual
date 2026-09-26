@@ -4,7 +4,7 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-09-20  
+**Status date:** 2026-09-26  
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
@@ -119,7 +119,7 @@ The private Pi-hosted EMS frontend is the **production website**. Live operation
 
 Production presentation path: private EMS frontend -> Caddy on trusted LAN -> `/web/*` -> Web Data API `127.0.0.1:3200` -> canonical Pi runtime state.
 
-GitHub is not runtime-state transport for the production Live website. The former GitHub energy-state publisher `services/pi/integrations/github/publish_energy_state.py` and `ems-energy-state-publication.timer` are retired from production scheduling. The timer is disabled and inactive. `docs/data/energy-state-v2.json`, publisher source and deployment units are retained temporarily as rollback/retirement artifacts until repository cleanup.
+GitHub is not runtime-state transport for the production Live website. The former GitHub energy-state publisher, its systemd service/timer, and the derived `docs/data/energy-state-v2.json` publication artifact were removed from the repository on 2026-09-26 after the private Pi-hosted Frontend V2 cutover. They are not supported rollback paths and must not be reintroduced as production transport.
 
 The former MkDocs/GitHub Pages Live energy view is retired as the production Live frontend. Planner, History and Groups/Phases may remain temporarily available through the legacy site until equivalent production-frontend resources are migrated. This temporary legacy availability does not make GitHub an allowed production runtime-state boundary.
 
@@ -229,7 +229,7 @@ services/pi/planner/warm-water/        # WW planning + Seasonal Source Advisor
 
 The production runtime path remains `/home/jeroen/ems/runtime/planner/warm-water/`. Repository placement and runtime placement are deliberately decoupled: deployment maps the target-structure source to this stable runtime path, and drift/integrity validation checks that mapping. The WW migration therefore changes repository ownership without changing systemd execution paths or runtime control ownership.
 
-The former GitHub website energy-state publisher remains temporarily under `services/pi/integrations/github/` as a rollback/retirement artifact. It is not production-scheduled and must not be re-enabled as a production Live transport.
+The former GitHub website energy-state publisher has been removed. `services/pi/integrations/github/` remains only for the separate authenticated command-transfer integration; it must not regain an energy-state publication role.
 
 The target Frontend V2 operational-data boundary is the dedicated read-only EMS Web Data API under `services/pi/api/web-data/`. It is separate in responsibility and failure behaviour from the existing runtime/control status API. The Web Data API is presentation transport only: it has no EMS policy, optimizer, Homey/device write or actuator path. The initial resource is WW Seasonal Advice; the same boundary is intended to serve later Live, Planner, History and observability resources through explicitly versioned allowlisted contracts.
 
@@ -243,7 +243,7 @@ Runtime validation on 2026-09-19 confirmed the initial Web Data API service on P
 
 Private Pi-hosted frontend is the production EMS website. The first runtime attempt proved the same-origin `/web/*` reverse proxy but also exposed two deployment-boundary defects: a site address alone still produced a wildcard `*:80` listener, and the packaged Caddy service could not serve the webroot below `/home/jeroen`. Caddy was stopped immediately. The corrected repository definition now uses an explicit `bind 192.168.1.42` and stages static V2 files read-only under `/var/www/ems-frontend-v2`; the Web Data API remains `127.0.0.1:3200`. The reserved Wi-Fi address `192.168.1.45`, Docker interfaces and wildcard listeners remain excluded. Remote browser access is to be added separately through Tailscale without Funnel. Deployment source is `deploy/caddy/ems-frontend-v2.Caddyfile`; staging helper is `deploy/install/install_private_frontend_v2.sh`. The Debian Caddy 2.6.2 package does not provide the optional `caddy.logging.writers.journal` module; the private ingress therefore uses Caddy/systemd standard service logging rather than an explicit Caddy `output journal` writer.
 
-Live runtime-data cutover is complete through `GET /web/state/current` (schema `EMS_WEB_STATE_CURRENT_V1`). The endpoint is an explicit allowlisted projection of canonical Pi `/home/jeroen/ems/data/energy-state-v2.json`; the production Live frontend reads this same-origin resource and has no GitHub runtime-data fallback. Runtime validation proved fresh state through both the localhost Web Data API and Caddy while the GitHub energy-state publisher was disabled. The GitHub energy-state publication is retired from production and retained temporarily only for rollback/repository cleanup.
+Live runtime-data cutover is complete through `GET /web/state/current` (schema `EMS_WEB_STATE_CURRENT_V1`). The endpoint is an explicit allowlisted projection of canonical Pi `/home/jeroen/ems/data/energy-state-v2.json`; the production Live frontend reads this same-origin resource and has no GitHub runtime-data fallback. Runtime validation proved fresh state through both the localhost Web Data API and Caddy. The former GitHub energy-state publication path has now been fully removed from repository and deployment definitions.
 
 Live V2 PV observability was extended and runtime-validated on 2026-09-19 without changing control ownership. `GET /web/state/current` now allowlists the canonical aggregate PV value, SolarEdge / GoodWe 4200 / GoodWe 2000 power observations, and their existing per-source freshness/age metadata. P1 remains authoritative for realtime grid import/export and flex control; inverter staleness or P1/PV source skew may suppress derived House/Other reconstruction but does not invalidate a fresh P1 measurement. The frontend uses these fields only for read-only PV source detail/freshness presentation and does not poll inverter devices or implement control policy.
 
