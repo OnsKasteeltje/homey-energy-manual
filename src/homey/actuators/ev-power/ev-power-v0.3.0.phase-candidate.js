@@ -202,6 +202,11 @@ const value=JSON.stringify({
   phaseExecutionEnabled:PHASE_EXECUTION_ENABLED,
   physicalWritePerformed:false,
   targetW,
+  targetA:desiredA,
+  phaseMode:desiredMode,
+  candidateAction:nextAction,
+  reason,
+  confirmedMode,
   productionRequestedA,
   phaseTransition:candidate
 });
