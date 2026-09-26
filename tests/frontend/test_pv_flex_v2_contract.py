@@ -16,10 +16,16 @@ assert '{cache:"no-store"}' in state
 assert 'EMS_WEB_PV_FLEX_ANALYSIS_V1' in state
 assert 'PREHEAT_ROOT="/web/planner/heating-preheat-shadow"' in state
 assert 'EMS_WEB_HEATING_PREHEAT_SHADOW_V1' in state
+assert 'FLEX_PRIORITY_ROOT="/web/planner/flex-priority-shadow"' in state
+assert 'EMS_WEB_FLEX_PRIORITY_SHADOW_V1' in state
 assert "forecast?.confidence" in render
 assert 'function lane(' not in render
 assert 'evPowerW' in render
 assert 'loadHeatingPreheatShadow' in render
+assert 'loadFlexPriorityShadow' in render
+assert 'Heating eerst' in render
+assert 'EV eerst' in render
+assert 'EV residual via P1' in render
 assert 'PREHEAT_READY_FOR_GRANT' in render
 assert 'Volgende shadow-stap' in render
 assert 'Planner grant' in render
