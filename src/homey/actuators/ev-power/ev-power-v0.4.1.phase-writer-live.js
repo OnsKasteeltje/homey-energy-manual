@@ -216,7 +216,15 @@ const paused=
   powerW!==null && powerW<=250;
 
 const nowMs=Date.now();
-const priorT=previous?.transition?.schema===TRANSITION_SCHEMA?previous.transition:null;
+// Transition state is only reusable within the exact same LIVE writer
+// version. Never inherit ARMED-DISABLED or older-version transition state at
+// cutover, otherwise stale requestedMode/stage can look like a live mode change.
+const priorT=
+  previous?.schema===VERSION &&
+  previous?.phaseExecutionEnabled===true &&
+  previous?.transition?.schema===TRANSITION_SCHEMA
+    ?previous.transition
+    :null;
 let t=priorT||{
   schema:TRANSITION_SCHEMA,
   stage:'STABLE',
