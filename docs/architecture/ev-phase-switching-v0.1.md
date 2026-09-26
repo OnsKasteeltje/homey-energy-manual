@@ -68,7 +68,7 @@ Canonical selector:
 
 Deployed into the existing flow IDs:
 
-- Bridge `8bf53fdb-76f4-47db-8ccb-773ac515f06e` → v1.4.0 PHASE-SHADOW
+- Bridge `8bf53fdb-76f4-47db-8ccb-773ac515f06e` → v1.4.1 FAST-IMPORT-CUTBACK
 - Adapter `953e9b18-3576-4557-b940-ed4a64eb2516` → v0.1.11 PHASE-SHADOW
 - Gate `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` → v0.2.12 PHASE-SHADOW
 - physical actuator remains `fea23193-a03f-49dd-9780-7e72ee48747d` v0.2.15 until LIVE promotion
@@ -302,9 +302,24 @@ Physical 1P and 3P are proven, but automatic phase switching is **not yet LIVE**
 
 Production remains:
 
-- Bridge v1.4.0 PHASE-SHADOW
+- Bridge v1.4.1 FAST-IMPORT-CUTBACK
 - Adapter v0.1.11 PHASE-SHADOW
 - Gate v0.2.12 PHASE-SHADOW
 - Actuator v0.2.15 CONTROL-AUTHORITY
 
 Phase promotion requires an explicit actuator version bump after the remaining LIVE-gate checks pass.
+
+
+## Realtime P1 import cutback v1.4.1
+
+Commissioning exposed a separate production-control weakness while PV changed quickly: the previous bridge reduced EV current by only 1 A per control cycle regardless of import magnitude. A live example reached approximately +3.0 kW net import before successive cycles reduced the charger target.
+
+Bridge v1.4.1 keeps upward PV capture conservative at +1 A per cycle, but makes downward correction proportional:
+
+`reductionA = ceil((gridImportW - 250 W deadband) / 690 W per 3P amp)`
+
+If the resulting current would be below 6 A, opportunity charging goes directly to 0 A.
+
+This change affects only the existing fixed-3P production current controller. It does not activate phase switching and does not alter the phase SHADOW contract.
+
+A controlled physical validation attempt was limited by Easee/Equalizer itself: when charger target was raised to 12 A, Equalizer held offered current at 6 A while the house was still exporting. Equalizer safety was deliberately not bypassed.
