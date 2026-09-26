@@ -54,3 +54,17 @@ test('live cutover ignores transition state from armed-disabled or older writer'
   assert.match(src,/previous\?\.phaseExecutionEnabled===true/);
   assert.match(src,/previous\?\.transition\?\.schema===TRANSITION_SCHEMA/);
 });
+
+
+test('failed writer recovers only from safe paused boundary',()=>{
+  assert.match(src,/const safePausedRecovery=/);
+  assert.match(src,/t\.stage==='FAILED'/);
+  assert.match(src,/paused/);
+  assert.match(src,/circuitTargetA!==null/);
+  assert.match(src,/contractAligned/);
+  assert.match(src,/fresh/);
+  assert.match(src,/requestValid/);
+  assert.match(src,/deadlinePhaseOK/);
+  assert.match(src,/stage:'STABLE'/);
+  assert.match(src,/failure:null/);
+});
