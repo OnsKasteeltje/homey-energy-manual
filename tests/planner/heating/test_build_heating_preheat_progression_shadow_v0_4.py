@@ -84,13 +84,14 @@ def priority(*, grant=True, ready=None, generated="2026-09-26T11:59:30Z",
 
 
 def previous_room(key="woonkamer", target=17.5, state="STEP_WAIT", group="living_area",
-                  close="2026-09-26T15:00:00Z", future=19.0, completed=None):
+                  close="2026-09-26T15:00:00Z", future=19.0, completed=None, reason="WAITING_FOR_MEASURED_TEMPERATURE"):
     return {
         "key": key,
         "group": group,
         "opportunityId": f"{key}|{close}|{future:.3f}",
         "progression": {
             "state": state,
+            "reason": reason,
             "activeStepTarget_C": target,
             "activeStepReached": False,
             "activeStepStartedAt": "2026-09-26T11:55:00Z",
@@ -152,7 +153,7 @@ def test_active_step_waits_until_measured_temperature_reaches_target():
     assert p["state"] == "STEP_WAIT"
     assert p["activeStepTarget_C"] == 17.5
     assert p["activeStepReached"] is False
-    assert p["lastTransition"] == "NONE"
+    assert p["lastTransition"] == "STARTED_STEP"
 
 
 def test_reached_step_advances_by_at_most_half_degree():
