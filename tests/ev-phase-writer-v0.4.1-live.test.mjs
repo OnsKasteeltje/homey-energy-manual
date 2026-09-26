@@ -39,3 +39,9 @@ test('safe writer still uses native Homey cards plus phase-only cloud call',()=>
   assert.match(src,/commands\/set_phase_mode/);
   assert.doesNotMatch(src,/setCapabilityValue\(/);
 });
+
+
+test('live writer uses direct Advanced Flow self-trigger',()=>{
+  assert.match(src,/Homey\.flow\.triggerAdvancedFlow\(\{id:FLOW_ID\}\)/);
+  assert.doesNotMatch(src,/homey:manager:flow:programmatic_trigger/);
+});
