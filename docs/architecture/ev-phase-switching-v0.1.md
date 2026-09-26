@@ -452,3 +452,40 @@ The legacy `phase_*_shadow` fields may remain temporarily in Power Intent for co
 The authoritative Bridge/Adapter/Gate contract may be promoted while actuator v0.3.1 remains no-write. Physical phase execution is a separate later gate.
 
 This preserves the single-writer invariant and allows semantic validation of the complete phase-aware control chain before any automatic phase or charger-session action is enabled.
+
+
+## Writer v0.4.0 prepared, not yet live
+
+A stateful physical-writer candidate now exists at:
+
+`src/homey/actuators/ev-power/ev-power-v0.4.0.phase-writer.js`
+
+It is deliberately shipped with:
+
+`PHASE_EXECUTION_ENABLED=false`
+
+so repository validation cannot yet cause physical execution.
+
+Writer design:
+
+- one short transition step per HomeyScript invocation;
+- persistent transition stage in `EM2_EV_Actuator_Status`;
+- bounded self-retrigger between steps;
+- overall transition timeout 90 s;
+- phase confirmation timeout 30 s;
+- 5 s deadtime after confirmed phase change;
+- native Homey Easee action cards for:
+  - Pause Charging
+  - Resume Charging
+  - Set dynamic circuit current
+  - Set dynamic charger current
+- Easee Cloud only for locked phase-mode command;
+- rotating access/refresh-token update stays inside private Homey Logic;
+- no password or username is stored in the writer;
+- no direct `setCapabilityValue()` path exists.
+
+Required transition remains:
+
+`PAUSE -> phase command -> confirmed locked phase -> 5 s deadtime -> temporary symmetric circuit cap -> RESUME -> desired charger current -> charging confirmation -> restore original circuit cap -> STABLE`
+
+The next gate is regression plus armed-disabled deployment. Physical cutover requires a separate explicit promotion of `PHASE_EXECUTION_ENABLED`.
