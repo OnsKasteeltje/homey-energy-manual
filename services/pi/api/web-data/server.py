@@ -35,6 +35,10 @@ EMS_SETTINGS_COMMAND_FILE = os.environ.get(
     "/home/jeroen/ems/repo/homey-energy-manual/docs/data/ems-settings-command.json",
 )
 HISTORY_DB = os.environ.get("EMS_HISTORY_DB", "/home/jeroen/ems/data/ems-history.sqlite")
+HEATING_PREHEAT_FILE = os.environ.get(
+    "EMS_HEATING_PREHEAT_FILE",
+    "/home/jeroen/ems/data/heating-preheat-plan.json",
+)
 LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
 API_SCHEMA = "EMS_WEB_WW_SEASONAL_ADVICE_V1"
@@ -45,6 +49,7 @@ PV_FLEX_API_SCHEMA = "EMS_WEB_PV_FLEX_ANALYSIS_V1"
 PV_FORECAST_API_SCHEMA = "EMS_WEB_PV_FORECAST_V2"
 EV_REQUIREMENT_API_SCHEMA = "EMS_WEB_EV_REQUIREMENT_V1"
 HEATING_SCHEDULE_API_SCHEMA = "EMS_WEB_HEATING_SCHEDULE_V1"
+HEATING_PREHEAT_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_V1"
 HONEYWELL_SCHEDULE_FILE = os.environ.get("EMS_HONEYWELL_SCHEDULE_FILE", "/home/jeroen/ems/runtime/tools/honeywell/output/honeywell-schedule.json")
 ALLOWED_ADVICE = {
     "KEEP_CURRENT",
@@ -668,6 +673,78 @@ def pv_forecast_resource():
     return {"schema":PV_FORECAST_API_SCHEMA,"generatedAt":source["generatedAt"],"status":"SHADOW","realtimeAuthority":"P1","slots":slots}
 
 
+def heating_preheat_resource():
+    """Return allowlisted Heating Preheat SHADOW observability.
+
+    This endpoint is presentation-only. It never creates a planner decision,
+    advances a setpoint or writes a physical device.
+    """
+    source = load_json(HEATING_PREHEAT_FILE)
+    if source.get("schema") != "EMS_HEATING_PREHEAT_PLAN_V0.2":
+        raise ValueError("HEATING_PREHEAT_SOURCE_INVALID")
+    if source.get("mode") != "READ_ONLY" or source.get("controlMode") != "SHADOW":
+        raise ValueError("HEATING_PREHEAT_MODE_INVALID")
+    generated_at = source.get("generatedAt")
+    if parse_timestamp(generated_at) is None:
+        raise ValueError("HEATING_PREHEAT_GENERATED_AT_INVALID")
+
+    rooms = []
+    allowed_keys = {"woonkamer", "eetkamer", "keuken", "serre"}
+    for room in source.get("rooms") or []:
+        if not isinstance(room, dict) or room.get("key") not in allowed_keys:
+            continue
+        current = room.get("current") if isinstance(room.get("current"), dict) else {}
+        baseline = room.get("baseline") if isinstance(room.get("baseline"), dict) else {}
+        candidate = room.get("candidate") if isinstance(room.get("candidate"), dict) else {}
+
+        change_at = baseline.get("changeAt")
+        earliest_start_at = candidate.get("earliestStartAt")
+        start_at = candidate.get("startAt")
+        for value in (change_at, earliest_start_at, start_at):
+            if value is not None and parse_timestamp(value) is None:
+                raise ValueError("HEATING_PREHEAT_TIME_INVALID")
+
+        steps = candidate.get("steps_C")
+        if not isinstance(steps, list) or any(
+            not isinstance(v, (int, float)) or isinstance(v, bool) for v in steps
+        ):
+            raise ValueError("HEATING_PREHEAT_STEPS_INVALID")
+
+        rooms.append({
+            "key": room["key"],
+            "displayName": room.get("displayName") or room["key"],
+            "group": room.get("group"),
+            "currentTemperatureC": current.get("temperature_C"),
+            "baselineTargetC": baseline.get("currentTargetTemperature_C"),
+            "futureTargetC": baseline.get("targetTemperature_C"),
+            "changeAt": change_at,
+            "direction": baseline.get("direction"),
+            "candidate": {
+                "status": candidate.get("status"),
+                "reason": candidate.get("reason"),
+                "earliestStartAt": earliest_start_at,
+                "startAt": start_at,
+                "stepsC": list(steps),
+            },
+        })
+
+    policy = source.get("policy") if isinstance(source.get("policy"), dict) else {}
+    return {
+        "schema": HEATING_PREHEAT_API_SCHEMA,
+        "generatedAt": generated_at,
+        "mode": "READ_ONLY",
+        "controlMode": "SHADOW",
+        "baselineAuthority": "HONEYWELL",
+        "controlWrites": False,
+        "policy": {
+            "maxAdvanceMinutes": policy.get("maxAdvanceMinutes"),
+            "maxStepC": policy.get("maxStep_C"),
+            "intentionalGridImportAllowed": policy.get("intentionalGridImportAllowed"),
+        },
+        "rooms": rooms,
+    }
+
+
 def heating_schedule_resource():
     """Return an allowlisted read-only projection of the canonical Honeywell schedule."""
     source = load_json(HONEYWELL_SCHEDULE_FILE)
@@ -757,6 +834,13 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 503, {
                     "schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "RESOURCE_UNAVAILABLE",
                 })
+            return
+
+        if path.path == "/web/planner/heating-preheat":
+            try:
+                send_json(self, 200, heating_preheat_resource())
+            except (OSError, json.JSONDecodeError, ValueError):
+                send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
             return
 
         if path.path == "/web/heating/schedule":
