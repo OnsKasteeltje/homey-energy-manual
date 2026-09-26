@@ -60,19 +60,22 @@ class TestEvRealtimeDeadlineContract(unittest.TestCase):
         self.assertEqual(policy["physicalPhaseOwner"], "EASEE_EQUALIZER")
         self.assertIsNone(policy["phaseCommand"])
 
-    def test_blocked_realtime_envelope_allows_only_off_phase_mode(self):
+    def test_realtime_envelope_does_not_gate_on_plan_build_connectivity(self):
         plan = {"tesla": {"connectedNow": False}}
         current = {
-            "evAllocationReason": "NO_QUALIFIED_PV_WINDOW",
+            "evAllocationReason": "NOT_CONNECTED",
             "evDeadlineRequired": False,
             "evPlanA": 0,
         }
         deadline = {"valid": True, "active": False, "maxA": None}
 
         result = server.ev_realtime_envelope(plan, current, 0, 0, deadline)
-        self.assertFalse(result["allowed"])
-        self.assertEqual(result["phasePolicy"]["allowedModes"], ["OFF"])
-        self.assertEqual(result["phasePolicy"]["max_A"], 0)
+        self.assertTrue(result["allowed"])
+        self.assertEqual(result["mode"], "PV_OPPORTUNITY")
+        self.assertFalse(result["planConnectedAtBuild"])
+        self.assertEqual(result["liveConnectivityOwner"], "HOMEY_EASEE_CHARGE_STATE")
+        self.assertEqual(result["phasePolicy"]["allowedModes"], ["OFF", "1P", "3P"])
+        self.assertEqual(result["phasePolicy"]["max_A"], 16)
 
 
 if __name__ == "__main__":
