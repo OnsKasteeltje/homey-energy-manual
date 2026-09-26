@@ -21,7 +21,14 @@ def schedule(next_target=15.5, status="OK"):
             "scheduleStatus": status,
             "currentSwitchpoint": {"time": "2026-09-15T19:30:00+02:00", "targetTemperature_C": 19.0},
             "nextSwitchpoint": {"time": "2026-09-15T22:00:00+02:00", "targetTemperature_C": next_target},
-            "weeklySchedule": [],
+            "weeklySchedule": [{
+                "day_of_week": "tuesday",
+                "switchpoints": [
+                    {"time_of_day": "06:00:00", "heat_setpoint": 16.0},
+                    {"time_of_day": "19:30:00", "heat_setpoint": 19.0},
+                    {"time_of_day": "22:00:00", "heat_setpoint": next_target},
+                ],
+            }],
         }],
     }
 
@@ -44,7 +51,7 @@ def build(s=None, st=None):
     return module.build_model(
         s or schedule(),
         st or state(),
-        generated_at=datetime(2026, 9, 15, 20, 0, tzinfo=timezone.utc),
+        generated_at=datetime(2026, 9, 15, 19, 0, tzinfo=timezone.utc),  # 21:00 Europe/Amsterdam
     )
 
 
@@ -86,8 +93,8 @@ def test_room_key_mismatch_fails_closed():
         build(st=st)
 
 
-def test_naive_switchpoint_timestamp_is_rejected():
+def test_naive_schedule_generated_at_is_rejected():
     s = schedule()
-    s["zones"][0]["nextSwitchpoint"]["time"] = "2026-09-15T22:00:00"
+    s["generatedAt"] = "2026-09-15T19:49:03"
     with pytest.raises(module.ModelError, match="offset-aware"):
         build(s=s)
