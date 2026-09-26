@@ -204,7 +204,7 @@ The controlled 2026-09-12 cutover validated Pi→Homey→Tesla and Pi→Homey→
 
 The 2026-09-14 history incident demonstrated that a separate Homey Insights pull chain is unsuitable as the production history transport; accepted Homey state pushes are archived locally instead.
 
-Heating Preheat V0.3 remains shadow-only. No Honeywell, Homey, Quatt or CV physical control is introduced by this release, so no heating-control cutover is claimed.
+Heating Preheat V0.3 remains shadow-only. This release additionally defines deployable Heating Preheat Progression V0.4 SHADOW downstream of V0.3 and Flex Priority Shadow V0.1. V0.4 persists only hypothetical active <=0.5 C steps in `/home/jeroen/ems/data/heating-preheat-progression-shadow-v0.4.json`, advances only after measured room-temperature proof, requires a fresh/consistent central planner grant for start and advancement, and synchronizes subsequent advancement across selected grouped rooms. Loss of grant or a safety guard can hold/block progression, but LIVE rollback behavior is deliberately undefined in shadow. No Honeywell, Homey, Quatt, CV, Power Intent or other physical control is introduced, so no heating-control cutover is claimed. Runtime commissioning of the V0.4 timer remains required before the layer is treated as validated production observability.
 
 The 2026-09-17 energy-state website incident was isolated to the GitHub observability publication path: canonical local Pi state remained fresh while `docs/data/energy-state-v2.json` stopped updating after 2026-09-14 20:03 local time. Restoring this publisher must not restore the retired Pi→Homey control-push timer.
 
