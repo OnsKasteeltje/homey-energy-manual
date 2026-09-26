@@ -158,3 +158,32 @@ The additive phase contract has been deployed into the existing production contr
 Topology, triggers, Logic variable IDs and the sole physical EV Actuator were left unchanged. The phase path is observability-only and performs no Easee phase-mode write.
 
 Immediate live validation after the Bridge trigger showed the existing fixed-3P production path still functioning: Easee charged at approximately 3x6 A / 4.31 kW while net P1 power was approximately -14 W. This is production-current validation only; it is not yet proof of a physical 1P phase transition.
+
+
+## End-to-end SHADOW validation 2026-09-26
+
+Live evidence after deploying the SHADOW contract through the existing Homey chain:
+
+- Bridge phase shadow: `3P + 6 A`
+- reconstructed available total power: `4336 W`
+- reason: `HOLD`
+- Intent: `phase_mode_shadow=3P`, `phase_requested_A_shadow=6`
+- Adapter phase shadow: valid `3P + 6 A`
+- Gate phase shadow: `PASS`, all phase-shadow checks true
+- production Gate: `PASS`, requested current `6 A`
+
+This is the expected hysteresis case: `4336 W` is below the `enter3p_W=4400` threshold but above `leave3p_W=3600`. Because SHADOW was already in 3P, it correctly remains in 3P rather than oscillating back to 1P.
+
+The physical production path remained the existing fixed-3P path during this validation.
+
+## Homey Easee phase-mode interface constraint
+
+Inspection of the public Easee Homey app source shows that charger observation 38 is decoded into the device setting `phaseMode`, but that setting is defined as an informational label and no capability listener / writable phase-mode Flow card is exposed. Therefore programmatically changing the Homey setting is not a valid charger command path.
+
+The official Easee charger API does expose a dedicated runtime command:
+
+`POST /api/chargers/{serialNumber}/commands/set_phase_mode`
+
+with `1=1P`, `2=Auto`, `3=3P`.
+
+LIVE promotion therefore remains blocked until the sole EV Actuator has a validated command transport for that dedicated Easee command plus phase-mode readback. No per-phase circuit-current workaround is promoted as the canonical design while physical phase ownership remains assigned to Easee/Equalizer.
