@@ -43,7 +43,7 @@ test('refresh uses access plus rotating refresh token',async()=>{
   });
   assert.equal(r.ok,true);
   assert.equal(calls[0].url,'https://api.easee.com/api/accounts/refresh_token');
-  assert.deepEqual(JSON.parse(calls[0].opts.body),{accessToken:'old-access',refreshToken:'old-refresh'});
+  assert.deepEqual(JSON.parse(calls[0].opts.body),{refreshToken:'old-refresh'});
   assert.equal(r.tokens.accessToken,'new-access');
   assert.equal(r.tokens.refreshToken,'new-refresh');
   assert.equal(r.tokens.expiresIn,3600);
