@@ -46,10 +46,15 @@ PV_FORECAST_API_SCHEMA = "EMS_WEB_PV_FORECAST_V2"
 EV_REQUIREMENT_API_SCHEMA = "EMS_WEB_EV_REQUIREMENT_V1"
 HEATING_SCHEDULE_API_SCHEMA = "EMS_WEB_HEATING_SCHEDULE_V1"
 HEATING_PREHEAT_SHADOW_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_SHADOW_V1"
+FLEX_PRIORITY_SHADOW_API_SCHEMA = "EMS_WEB_FLEX_PRIORITY_SHADOW_V1"
 HONEYWELL_SCHEDULE_FILE = os.environ.get("EMS_HONEYWELL_SCHEDULE_FILE", "/home/jeroen/ems/runtime/tools/honeywell/output/honeywell-schedule.json")
 HEATING_PREHEAT_SHADOW_FILE = os.environ.get(
     "EMS_HEATING_PREHEAT_SHADOW_FILE",
     "/home/jeroen/ems/data/heating-preheat-shadow-v0.3.json",
+)
+FLEX_PRIORITY_SHADOW_FILE = os.environ.get(
+    "EMS_FLEX_PRIORITY_SHADOW_FILE",
+    "/home/jeroen/ems/data/flex-priority-shadow-v0.1.json",
 )
 ALLOWED_ADVICE = {
     "KEEP_CURRENT",
@@ -709,6 +714,85 @@ def heating_schedule_resource():
         "rooms": rooms,
     }
 
+def flex_priority_shadow_resource():
+    """Return allowlisted cross-domain Flex Priority SHADOW observability."""
+    source = load_json(FLEX_PRIORITY_SHADOW_FILE)
+    if source.get("schema") != "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1":
+        raise ValueError("FLEX_PRIORITY_SOURCE_INVALID")
+    if source.get("mode") != "READ_ONLY" or source.get("controlMode") != "SHADOW":
+        raise ValueError("FLEX_PRIORITY_MODE_INVALID")
+    if source.get("controlWrites") is not False:
+        raise ValueError("FLEX_PRIORITY_WRITE_BOUNDARY_INVALID")
+    generated_at = source.get("generatedAt")
+    if parse_timestamp(generated_at) is None:
+        raise ValueError("FLEX_PRIORITY_TIME_INVALID")
+
+    policy = source.get("policy")
+    heating = source.get("heating")
+    ev = source.get("ev")
+    decision = source.get("decision")
+    if not all(isinstance(v, dict) for v in (policy, heating, ev, decision)):
+        raise ValueError("FLEX_PRIORITY_STRUCTURE_INVALID")
+
+    allowed_owner = {"EV", "HEATING", "HOLD_UNKNOWN"}
+    allowed_heating = {"SHADOW_GRANT", "HOLD"}
+    allowed_ev_role = {"MUST", "PRIMARY_OPPORTUNITY", "RESIDUAL_OPPORTUNITY", "SAFETY_HOLD"}
+
+    if decision.get("priorityOwner") not in allowed_owner:
+        raise ValueError("FLEX_PRIORITY_OWNER_INVALID")
+    if decision.get("heatingShadowGrant") not in allowed_heating:
+        raise ValueError("FLEX_PRIORITY_HEATING_GRANT_INVALID")
+    if decision.get("evRole") not in allowed_ev_role:
+        raise ValueError("FLEX_PRIORITY_EV_ROLE_INVALID")
+    if decision.get("physicalWriteAllowed") is not False:
+        raise ValueError("FLEX_PRIORITY_PHYSICAL_WRITE_INVALID")
+    if policy.get("powerReservationW") != 0:
+        raise ValueError("FLEX_PRIORITY_RESERVATION_INVALID")
+    if policy.get("realtimeOpportunityAuthority") != "P1":
+        raise ValueError("FLEX_PRIORITY_REALTIME_AUTHORITY_INVALID")
+
+    close_at = heating.get("earliestOpportunityClosesAt")
+    latest_start = ev.get("latestSafeStartAt")
+    for value in (close_at, latest_start):
+        if value is not None and parse_timestamp(value) is None:
+            raise ValueError("FLEX_PRIORITY_TIME_INVALID")
+
+    ready_rooms = heating.get("readyRooms")
+    if not isinstance(ready_rooms, list):
+        raise ValueError("FLEX_PRIORITY_READY_ROOMS_INVALID")
+
+    return {
+        "schema": FLEX_PRIORITY_SHADOW_API_SCHEMA,
+        "generatedAt": generated_at,
+        "mode": "READ_ONLY",
+        "controlWrites": False,
+        "policy": {
+            "strategy": policy.get("strategy"),
+            "powerReservationW": 0,
+            "realtimeOpportunityAuthority": "P1",
+            "evMayUseResidualWhenHeatingFirst": policy.get("evMayUseResidualWhenHeatingFirst") is True,
+        },
+        "heating": {
+            "readyRooms": list(ready_rooms),
+            "earliestOpportunityClosesAt": close_at,
+        },
+        "ev": {
+            "deadlineActive": ev.get("deadlineActive") is True,
+            "remainingKWh": ev.get("remainingKWh"),
+            "urgency": ev.get("urgency"),
+            "latestSafeStartAt": latest_start,
+        },
+        "decision": {
+            "priorityOwner": decision.get("priorityOwner"),
+            "heatingShadowGrant": decision.get("heatingShadowGrant"),
+            "evRole": decision.get("evRole"),
+            "reason": decision.get("reason"),
+            "appliesOnlyWhenPvOpportunityExists": decision.get("appliesOnlyWhenPvOpportunityExists") is True,
+        },
+        "presentationOnly": True,
+    }
+
+
 def heating_preheat_shadow_resource():
     """Return an allowlisted read-only Heating Preheat V0.3 shadow projection."""
     source = load_json(HEATING_PREHEAT_SHADOW_FILE)
@@ -874,6 +958,13 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 503, {
                     "schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "RESOURCE_UNAVAILABLE",
                 })
+            return
+
+        if path.path == "/web/planner/flex-priority-shadow":
+            try:
+                send_json(self, 200, flex_priority_shadow_resource())
+            except (OSError, json.JSONDecodeError, ValueError):
+                send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
             return
 
         if path.path == "/web/planner/heating-preheat-shadow":
