@@ -45,3 +45,10 @@ test('live writer uses direct Advanced Flow self-trigger',()=>{
   assert.match(src,/Homey\.flow\.triggerAdvancedFlow\(\{id:FLOW_ID\}\)/);
   assert.doesNotMatch(src,/homey:manager:flow:programmatic_trigger/);
 });
+
+
+test('live cutover ignores transition state from armed-disabled or older writer',()=>{
+  assert.match(src,/previous\?\.schema===VERSION/);
+  assert.match(src,/previous\?\.phaseExecutionEnabled===true/);
+  assert.match(src,/previous\?\.transition\?\.schema===TRANSITION_SCHEMA/);
+});
