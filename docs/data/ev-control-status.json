@@ -1,26 +1,26 @@
 {
   "schema": "EM2_EV_CONTROL_STATUS_V0.4",
-  "publishedAt": "2026-09-26T11:26:19.737Z",
+  "publishedAt": "2026-09-26T12:13:40.880Z",
   "observabilityOnly": true,
   "controlImpact": "NONE",
   "targetW": 11040,
   "evStatus": "NUMERIC_REALTIME_PV_TARGET",
   "requestedA": 16,
-  "controlRevision": "",
-  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.4.4_PAUSE_AWARE_PHASE_SHADOW\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":11040,\"evStatus\":\"NUMERIC_REALTIME_PV_TARGET\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
-  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.4.4_PAUSE_AWARE_PHASE_SHADOW\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":11040,\"evStatus\":\"NUMERIC_REALTIME_PV_TARGET\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+  "controlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.5.0_PHASE_AUTHORITY\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":11040,\"evStatus\":\"NUMERIC_REALTIME_PV_TARGET\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"evPhaseMode\":\"3P\",\"evRequestedA\":16,\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+  "adapterControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.5.0_PHASE_AUTHORITY\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":11040,\"evStatus\":\"NUMERIC_REALTIME_PV_TARGET\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"evPhaseMode\":\"3P\",\"evRequestedA\":16,\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
+  "gateControlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.5.0_PHASE_AUTHORITY\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":11040,\"evStatus\":\"NUMERIC_REALTIME_PV_TARGET\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"evPhaseMode\":\"3P\",\"evRequestedA\":16,\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
   "sourceRevisions": {
-    "intent": 10805,
-    "adapter": 10805,
-    "adapterState": 10805,
-    "core": 10805
+    "intent": 10814,
+    "adapter": 10814,
+    "adapterState": 10814,
+    "core": 10814
   },
   "adapter": {
     "valid": true,
     "status": "EXECUTABLE",
-    "reason": "11040 W → 16 A",
-    "generatedAt": "2026-09-26T11:26:00.414Z",
-    "stateAgeSec": 60,
+    "reason": "3P + 16 A -> 11040 W",
+    "generatedAt": "2026-09-26T12:13:00.385Z",
+    "stateAgeSec": 180,
     "intentAgeSec": 0
   },
   "gate": {
@@ -29,30 +29,33 @@
     "checks": {
       "schema": true,
       "controlRevisionAligned": true,
-      "safety": true,
-      "coreStateObservabilityOnly": true,
+      "phaseAuthority": true,
+      "adapterSafety": true,
+      "fresh": true,
+      "mode": true,
+      "current": true,
+      "power": true,
       "electrical": true,
-      "commandRange": true,
-      "translation": true
+      "phaseOwner": true
     },
-    "coreRevision": 10805,
-    "updatedAt": "2026-09-26T11:26:02.522Z"
+    "coreRevision": 10814,
+    "updatedAt": "2026-09-26T12:13:02.477Z"
   },
   "actuator": {
-    "status": "PHASE_CANDIDATE",
-    "reason": "PAUSED_RESUME_REQUIRES_SAFETY_CAP",
+    "status": "ARMED_DISABLED",
+    "reason": "PHASE_EXECUTION_DISABLED",
     "live": true,
     "physicalWritePerformed": false,
-    "targetA": 7,
+    "targetA": 8,
     "previousA": null,
-    "controlRevision": null,
+    "controlRevision": "{\"policy\":\"PI_DYNAMIC_PLANNER_BRIDGE_V1.5.0_PHASE_AUTHORITY\",\"engine\":\"PI_DYNAMIC_PLANNER_V0.3_LAN_BRIDGE\",\"valid\":true,\"status\":\"OK\",\"evTargetW\":5520,\"evStatus\":\"NUMERIC_REALTIME_PV_TARGET\",\"evSource\":\"HOMEY_BOUNDED_REALTIME_PV\",\"evPhaseMode\":\"3P\",\"evRequestedA\":8,\"wwTargetOn\":true,\"wwStatus\":\"PI_BINARY_TARGET\",\"authority\":\"PI\"}",
     "coreRevision": null
   },
   "deviceHealth": {
     "status": "OK",
     "reason": "FRESH_TELEMETRY",
-    "chargeState": "plugged_in_paused",
-    "telemetryAgeSec": 293
+    "chargeState": "plugged_in_charging",
+    "telemetryAgeSec": 143
   },
-  "coherent": false
+  "coherent": true
 }
