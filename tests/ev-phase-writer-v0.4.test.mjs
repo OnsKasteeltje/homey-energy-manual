@@ -36,12 +36,22 @@ test('token refresh stores rotating pair without credentials',()=>{
   assert.doesNotMatch(src,/username/i);
 });
 
-test('writer follows safe resume sequence',()=>{
-  const cap=src.indexOf("SET_TRANSITION_CIRCUIT_CAP");
-  const resume=src.indexOf("RESUME_SESSION");
-  const current=src.indexOf("SET_CURRENT");
-  const restore=src.indexOf("RESTORE_CIRCUIT_CAP");
-  assert.ok(cap>=0 && resume>cap && current>resume && restore>current);
+test('writer follows safe transition resume sequence by stage',()=>{
+  const deadtimeStage=src.indexOf("if(t.stage==='DEADTIME')");
+  const capWrite=src.indexOf("await setCircuitA(desiredA);",deadtimeStage);
+  const armingStage=src.indexOf("if(t.stage==='ARMING_CIRCUIT_CAP')");
+  const resumeWrite=src.indexOf("await resumeSession();",armingStage);
+  const resumingStage=src.indexOf("if(t.stage==='RESUMING')");
+  const currentWrite=src.indexOf("await setCurrentA(desiredA);",resumingStage);
+  const applyStage=src.indexOf("if(t.stage==='APPLY_CURRENT')");
+  const restoreWrite=src.indexOf("await setCircuitA(restoreA);",applyStage);
+  const restoringStage=src.indexOf("if(t.stage==='RESTORING_CIRCUIT_CAP')");
+
+  assert.ok(deadtimeStage>=0);
+  assert.ok(capWrite>deadtimeStage && capWrite<armingStage);
+  assert.ok(resumeWrite>armingStage && resumeWrite<resumingStage);
+  assert.ok(currentWrite>resumingStage && currentWrite<applyStage);
+  assert.ok(restoreWrite>applyStage && restoreWrite<restoringStage);
 });
 
 test('phase change requires confirmed pause before cloud command',()=>{
