@@ -290,9 +290,23 @@ if(!canWrite){
   return true;
 }
 
-const requestChanged=t.requestedMode!==desiredMode||t.requestedA!==desiredA;
-if(requestChanged&&t.stage!=='STABLE'){
-  return await failClosed('REQUEST_CHANGED_DURING_TRANSITION');
+// During a transition, phase-mode changes fail closed. Current changes on
+// the same phase are handled conservatively: decreases take effect immediately
+// inside the transition; increases wait until the circuit cap has been restored
+// and STABLE current control can apply them safely.
+let transitionA=desiredA;
+if(t.stage!=='STABLE'){
+  if(t.requestedMode!==desiredMode){
+    return await failClosed('PHASE_MODE_CHANGED_DURING_TRANSITION');
+  }
+  if(Number.isInteger(t.requestedA)&&t.requestedA>=6&&t.requestedA<=16){
+    if(desiredA<t.requestedA){
+      t={...t,requestedA:desiredA};
+      transitionA=desiredA;
+    }else{
+      transitionA=t.requestedA;
+    }
+  }
 }
 
 if(desiredMode==='OFF'){
@@ -382,7 +396,7 @@ if(t.stage==='DEADTIME'){
     await scheduleNext(Math.min(1500,Math.max(500,DEADTIME_MS-stageAge)));
     return true;
   }
-  await setCircuitA(desiredA);
+  await setCircuitA(transitionA);
   t={...t,stage:'ARMING_CIRCUIT_CAP',stageSince:iso()};
   await save('TRANSITION','PROTECT_RESUME_CURRENT_RESET','SET_TRANSITION_CIRCUIT_CAP',true);
   await scheduleNext();
@@ -392,8 +406,8 @@ if(t.stage==='DEADTIME'){
 if(t.stage==='ARMING_CIRCUIT_CAP'){
   if(!paused)return await failClosed('PAUSE_CONFIRMATION_LOST');
   if(confirmedMode!==desiredMode)return await failClosed('PHASE_CONFIRMATION_LOST');
-  if(circuitTargetA!==desiredA){
-    await setCircuitA(desiredA);
+  if(circuitTargetA!==transitionA){
+    await setCircuitA(transitionA);
     await save('TRANSITION','WAIT_CIRCUIT_CAP_CONFIRMATION','SET_TRANSITION_CIRCUIT_CAP',true);
     await scheduleNext();
     return true;
@@ -413,7 +427,7 @@ if(t.stage==='RESUMING'){
     await scheduleNext();
     return true;
   }
-  await setCurrentA(desiredA);
+  await setCurrentA(transitionA);
   t={...t,stage:'APPLY_CURRENT',stageSince:iso()};
   await save('TRANSITION','RESUME_RESETS_CHARGER_CURRENT','SET_CURRENT',true);
   await scheduleNext();
@@ -422,8 +436,8 @@ if(t.stage==='RESUMING'){
 
 if(t.stage==='APPLY_CURRENT'){
   if(confirmedMode!==desiredMode)return await failClosed('PHASE_CONFIRMATION_LOST');
-  if(chargerTargetA!==desiredA){
-    await setCurrentA(desiredA);
+  if(chargerTargetA!==transitionA){
+    await setCurrentA(transitionA);
     await save('TRANSITION','WAIT_CURRENT_TARGET','SET_CURRENT',true);
     await scheduleNext();
     return true;
@@ -434,7 +448,7 @@ if(t.stage==='APPLY_CURRENT'){
     return true;
   }
   const restoreA=Number(t.originalCircuitA);
-  if(!Number.isInteger(restoreA)||restoreA<desiredA||restoreA>64)return await failClosed('ORIGINAL_CIRCUIT_LIMIT_INVALID');
+  if(!Number.isInteger(restoreA)||restoreA<transitionA||restoreA>64)return await failClosed('ORIGINAL_CIRCUIT_LIMIT_INVALID');
   await setCircuitA(restoreA);
   t={...t,stage:'RESTORING_CIRCUIT_CAP',stageSince:iso()};
   await save('TRANSITION','DESIRED_CURRENT_AND_CHARGING_CONFIRMED','RESTORE_CIRCUIT_CAP',true);
@@ -444,15 +458,16 @@ if(t.stage==='APPLY_CURRENT'){
 
 if(t.stage==='RESTORING_CIRCUIT_CAP'){
   const restoreA=Number(t.originalCircuitA);
-  if(!Number.isInteger(restoreA)||restoreA<desiredA||restoreA>64)return await failClosed('ORIGINAL_CIRCUIT_LIMIT_INVALID');
+  if(!Number.isInteger(restoreA)||restoreA<transitionA||restoreA>64)return await failClosed('ORIGINAL_CIRCUIT_LIMIT_INVALID');
   if(circuitTargetA!==restoreA){
     await setCircuitA(restoreA);
     await save('TRANSITION','WAIT_CIRCUIT_RESTORE_CONFIRMATION','RESTORE_CIRCUIT_CAP',true);
     await scheduleNext();
     return true;
   }
-  t={...t,stage:'STABLE',transitionId:null,requestedMode:desiredMode,requestedA:desiredA,originalCircuitA:null,startedAt:null,stageSince:iso(),failure:null};
-  await save('STABLE','TRANSITION_COMPLETE','NOOP',false);
+  t={...t,stage:'STABLE',transitionId:null,requestedMode:desiredMode,requestedA:transitionA,originalCircuitA:null,startedAt:null,stageSince:iso(),failure:null};
+  await save('STABLE','TRANSITION_COMPLETE','NOOP',false,{transitionTargetA:transitionA});
+  if(desiredA!==transitionA)await scheduleNext(500);
   return true;
 }
 
