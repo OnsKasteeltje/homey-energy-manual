@@ -9,6 +9,7 @@ test('commissioning is guarded by zero-current preconditions',()=>{
   assert.match(s,/PRECONDITION_OFFERED_CURRENT_NOT_ZERO/);
   assert.match(s,/PRECONDITION_POWER_NOT_ZERO/);
   assert.match(s,/PRECONDITION_CHARGING_STILL_TRUE/);
+  assert.match(s,/PRECONDITION_SESSION_NOT_PAUSED/);
 });
 
 test('credentials are interactive and not persisted',()=>{
