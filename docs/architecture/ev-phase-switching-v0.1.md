@@ -419,3 +419,36 @@ Published control evidence showed:
 The legacy production-current contract simultaneously still exposed 16 A / 11.04 kW because Bridge/Adapter/Gate production semantics are still fixed-3P while the new phase selector is shadow-only.
 
 This is intentional evidence for the next gate: phase mode + A must be promoted into the authoritative Adapter/Gate contract before any phase-capable writer becomes LIVE. The actuator must not choose between two competing desired-current semantics.
+
+
+## Phase-authority control contract
+
+After the no-write actuator candidate exposed that the legacy production path could still report a fixed-3P target while phase SHADOW requested a different current, the chain is being promoted to one authoritative EV command.
+
+Prepared contract:
+
+- Bridge v1.5.0: `EM2_EV_PHASE_CONTROL_V0.1`
+  - authoritative `OFF | 1P | 3P`
+  - `phase_requested_A`
+  - `phase_requested_W`
+  - `target_W` derives from the same mode/current pair
+  - deadline execution always projects to 3P
+  - explicit `controlRevision` includes phase mode and current
+- Adapter v0.2.0: `EM2_EV_POWER_ADAPTER_V0.2`
+  - does not infer current from an assumed 3-phase watt target
+  - validates exact mode/current/power mapping
+  - emits `EM2_EV_PHASE_COMMAND_V0.1`
+- Gate v0.3.0: `EM2_EV_ADAPTER_GATE_V0.3`
+  - phase mode/current/power alignment is part of `finalStatus`
+  - no separate observability-only phase authority remains
+- Actuator v0.3.1 candidate:
+  - consumes only Adapter v0.2 / Gate v0.3 command authority
+  - remains hard no-write during validation
+
+The legacy `phase_*_shadow` fields may remain temporarily in Power Intent for comparison, but they are no longer allowed to compete with the authoritative command.
+
+### Cutover safety rule
+
+The authoritative Bridge/Adapter/Gate contract may be promoted while actuator v0.3.1 remains no-write. Physical phase execution is a separate later gate.
+
+This preserves the single-writer invariant and allows semantic validation of the complete phase-aware control chain before any automatic phase or charger-session action is enabled.
