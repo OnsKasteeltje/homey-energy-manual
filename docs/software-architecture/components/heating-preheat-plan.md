@@ -7,7 +7,7 @@ Schema: `EMS_HEATING_PREHEAT_PLAN_V0.2`
 
 Heating Preheat is the PV-voorverwarming function within the **Ruimteverwarming** domain. It determines whether an already planned Honeywell comfort-temperature increase may be advanced for shadow validation and visualisation. Honeywell remains the baseline comfort authority. The planner never writes Honeywell, Homey, OpenTherm, Quatt or another physical device.
 
-Canonical domain design: `docs/components/space-heating.md`.
+Canonical domain design: `docs/software-architecture/components/space-heating.md`.
 
 ## V0.2 scope
 
@@ -45,13 +45,53 @@ If measured room temperature is already at or above the future Honeywell target,
 
 ## 0.5 C advancement steps
 
-When a large Honeywell `UP` is actually considered for advancement, V0.2 decomposes the rise into setpoint building blocks of at most **0.5 C**. This supports the household strategy of gradual heating so the Quatt can carry the load without unnecessarily provoking CV assistance.
+Any future Honeywell `UP` may be a preheat candidate regardless of the total size of that scheduled increase. The **0.5 C limit applies to each EMS preheat increment**, not to the size of the Honeywell `UP` itself.
+
+When a larger Honeywell `UP` is actually considered for advancement, V0.2 decomposes the rise into setpoint building blocks of at most **0.5 C**. This supports gradual heating so the Quatt can carry the additional load without unnecessarily provoking CV assistance.
 
 The normal Honeywell schedule is never rewritten. Steps already satisfied by measured room temperature are omitted. The final candidate target never exceeds the later Honeywell baseline target.
 
 Example: baseline target 15.5 C, actual room temperature 17.2 C, future Honeywell target 19.0 C produces shadow candidate setpoints `17.5, 18.0, 18.5, 19.0 C`.
 
-V0.2 does **not** determine the time spacing between these steps. That spacing requires empirical thermal-response data and must not be guessed.
+For V0.3 and later guarded execution, the intended step semantics are stricter:
+
+- after selecting a `+0.5 C` preheat step, the controller waits until the measured room temperature has reached that active preheat target within a small validated tolerance;
+- no subsequent `+0.5 C` step is allowed before that proof exists;
+- for a grouped opportunity such as Woonkamer + Eetkamer, all selected rooms must have reached their active preheat targets before a next grouped step;
+- CV activity is checked on every active-preheat evaluation iteration, not only after target attainment.
+
+V0.2 does **not** determine the time spacing between these steps. Timing must remain evidence-based and gated by measured step completion, remaining opportunity window, planner priority and safety state rather than by a guessed fixed interval.
+
+## Baseline heating versus pure EMS preheat
+
+Heating Preheat V0.3 must explicitly distinguish normal Honeywell comfort demand from incremental EMS-created preheat demand.
+
+Conceptually, the planner/control layer derives a house-wide `baselineHeatingDemandPresent` signal from the current Honeywell baseline targets and measured room temperatures, using a small validated tolerance/hysteresis.
+
+The target semantics are:
+
+```text
+baselineHeatingDemandPresent = true
+  -> BASELINE_HEATING
+  -> no new EMS preheat increment
+  -> CV activity is normal comfort heating, not a preheat fault
+
+baselineHeatingDemandPresent = false
++ preheatActive = true
++ CV heating active
+  -> CV_ASSIST_DURING_PURE_PREHEAT
+  -> block all further EMS preheat increments
+  -> retain the event for Thermal Learning / validation
+
+now >= originalHoneywellUpAt
+  -> end PREHEAT state
+  -> Honeywell baseline resumes full ownership
+  -> later CV activity belongs to normal baseline heating
+```
+
+Preheat therefore exists only while the EMS is intentionally holding an advanced target above the currently active Honeywell baseline before the original Honeywell `UP`, with normal baseline comfort already satisfied.
+
+This distinction is a **design objective for V0.3+**. It does not change the current V0.2 READ_ONLY/SHADOW safety boundary.
 
 ## Output and planner boundary
 
@@ -103,6 +143,8 @@ Initial learning focus is Woonkamer/Eetkamer, followed by validation against Keu
 - `DOWN` and `NONE` are never advanced;
 - no target above the future Honeywell target;
 - no intentional grid import for preheat;
+- no new EMS preheat increment while normal Honeywell baseline demand is present;
+- CV activity during pure EMS preheat blocks further preheat increments, while CV activity for baseline comfort is not treated as a preheat fault;
 - no physical write or actuator command;
 - timestamps remain offset-aware in `Europe/Amsterdam`;
 - invalid/ambiguous source or time semantics fail closed.
