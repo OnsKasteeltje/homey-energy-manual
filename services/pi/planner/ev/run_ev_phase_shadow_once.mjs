@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import {decideEvPhaseShadow} from '../../../../src/homey/ev/ev-phase-selector-shadow-v0.1.mjs';
+import {decideEvPhaseShadow} from './ev_phase_selector_shadow_v0.2.mjs';
 
 const STATE_PATH='/home/jeroen/ems/data/energy-state-v2.json';
 const OUT_PATH='/home/jeroen/ems/data/ev-phase-shadow-state.json';
@@ -102,7 +102,7 @@ if(!p1Valid){
 }
 
 const out={
-  schema:'EMS_PI_EV_PHASE_SHADOW_OBSERVER_V0.1',
+  schema:'EMS_PI_EV_PHASE_SHADOW_OBSERVER_V0.2',
   generatedAt:new Date(now).toISOString(),
   shadow:true,
   readOnly:true,
