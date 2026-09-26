@@ -31,5 +31,6 @@ for forbidden in (
 
 assert "julianday(f2.generated_at) <= julianday(f.slot_start_utc) - (12.0/24.0)" in s, "forecast selection must enforce 12h no-hindsight lead"
 assert 'max(0.0, totals["pvKWh"] - totals["exportKWh"])' in s, "daily PV self-use must derive from the daily energy balance"
-assert "quality != \"observed\"" in s, "non-observed actuals must not be treated as measured truth"
+assert "quality != \"observed\"" in s, "non-observed household actuals must not be treated as measured truth"
+assert 'quality not in {"complete", "partial"}' in s, "15-minute device aggregates must accept canonical complete/partial quality"
 print("PASS: PV & Flex Analysis V2 read-only contract")
