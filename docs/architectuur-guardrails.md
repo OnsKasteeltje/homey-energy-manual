@@ -143,7 +143,15 @@ Een adapter mag niet van SHADOW naar LIVE zolang niet aantoonbaar is bewezen dat
 5. boundary- en invarianttests aantonen dat de adapter geen upstream power budget kan overschrijden;
 6. eventuele stateful actuatortransities expliciet zijn gemodelleerd en getest.
 
-Voor de Easee EV Power Adapter v0.1 betekent dit aanvullend: vaste 3-fase mapping, geen automatische phaseswitching en uitsluitend dynamic/volatile current-control bij een latere LIVE-cut-over.
+Voor de huidige productieversie van de Easee EV Power Adapter blijft de vaste 3-fase mapping gelden totdat een opvolgende versie de LIVE release-gate voor phaseswitching volledig heeft doorlopen.
+
+Een opvolgende 1P/3P-adapter mag alleen worden gepromoveerd wanneer aanvullend is bewezen dat:
+
+- het upstream contract expliciet `OFF | 1P | 3P + requested current` draagt en de actuator deze mode niet zelf als EMS-policy afleidt;
+- de fysieke fase bij 1P niet door EMS wordt gekozen maar door Easee/Equalizer wordt beheerd;
+- de Easee phase-mode wijziging via een daarvoor bedoelde charger command-interface loopt en niet als hoogfrequente settings-write wordt gebruikt;
+- 1P↔3P als stateful transitie met 0 A/pauze, bevestiging, dead-time, timeout en fail-closed recovery wordt uitgevoerd;
+- dezelfde bestaande EV Actuator de enige automatische fysieke writer blijft voor zowel current als phase-mode transitions.
 
 ### Acceptatiecriterium
 
