@@ -427,7 +427,7 @@ After the no-write actuator candidate exposed that the legacy production path co
 
 Prepared contract:
 
-- Bridge v1.5.1: `EM2_EV_PHASE_CONTROL_V0.1`
+- Bridge v1.5.2: `EM2_EV_PHASE_CONTROL_V0.1`
   - authoritative `OFF | 1P | 3P`
   - `phase_requested_A`
   - `phase_requested_W`
@@ -510,7 +510,7 @@ A live proof test lowered charger current to 7 A manually, triggered only the Br
 
 ### Physical EV-load reconstruction
 
-Bridge v1.5.1 keeps P1 total net power authoritative, but the EV load already being consumed is now reconstructed from live Easee `measure_current.offered` together with confirmed 1P/3P mode. The previous controller command is only a fallback.
+Bridge v1.5.2 keeps P1 total net power authoritative, but the EV load already being consumed is now reconstructed from live Easee `measure_current.offered` together with confirmed 1P/3P mode. The previous controller command is only a fallback.
 
 This prevents a stale controller target from inflating available PV after commissioning/manual intervention.
 
@@ -536,3 +536,40 @@ With a 120 s minimum mode dwell:
 The 3P → 1P physical transition is:
 
 `pause → locked 1P command → confirmed 1P → 5 s deadtime → temporary symmetric circuit cap → resume → requested current → charging confirmation → restore original circuit cap`.
+
+
+## Stale / transient Easee handling
+
+The live commissioning exposed two separate failure modes that must not be conflated with energy policy.
+
+### Transition timeout
+
+The former 90 s generic transition timeout is no longer a control failure boundary.
+
+In the LIVE writer:
+
+- 90 s is observability only (`transitionSlow`);
+- it does not force `FAILED`;
+- phase confirmation has a 30 s watchdog, but expiry retries the locked phase command while the session remains paused;
+- delayed pause/phase readback keeps the writer in a safe transition stage and retries instead of permanently deadlocking.
+
+Therefore stale or slow Easee readback can delay a hardware transition but cannot by itself strand the EV actuator in a permanent timeout failure.
+
+### Disconnect debounce
+
+Bridge v1.5.2 no longer maps one raw Easee `plugged_out` sample directly to EV OFF.
+
+Effective connectivity combines:
+
+- Homey Easee connected charge-state;
+- Easee `evcharger_charging=true`;
+- offered current > 1 A;
+- charger power > 250 W;
+- canonical/core Tesla connected state or connected charge-state;
+- bounded recent connected intent.
+
+When all direct connection evidence disappears after a previously connected state, a 180 s disconnect grace starts. Only a continuous disconnect beyond that grace, with no other connection evidence, becomes `REALTIME_TESLA_NOT_CONNECTED_CONFIRMED`.
+
+This debounce affects connection qualification only. P1 remains authoritative for available-energy decisions.
+
+A true physical unplug therefore settles to OFF after the bounded grace period; a transient/stale `plugged_out` does not immediately stop PV charging.
