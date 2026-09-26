@@ -82,6 +82,8 @@ def assert_zero_current_safe(snapshot):
         raise RuntimeError(f"PRECONDITION_POWER_NOT_ZERO:{snapshot['powerW']}")
     if snapshot["charging"] is True:
         raise RuntimeError("PRECONDITION_CHARGING_STILL_TRUE")
+    if str(snapshot["chargeState"] or "").lower() != "plugged_in_paused":
+        raise RuntimeError(f"PRECONDITION_SESSION_NOT_PAUSED:{snapshot['chargeState']}")
 
 
 def post_json(url, payload, token=None):
