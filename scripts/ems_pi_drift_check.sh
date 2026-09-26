@@ -6,6 +6,8 @@ RUNTIME="/home/jeroen/ems/runtime"
 SOURCE="$REPO/src/pi/ems-runtime"
 TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
+TARGET_FORECAST_SOURCE="$REPO/services/pi/forecast"
+TARGET_FORECAST_RUNTIME="$RUNTIME/forecast"
 
 TARGET_WW_SOURCE="$REPO/services/pi/planner/warm-water"
 TARGET_WW_RUNTIME="$RUNTIME/planner/warm-water"
@@ -25,6 +27,7 @@ echo "=== EMS PI DRIFT CHECK ==="
 echo "Repo:      $REPO"
 echo "Source:    $SOURCE"
 echo "History:   $TARGET_HISTORY_SOURCE"
+echo "Forecast:  $TARGET_FORECAST_SOURCE"
 echo "WW planner:$TARGET_WW_SOURCE"
 echo "Honeywell: $TARGET_HONEYWELL_SOURCE"
 echo "Homey in:  $TARGET_HOMEY_INGRESS_FILE"
@@ -110,6 +113,34 @@ done < <(
         -not -name '*.pyc' \
         -printf '%P\n' | sort
 )
+
+echo
+echo "=== TARGET-STRUCTURE FORECAST FILES ==="
+if [[ ! -d "$TARGET_FORECAST_RUNTIME" ]]; then
+    echo "MISSING: $TARGET_FORECAST_RUNTIME"
+    FAIL=1
+else
+    while IFS= read -r rel; do
+        src="$TARGET_FORECAST_SOURCE/$rel"
+        dst="$TARGET_FORECAST_RUNTIME/$rel"
+
+        if [[ ! -f "$dst" ]]; then
+            echo "MISSING: forecast/$rel"
+            FAIL=1
+            continue
+        fi
+
+        if ! cmp -s "$src" "$dst"; then
+            echo "DRIFT:   forecast/$rel"
+            FAIL=1
+        fi
+    done < <(
+        cd "$TARGET_FORECAST_SOURCE" && find . -type f \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort
+    )
+fi
 
 echo
 echo "=== TARGET-STRUCTURE HONEYWELL FILES ==="

@@ -6,6 +6,8 @@ RUNTIME="/home/jeroen/ems/runtime"
 SOURCE="$REPO/src/pi/ems-runtime"
 TARGET_HISTORY_SOURCE="$REPO/services/pi/history"
 TARGET_HISTORY_RUNTIME="$RUNTIME/history"
+TARGET_FORECAST_SOURCE="$REPO/services/pi/forecast"
+TARGET_FORECAST_RUNTIME="$RUNTIME/forecast"
 
 TARGET_WW_SOURCE="$REPO/services/pi/planner/warm-water"
 TARGET_WW_RUNTIME="$RUNTIME/planner/warm-water"
@@ -78,6 +80,7 @@ UNMANAGED="$(
             -not -path './data/*' \
             -not -path './logs/*' \
             -not -path './history/*' \
+            -not -path './forecast/*' \
             -not -path './planner/warm-water/*' \
             -not -path './status-api/*' \
             -not -path './web-data-api/*' \
@@ -113,6 +116,25 @@ if echo "$HISTORY_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; then
     echo "Deployment aborted to prevent accidental deletion."
     echo
     echo "$HISTORY_UNMANAGED"
+    exit 1
+fi
+
+mkdir -p "$TARGET_FORECAST_RUNTIME"
+FORECAST_UNMANAGED="$(
+    diff -u \
+        <(cd "$TARGET_FORECAST_SOURCE" && find . -type f -printf '%P\n' | sort) \
+        <(cd "$TARGET_FORECAST_RUNTIME" && find . -type f \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort) \
+        || true
+)"
+
+if echo "$FORECAST_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; then
+    echo "ERROR: unmanaged files exist in runtime/forecast."
+    echo "Deployment aborted to prevent accidental deletion."
+    echo
+    echo "$FORECAST_UNMANAGED"
     exit 1
 fi
 
@@ -205,6 +227,7 @@ rsync -a --delete \
     --exclude='data/' \
     --exclude='logs/' \
     --exclude='history/' \
+    --exclude='forecast/' \
     --exclude='status-api/' \
     --exclude='web-data-api/' \
     --exclude='tools/' \
@@ -227,6 +250,12 @@ rsync -a --delete \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     "$TARGET_HISTORY_SOURCE/" "$TARGET_HISTORY_RUNTIME/"
+
+mkdir -p "$TARGET_FORECAST_RUNTIME"
+rsync -a --delete \
+    --exclude='__pycache__/' \
+    --exclude='*.pyc' \
+    "$TARGET_FORECAST_SOURCE/" "$TARGET_FORECAST_RUNTIME/"
 
 mkdir -p "$TARGET_HONEYWELL_RUNTIME"
 rsync -a --delete \
