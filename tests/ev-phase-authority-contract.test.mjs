@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.5.1.phase-authority.js','utf8');
+const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.5.2.phase-authority.js','utf8');
 const adapter=fs.readFileSync('src/homey/adapters/ev-power/ev-power-v0.2.0.phase-aware.js','utf8');
 const gate=fs.readFileSync('src/homey/validation/ev-power-adapter-gate-v0.3.0.phase-aware.js','utf8');
 const actuator=fs.readFileSync('src/homey/actuators/ev-power/ev-power-v0.3.1.phase-authority-candidate.js','utf8');
@@ -85,4 +85,14 @@ test('bridge reconstructs physical EV load from Easee offered current',()=>{
   assert.match(bridge,/offeredAUsable/);
   assert.match(bridge,/EASEE_OFFERED_CURRENT/);
   assert.match(bridge,/phaseShadowPhysicalA=/);
+});
+
+
+test('bridge debounces transient Easee disconnect state',()=>{
+  assert.match(bridge,/DISCONNECT_GRACE_MS=180000/);
+  assert.match(bridge,/directConnectedEvidence/);
+  assert.match(bridge,/disconnectGraceActive/);
+  assert.match(bridge,/effectiveConnected/);
+  assert.match(bridge,/REALTIME_TESLA_NOT_CONNECTED_CONFIRMED/);
+  assert.match(bridge,/connectionGuard/);
 });
