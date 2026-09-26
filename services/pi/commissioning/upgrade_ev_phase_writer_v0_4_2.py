@@ -24,6 +24,9 @@ FLOW_ID = "fea23193-a03f-49dd-9780-7e72ee48747d"
 SCRIPT_CARD = "10a00000-0000-4000-8000-000000000002"
 NOTE_CARD = "10a00000-0000-4000-8000-000000000003"
 STATUS_ID = "ea1f8a44-2f6c-490e-9b86-bae761886cf9"
+CHARGER_ID = "4d0b6913-d940-474e-95d6-b43f194c4119"
+QUIESCENCE_SEC = 3
+MIN_NORMAL_CIRCUIT_A = 16
 
 SOURCE = ROOT / "src/homey/actuators/ev-power/ev-power-v0.4.2.phase-writer-live.js"
 FLOW_NAME = "EM v2 | 60 Actuator | EV Power v0.4.2 PHASE-WRITER [LIVE]"
@@ -117,6 +120,40 @@ def status():
     return json.loads(raw) if isinstance(raw, str) else {}
 
 
+def cap(device, name):
+    obj = (device.get("capabilitiesObj") or {}).get(name)
+    return obj.get("value") if isinstance(obj, dict) else None
+
+
+def charger_state():
+    d = jrun("api", "devices", "get-device", "--id", CHARGER_ID, "--json")
+    return {
+        "chargeState": cap(d, "evcharger_charging_state"),
+        "charging": cap(d, "evcharger_charging"),
+        "offeredA": cap(d, "measure_current.offered"),
+        "powerW": cap(d, "measure_power"),
+        "circuitTargetA": cap(d, "target_circuit_current"),
+    }
+
+
+def stable_guard(st, charger):
+    observed = st.get("observed") or {}
+    return {
+        "schema": st.get("schema") in ALLOWED_PREVIOUS_SCHEMAS,
+        "statusStable": st.get("status") == "STABLE",
+        "transitionStable": (st.get("transition") or {}).get("stage") == "STABLE",
+        "live": st.get("live") is True,
+        "phaseAligned": st.get("phaseMode") == st.get("confirmedMode"),
+        "normalCircuitCap": isinstance(charger.get("circuitTargetA"), (int, float)) and charger.get("circuitTargetA") >= MIN_NORMAL_CIRCUIT_A,
+        "notPausedDuringPositiveTarget": not (
+            isinstance(st.get("targetA"), (int, float)) and st.get("targetA") >= 6 and charger.get("chargeState") == "plugged_in_paused"
+        ),
+        "observedCircuitConsistent": observed.get("circuitTargetA") in (None, charger.get("circuitTargetA")),
+    }
+
+
+
+
 def main():
     source = SOURCE.read_text(encoding="utf-8")
     required = (
@@ -131,6 +168,7 @@ def main():
             raise RuntimeError(f"SOURCE_MARKER_MISSING:{marker}")
 
     before_status = status()
+    before_charger = charger_state()
     print("=== PRE-UPGRADE STATUS ===")
     print(json.dumps({
         "schema": before_status.get("schema"),
@@ -139,16 +177,32 @@ def main():
         "phaseMode": before_status.get("phaseMode"),
         "confirmedMode": before_status.get("confirmedMode"),
         "transitionStage": (before_status.get("transition") or {}).get("stage"),
+        "targetA": before_status.get("targetA"),
+        "charger": before_charger,
     }, indent=2))
 
-    if before_status.get("schema") not in ALLOWED_PREVIOUS_SCHEMAS:
-        raise RuntimeError("UNEXPECTED_CURRENT_WRITER_SCHEMA")
-    if before_status.get("status") != "STABLE":
-        raise RuntimeError("CURRENT_WRITER_NOT_STABLE")
-    if (before_status.get("transition") or {}).get("stage") != "STABLE":
-        raise RuntimeError("CURRENT_TRANSITION_NOT_STABLE")
-    if before_status.get("live") is not True:
-        raise RuntimeError("CURRENT_WRITER_NOT_LIVE")
+    guards1 = stable_guard(before_status, before_charger)
+    failed1 = [k for k, ok in guards1.items() if not ok]
+    if failed1:
+        raise RuntimeError("PRE_UPGRADE_NOT_QUIESCENT:" + ",".join(failed1))
+
+    print(f"QUIESCENCE: waiting {QUIESCENCE_SEC}s and rechecking stable physical state")
+    time.sleep(QUIESCENCE_SEC)
+    confirm_status = status()
+    confirm_charger = charger_state()
+    guards2 = stable_guard(confirm_status, confirm_charger)
+    same_control = confirm_status.get("controlRevision") == before_status.get("controlRevision")
+    same_phase = confirm_status.get("phaseMode") == before_status.get("phaseMode")
+    same_target = confirm_status.get("targetA") == before_status.get("targetA")
+    guards2.update({
+        "sameControlRevision": same_control,
+        "samePhaseMode": same_phase,
+        "sameTargetA": same_target,
+    })
+    print("quiescenceGuards:", json.dumps(guards2, indent=2))
+    failed2 = [k for k, ok in guards2.items() if not ok]
+    if failed2:
+        raise RuntimeError("PRE_UPGRADE_CHANGED_DURING_QUIESCENCE:" + ",".join(failed2))
 
     raw = jrun("api", "flow", "get-advanced-flow", "--id", FLOW_ID, "--json")
     flow = unwrap_flow(raw)
