@@ -141,6 +141,12 @@ In particular:
 
 This rule exists to prevent presentation-only changes from unintentionally changing a previously working private LAN/Tailscale ingress configuration.
 
+### 8.2 Static asset cache policy
+
+The private V2 frontend is a small operational interface and must not risk running mismatched browser module versions after a deployment. Caddy therefore serves static frontend assets with `Cache-Control: no-store`.
+
+This applies to the static frontend file-server path only. The `/web/*` Web Data API keeps its own response cache policy. The purpose is correctness and deterministic commissioning, not public-web cache optimization.
+
 ## 9. State and data rules
 
 Each page has one normalized page-state boundary:
