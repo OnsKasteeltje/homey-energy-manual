@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.0.phase-shadow.js','utf8');
+const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.1.fast-import-cutback.js','utf8');
 const adapter=fs.readFileSync('src/homey/adapters/ev-power/ev-power-v0.1.11.phase-shadow.js','utf8');
 const gate=fs.readFileSync('src/homey/validation/ev-power-adapter-gate-v0.2.12.phase-shadow.js','utf8');
 
@@ -49,4 +49,16 @@ test('phase shadow cannot create a second physical writer',()=>{
     assert.doesNotMatch(source,/commands\/set_phase_mode/);
     assert.doesNotMatch(source,/charger_set_phase_mode/);
   }
+});
+
+
+test('bridge cuts large grid import proportionally instead of one amp per cycle',()=>{
+  assert.match(bridge,/excessImportW=Math\.max\(0,p1W-P1_DOWN_THRESHOLD_W\)/);
+  assert.match(bridge,/Math\.ceil\(excessImportW\/EV_W_PER_A\)/);
+  assert.match(bridge,/candidateA=reducedA>=MIN_A\?reducedA:0/);
+  assert.match(bridge,/REALTIME_P1_IMPORT_PROPORTIONAL_DOWN/);
+});
+
+test('bridge keeps upward PV capture bounded to one amp per cycle',()=>{
+  assert.match(bridge,/candidateA=currentA\+1/);
 });
