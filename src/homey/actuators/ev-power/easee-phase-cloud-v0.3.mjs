@@ -66,7 +66,7 @@ export async function refreshEaseeTokenPair({
   const {payload,result:base}=await postJson({
     fetchFn,
     url:'https://api.easee.com/api/accounts/refresh_token',
-    body:{accessToken:String(accessToken).trim(),refreshToken:String(refreshToken).trim()},
+    body:{refreshToken:String(refreshToken).trim()},
     accessToken,
     kind:'REFRESH_TOKEN',
     transitionId:null,
