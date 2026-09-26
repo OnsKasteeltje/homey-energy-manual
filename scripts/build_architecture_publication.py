@@ -57,7 +57,8 @@ def render_mermaid(source: str, index: int) -> str:
         '-i', str(mmd),
         '-o', str(png),
         '-b', 'white',
-        '--size', '1600',
+        '-w', '1600',
+        '-s', '1',
     ]
     subprocess.run(cmd, check=True)
     if not png.exists() or png.stat().st_size == 0:
