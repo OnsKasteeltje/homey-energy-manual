@@ -81,6 +81,25 @@ base_doc = load(BASE_FILE)
 energy_state = load(ENERGY_STATE_FILE) if ENERGY_STATE_FILE.exists() else {}
 ww = ww_doc["warmWater"]
 
+# Electrical WW flex exists only when the canonical runtime source is BOILER.
+# Core publishes hot_water.mode as a boolean: true=BOILER, false=CV. Missing or
+# ambiguous source state fails closed to no electrical WW planning.
+hot_water_state = energy_state.get("hot_water") or {}
+hot_water_mode = hot_water_state.get("mode")
+if hot_water_mode is True:
+    hot_water_source = "BOILER"
+    ww_flex_eligible = True
+elif hot_water_mode is False:
+    hot_water_source = "CV"
+    ww_flex_eligible = False
+else:
+    hot_water_source = "UNKNOWN"
+    ww_flex_eligible = False
+
+ww_source_block_reason = (
+    None if ww_flex_eligible else f"BLOCKED_SOURCE_{hot_water_source}"
+)
+
 tesla_state = energy_state.get("tesla") or {}
 tesla_connected_now = tesla_state.get("connected") is True
 
@@ -263,12 +282,14 @@ for date_key, day_slots in sorted(by_date.items()):
         s for s in day_slots
         if parse_utc(s["slot_start_utc"]) < deadline
     ]
-    required_slots = int(need_kwh / WW_SLOT_ENERGY_KWH + 0.999999)
+    forecast_need_kwh = need_kwh
+    electrical_need_kwh = need_kwh if ww_flex_eligible else 0.0
+    required_slots = int(electrical_need_kwh / WW_SLOT_ENERGY_KWH + 0.999999)
     chosen_indices = set()
     pv_chosen_indices = set()
     eligible_pv_windows = []
 
-    if not goal_reached and required_slots > 0:
+    if ww_flex_eligible and not goal_reached and required_slots > 0:
         chosen_indices, eligible_pv_windows = choose_pv_windows(
             candidates, required_slots
         )
@@ -295,7 +316,7 @@ for date_key, day_slots in sorted(by_date.items()):
             for i, _ in fallback_pool[:remaining_slots]:
                 chosen_indices.add(i)
 
-    remain_kwh = need_kwh
+    remain_kwh = electrical_need_kwh
     chosen = []
 
     for i, s in enumerate(candidates):
@@ -339,14 +360,18 @@ for date_key, day_slots in sorted(by_date.items()):
                 "allocatedKWh": 0,
                 "pvCoverageW": 0,
                 "gridRequiredW": 0,
-                "allocationReason": "HOLD",
+                "allocationReason": ww_source_block_reason or "HOLD",
             })
 
     daily.append({
         "date": date_key,
         "goalReached": goal_reached,
         "remainingFallbackMin": remaining_min,
-        "requiredEnergyKWh": round(need_kwh, 3),
+        "requiredEnergyKWh": round(electrical_need_kwh, 3),
+        "forecastDemandKWh": round(forecast_need_kwh, 3),
+        "sourceMode": hot_water_source,
+        "electricalFlexEligible": ww_flex_eligible,
+        "sourceBlockReason": ww_source_block_reason,
         "expectedDailyEnergyKWh": round(weekday_expected_kwh, 3),
         "expectedDailyEnergySource": "WEEKDAY_MEDIAN_SQLITE_V0.2",
         "expectedDailyEnergyFallbackKWh": WW_EXPECTED_DAILY_KWH,
@@ -388,6 +413,9 @@ payload = {
     "flexPriority": "WW_COMFORT_RESERVED_BEFORE_EV_OPPORTUNITY",
     "teslaPeakPreservation": "LIVE_CONNECTED_CURRENT_STATE_ONLY",
     "teslaConnectedNow": tesla_connected_now,
+    "hotWaterSource": hot_water_source,
+    "electricalFlexEligible": ww_flex_eligible,
+    "sourceBlockReason": ww_source_block_reason,
     "slot_count": len(plan_slots),
     "dailyPlans": daily,
     "slots": plan_slots,
@@ -399,6 +427,7 @@ tmp.replace(OUTPUT)
 
 print("PASS: WW plan v0.7.0 built")
 print("slots:", len(plan_slots))
+print("hotWaterSource:", hot_water_source, "electricalFlexEligible=", ww_flex_eligible)
 for d in daily:
     print(
         d["date"],
