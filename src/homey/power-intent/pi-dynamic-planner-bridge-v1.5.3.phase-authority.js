@@ -350,7 +350,7 @@ try{
           offeredA>=0 &&
           offeredA<=MAX_A;
         const phaseShadowPhysicalA=
-          chargeState==='plugged_in_charging'
+          rawChargeState==='plugged_in_charging'
             ?(offeredAUsable?Math.round(offeredA):currentA)
             :0;
         const actualProductionPhaseCount=phaseShadowPhysicalA<=0
@@ -412,7 +412,7 @@ try{
             controllerStateA:currentA,
             actualProductionA:phaseShadowPhysicalA,
             actualProductionCurrentSource:
-              chargeState==='plugged_in_charging'&&offeredAUsable
+              rawChargeState==='plugged_in_charging'&&offeredAUsable
                 ?'EASEE_OFFERED_CURRENT'
                 :'CONTROLLER_STATE_FALLBACK',
             actualProductionPhaseCount,
