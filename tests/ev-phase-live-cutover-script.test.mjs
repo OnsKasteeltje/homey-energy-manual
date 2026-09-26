@@ -29,3 +29,11 @@ test('cutover guard still requires paused zero-load state and enough PV',()=>{
 test('cutover rollback remains armed-disabled on failure',()=>{
   assert.match(src,/except Exception:\s*\n\s*rollback_armed\(\)/);
 });
+
+
+test('external commissioning monitor is low-rate and read-only',()=>{
+  assert.match(src,/POLL_SEC = 5/);
+  assert.match(src,/one persisted Logic status read per poll/);
+  assert.doesNotMatch(src,/fallback: actuator status stalled/);
+  assert.doesNotMatch(src,/stagnant_polls/);
+});
