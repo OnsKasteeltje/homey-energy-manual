@@ -121,7 +121,7 @@ Production presentation path: private EMS frontend -> Caddy on trusted LAN -> `/
 
 GitHub is not runtime-state transport for the production Live website. The former GitHub energy-state publisher, its systemd service/timer, and the derived `docs/data/energy-state-v2.json` publication artifact were removed from the repository on 2026-09-26 after the private Pi-hosted Frontend V2 cutover. They are not supported rollback paths and must not be reintroduced as production transport.
 
-The former MkDocs/GitHub Pages Live energy view is retired as the production Live frontend. GitHub Pages no longer stages a Frontend V2 preview; Frontend V2 is deployed only to the private Pi-hosted production boundary. Planner, History and Groups/Phases may remain temporarily available through the legacy documentation site until equivalent production-frontend resources are migrated. This temporary legacy availability does not make GitHub an allowed production runtime-state boundary.
+The former MkDocs/GitHub Pages Live, Planner and History operational views are retired. GitHub Pages no longer stages a Frontend V2 preview and no longer depends on Planner/History runtime JSON publication; Frontend V2 is deployed only to the private Pi-hosted production boundary. The Pages site is now a documentation boundary, with Groups/Phases retained temporarily because it still provides unique phase/topology diagnostics. This remaining diagnostic page does not make GitHub an allowed production runtime-state boundary.
 
 ### 2.4 Frontend V2 shared navigation governance
 
