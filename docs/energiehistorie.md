@@ -1,8 +1,7 @@
 # Energiehistorie
 
-<div id="energy-history-dashboard">
-  <p><em>Energiehistorie wordt geladen…</em></p>
-</div>
+!!! info "Operationele UI verhuisd"
+    De voormalige GitHub Pages History-renderer is op **26 september 2026** retired. De actuele Historie draait in de private Pi-hosted Frontend V2 via `/web/history/...`. De onderstaande tekst blijft als technische/historische documentatie behouden; deze pagina laadt geen live history-dashboard meer.
 
 !!! info "Canonieke telemetry-history v0.5.4"
     **Dag** gebruikt `energy-day-v2.json` uit `EM v2 | 70 History | Day Series v0.5.4`. De historylaag blijft onafhankelijk van de fysieke control-loop. P1 wordt iedere vijf minuten gericht en rechtstreeks gelezen; een ontbrekende P1-waarde blijft `null`/ongeldig en wordt nooit stilzwijgend `0 W`. Daarnaast worden de cumulatieve P1-tellers voor import en export vastgelegd als onafhankelijke energetische controle.
