@@ -1,4 +1,4 @@
-import {loadHeatingPreheatShadow,loadPvFlex,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
+import {loadFlexPriorityShadow,loadHeatingPreheatShadow,loadPvFlex,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
 const $=id=>document.getElementById(id); let day=todayAmsterdam();
 const kwh=v=>`${Number(v||0).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:2})} kWh`;
 const pct=v=>`${Math.round(Number(v||0)*100)}%`;
@@ -56,13 +56,24 @@ const label=s=>({
  BASELINE_HEATING:"Normale warmtevraag",
  NOT_ELIGIBLE:"Niet kandidaat"
 }[s]||s||"—");
-function renderPreheat(d,isCurrent){
+const priorityLabel=p=>({
+ HEATING:"Heating eerst",
+ EV:"EV eerst",
+ HOLD_UNKNOWN:"Veilig HOLD"
+}[p]||p||"—");
+const evRoleLabel=r=>({
+ MUST:"EV MUST",
+ PRIMARY_OPPORTUNITY:"EV primaire opportunity",
+ RESIDUAL_OPPORTUNITY:"EV residual via P1",
+ SAFETY_HOLD:"EV safety hold"
+}[r]||r||"—");
+function renderPreheat(d,priority,isCurrent){
  const root=$("preheat-rooms"),empty=$("preheat-empty"),status=$("preheat-status");root.replaceChildren();
  if(!isCurrent){status.textContent="Live shadow";empty.hidden=false;empty.textContent="Preheat shadow wordt alleen voor vandaag getoond.";return;}
  if(!d){status.textContent="Niet beschikbaar";empty.hidden=false;empty.textContent="Heating Preheat shadow is niet beschikbaar; PV & Flex blijft read-only actief.";return;}
  empty.hidden=true;
  const cv=d.cvGuard?.status==="OK"?(d.cvGuard.boilerAssistOn?"CV actief":"CV uit"):"CV onbekend";
- status.textContent=`${d.house?.baselineHeatingDemandPresent?"Baselinevraag actief":"Baseline voldaan"} · ${cv}`;
+ const pr=priority?.decision;\n const priorityText=pr?`${priorityLabel(pr.priorityOwner)} · ${evRoleLabel(pr.evRole)}`:"Prioriteit niet beschikbaar";\n status.textContent=`${priorityText} · ${d.house?.baselineHeatingDemandPresent?"Baselinevraag actief":"Baseline voldaan"} · ${cv}`;
  for(const r of d.rooms||[]){
   const card=document.createElement("article");card.className="preheat-room";
   const head=document.createElement("div");head.className="preheat-room-head";
@@ -87,15 +98,16 @@ async function refresh(){
  $("quality").textContent="Laden…";
  try{
   const isCurrent=day===todayAmsterdam();
-  const [d,h]=await Promise.all([
+  const [d,h,p]=await Promise.all([
    loadPvFlex(day),
-   isCurrent?loadHeatingPreheatShadow().catch(()=>null):Promise.resolve(null)
+   isCurrent?loadHeatingPreheatShadow().catch(()=>null):Promise.resolve(null),
+   isCurrent?loadFlexPriorityShadow().catch(()=>null):Promise.resolve(null)
   ]);
-  summary(d);chart(d);renderPreheat(h,isCurrent);
+  summary(d);chart(d);renderPreheat(h,p,isCurrent);
  }catch(e){
   $("quality").textContent="Analyse niet beschikbaar";
   $("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;
-  renderPreheat(null,day===todayAmsterdam());
+  renderPreheat(null,null,day===todayAmsterdam());
  }
 }
 $("prev").addEventListener("click",()=>{day=shiftDay(day,-1);refresh();});$("next").addEventListener("click",()=>{if(day<todayAmsterdam()){day=shiftDay(day,1);refresh();}});refresh();
