@@ -272,3 +272,19 @@ STABLE
 Fail-closed now means `PAUSE_SESSION`, not merely setting dynamic current to 0 A.
 
 The one-shot commissioning tool at `services/pi/commissioning/ev_phase_commission.py` requires the same paused-session precondition before issuing a phase command.
+
+
+## Physical commissioning: 1P command accepted 2026-09-26
+
+With the production EV actuator disabled and the charger confirmed `plugged_in_paused`, offered current 0 A and measured power 0 W, the guarded commissioning tool sent the official Easee phase command for locked single-phase mode.
+
+Observed Homey readback sequence:
+
+- initial `phaseMode = Auto`
+- then `phaseMode = Locked to single phase`
+- commissioning result: `PASS`
+- charger remained paused at 0 A / 0 W after the phase-mode change
+
+This is the first physical proof that the dedicated Easee command path and Homey phase-mode readback work together on charger `ECHM6B9F`.
+
+The next commissioning step is to pre-set 6 A while paused, resume the session, and validate that physical charging uses exactly one phase before restoring locked 3P.
