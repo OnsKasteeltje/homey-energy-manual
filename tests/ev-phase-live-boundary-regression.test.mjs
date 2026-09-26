@@ -44,3 +44,12 @@ test('only locked 1P and locked 3P are phase command values',()=>{
   assert.match(cloud,/\[1,3\]\.includes/);
   assert.doesNotMatch(cloud,/\[1,2,3\]\.includes/);
 });
+
+
+test('bootstrap does not enumerate full Homey Logic store or expose token bodies in argv',()=>{
+  assert.doesNotMatch(bootstrap,/get-variables/);
+  assert.match(bootstrap,/get-variable/);
+  assert.match(bootstrap,/tempfile\.mkstemp/);
+  assert.match(bootstrap,/os\.fchmod\(fd, 0o600\)/);
+  assert.match(bootstrap,/--body", f"@\{path\}"/);
+});
