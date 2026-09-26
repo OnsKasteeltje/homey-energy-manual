@@ -97,3 +97,10 @@ test('bridge keeps connection handling simple and immediate',()=>{
   assert.match(bridge,/effectiveConnected/);
   assert.match(bridge,/REALTIME_TESLA_NOT_CONNECTED/);
 });
+
+
+test('bridge uses the defined raw charge state in phase calculation',()=>{
+  assert.match(bridge,/const rawChargeState=/);
+  assert.match(bridge,/rawChargeState==='plugged_in_charging'/);
+  assert.doesNotMatch(bridge,/const phaseShadowPhysicalA=\s*chargeState===/);
+});
