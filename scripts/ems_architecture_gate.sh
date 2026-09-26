@@ -15,6 +15,8 @@ PERFORMANCE="services/pi/history/ems_performance.py"
 HONEYWELL="services/pi/integrations/honeywell"
 CONNECTLIFE="services/pi/integrations/connectlife"
 FORECAST_CHAIN="deploy/systemd/ems-forecast-chain.service"
+PV_FORECAST_V2_SOURCE="services/pi/forecast/pv/build_pv_forecast_v2.py"
+PV_FORECAST_V2_UNIT="deploy/systemd/ems-pv-forecast-v2-shadow.service"
 BASE_REF="${1:-}"
 
 fail() { echo "ARCHITECTURE GATE: FAIL: $*" >&2; exit 1; }
@@ -34,6 +36,8 @@ cd "$REPO"
 [[ -d "$HONEYWELL" ]] || fail "$HONEYWELL missing"
 [[ -d "$CONNECTLIFE" ]] || fail "$CONNECTLIFE missing"
 [[ -f "$FORECAST_CHAIN" ]] || fail "$FORECAST_CHAIN missing"
+[[ -f "$PV_FORECAST_V2_SOURCE" ]] || fail "$PV_FORECAST_V2_SOURCE missing"
+[[ -f "$PV_FORECAST_V2_UNIT" ]] || fail "$PV_FORECAST_V2_UNIT missing"
 
 python3 - "$POLICY" <<'PY'
 import json, sys
@@ -67,6 +71,12 @@ grep -q '/home/jeroen/ems/runtime/history/archive_planner_snapshot.py' "$FORECAS
 grep -q 'services/pi/history' scripts/deploy_ems_pi.sh || fail "target-structure Pi history source is not deployed"
 grep -q 'TARGET-STRUCTURE HISTORY FILES' scripts/ems_pi_drift_check.sh || fail "target-structure Pi history source is not drift-checked"
 pass "planner decision history uses atomic planner-owned context"
+
+grep -q 'services/pi/forecast' scripts/deploy_ems_pi.sh || fail "target-structure Pi forecast source is not deployed"
+grep -q -- "--exclude='forecast/'" scripts/deploy_ems_pi.sh || fail "generic runtime deploy must protect target-managed forecast directory"
+grep -q 'TARGET-STRUCTURE FORECAST FILES' scripts/ems_pi_drift_check.sh || fail "target-structure Pi forecast source is not drift-checked"
+grep -q '/home/jeroen/ems/runtime/forecast/pv/build_pv_forecast_v2.py' "$PV_FORECAST_V2_UNIT" || fail "PV Forecast V2 service does not use canonical runtime forecast path"
+pass "PV Forecast V2 target-structure deploy/drift mapping present"
 
 grep -q 'EMS_PI_DAY_PERFORMANCE_V0.1' "$PERFORMANCE" || fail "standard EMS performance report schema missing"
 grep -q 'ems-history.sqlite' "$PERFORMANCE" || fail "EMS performance command does not use canonical measurement history"
