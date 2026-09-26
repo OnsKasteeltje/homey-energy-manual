@@ -79,7 +79,9 @@ function pauseConfirmed(input,cfg){
 }
 
 function circuitA(input,cfg){
-  const n=Number(input?.circuitTargetA);
+  const raw=input?.circuitTargetA;
+  if(raw===null||raw===undefined||raw==='')return null;
+  const n=Number(raw);
   return Number.isInteger(n)&&n>=0&&n<=cfg.maxCircuitA?n:null;
 }
 
