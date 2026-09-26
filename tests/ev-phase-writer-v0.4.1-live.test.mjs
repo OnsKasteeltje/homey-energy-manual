@@ -68,3 +68,17 @@ test('failed writer recovers only from safe paused boundary',()=>{
   assert.match(src,/stage:'STABLE'/);
   assert.match(src,/failure:null/);
 });
+
+
+test('generic transition age is observability only',()=>{
+  assert.match(src,/const TRANSITION_WARN_MS=90000/);
+  assert.match(src,/transitionSlow:t\.startedAt&&transitionAge>TRANSITION_WARN_MS/);
+  assert.doesNotMatch(src,/TRANSITION_TIMEOUT/);
+});
+
+test('stale phase confirmation retries while paused instead of failing',()=>{
+  assert.match(src,/PHASE_CONFIRM_TIMEOUT_MS=30000/);
+  assert.match(src,/PHASE_CONFIRM_RETRY/);
+  assert.match(src,/await setPhaseMode\(desiredMode,vars\)/);
+  assert.doesNotMatch(src,/failClosed\('PHASE_CONFIRM_TIMEOUT'\)/);
+});
