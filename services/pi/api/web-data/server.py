@@ -45,7 +45,12 @@ PV_FLEX_API_SCHEMA = "EMS_WEB_PV_FLEX_ANALYSIS_V1"
 PV_FORECAST_API_SCHEMA = "EMS_WEB_PV_FORECAST_V2"
 EV_REQUIREMENT_API_SCHEMA = "EMS_WEB_EV_REQUIREMENT_V1"
 HEATING_SCHEDULE_API_SCHEMA = "EMS_WEB_HEATING_SCHEDULE_V1"
+HEATING_PREHEAT_SHADOW_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_SHADOW_V1"
 HONEYWELL_SCHEDULE_FILE = os.environ.get("EMS_HONEYWELL_SCHEDULE_FILE", "/home/jeroen/ems/runtime/tools/honeywell/output/honeywell-schedule.json")
+HEATING_PREHEAT_SHADOW_FILE = os.environ.get(
+    "EMS_HEATING_PREHEAT_SHADOW_FILE",
+    "/home/jeroen/ems/data/heating-preheat-shadow-v0.3.json",
+)
 ALLOWED_ADVICE = {
     "KEEP_CURRENT",
     "ADVISE_SWITCH_TO_CV",
@@ -704,6 +709,118 @@ def heating_schedule_resource():
         "rooms": rooms,
     }
 
+def heating_preheat_shadow_resource():
+    """Return an allowlisted read-only Heating Preheat V0.3 shadow projection."""
+    source = load_json(HEATING_PREHEAT_SHADOW_FILE)
+    if source.get("schema") != "EMS_HEATING_PREHEAT_SHADOW_V0.3":
+        raise ValueError("HEATING_PREHEAT_SHADOW_SOURCE_INVALID")
+    if source.get("mode") != "READ_ONLY" or source.get("controlMode") != "SHADOW":
+        raise ValueError("HEATING_PREHEAT_SHADOW_MODE_INVALID")
+    if source.get("controlWrites") is not False:
+        raise ValueError("HEATING_PREHEAT_SHADOW_WRITE_BOUNDARY_INVALID")
+    generated_at = source.get("generatedAt")
+    if parse_timestamp(generated_at) is None:
+        raise ValueError("HEATING_PREHEAT_SHADOW_TIME_INVALID")
+    if source.get("baselineAuthority") != "HONEYWELL":
+        raise ValueError("HEATING_PREHEAT_SHADOW_AUTHORITY_INVALID")
+
+    house = source.get("house")
+    cv_guard = source.get("cvGuard")
+    policy = source.get("policy")
+    if not isinstance(house, dict) or not isinstance(cv_guard, dict) or not isinstance(policy, dict):
+        raise ValueError("HEATING_PREHEAT_SHADOW_STRUCTURE_INVALID")
+
+    rooms = []
+    allowed_rooms = {"woonkamer", "eetkamer", "keuken", "serre"}
+    allowed_states = {
+        "NOT_ELIGIBLE",
+        "BASELINE_HEATING",
+        "PREHEAT_BLOCKED_CV_STATUS_UNKNOWN",
+        "PREHEAT_BLOCKED_CV_ASSIST",
+        "PREHEAT_READY_FOR_GRANT",
+    }
+    for room in source.get("rooms") or []:
+        if not isinstance(room, dict) or room.get("preheatScope") is not True:
+            continue
+        key = room.get("key")
+        if key not in allowed_rooms:
+            raise ValueError("HEATING_PREHEAT_SHADOW_ROOM_INVALID")
+        current = room.get("current")
+        baseline = room.get("baseline")
+        candidate = room.get("candidate")
+        shadow = room.get("shadow")
+        if not all(isinstance(v, dict) for v in (current, baseline, candidate, shadow)):
+            raise ValueError("HEATING_PREHEAT_SHADOW_ROOM_INVALID")
+        if shadow.get("state") not in allowed_states:
+            raise ValueError("HEATING_PREHEAT_SHADOW_STATE_INVALID")
+        for timestamp in (candidate.get("opportunityOpensAt"), candidate.get("opportunityClosesAt")):
+            if timestamp is not None and parse_timestamp(timestamp) is None:
+                raise ValueError("HEATING_PREHEAT_SHADOW_TIME_INVALID")
+        rooms.append({
+            "key": key,
+            "displayName": room.get("displayName") or key,
+            "group": room.get("group"),
+            "current": {
+                "temperature_C": current.get("temperature_C"),
+                "baselineDemand": current.get("baselineDemand") is True,
+            },
+            "baseline": {
+                "currentTargetTemperature_C": baseline.get("currentTargetTemperature_C"),
+                "changeAt": baseline.get("changeAt"),
+                "targetTemperature_C": baseline.get("targetTemperature_C"),
+                "direction": baseline.get("direction"),
+            },
+            "candidate": {
+                "status": candidate.get("status"),
+                "reason": candidate.get("reason"),
+                "opportunityOpensAt": candidate.get("opportunityOpensAt"),
+                "opportunityClosesAt": candidate.get("opportunityClosesAt"),
+                "steps_C": candidate.get("steps_C") if isinstance(candidate.get("steps_C"), list) else [],
+            },
+            "shadow": {
+                "state": shadow.get("state"),
+                "reason": shadow.get("reason"),
+                "plannerGrant": shadow.get("plannerGrant"),
+                "activeStepTarget_C": shadow.get("activeStepTarget_C"),
+                "activeStepReached": shadow.get("activeStepReached"),
+                "nextStepTarget_C": shadow.get("nextStepTarget_C"),
+            },
+        })
+
+    if {room["key"] for room in rooms} != allowed_rooms:
+        raise ValueError("HEATING_PREHEAT_SHADOW_ROOMS_INCOMPLETE")
+
+    return {
+        "schema": HEATING_PREHEAT_SHADOW_API_SCHEMA,
+        "generatedAt": generated_at,
+        "mode": "READ_ONLY",
+        "controlWrites": False,
+        "baselineAuthority": "HONEYWELL",
+        "allocationAuthority": source.get("allocationAuthority"),
+        "house": {
+            "baselineHeatingDemandPresent": house.get("baselineHeatingDemandPresent") is True,
+            "baselineDemandRooms": house.get("baselineDemandRooms")
+            if isinstance(house.get("baselineDemandRooms"), list) else [],
+        },
+        "cvGuard": {
+            "status": cv_guard.get("status"),
+            "reason": cv_guard.get("reason"),
+            "boilerAssistOn": cv_guard.get("boilerAssistOn")
+            if isinstance(cv_guard.get("boilerAssistOn"), bool) else None,
+            "ageSeconds": cv_guard.get("ageSeconds"),
+        },
+        "policy": {
+            "maxStep_C": policy.get("maxStep_C"),
+            "cvCheckedEveryIteration": policy.get("cvCheckedEveryIteration") is True,
+            "advanceOnlyAfterCurrentStepReached": policy.get("advanceOnlyAfterCurrentStepReached") is True,
+            "normalBaselineCvIsNotPreheatFault": policy.get("normalBaselineCvIsNotPreheatFault") is True,
+            "purePreheatCvAssistBlocksFurtherSteps": policy.get("purePreheatCvAssistBlocksFurtherSteps") is True,
+        },
+        "rooms": rooms,
+        "presentationOnly": True,
+    }
+
+
 def send_json(handler, status, payload, extra_headers=None):
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     handler.send_response(status)
@@ -757,6 +874,13 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 503, {
                     "schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "RESOURCE_UNAVAILABLE",
                 })
+            return
+
+        if path.path == "/web/planner/heating-preheat-shadow":
+            try:
+                send_json(self, 200, heating_preheat_shadow_resource())
+            except (OSError, json.JSONDecodeError, ValueError):
+                send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
             return
 
         if path.path == "/web/heating/schedule":
