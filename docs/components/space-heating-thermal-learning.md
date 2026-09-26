@@ -1,7 +1,7 @@
 # Ruimteverwarming — Thermal Learning boundary
 
 Status: **READ_ONLY / SHADOW**  
-Parent domain: `docs/components/space-heating.md`
+Parent domain: `docs/software-architecture/components/space-heating.md`
 
 ## Legacy thermal consolidation
 
