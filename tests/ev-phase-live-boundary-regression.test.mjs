@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const production=fs.readFileSync('src/homey/actuators/ev-power/ev-power-v0.2.15.control-authority.js','utf8');
-const transition=fs.readFileSync('src/homey/actuators/ev-power/ev-phase-transition-v0.1.mjs','utf8');
+const transition=fs.readFileSync('src/homey/actuators/ev-power/ev-phase-transition-v0.2.mjs','utf8');
 const transport=fs.readFileSync('src/homey/actuators/ev-power/easee-phase-command-transport-v0.1.mjs','utf8');
 
 test('current production actuator has no phase-mode writer',()=>{
@@ -14,6 +14,7 @@ test('current production actuator has no phase-mode writer',()=>{
 
 test('transition state machine is decision-only',()=>{
   assert.match(transition,/physicalWriteAllowed:false/);
+  assert.match(transition,/PAUSE_SESSION/);
   assert.doesNotMatch(transition,/Homey\.devices/);
   assert.doesNotMatch(transition,/fetch\(/);
   assert.doesNotMatch(transition,/setCapabilityValue/);
