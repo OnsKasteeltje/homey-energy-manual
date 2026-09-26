@@ -31,11 +31,13 @@ test('transition physical actions use latched transition current',()=>{
   assert.match(src,/chargerTargetA!==transitionA/);
 });
 
-test('safe writer still uses native Homey cards plus phase-only cloud call',()=>{
-  assert.match(src,/runNative\('pauseCharging'/);
-  assert.match(src,/runNative\('resumeCharging'/);
-  assert.match(src,/runNative\('circuitCurrentControl'/);
-  assert.match(src,/runNative\('setDynamicChargerCurrent'/);
+test('safe writer uses full native Homey card ids plus phase-only cloud call',()=>{
+  assert.match(src,/homey:device:\$\{CHARGER_ID\}:pauseCharging/);
+  assert.match(src,/homey:device:\$\{CHARGER_ID\}:resumeCharging/);
+  assert.match(src,/homey:device:\$\{CHARGER_ID\}:circuitCurrentControl/);
+  assert.match(src,/homey:device:\$\{CHARGER_ID\}:setDynamicChargerCurrent/);
+  assert.match(src,/Homey\.flow\.runFlowCardAction\(\{id,args\}\)/);
+  assert.doesNotMatch(src,/runFlowCardAction\(\{uri,id,args\}\)/);
   assert.match(src,/commands\/set_phase_mode/);
   assert.doesNotMatch(src,/setCapabilityValue\(/);
 });
