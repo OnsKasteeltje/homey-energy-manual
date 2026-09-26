@@ -276,5 +276,70 @@ class PvFlexDeviceActualsTest(unittest.TestCase):
         )
 
 
+class HeatingPreheatResourceTest(unittest.TestCase):
+    def write_source(self, payload):
+        handle = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False)
+        json.dump(payload, handle)
+        handle.close()
+        self.addCleanup(lambda: Path(handle.name).unlink(missing_ok=True))
+        return handle.name
+
+    def test_preheat_projection_is_allowlisted_and_shadow_only(self):
+        server.HEATING_PREHEAT_FILE = self.write_source({
+            "schema": "EMS_HEATING_PREHEAT_PLAN_V0.2",
+            "mode": "READ_ONLY",
+            "controlMode": "SHADOW",
+            "generatedAt": "2026-09-26T10:00:00Z",
+            "policy": {
+                "maxAdvanceMinutes": 180,
+                "maxStep_C": 0.5,
+                "intentionalGridImportAllowed": False,
+                "internal": "no",
+            },
+            "rooms": [{
+                "key": "woonkamer",
+                "displayName": "Woonkamer",
+                "group": "living_area",
+                "current": {"temperature_C": 17.2, "secret": "no"},
+                "baseline": {
+                    "currentTargetTemperature_C": 15.5,
+                    "targetTemperature_C": 19.0,
+                    "changeAt": "2026-09-26T18:30:00+02:00",
+                    "direction": "UP",
+                },
+                "candidate": {
+                    "status": "ELIGIBLE_UP_TRANSITION",
+                    "reason": "AWAITING_PV_OPPORTUNITY_EVALUATION",
+                    "earliestStartAt": "2026-09-26T15:30:00+02:00",
+                    "startAt": None,
+                    "targetTemperature_C": 19.0,
+                    "steps_C": [17.5, 18.0, 18.5, 19.0],
+                    "secret": "no",
+                },
+            }],
+            "secret": "no",
+        })
+        result = server.heating_preheat_resource()
+        self.assertEqual(result["schema"], "EMS_WEB_HEATING_PREHEAT_V1")
+        self.assertEqual(result["mode"], "READ_ONLY")
+        self.assertEqual(result["controlMode"], "SHADOW")
+        self.assertFalse(result["controlWrites"])
+        self.assertEqual(result["policy"]["maxStepC"], 0.5)
+        self.assertEqual(result["rooms"][0]["candidate"]["stepsC"], [17.5, 18.0, 18.5, 19.0])
+        self.assertNotIn("secret", result)
+        self.assertNotIn("secret", result["rooms"][0]["candidate"])
+
+    def test_preheat_projection_rejects_non_shadow_source(self):
+        server.HEATING_PREHEAT_FILE = self.write_source({
+            "schema": "EMS_HEATING_PREHEAT_PLAN_V0.2",
+            "mode": "READ_ONLY",
+            "controlMode": "LIVE",
+            "generatedAt": "2026-09-26T10:00:00Z",
+            "rooms": [],
+        })
+        with self.assertRaises(ValueError):
+            server.heating_preheat_resource()
+
+
 if __name__ == "__main__":
     unittest.main()
