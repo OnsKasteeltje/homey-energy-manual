@@ -1,4 +1,4 @@
-import {loadFlexPriorityShadow,loadHeatingPreheatShadow,loadPvFlex,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
+import {loadFlexPriorityShadow,loadHeatingPreheatProgressionShadow,loadHeatingPreheatShadow,loadPvFlex,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
 const $=id=>document.getElementById(id); let day=todayAmsterdam();
 const kwh=v=>`${Number(v||0).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:2})} kWh`;
 const pct=v=>`${Math.round(Number(v||0)*100)}%`;
@@ -75,6 +75,21 @@ const plannerReasonLabel=r=>({
  EV_DEADLINE_MUST:"EV-deadline MUST",
  EV_DEADLINE_STATE_NOT_SAFE_TO_DEPRIORITIZE:"EV-deadline onzeker; Heating veilig HOLD"
 }[r]||r||"—");
+const progressionLabel=s=>({
+ INACTIVE:"Inactief",
+ WAITING_FOR_FRESH_PRIORITY:"Wacht op verse prioriteit",
+ WAITING_FOR_GRANT:"Wacht op planner-grant",
+ STEP_WAIT:"Stap actief · op temperatuur wachten",
+ STEP_REACHED:"Stap bereikt",
+ STEP_REACHED_GROUP_WAIT:"Stap bereikt · wacht op groep",
+ STEP_HOLD_PRIORITY_UNKNOWN:"Stap HOLD · prioriteit onzeker",
+ STEP_HOLD_NO_GRANT:"Stap HOLD · geen grant",
+ BLOCKED_CV_ASSIST:"Geblokkeerd · CV-assist",
+ BLOCKED_CV_STATUS_UNKNOWN:"Geblokkeerd · CV-status onbekend",
+ ENDED_BASELINE_HEATING:"Beëindigd · baseline warmtevraag",
+ COMPLETE_TARGET_REACHED:"Gereed · Honeywell-target bereikt",
+ COMPLETE_NO_NEXT_STEP:"Gereed · geen volgende stap"
+}[s]||s||"—");
 function roomPlannerState(room,priority){
  const decision=priority?.decision;
  if(!decision)return {grant:"NOT_EVALUATED",reason:"Prioriteit niet beschikbaar"};
@@ -86,7 +101,7 @@ function roomPlannerState(room,priority){
  }
  return {grant:"HOLD",reason:plannerReasonLabel(decision.reason)};
 }
-function renderPreheat(d,priority,isCurrent){
+function renderPreheat(d,priority,progression,isCurrent){
  const root=$("preheat-rooms"),empty=$("preheat-empty"),status=$("preheat-status");root.replaceChildren();
  if(!isCurrent){status.textContent="Live shadow";empty.hidden=false;empty.textContent="Preheat shadow wordt alleen voor vandaag getoond.";return;}
  if(!d){status.textContent="Niet beschikbaar";empty.hidden=false;empty.textContent="Heating Preheat shadow is niet beschikbaar; PV & Flex blijft read-only actief.";return;}
@@ -95,8 +110,11 @@ function renderPreheat(d,priority,isCurrent){
  const pr=priority?.decision;
  const priorityText=pr?`${priorityLabel(pr.priorityOwner)} · ${evRoleLabel(pr.evRole)}`:"Prioriteit niet beschikbaar";
  status.textContent=`${priorityText} · ${d.house?.baselineHeatingDemandPresent?"Baselinevraag actief":"Baseline voldaan"} · ${cv}`;
+ const progressionByKey=new Map((progression?.rooms||[]).map(r=>[r.key,r]));
  for(const r of d.rooms||[]){
   const roomPlan=roomPlannerState(r,priority);
+  const v04=progressionByKey.get(r.key);
+  const prog=v04?.progression;
   const card=document.createElement("article");card.className="preheat-room";
   const head=document.createElement("div");head.className="preheat-room-head";
   const name=document.createElement("strong");name.textContent=r.displayName||r.key;
@@ -107,30 +125,35 @@ function renderPreheat(d,priority,isCurrent){
    ["Nu",temp(r.current?.temperature_C)],
    ["Baseline",temp(r.baseline?.currentTargetTemperature_C)],
    ["Volgende Honeywell-UP",r.baseline?.direction==="UP"?temp(r.baseline?.targetTemperature_C):"—"],
-   ["Volgende shadow-stap",temp(r.shadow?.nextStepTarget_C)],
    ["Preheat-window",r.candidate?.opportunityOpensAt&&r.candidate?.opportunityClosesAt?`${time(r.candidate.opportunityOpensAt)}–${time(r.candidate.opportunityClosesAt)}`:"—"],
-   ["Planner grant",roomPlan.grant]
+   ["Planner grant",roomPlan.grant],
+   ["V0.4 progression",progressionLabel(prog?.state)],
+   ["Actieve shadow-target",temp(prog?.activeStepTarget_C)],
+   ["Target bereikt",prog?.activeStepReached===true?"Ja":prog?.activeStepReached===false?"Nee":"—"],
+   ["Volgende V0.4-stap",temp(prog?.nextStepTarget_C)]
   ];
   for(const [k,v] of entries){const row=document.createElement("span");const b=document.createElement("b");b.textContent=k;const val=document.createTextNode(v);row.append(b,val);metrics.append(row);}
   const reason=document.createElement("small");reason.className="preheat-reason";reason.textContent=r.shadow?.reason||r.candidate?.reason||"—";
   const plannerReason=document.createElement("small");plannerReason.className="preheat-reason";plannerReason.textContent=`Planner: ${roomPlan.reason}`;
-  card.append(head,metrics,reason,plannerReason);root.append(card);
+  const progressionReason=document.createElement("small");progressionReason.className="preheat-reason";progressionReason.textContent=`V0.4: ${prog?.reason||"Niet beschikbaar"}`;
+  card.append(head,metrics,reason,plannerReason,progressionReason);root.append(card);
  }
 }
 async function refresh(){
  $("quality").textContent="Laden…";
  try{
   const isCurrent=day===todayAmsterdam();
-  const [d,h,p]=await Promise.all([
+  const [d,h,p,g]=await Promise.all([
    loadPvFlex(day),
    isCurrent?loadHeatingPreheatShadow().catch(()=>null):Promise.resolve(null),
-   isCurrent?loadFlexPriorityShadow().catch(()=>null):Promise.resolve(null)
+   isCurrent?loadFlexPriorityShadow().catch(()=>null):Promise.resolve(null),
+   isCurrent?loadHeatingPreheatProgressionShadow().catch(()=>null):Promise.resolve(null)
   ]);
-  summary(d);chart(d);renderPreheat(h,p,isCurrent);
+  summary(d);chart(d);renderPreheat(h,p,g,isCurrent);
  }catch(e){
   $("quality").textContent="Analyse niet beschikbaar";
   $("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;
-  renderPreheat(null,null,day===todayAmsterdam());
+  renderPreheat(null,null,null,day===todayAmsterdam());
  }
 }
 $("prev").addEventListener("click",()=>{day=shiftDay(day,-1);refresh();});$("next").addEventListener("click",()=>{if(day<todayAmsterdam()){day=shiftDay(day,1);refresh();}});refresh();

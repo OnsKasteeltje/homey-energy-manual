@@ -328,6 +328,27 @@ Frontend V2 / PV Flex
 
 Schema: `EMS_WEB_FLEX_PRIORITY_SHADOW_V1`. The canonical source is `EMS_PI_FLEX_PRIORITY_SHADOW_V0.1` and is accepted only when it is `READ_ONLY / SHADOW`, `controlWrites=false`, `powerReservationW=0` and realtime opportunity authority remains `P1`. The API exposes only the chosen priority owner, Heating shadow-grant state, EV role/urgency and closing-time context needed for commissioning. It never computes priority itself and cannot authorize a physical write.
 
+## 15.4 Heating Preheat V0.4 progression shadow resource
+
+PV Flex may consume the stateful progression commissioning layer through:
+
+```text
+/home/jeroen/ems/data/heating-preheat-progression-shadow-v0.4.json
+                 |
+                 v
+allowlisted Web Data API projection
+                 |
+                 v
+GET /web/planner/heating-preheat-progression-shadow
+                 |
+                 v
+Frontend V2 / PV Flex
+```
+
+Schema: `EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1`. The source must be canonical `EMS_HEATING_PREHEAT_PROGRESSION_SHADOW_V0.4`, `READ_ONLY / SHADOW`, `controlWrites=false`, `physicalWriteAllowed=false`, Honeywell baseline authority, V0.3 eligibility authority and Flex Priority V0.1 allocation authority. The API rejects any room state reporting a physical write, any step bound other than `0.5 C`, intentional grid import, or any rollback mode other than `NOT_DEFINED_SHADOW_ONLY`.
+
+The endpoint is presentation-only. It exposes progression state, active/next shadow target, measured-step completion and transition history for the four scoped rooms. It does not calculate progression, planner grants, Honeywell targets, CV policy or device commands.
+
 ## 16. Planned resource families
 
 This first endpoint establishes the boundary for the entire website. Expected resource families include:
@@ -336,6 +357,7 @@ This first endpoint establishes the boundary for the entire website. Expected re
 /web/state/current
 /web/planner/current
 /web/planner/heating-preheat-shadow
+/web/planner/heating-preheat-progression-shadow
 /web/planner/flex-priority-shadow
 /web/history/day
 /web/history/daily

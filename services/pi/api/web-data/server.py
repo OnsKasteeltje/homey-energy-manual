@@ -46,11 +46,16 @@ PV_FORECAST_API_SCHEMA = "EMS_WEB_PV_FORECAST_V2"
 EV_REQUIREMENT_API_SCHEMA = "EMS_WEB_EV_REQUIREMENT_V1"
 HEATING_SCHEDULE_API_SCHEMA = "EMS_WEB_HEATING_SCHEDULE_V1"
 HEATING_PREHEAT_SHADOW_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_SHADOW_V1"
+HEATING_PREHEAT_PROGRESSION_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1"
 FLEX_PRIORITY_SHADOW_API_SCHEMA = "EMS_WEB_FLEX_PRIORITY_SHADOW_V1"
 HONEYWELL_SCHEDULE_FILE = os.environ.get("EMS_HONEYWELL_SCHEDULE_FILE", "/home/jeroen/ems/runtime/tools/honeywell/output/honeywell-schedule.json")
 HEATING_PREHEAT_SHADOW_FILE = os.environ.get(
     "EMS_HEATING_PREHEAT_SHADOW_FILE",
     "/home/jeroen/ems/data/heating-preheat-shadow-v0.3.json",
+)
+HEATING_PREHEAT_PROGRESSION_FILE = os.environ.get(
+    "EMS_HEATING_PREHEAT_PROGRESSION_FILE",
+    "/home/jeroen/ems/data/heating-preheat-progression-shadow-v0.4.json",
 )
 FLEX_PRIORITY_SHADOW_FILE = os.environ.get(
     "EMS_FLEX_PRIORITY_SHADOW_FILE",
@@ -714,6 +719,148 @@ def heating_schedule_resource():
         "rooms": rooms,
     }
 
+def heating_preheat_progression_resource():
+    """Return allowlisted read-only Heating Preheat V0.4 progression observability."""
+    source = load_json(HEATING_PREHEAT_PROGRESSION_FILE)
+    if source.get("schema") != "EMS_HEATING_PREHEAT_PROGRESSION_SHADOW_V0.4":
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_SOURCE_INVALID")
+    if source.get("mode") != "READ_ONLY" or source.get("controlMode") != "SHADOW":
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_MODE_INVALID")
+    if source.get("controlWrites") is not False or source.get("physicalWriteAllowed") is not False:
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_WRITE_BOUNDARY_INVALID")
+    if source.get("baselineAuthority") != "HONEYWELL":
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_AUTHORITY_INVALID")
+    if source.get("eligibilityAuthority") != "EMS_HEATING_PREHEAT_SHADOW_V0.3":
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_ELIGIBILITY_INVALID")
+    if source.get("allocationAuthority") != "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1":
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_ALLOCATION_INVALID")
+
+    generated_at = source.get("generatedAt")
+    if parse_timestamp(generated_at) is None:
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_TIME_INVALID")
+
+    freshness = source.get("sourceFreshness")
+    policy = source.get("policy")
+    if not isinstance(freshness, dict) or not isinstance(policy, dict):
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_STRUCTURE_INVALID")
+    if policy.get("maxStep_C") != 0.5:
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_STEP_BOUND_INVALID")
+    if policy.get("intentionalGridImportAllowed") is not False:
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_GRID_IMPORT_INVALID")
+    if policy.get("rollbackBehavior") != "NOT_DEFINED_SHADOW_ONLY":
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_ROLLBACK_INVALID")
+
+    allowed_rooms = {"woonkamer", "eetkamer", "keuken", "serre"}
+    allowed_states = {
+        "INACTIVE",
+        "WAITING_FOR_FRESH_PRIORITY",
+        "WAITING_FOR_GRANT",
+        "STEP_WAIT",
+        "STEP_REACHED",
+        "STEP_REACHED_GROUP_WAIT",
+        "STEP_HOLD_PRIORITY_UNKNOWN",
+        "STEP_HOLD_NO_GRANT",
+        "BLOCKED_CV_ASSIST",
+        "BLOCKED_CV_STATUS_UNKNOWN",
+        "ENDED_BASELINE_HEATING",
+        "COMPLETE_TARGET_REACHED",
+        "COMPLETE_NO_NEXT_STEP",
+    }
+
+    rooms = []
+    for room in source.get("rooms") or []:
+        if not isinstance(room, dict) or room.get("preheatScope") is not True:
+            continue
+        key = room.get("key")
+        if key not in allowed_rooms:
+            raise ValueError("HEATING_PREHEAT_PROGRESSION_ROOM_INVALID")
+        eligibility = room.get("heatingEligibility")
+        planner = room.get("planner")
+        progression = room.get("progression")
+        if not all(isinstance(v, dict) for v in (eligibility, planner, progression)):
+            raise ValueError("HEATING_PREHEAT_PROGRESSION_ROOM_INVALID")
+        if progression.get("state") not in allowed_states:
+            raise ValueError("HEATING_PREHEAT_PROGRESSION_STATE_INVALID")
+        if progression.get("physicalWritePerformed") is not False:
+            raise ValueError("HEATING_PREHEAT_PROGRESSION_PHYSICAL_WRITE_INVALID")
+        for timestamp in (
+            room.get("opportunityClosesAt"),
+            progression.get("activeStepStartedAt"),
+            progression.get("lastTransitionAt"),
+        ):
+            if timestamp is not None and parse_timestamp(timestamp) is None:
+                raise ValueError("HEATING_PREHEAT_PROGRESSION_TIME_INVALID")
+        completed = progression.get("completedSteps_C")
+        if not isinstance(completed, list):
+            raise ValueError("HEATING_PREHEAT_PROGRESSION_COMPLETED_STEPS_INVALID")
+
+        rooms.append({
+            "key": key,
+            "displayName": room.get("displayName") or key,
+            "group": room.get("group"),
+            "opportunityId": room.get("opportunityId"),
+            "currentTemperature_C": room.get("currentTemperature_C"),
+            "futureHoneywellTarget_C": room.get("futureHoneywellTarget_C"),
+            "opportunityClosesAt": room.get("opportunityClosesAt"),
+            "heatingEligibility": {
+                "state": eligibility.get("state"),
+                "reason": eligibility.get("reason"),
+            },
+            "planner": {
+                "domainGrant": planner.get("domainGrant"),
+                "priorityReason": planner.get("priorityReason"),
+            },
+            "progression": {
+                "state": progression.get("state"),
+                "reason": progression.get("reason"),
+                "activeStepTarget_C": progression.get("activeStepTarget_C"),
+                "activeStepReached": progression.get("activeStepReached"),
+                "activeStepStartedAt": progression.get("activeStepStartedAt"),
+                "nextStepTarget_C": progression.get("nextStepTarget_C"),
+                "completedSteps_C": list(completed),
+                "lastTransition": progression.get("lastTransition"),
+                "lastTransitionAt": progression.get("lastTransitionAt"),
+                "physicalWritePerformed": False,
+            },
+        })
+
+    if {room["key"] for room in rooms} != allowed_rooms:
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_ROOMS_INCOMPLETE")
+
+    heating_freshness = freshness.get("heating") if isinstance(freshness.get("heating"), dict) else {}
+    priority_freshness = freshness.get("priority") if isinstance(freshness.get("priority"), dict) else {}
+
+    return {
+        "schema": HEATING_PREHEAT_PROGRESSION_API_SCHEMA,
+        "generatedAt": generated_at,
+        "mode": "READ_ONLY",
+        "controlWrites": False,
+        "physicalWriteAllowed": False,
+        "sourceFreshness": {
+            "heating": {
+                "status": heating_freshness.get("status"),
+                "ageSeconds": heating_freshness.get("ageSeconds"),
+            },
+            "priority": {
+                "status": priority_freshness.get("status"),
+                "ageSeconds": priority_freshness.get("ageSeconds"),
+            },
+            "priorityConsistentWithHeating": freshness.get("priorityConsistentWithHeating") is True,
+        },
+        "policy": {
+            "maxStep_C": 0.5,
+            "stepReachedTolerance_C": policy.get("stepReachedTolerance_C"),
+            "advanceOnlyAfterMeasuredStepReached": policy.get("advanceOnlyAfterMeasuredStepReached") is True,
+            "groupAdvanceRequiresAllSelectedRoomsReached": policy.get("groupAdvanceRequiresAllSelectedRoomsReached") is True,
+            "plannerGrantRequiredForStartAndAdvance": policy.get("plannerGrantRequiredForStartAndAdvance") is True,
+            "intentionalGridImportAllowed": False,
+            "rollbackBehavior": "NOT_DEFINED_SHADOW_ONLY",
+        },
+        "rooms": rooms,
+        "presentationOnly": True,
+    }
+
+
 def flex_priority_shadow_resource():
     """Return allowlisted cross-domain Flex Priority SHADOW observability."""
     source = load_json(FLEX_PRIORITY_SHADOW_FILE)
@@ -958,6 +1105,13 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 503, {
                     "schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "RESOURCE_UNAVAILABLE",
                 })
+            return
+
+        if path.path == "/web/planner/heating-preheat-progression-shadow":
+            try:
+                send_json(self, 200, heating_preheat_progression_resource())
+            except (OSError, json.JSONDecodeError, ValueError):
+                send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
             return
 
         if path.path == "/web/planner/flex-priority-shadow":

@@ -364,6 +364,106 @@ class HeatingPreheatShadowResourceTest(unittest.TestCase):
             server.heating_preheat_shadow_resource()
 
 
+class HeatingPreheatProgressionResourceTest(unittest.TestCase):
+    def write_source(self, payload):
+        handle = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False)
+        json.dump(payload, handle)
+        handle.close()
+        self.addCleanup(lambda: Path(handle.name).unlink(missing_ok=True))
+        return handle.name
+
+    def source(self):
+        rooms = []
+        for key in ("woonkamer", "eetkamer", "keuken", "serre"):
+            rooms.append({
+                "key": key,
+                "displayName": key.title(),
+                "preheatScope": True,
+                "group": "living_area" if key in {"woonkamer", "eetkamer"} else None,
+                "opportunityId": f"{key}|2026-09-26T16:00:00+02:00|19.000",
+                "currentTemperature_C": 18.0,
+                "futureHoneywellTarget_C": 19.0,
+                "opportunityClosesAt": "2026-09-26T16:00:00+02:00",
+                "heatingEligibility": {
+                    "state": "PREHEAT_READY_FOR_GRANT",
+                    "reason": "AWAITING_CENTRAL_PV_PRIORITY",
+                },
+                "planner": {
+                    "domainGrant": "SHADOW_GRANT",
+                    "priorityReason": "HEATING_WINDOW_CLOSES_FIRST",
+                },
+                "progression": {
+                    "state": "STEP_WAIT",
+                    "reason": "WAITING_FOR_MEASURED_TEMPERATURE",
+                    "activeStepTarget_C": 18.5,
+                    "activeStepReached": False,
+                    "activeStepStartedAt": "2026-09-26T12:00:00Z",
+                    "nextStepTarget_C": 19.0,
+                    "completedSteps_C": [],
+                    "lastTransition": "STARTED_STEP",
+                    "lastTransitionAt": "2026-09-26T12:00:00Z",
+                    "physicalWritePerformed": False,
+                },
+                "secret": "must-not-leak",
+            })
+        return {
+            "schema": "EMS_HEATING_PREHEAT_PROGRESSION_SHADOW_V0.4",
+            "mode": "READ_ONLY",
+            "controlMode": "SHADOW",
+            "controlWrites": False,
+            "physicalWriteAllowed": False,
+            "generatedAt": "2026-09-26T12:00:30Z",
+            "baselineAuthority": "HONEYWELL",
+            "eligibilityAuthority": "EMS_HEATING_PREHEAT_SHADOW_V0.3",
+            "allocationAuthority": "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1",
+            "sourceFreshness": {
+                "heating": {"status": "OK", "reason": "HEATING_SHADOW_CURRENT", "ageSeconds": 30},
+                "priority": {"status": "OK", "reason": "FLEX_PRIORITY_CURRENT", "ageSeconds": 29},
+                "priorityConsistentWithHeating": True,
+            },
+            "policy": {
+                "maxStep_C": 0.5,
+                "stepReachedTolerance_C": 0.0,
+                "advanceOnlyAfterMeasuredStepReached": True,
+                "groupAdvanceRequiresAllSelectedRoomsReached": True,
+                "plannerGrantRequiredForStartAndAdvance": True,
+                "cvGuardInheritedEveryIterationFromV03": True,
+                "baselineDemandGuardInheritedFromV03": True,
+                "intentionalGridImportAllowed": False,
+                "rollbackBehavior": "NOT_DEFINED_SHADOW_ONLY",
+                "statePersistence": "LOCAL_SHADOW_ARTIFACT",
+            },
+            "rooms": rooms,
+            "internalSecretLikeField": "no",
+        }
+
+    def test_allowlisted_progression_projection(self):
+        server.HEATING_PREHEAT_PROGRESSION_FILE = self.write_source(self.source())
+        result = server.heating_preheat_progression_resource()
+        self.assertEqual(result["schema"], "EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1")
+        self.assertFalse(result["controlWrites"])
+        self.assertFalse(result["physicalWriteAllowed"])
+        self.assertEqual(result["policy"]["maxStep_C"], 0.5)
+        self.assertEqual(result["rooms"][0]["progression"]["state"], "STEP_WAIT")
+        self.assertEqual(result["rooms"][0]["progression"]["activeStepTarget_C"], 18.5)
+        self.assertNotIn("secret", result["rooms"][0])
+        self.assertNotIn("internalSecretLikeField", result)
+
+    def test_write_capable_progression_fails_closed(self):
+        payload = self.source()
+        payload["rooms"][0]["progression"]["physicalWritePerformed"] = True
+        server.HEATING_PREHEAT_PROGRESSION_FILE = self.write_source(payload)
+        with self.assertRaises(ValueError):
+            server.heating_preheat_progression_resource()
+
+    def test_step_bound_change_fails_closed(self):
+        payload = self.source()
+        payload["policy"]["maxStep_C"] = 1.0
+        server.HEATING_PREHEAT_PROGRESSION_FILE = self.write_source(payload)
+        with self.assertRaises(ValueError):
+            server.heating_preheat_progression_resource()
+
+
 class FlexPriorityShadowResourceTest(unittest.TestCase):
     def write_source(self, payload):
         handle = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False)
