@@ -119,6 +119,40 @@ V0.3 derives house-wide `baselineHeatingDemandPresent` from all canonical Honeyw
 
 V0.3 does **not** grant heating opportunity itself. Each room exposes `plannerGrant = NOT_EVALUATED`, no active physical step, the next thermally legal `+0.5 C` step and `opportunityClosesAt`. Central Heating/EV/WW priority remains a later Dynamic Pi Planner responsibility.
 
+## V0.4 stateful progression SHADOW
+
+Heating Preheat V0.4 is a separate downstream state machine. It does **not** modify V0.3 eligibility and does not create a physical Honeywell target.
+
+Canonical implementation:
+
+- `services/pi/planner/heating/build_heating_preheat_progression_shadow_v0_4.py`;
+- `services/pi/planner/heating/run_heating_preheat_progression_shadow_v0_4.py`;
+- derived runtime artifact: `/home/jeroen/ems/data/heating-preheat-progression-shadow-v0.4.json`.
+
+Inputs are deliberately limited to:
+
+1. Heating Preheat V0.3 eligibility/safety;
+2. Flex Priority Shadow V0.1 central Heating↔EV grant;
+3. the previous local V0.4 shadow artifact for state persistence.
+
+V0.4 therefore sits **after** central arbitration and cannot become a second planner.
+
+A new shadow step starts only when V0.3 says `PREHEAT_READY_FOR_GRANT`, Flex Priority grants Heating, the room is in the granted ready-room set and both source artifacts are fresh and ordered consistently. The active step is a hypothetical/would-command target only; `physicalWritePerformed=false` is part of every room state.
+
+Once a shadow step is active:
+
+- its target remains fixed while measured room temperature is below that target;
+- no subsequent step is allowed until the measured room temperature has reached the active target;
+- a subsequent target increases by at most `+0.5 C` and never exceeds the future Honeywell target;
+- loss of planner grant holds the existing progression and forbids advancement;
+- CV-assist or unknown CV state inherits the V0.3 block and forbids advancement;
+- normal baseline heating ends the preheat progression because it is no longer pure preheat;
+- for a selected room group such as Woonkamer + Eetkamer, no member advances until all selected members with active steps have reached their current target.
+
+V0.4 intentionally does **not** define LIVE rollback semantics when planner grant disappears or a guard trips. It records `rollbackBehavior = NOT_DEFINED_SHADOW_ONLY` rather than inventing actuator behaviour before a guarded Honeywell writer exists.
+
+The V0.4 minute cadence is Pi-local only and performs no Homey call. It accepts V0.3 only within its bounded freshness horizon and accepts Flex Priority only when the priority artifact is fresh and was generated at or after the V0.3 state it is granting. Otherwise progression fails closed to a waiting/hold state.
+
 ## PV Flex observability
 
 Frontend V2 PV & Flex exposes the current V0.3 shadow state through the read-only Web Data API endpoint `/web/planner/heating-preheat-shadow`.
@@ -204,11 +238,15 @@ EMS_HEATING_PREHEAT_PLAN_V0.2
 (scope / actual-temp / <=3h / <=0.5C candidate steps)
                 |
                 v
-Dynamic Pi Planner
-(common residual PV-export allocation: WW / heating-preheat / EV)
+Flex Priority Shadow
+(common residual PV opportunity: heating-preheat / EV)
                 |
                 v
-SHADOW allocation + visualisation + rebound validation
+Heating Preheat Progression V0.4 SHADOW
+(stateful <=0.5C would-command steps; measured completion proof)
+                |
+                v
+SHADOW visualisation + rebound validation
                 |
                 v
 future guarded control only after explicit validation
