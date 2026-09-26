@@ -187,3 +187,50 @@ The official Easee charger API does expose a dedicated runtime command:
 with `1=1P`, `2=Auto`, `3=3P`.
 
 LIVE promotion therefore remains blocked until the sole EV Actuator has a validated command transport for that dedicated Easee command plus phase-mode readback. No per-phase circuit-current workaround is promoted as the canonical design while physical phase ownership remains assigned to Easee/Equalizer.
+
+
+## Stateful actuator preparation 2026-09-26
+
+Prepared pure transition logic:
+
+`src/homey/actuators/ev-power/ev-phase-transition-v0.1.mjs`
+
+The transition machine has no Homey/Easee side effects. It emits only the next requested actuator action.
+
+Canonical transition:
+
+```text
+STABLE
+  ↓ mode differs
+ZEROING
+  ↓ target 0 A + low power/current confirmed
+PHASE_COMMAND
+  ↓ dedicated Easee command accepted
+CONFIRMING
+  ↓ Homey readback phaseMode matches requested locked mode
+DEADTIME
+  ↓ 5 s
+APPLY_CURRENT
+  ↓ charger target matches requested A
+STABLE
+```
+
+Fail-closed conditions include invalid request, Gate not PASS, stale control, phase-command error, phase-confirm timeout, transition timeout and loss of phase confirmation.
+
+Prepared official command transport:
+
+`src/homey/actuators/ev-power/easee-phase-command-transport-v0.1.mjs`
+
+This transport contains no credentials and no token persistence. It only knows the official command endpoint and accepts an injected Bearer access token. It never logs or returns the supplied token.
+
+Easee authentication remains a deployment concern. Official cloud authentication returns a one-hour Bearer access token plus a rotating refresh token. No username, password, access token or refresh token may be committed to this repository.
+
+Current Homey readback on charger `ECHM6B9F` confirmed:
+
+- `phaseMode = Auto`
+- grid type `TN_3_PHASE`
+- main fuse `25 A`
+- circuit fuse `20 A`
+- max charger current `16 A`
+
+For LIVE commissioning, requested `1P` must confirm as `Locked to single phase`; requested `3P` must confirm as `Locked to three phase`. `Auto` is valid observed state but is not treated as confirmation of a requested locked phase mode.
