@@ -4,6 +4,11 @@ import fs from 'node:fs';
 
 const src=fs.readFileSync('src/homey/actuators/ev-power/ev-power-v0.4.2.phase-writer-live.js','utf8');
 
+test('HomeyScript source compiles as an async function body',()=>{
+  const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+  assert.doesNotThrow(()=>new AsyncFunction(src));
+});
+
 test('v0.4.2 remains the sole guarded live phase writer',()=>{
   assert.match(src,/EM2_EV_ACTUATOR_V0\.4\.2_PHASE_WRITER/);
   assert.match(src,/const PHASE_EXECUTION_ENABLED=true/);
