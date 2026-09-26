@@ -37,6 +37,43 @@ class TestEvRealtimeDeadlineContract(unittest.TestCase):
         self.assertEqual(result["deadlineMax_A"], 8)
         self.assertEqual(result["max_A"], 8)
 
+    def test_realtime_envelope_exposes_bounded_phase_policy(self):
+        plan = {"tesla": {"connectedNow": True}}
+        current = {
+            "evAllocationReason": "NO_QUALIFIED_PV_WINDOW",
+            "evDeadlineRequired": False,
+            "evPlanA": 0,
+        }
+        deadline = {"valid": True, "active": False, "maxA": None}
+
+        result = server.ev_realtime_envelope(plan, current, 0, 0, deadline)
+        policy = result["phasePolicy"]
+
+        self.assertEqual(policy["schema"], "EMS_PI_EV_PHASE_POLICY_V0.1")
+        self.assertTrue(policy["shadowOnly"])
+        self.assertEqual(policy["allowedModes"], ["OFF", "1P", "3P"])
+        self.assertEqual(policy["start1p_W"], 1500)
+        self.assertEqual(policy["stop1p_W"], 1100)
+        self.assertEqual(policy["enter3p_W"], 4400)
+        self.assertEqual(policy["leave3p_W"], 3600)
+        self.assertEqual(policy["minModeDwellSec"], 120)
+        self.assertEqual(policy["physicalPhaseOwner"], "EASEE_EQUALIZER")
+        self.assertIsNone(policy["phaseCommand"])
+
+    def test_blocked_realtime_envelope_allows_only_off_phase_mode(self):
+        plan = {"tesla": {"connectedNow": False}}
+        current = {
+            "evAllocationReason": "NO_QUALIFIED_PV_WINDOW",
+            "evDeadlineRequired": False,
+            "evPlanA": 0,
+        }
+        deadline = {"valid": True, "active": False, "maxA": None}
+
+        result = server.ev_realtime_envelope(plan, current, 0, 0, deadline)
+        self.assertFalse(result["allowed"])
+        self.assertEqual(result["phasePolicy"]["allowedModes"], ["OFF"])
+        self.assertEqual(result["phasePolicy"]["max_A"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
