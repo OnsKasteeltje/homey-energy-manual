@@ -373,6 +373,7 @@ def build_progression(
         output_rooms.append({
             "key": key,
             "displayName": room.get("displayName") or key,
+            "preheatScope": room.get("preheatScope") is True,
             "group": c["group"],
             "opportunityId": c["opportunityId"],
             "currentTemperature_C": c["actual"],
