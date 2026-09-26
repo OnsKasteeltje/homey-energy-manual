@@ -6,7 +6,7 @@ import {
   initialTransitionState,
   normalizeEaseePhaseMode,
   easeeCommandForMode,
-} from '../src/homey/actuators/ev-power/ev-phase-transition-v0.3.mjs';
+} from '../src/homey/actuators/ev-power/ev-phase-transition-v0.4.mjs';
 
 const t0=1_800_000_000_000;
 const paused={
@@ -14,6 +14,7 @@ const paused={
   controlFresh:true,
   liveEnabled:false,
   chargerTargetA:0,
+  circuitTargetA:40,
   chargerPowerW:0,
   offeredA:0,
   charging:false,
@@ -41,17 +42,18 @@ test('OFF requires paused session',()=>{
   assert.equal(r.action.type,'PAUSE_SESSION');
 });
 
-test('same phase but paused still arms safety circuit cap before resume',()=>{
+test('same confirmed phase but paused arms native safety cap and captures original circuit limit',()=>{
   const r=decidePhaseTransition({...paused,desiredMode:'1P',desiredA:11,easeePhaseMode:'Locked to single phase'},initialTransitionState(t0),t0);
   assert.equal(r.state.stage,'ARMING_CIRCUIT_CAP');
+  assert.equal(r.state.originalCircuitA,40);
   assert.equal(r.action.type,'SET_TRANSITION_CIRCUIT_CAP');
   assert.equal(r.action.amps,11);
-  assert.equal(r.action.ttlMinutes,1);
 });
 
-test('new mode transition starts by pausing session',()=>{
+test('new mode transition starts by pausing session and captures original circuit limit',()=>{
   const r=decidePhaseTransition({...charging,desiredMode:'1P',desiredA:16,easeePhaseMode:'Auto'},initialTransitionState(t0),t0);
   assert.equal(r.state.stage,'PAUSING');
+  assert.equal(r.state.originalCircuitA,40);
   assert.equal(r.action.type,'PAUSE_SESSION');
 });
 
@@ -72,7 +74,7 @@ test('accepted phase command waits for locked readback',()=>{
   assert.equal(r.action.type,'WAIT_PHASE_CONFIRM');
 });
 
-test('phase confirmation then deadtime arms symmetric TTL circuit cap',()=>{
+test('phase confirmation then deadtime arms native circuit cap',()=>{
   let r=decidePhaseTransition({...charging,desiredMode:'1P',desiredA:12,easeePhaseMode:'Auto'},initialTransitionState(t0),t0);
   r=decidePhaseTransition({...paused,desiredMode:'1P',desiredA:12,easeePhaseMode:'Auto'},r.state,t0+1000);
   const id=r.state.transitionId;
@@ -83,21 +85,21 @@ test('phase confirmation then deadtime arms symmetric TTL circuit cap',()=>{
   assert.equal(r.state.stage,'ARMING_CIRCUIT_CAP');
   assert.equal(r.action.type,'SET_TRANSITION_CIRCUIT_CAP');
   assert.equal(r.action.amps,12);
-  assert.equal(r.action.ttlMinutes,1);
 });
 
-test('accepted circuit cap permits resume',()=>{
+test('confirmed circuit cap permits resume',()=>{
   const prev={
     ...initialTransitionState(t0),
     stage:'ARMING_CIRCUIT_CAP',
     transitionId:'x',
     requestedMode:'1P',
     requestedA:8,
+    originalCircuitA:40,
     startedAt:new Date(t0).toISOString(),
     stageSince:new Date(t0+1000).toISOString(),
     phaseConfirmedAt:new Date(t0+500).toISOString(),
   };
-  const r=decidePhaseTransition({...paused,desiredMode:'1P',desiredA:8,easeePhaseMode:'Locked to single phase',circuitCapResult:{transitionId:'x',ok:true,at:new Date(t0+1500).toISOString()}},prev,t0+1500);
+  const r=decidePhaseTransition({...paused,circuitTargetA:8,desiredMode:'1P',desiredA:8,easeePhaseMode:'Locked to single phase'},prev,t0+1500);
   assert.equal(r.state.stage,'RESUMING');
   assert.equal(r.action.type,'RESUME_SESSION');
 });
@@ -109,12 +111,13 @@ test('resume transition reapplies charger current because Easee resets it',()=>{
     transitionId:'x',
     requestedMode:'1P',
     requestedA:6,
+    originalCircuitA:40,
     startedAt:new Date(t0).toISOString(),
     stageSince:new Date(t0+1000).toISOString(),
-    circuitCapAcceptedAt:new Date(t0+500).toISOString(),
   };
   const r=decidePhaseTransition({
     ...paused,
+    circuitTargetA:6,
     chargeState:'plugged_in',
     desiredMode:'1P',
     desiredA:6,
@@ -124,24 +127,48 @@ test('resume transition reapplies charger current because Easee resets it',()=>{
   assert.equal(r.state.stage,'APPLY_CURRENT');
   assert.equal(r.action.type,'SET_CURRENT');
   assert.equal(r.action.requestedA,6);
-  assert.equal(r.action.reason,'RESUME_RESETS_CHARGER_CURRENT');
 });
 
-test('transition completes only after desired current and charging are observed',()=>{
+test('desired current plus charging triggers restore of original circuit limit',()=>{
   const prev={
     ...initialTransitionState(t0),
     stage:'APPLY_CURRENT',
     transitionId:'x',
     requestedMode:'1P',
     requestedA:6,
+    originalCircuitA:40,
     startedAt:new Date(t0).toISOString(),
     stageSince:new Date(t0+1000).toISOString(),
   };
   const r=decidePhaseTransition({
     ...charging,
+    circuitTargetA:6,
     chargerTargetA:6,
     chargerPowerW:1400,
     offeredA:6,
+    desiredMode:'1P',
+    desiredA:6,
+    easeePhaseMode:'Locked to single phase',
+  },prev,t0+2000);
+  assert.equal(r.state.stage,'RESTORING_CIRCUIT_CAP');
+  assert.equal(r.action.type,'RESTORE_CIRCUIT_CAP');
+  assert.equal(r.action.amps,40);
+});
+
+test('transition completes only after original circuit limit is restored',()=>{
+  const prev={
+    ...initialTransitionState(t0),
+    stage:'RESTORING_CIRCUIT_CAP',
+    transitionId:'x',
+    requestedMode:'1P',
+    requestedA:6,
+    originalCircuitA:40,
+    startedAt:new Date(t0).toISOString(),
+    stageSince:new Date(t0+1000).toISOString(),
+  };
+  const r=decidePhaseTransition({
+    ...charging,
+    circuitTargetA:40,
     desiredMode:'1P',
     desiredA:6,
     easeePhaseMode:'Locked to single phase',
@@ -150,20 +177,11 @@ test('transition completes only after desired current and charging are observed'
   assert.equal(r.action.type,'NOOP');
 });
 
-test('circuit cap failure fail-closes by pausing',()=>{
-  const prev={
-    ...initialTransitionState(t0),
-    stage:'ARMING_CIRCUIT_CAP',
-    transitionId:'x',
-    requestedMode:'3P',
-    requestedA:6,
-    startedAt:new Date(t0).toISOString(),
-    stageSince:new Date(t0).toISOString(),
-  };
-  const r=decidePhaseTransition({...paused,desiredMode:'3P',desiredA:6,easeePhaseMode:'Locked to three phase',circuitCapResult:{transitionId:'x',ok:false,reason:'HTTP_500'}},prev,t0+1000);
+test('unknown circuit target fails closed before transition',()=>{
+  const r=decidePhaseTransition({...charging,circuitTargetA:null,desiredMode:'1P',desiredA:6,easeePhaseMode:'Auto'},initialTransitionState(t0),t0);
   assert.equal(r.state.stage,'FAILED');
   assert.equal(r.action.type,'PAUSE_SESSION');
-  assert.match(r.action.reason,/CIRCUIT_CAP_FAILED/);
+  assert.equal(r.action.reason,'CIRCUIT_TARGET_UNKNOWN');
 });
 
 test('gate failure always fail-closes by pausing',()=>{
