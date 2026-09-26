@@ -84,13 +84,14 @@ def priority(*, grant=True, ready=None, generated="2026-09-26T11:59:30Z",
 
 
 def previous_room(key="woonkamer", target=17.5, state="STEP_WAIT", group="living_area",
-                  close="2026-09-26T15:00:00Z", future=19.0, completed=None):
+                  close="2026-09-26T15:00:00Z", future=19.0, completed=None, reason="WAITING_FOR_MEASURED_TEMPERATURE"):
     return {
         "key": key,
         "group": group,
         "opportunityId": f"{key}|{close}|{future:.3f}",
         "progression": {
             "state": state,
+            "reason": reason,
             "activeStepTarget_C": target,
             "activeStepReached": False,
             "activeStepStartedAt": "2026-09-26T11:55:00Z",
@@ -152,7 +153,7 @@ def test_active_step_waits_until_measured_temperature_reaches_target():
     assert p["state"] == "STEP_WAIT"
     assert p["activeStepTarget_C"] == 17.5
     assert p["activeStepReached"] is False
-    assert p["lastTransition"] == "NONE"
+    assert p["lastTransition"] == "STARTED_STEP"
 
 
 def test_reached_step_advances_by_at_most_half_degree():
@@ -256,6 +257,36 @@ def test_living_group_advances_together_after_both_reach():
     assert progression(out, "woonkamer")["lastTransition"] == "ADVANCED_STEP"
     assert progression(out, "eetkamer")["lastTransition"] == "ADVANCED_STEP"
 
+
+
+def test_unchanged_inactive_state_preserves_last_transition_event_time():
+    first = build(
+        h=heating(room(state="NOT_ELIGIBLE", reason="OUTSIDE_MAX_ADVANCE_WINDOW", next_step=None)),
+        p=priority(grant=False, ready=[]),
+    )
+    first_room = next(r for r in first["rooms"] if r["key"] == "woonkamer")
+    assert first_room["progression"]["lastTransition"] == "RESET"
+    first_time = first_room["progression"]["lastTransitionAt"]
+
+    second = m.build_progression(
+        heating(room(state="NOT_ELIGIBLE", reason="OUTSIDE_MAX_ADVANCE_WINDOW", next_step=None)),
+        priority(grant=False, ready=[]),
+        first,
+        generated_at=datetime(2026, 9, 26, 12, 1, tzinfo=timezone.utc),
+    )
+    p = progression(second)
+    assert p["state"] == "INACTIVE"
+    assert p["lastTransition"] == "RESET"
+    assert p["lastTransitionAt"] == first_time
+
+
+def test_unchanged_step_wait_preserves_last_transition_event_time():
+    prev = previous(previous_room(target=17.5))
+    out = build(h=heating(room(actual=17.4)), prev=prev)
+    p = progression(out)
+    assert p["state"] == "STEP_WAIT"
+    assert p["lastTransition"] == "STARTED_STEP"
+    assert p["lastTransitionAt"] == "2026-09-26T11:55:00Z"
 
 def test_policy_keeps_shadow_boundaries_explicit():
     policy = build()["policy"]

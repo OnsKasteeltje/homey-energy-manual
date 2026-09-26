@@ -360,11 +360,29 @@ def build_progression(
                 transition = "ADVANCED_STEP"
 
         previous_state = prev.get("state") if isinstance(prev, dict) else None
+        previous_reason = prev.get("reason") if isinstance(prev, dict) else None
         previous_target = prev.get("activeStepTarget_C") if isinstance(prev, dict) else None
-        if transition == "NONE" and (state != previous_state or active != previous_target):
-            transition = "STATE_CHANGED"
-        if transition != "NONE":
+        previous_reached = prev.get("activeStepReached") if isinstance(prev, dict) else None
+        previous_completed = _completed(prev)
+
+        progression_changed = (
+            not isinstance(prev, dict)
+            or state != previous_state
+            or reason != previous_reason
+            or active != previous_target
+            or reached != previous_reached
+            or completed != previous_completed
+        )
+
+        if progression_changed:
+            if transition == "NONE":
+                transition = "STATE_CHANGED"
             last_transition_at = _iso(now)
+        elif isinstance(prev, dict):
+            # lastTransition is event history, not an every-iteration status.
+            # Keep the previous event/time when progression did not change.
+            transition = prev.get("lastTransition") or "NONE"
+            last_transition_at = prev.get("lastTransitionAt")
 
         next_after_active = None
         if active is not None:
