@@ -25,7 +25,7 @@ SCRIPT_CARD = "10a00000-0000-4000-8000-000000000002"
 NOTE_CARD = "10a00000-0000-4000-8000-000000000003"
 STATUS_ID = "ea1f8a44-2f6c-490e-9b86-bae761886cf9"
 CHARGER_ID = "4d0b6913-d940-474e-95d6-b43f194c4119"
-QUIESCENCE_SEC = 3
+QUIESCENCE_SEC = 10
 MIN_NORMAL_CIRCUIT_A = 16
 
 SOURCE = ROOT / "src/homey/actuators/ev-power/ev-power-v0.4.2.phase-writer-live.js"
@@ -138,6 +138,18 @@ def charger_state():
 
 def stable_guard(st, charger):
     observed = st.get("observed") or {}
+    target_a = st.get("targetA")
+    positive_target = isinstance(target_a, (int, float)) and target_a >= 6
+    offered_a = charger.get("offeredA")
+    power_w = charger.get("powerW")
+    physically_running = (
+        charger.get("chargeState") == "plugged_in_charging"
+        and charger.get("charging") is True
+        and isinstance(offered_a, (int, float))
+        and abs(offered_a - target_a) <= 0.5
+        and isinstance(power_w, (int, float))
+        and power_w > 500
+    )
     return {
         "schema": st.get("schema") in ALLOWED_PREVIOUS_SCHEMAS,
         "statusStable": st.get("status") == "STABLE",
@@ -145,9 +157,7 @@ def stable_guard(st, charger):
         "live": st.get("live") is True,
         "phaseAligned": st.get("phaseMode") == st.get("confirmedMode"),
         "normalCircuitCap": isinstance(charger.get("circuitTargetA"), (int, float)) and charger.get("circuitTargetA") >= MIN_NORMAL_CIRCUIT_A,
-        "notPausedDuringPositiveTarget": not (
-            isinstance(st.get("targetA"), (int, float)) and st.get("targetA") >= 6 and charger.get("chargeState") == "plugged_in_paused"
-        ),
+        "positiveTargetPhysicallyRunning": (not positive_target) or physically_running,
         "observedCircuitConsistent": observed.get("circuitTargetA") in (None, charger.get("circuitTargetA")),
     }
 
@@ -224,6 +234,18 @@ def main():
         )
 
     candidate = {"name": FLOW_NAME, "enabled": True, "cards": cards}
+
+    final_status = status()
+    final_charger = charger_state()
+    final_guards = stable_guard(final_status, final_charger)
+    final_guards.update({
+        "sameControlRevision": final_status.get("controlRevision") == confirm_status.get("controlRevision"),
+        "samePhaseMode": final_status.get("phaseMode") == confirm_status.get("phaseMode"),
+        "sameTargetA": final_status.get("targetA") == confirm_status.get("targetA"),
+    })
+    failed_final = [k for k, ok in final_guards.items() if not ok]
+    if failed_final:
+        raise RuntimeError("PRE_UPGRADE_CHANGED_BEFORE_PUSH:" + ",".join(failed_final))
 
     try:
         print()
