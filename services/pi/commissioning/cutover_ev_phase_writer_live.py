@@ -42,7 +42,8 @@ LIVE_NAME = "EM v2 | 60 Actuator | EV Power v0.4.1 PHASE-WRITER [LIVE]"
 ARMED_NAME = "EM v2 | 60 Actuator | EV Power v0.4.0 PHASE-WRITER [ARMED-DISABLED]"
 
 P1_MARGIN_W = 250
-MAX_STEPS = 20
+POLL_SEC = 5
+MAX_STEPS = 18  # <= 90 s transition window
 ROLLBACK_BODY = None
 
 
@@ -284,15 +285,14 @@ def main():
 
     try:
         trigger(ACTUATOR_FLOW_ID)
-        last_at = None
-        stagnant_polls = 0
 
         for step in range(1, MAX_STEPS + 1):
-            time.sleep(3)
+            time.sleep(POLL_SEC)
 
-            # The writer already persists its own Easee observations in status.
-            # Read only that single Logic variable during cutover to avoid Homey
-            # API throttling from separate device reads.
+            # The writer owns progression through self-triggering. The external
+            # commissioning monitor is read-only and intentionally low-rate:
+            # one persisted Logic status read per poll, no device polling and
+            # no external fallback triggers.
             status = get_status()
             observed = status.get("observed") or {}
             charger = {
@@ -341,20 +341,6 @@ def main():
                 print()
                 print("PASS: LIVE writer stable; Tesla charging and circuit limit restored")
                 return
-
-            current_at = status.get("at")
-            if current_at and current_at == last_at:
-                stagnant_polls += 1
-            else:
-                stagnant_polls = 0
-                last_at = current_at
-
-            # Self-trigger is the normal path. Only poke the flow if its
-            # persisted status has not changed for ~4 seconds.
-            if stagnant_polls >= 2:
-                print("fallback: actuator status stalled; issuing one external trigger")
-                trigger(ACTUATOR_FLOW_ID)
-                stagnant_polls = 0
 
         raise RuntimeError("LIVE_CUTOVER_TIMEOUT")
     except Exception:
