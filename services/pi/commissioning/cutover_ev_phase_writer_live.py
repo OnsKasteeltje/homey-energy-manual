@@ -179,7 +179,14 @@ def trigger(flow_id):
 def rollback_armed():
     try:
         update_writer(ARMED_SOURCE, ARMED_NAME)
-        print("ROLLBACK: actuator source returned to ARMED-DISABLED")
+        trigger(ACTUATOR_FLOW_ID)
+        time.sleep(2)
+        status = get_status()
+        print(
+            "ROLLBACK: actuator returned to ARMED-DISABLED "
+            f"(schema={status.get('schema')}, "
+            f"phaseExecutionEnabled={status.get('phaseExecutionEnabled')})"
+        )
     except Exception as exc:
         print(f"ROLLBACK WARNING: {exc}", file=sys.stderr)
 
@@ -194,7 +201,13 @@ def main():
 
     print("=== REFRESH AUTHORITATIVE CONTROL ===")
     trigger(BRIDGE_FLOW_ID)
-    time.sleep(5)
+    time.sleep(3)
+
+    # Refresh the currently deployed ARMED-DISABLED actuator status. The
+    # previous LIVE attempt may have left a FAILED v0.4.1 status value even
+    # though rollback already restored the v0.4.0 source.
+    trigger(ACTUATOR_FLOW_ID)
+    time.sleep(3)
 
     status = get_status()
     charger = charger_state()
