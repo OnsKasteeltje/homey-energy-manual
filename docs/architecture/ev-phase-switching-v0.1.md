@@ -288,3 +288,54 @@ Observed Homey readback sequence:
 This is the first physical proof that the dedicated Easee command path and Homey phase-mode readback work together on charger `ECHM6B9F`.
 
 The next commissioning step is to pre-set 6 A while paused, resume the session, and validate that physical charging uses exactly one phase before restoring locked 3P.
+
+
+## Physical commissioning: 1P charging confirmed and resume reset characterized
+
+After the successful locked-1P command/readback test, the paused charger was prepared with 6 A and resumed.
+
+Observed behavior:
+
+- `resume_charging` reset the dynamic charger-current limit to 32 A;
+- immediately after resume the car was connected but initially drew 0 W;
+- re-applying 6 A started charging;
+- Easee then measured approximately:
+  - phase 1: ~0 A
+  - phase 2: ~0 A
+  - phase 3: ~6 A
+  - charger power: ~1.4 kW
+- Tesla physically charged at 1x6 A.
+
+This confirms both:
+1. locked single-phase mode works physically on this charger/car combination;
+2. Easee/Equalizer chooses the physical phase (phase 3 during this commissioning run).
+
+The public Easee/Homey app source documents that `resume_charging` resets the dynamic charger-current output limit. This matches the observed 32 A target reset.
+
+### Resume safety barrier
+
+Transition state-machine v0.3 therefore adds a temporary symmetric dynamic circuit-current cap before resume:
+
+`phase1=A, phase2=A, phase3=A, timeToLive=1 minute`
+
+This is not phase selection. All three phases receive the same safety ceiling; physical phase ownership remains with Easee/Equalizer.
+
+Revised transition:
+
+```text
+PAUSE_SESSION
+  ↓ pause confirmed
+SET_PHASE_MODE
+  ↓ locked mode confirmed
+DEADTIME
+  ↓
+SET_TRANSITION_CIRCUIT_CAP A/A/A TTL=1m
+  ↓ cap accepted
+RESUME_SESSION
+  ↓ resume may reset charger-current target
+SET_CURRENT desired A
+  ↓ desired A + charging observed
+STABLE
+```
+
+The temporary cap protects the transient between resume and re-applying dynamic charger current.
