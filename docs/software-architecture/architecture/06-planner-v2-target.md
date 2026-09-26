@@ -44,7 +44,7 @@ flowchart TD
   HEATFLEX[Heating flex candidates<br/>bounded advance of Honeywell UP transition]
 
   JOINT[Joint Planner V2<br/>rolling 24h / 96 x 15 min]
-  CONTROL[/control/current<br/>current slot + validUntil<br/>targets / bounded envelopes]
+  CONTROL[GET /control/current<br/>current slot + validUntil<br/>targets / bounded envelopes]
   HOMEY[Homey execution + safety<br/>single physical writers]
   P1[P1 live energy balance<br/>realtime authority]
   DEV[Devices]
