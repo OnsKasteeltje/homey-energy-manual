@@ -68,7 +68,7 @@ Canonical selector:
 
 Deployed into the existing flow IDs:
 
-- Bridge `8bf53fdb-76f4-47db-8ccb-773ac515f06e` → v1.4.1 FAST-IMPORT-CUTBACK
+- Bridge `8bf53fdb-76f4-47db-8ccb-773ac515f06e` → production v1.4.1 FAST-IMPORT-CUTBACK; candidate v1.4.2 PHASE-READBACK-SHADOW
 - Adapter `953e9b18-3576-4557-b940-ed4a64eb2516` → v0.1.11 PHASE-SHADOW
 - Gate `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` → v0.2.12 PHASE-SHADOW
 - physical actuator remains `fea23193-a03f-49dd-9780-7e72ee48747d` v0.2.15 until LIVE promotion
@@ -302,7 +302,7 @@ Physical 1P and 3P are proven, but automatic phase switching is **not yet LIVE**
 
 Production remains:
 
-- Bridge v1.4.1 FAST-IMPORT-CUTBACK
+- Bridge production v1.4.1 FAST-IMPORT-CUTBACK; v1.4.2 PHASE-READBACK-SHADOW pending regression validation
 - Adapter v0.1.11 PHASE-SHADOW
 - Gate v0.2.12 PHASE-SHADOW
 - Actuator v0.2.15 CONTROL-AUTHORITY
@@ -323,3 +323,28 @@ If the resulting current would be below 6 A, opportunity charging goes directly 
 This change affects only the existing fixed-3P production current controller. It does not activate phase switching and does not alter the phase SHADOW contract.
 
 A controlled physical validation attempt was limited by Easee/Equalizer itself: when charger target was raised to 12 A, Equalizer held offered current at 6 A while the house was still exporting. Equalizer safety was deliberately not bypassed.
+
+
+## Confirmed phase readback candidate v1.4.2
+
+Before phase switching can become LIVE, active EV load reconstruction must use the confirmed physical mode rather than assuming 3P.
+
+Candidate bridge:
+
+`src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.2.phase-readback-shadow.js`
+
+The bridge reads Easee `phaseMode` from the Homey device/settings API and normalizes:
+
+- `Locked to single phase` → 1P
+- `Locked to three phase` → 3P
+- `Auto` or unknown → unconfirmed
+
+For active charging:
+
+`actualEvW = currentA × 230 W × confirmedPhaseCount`
+
+where confirmed phase count is 1 or 3.
+
+If an active charger has no confirmed locked phase readback, only phase SHADOW fails closed with `PHASE_READBACK_UNCONFIRMED`; the proven fixed-3P production current controller remains unchanged.
+
+This candidate must pass Pi regression tests before deployment into the existing Homey Bridge flow.
