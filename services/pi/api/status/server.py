@@ -187,6 +187,24 @@ def ev_realtime_envelope(plan, current, ev_w, ww_w, deadline):
         "wwSelfLoadCorrection": False,
         "requiresFreshP1": True,
         "requiresFreshEvActualPower": True,
+        "phasePolicy": {
+            "schema": "EMS_PI_EV_PHASE_POLICY_V0.1",
+            "shadowOnly": True,
+            "allowedModes": ["OFF", "1P", "3P"] if policy_valid else ["OFF"],
+            "min_A": EV_MIN_A if policy_valid else 0,
+            "max_A": hard_max_a if policy_valid else 0,
+            "voltage_V": 230,
+            "start1p_W": 1500,
+            "stop1p_W": 1100,
+            "enter3p_W": 4400,
+            "leave3p_W": 3600,
+            "minModeDwellSec": 120,
+            "p1DecisionBasis": "TOTAL_NET_GRID_POWER_PLUS_ACTUAL_EV_COMMAND",
+            "physicalPhaseOwner": "EASEE_EQUALIZER",
+            "phaseCommand": None,
+            "executionOwner": "HOMEY_BOUNDED_REALTIME_WITHIN_PI_ENVELOPE",
+            "failClosed": True,
+        },
         "failClosed": True,
     }
 
@@ -402,6 +420,15 @@ class Handler(BaseHTTPRequestHandler):
                             "mode": "DISABLED",
                             "min_A": 0,
                             "max_A": 0,
+                            "phasePolicy": {
+                                "schema": "EMS_PI_EV_PHASE_POLICY_V0.1",
+                                "shadowOnly": True,
+                                "allowedModes": ["OFF"],
+                                "min_A": 0,
+                                "max_A": 0,
+                                "physicalPhaseOwner": "EASEE_EQUALIZER",
+                                "failClosed": True,
+                            },
                             "failClosed": True,
                         }
                     }
