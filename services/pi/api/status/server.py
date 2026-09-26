@@ -133,13 +133,15 @@ def ev_realtime_envelope(plan, current, ev_w, ww_w, deadline):
         deadline_max_a = None
 
     hard_max_a = EV_MAX_A
-    policy_valid = tesla_connected and not deadline_required
+
+    # Realtime opportunity policy must not be gated by connectivity captured
+    # at planner-build time. A car may arrive after the plan was built.
+    # Pi decides policy; Homey executor uses live Easee charge-state as the
+    # physical connectivity/safety gate before any EV action.
+    policy_valid = not deadline_required
     block_reason = None
 
-    if not tesla_connected:
-        policy_valid = False
-        block_reason = "TESLA_NOT_CONNECTED_AT_PLAN_BUILD"
-    elif deadline_required:
+    if deadline_required:
         policy_valid = False
         block_reason = "DEADLINE_TARGET_OWNS_SLOT"
 
@@ -158,7 +160,7 @@ def ev_realtime_envelope(plan, current, ev_w, ww_w, deadline):
         planner_target_a = 0
 
     return {
-        "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.3",
+        "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.4",
         "shadowOnly": False,
         "productionConsumerAllowed": True,
         "executionOwner": "HOMEY_BOUNDED_REALTIME_WITHIN_PI_ENVELOPE",
@@ -176,7 +178,9 @@ def ev_realtime_envelope(plan, current, ev_w, ww_w, deadline):
                 or reason == "DYNAMIC_PV_PEAK_ABSORBER"
             )
         ),
-        "policyBasis": "PI_POLICY_ALLOWS_REALTIME_PV_CAPTURE_INDEPENDENT_OF_SLOT_TARGET",
+        "policyBasis": "PI_POLICY_ALLOWS_REALTIME_PV_CAPTURE_INDEPENDENT_OF_SLOT_TARGET_AND_PLAN_BUILD_CONNECTIVITY",
+        "planConnectedAtBuild": tesla_connected,
+        "liveConnectivityOwner": "HOMEY_EASEE_CHARGE_STATE",
         "blockReason": block_reason,
         "wwReserved_W": ww_w,
         "wwMustRemainUnchanged": True,
@@ -413,7 +417,7 @@ class Handler(BaseHTTPRequestHandler):
                     "targets": {"ev": {"target_W": 0}, "ww": {"target_on": False}, "battery": {"target_W": 0}},
                     "realtime": {
                         "ev": {
-                            "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.3",
+                            "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.4",
                             "shadowOnly": False,
                             "productionConsumerAllowed": False,
                             "allowed": False,
