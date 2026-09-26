@@ -145,3 +145,16 @@ Prepared non-live Homey candidates:
 - `src/homey/validation/ev-power-adapter-gate-v0.2.12.phase-shadow.js`
 
 The candidate bridge computes phase mode from fresh Homey P1 only inside the bounded Pi phase policy. It publishes `phase_mode_shadow` and `phase_requested_A_shadow` while retaining the existing fixed-3P production current target. Adapter and Gate validate and expose the phase contract without any physical phase write. The phase Gate result is observability-only until the LIVE release gate is explicitly completed.
+
+
+## Homey SHADOW deployment 2026-09-26
+
+The additive phase contract has been deployed into the existing production control-chain flow IDs without adding a writer:
+
+- Bridge ID `8bf53fdb-76f4-47db-8ccb-773ac515f06e` → `v1.4.0 PHASE-SHADOW`
+- Adapter ID `953e9b18-3576-4557-b940-ed4a64eb2516` → `v0.1.11 PHASE-SHADOW`
+- Gate ID `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` → `v0.2.12 PHASE-SHADOW`
+
+Topology, triggers, Logic variable IDs and the sole physical EV Actuator were left unchanged. The phase path is observability-only and performs no Easee phase-mode write.
+
+Immediate live validation after the Bridge trigger showed the existing fixed-3P production path still functioning: Easee charged at approximately 3x6 A / 4.31 kW while net P1 power was approximately -14 W. This is production-current validation only; it is not yet proof of a physical 1P phase transition.
