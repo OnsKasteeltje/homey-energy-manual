@@ -17,7 +17,7 @@ test('bridge carries Pi phase policy only as shadow',()=>{
 
 test('bridge production current controller remains fixed 3P',()=>{
   assert.match(bridge,/const EV_W_PER_A=690/);
-  assert.match(bridge,/currentA\*EV_W_PER_A/);
+  assert.match(bridge,/evW=candidateA\*EV_W_PER_A/);
   assert.match(bridge,/production remains the proven fixed-3P controller below/);
   assert.doesNotMatch(bridge,/set_phase_mode/);
   assert.doesNotMatch(bridge,/setCapabilityValue\(/);
