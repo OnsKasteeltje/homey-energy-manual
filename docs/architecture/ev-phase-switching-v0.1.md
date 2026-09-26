@@ -390,3 +390,32 @@ For phase SHADOW:
 - `plugged_in_paused` or `plugged_in` → physical add-back is 0 A.
 
 This keeps the production controller unchanged while preventing fictitious EV load from inflating reconstructed PV opportunity during a paused session.
+
+
+## v1.4.4 + actuator v0.3.0 no-write validation
+
+Bridge v1.4.4 was deployed with the physical actuator disabled. Live validation while Easee was `plugged_in_paused` confirmed:
+
+- charger target 0 A
+- offered 0 A
+- charger power 0 W
+- confirmed phase readback remains locked 3P
+- P1 export approximately 5.9 kW
+
+The existing actuator flow was then replaced in-place by:
+
+`EM v2 | 60 Actuator | EV Power v0.3.0 PHASE-CANDIDATE [NO-WRITE]`
+
+The candidate topology contains only Start / Gate-change trigger / HomeyScript / note. It contains no Easee action cards and its source contains no physical device or Cloud write calls.
+
+Published control evidence showed:
+
+- actuator status `PHASE_CANDIDATE`
+- phase candidate target: 7 A
+- next action: represented by reason `PAUSED_RESUME_REQUIRES_SAFETY_CAP`
+- physicalWritePerformed: false
+- live Easee state: `plugged_in_paused`
+
+The legacy production-current contract simultaneously still exposed 16 A / 11.04 kW because Bridge/Adapter/Gate production semantics are still fixed-3P while the new phase selector is shadow-only.
+
+This is intentional evidence for the next gate: phase mode + A must be promoted into the authoritative Adapter/Gate contract before any phase-capable writer becomes LIVE. The actuator must not choose between two competing desired-current semantics.
