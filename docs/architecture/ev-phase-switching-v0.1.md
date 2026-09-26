@@ -68,7 +68,7 @@ Canonical selector:
 
 Deployed into the existing flow IDs:
 
-- Bridge `8bf53fdb-76f4-47db-8ccb-773ac515f06e` → production v1.4.1 FAST-IMPORT-CUTBACK; candidate v1.4.3 PHASE-READBACK-OBS
+- Bridge `8bf53fdb-76f4-47db-8ccb-773ac515f06e` → production v1.4.1 FAST-IMPORT-CUTBACK; candidate v1.4.4 PAUSE-AWARE-PHASE-SHADOW
 - Adapter `953e9b18-3576-4557-b940-ed4a64eb2516` → v0.1.11 PHASE-SHADOW
 - Gate `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` → v0.2.12 PHASE-SHADOW
 - physical actuator remains `fea23193-a03f-49dd-9780-7e72ee48747d` v0.2.15 until LIVE promotion
@@ -302,7 +302,7 @@ Physical 1P and 3P are proven, but automatic phase switching is **not yet LIVE**
 
 Production remains:
 
-- Bridge production v1.4.1 FAST-IMPORT-CUTBACK; v1.4.3 PHASE-READBACK-OBS pending regression validation
+- Bridge production v1.4.1 FAST-IMPORT-CUTBACK; v1.4.4 PAUSE-AWARE-PHASE-SHADOW pending regression validation
 - Adapter v0.1.11 PHASE-SHADOW
 - Gate v0.2.12 PHASE-SHADOW
 - Actuator v0.2.15 CONTROL-AUTHORITY
@@ -331,7 +331,7 @@ Before phase switching can become LIVE, active EV load reconstruction must use t
 
 Candidate bridge:
 
-`src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.3.phase-readback-observability.js`
+`src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.4.pause-aware-phase-shadow.js`
 
 The bridge reads Easee `phaseMode` from the Homey device/settings API and normalizes:
 
@@ -366,3 +366,27 @@ The Pi envelope now exposes `planConnectedAtBuild` only as observability and dec
 This allows a Tesla that arrives after planner build to participate in realtime PV capture without waiting for a planner rebuild, while physical execution still fails closed when Homey does not observe a connected charger state.
 
 Phase-mode readback is also observability and is therefore evaluated independently of realtime envelope eligibility in Bridge v1.4.3.
+
+
+## Pause-aware physical EV reconstruction
+
+Validation of Bridge v1.4.3 while the charger was physically paused exposed that the previous realtime controller command could remain non-zero even though Easee reported:
+
+- `plugged_in_paused`
+- target charger current 0 A
+- offered current 0 A
+- charger power 0 W
+
+The phase SHADOW had therefore incorrectly reconstructed physical EV load from stale controller state.
+
+Bridge v1.4.4 separates:
+
+- `controllerStateA`: previous realtime command used only by the proven fixed-3P production loop;
+- `actualProductionA`: physical add-back used by phase SHADOW.
+
+For phase SHADOW:
+
+- `plugged_in_charging` → physical add-back may use controller current;
+- `plugged_in_paused` or `plugged_in` → physical add-back is 0 A.
+
+This keeps the production controller unchanged while preventing fictitious EV load from inflating reconstructed PV opportunity during a paused session.
