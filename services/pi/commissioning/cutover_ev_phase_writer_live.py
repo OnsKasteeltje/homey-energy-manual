@@ -2,13 +2,16 @@
 """
 Guarded LIVE cutover for EV phase writer v0.4.1.
 
-First-live guard intentionally requires the low-risk same-phase path:
+LIVE guard requires:
 - current armed-disabled writer v0.4.0 is active;
-- authoritative target is locked 3P, >=6A;
-- Easee confirmed phase is already locked 3P;
+- authoritative target is 1P or 3P at >=6A;
+- Easee phase readback is confirmed as locked 1P or locked 3P;
 - charger is plugged_in_paused, 0A offered, <=250W;
 - circuit target is known and >= requested current;
-- P1 export is sufficient for the requested 3P load.
+- P1 export is sufficient for the requested mode/current load.
+
+If target mode differs from confirmed mode, v0.4 performs the full guarded
+phase-change path before resume.
 
 Then the existing sole actuator flow is updated in-place to v0.4.1 LIVE and
 driven step-by-step until STABLE. No second writer is created.
@@ -220,8 +223,8 @@ def main():
         "armedSchema": status.get("schema") == "EM2_EV_ACTUATOR_V0.4.0_PHASE_WRITER",
         "armedDisabled": status.get("phaseExecutionEnabled") is False,
         "noPriorWrite": status.get("physicalWritePerformed") is False,
-        "target3P": phase_mode == "3P",
-        "confirmed3P": confirmed == "3P",
+        "targetMode": phase_mode in ("1P", "3P"),
+        "confirmedMode": confirmed in ("1P", "3P"),
         "targetA": isinstance(target_a, int) and 6 <= target_a <= 16,
         "paused": charger.get("chargeState") == "plugged_in_paused" and charger.get("charging") is False,
         "offeredZero": isinstance(charger.get("offeredA"), (int, float)) and charger.get("offeredA") <= 1,
@@ -230,7 +233,8 @@ def main():
     }
     if guards["targetA"] and guards["circuitKnown"]:
         guards["circuitEnough"] = charger["circuitTargetA"] >= target_a
-        required_w = target_a * 690
+        watts_per_amp = 230 if phase_mode == "1P" else 690
+        required_w = target_a * watts_per_amp
         guards["p1ExportEnough"] = (
             isinstance(p1w, (int, float)) and
             p1w <= -(required_w - P1_MARGIN_W)
