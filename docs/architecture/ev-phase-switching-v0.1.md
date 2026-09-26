@@ -427,7 +427,7 @@ After the no-write actuator candidate exposed that the legacy production path co
 
 Prepared contract:
 
-- Bridge v1.5.0: `EM2_EV_PHASE_CONTROL_V0.1`
+- Bridge v1.5.1: `EM2_EV_PHASE_CONTROL_V0.1`
   - authoritative `OFF | 1P | 3P`
   - `phase_requested_A`
   - `phase_requested_W`
@@ -489,3 +489,50 @@ Required transition remains:
 `PAUSE -> phase command -> confirmed locked phase -> 5 s deadtime -> temporary symmetric circuit cap -> RESUME -> desired charger current -> charging confirmation -> restore original circuit cap -> STABLE`
 
 The next gate is regression plus armed-disabled deployment. Physical cutover requires a separate explicit promotion of `PHASE_EXECUTION_ENABLED`.
+
+
+## Live runtime corrections before 3P → 1P observation
+
+Two commissioning findings were incorporated before observing the natural solar-decline transition.
+
+### Homey action-card invocation
+
+HomeyScript action execution now uses the current full Flow Card IDs, for example:
+
+- `homey:device:<easee-id>:pauseCharging`
+- `homey:device:<easee-id>:resumeCharging`
+- `homey:device:<easee-id>:circuitCurrentControl`
+- `homey:device:<easee-id>:setDynamicChargerCurrent`
+
+The writer calls `Homey.flow.runFlowCardAction({id,args})`; it no longer supplies a separate legacy `uri`.
+
+A live proof test lowered charger current to 7 A manually, triggered only the Bridge, and the LIVE actuator independently returned the charger target to 8 A.
+
+### Physical EV-load reconstruction
+
+Bridge v1.5.1 keeps P1 total net power authoritative, but the EV load already being consumed is now reconstructed from live Easee `measure_current.offered` together with confirmed 1P/3P mode. The previous controller command is only a fallback.
+
+This prevents a stale controller target from inflating available PV after commissioning/manual intervention.
+
+### Commissioning monitor
+
+The external Pi cutover monitor is not part of runtime control. It is now low-rate/read-only after its initial trigger:
+
+- one persisted actuator-status read every 5 s;
+- no repeated device polling;
+- no external fallback-trigger loop.
+
+Normal runtime phase control remains entirely Bridge → Adapter → Gate → sole LIVE actuator.
+
+### Natural 3P → 1P policy
+
+With a 120 s minimum mode dwell:
+
+- 3P → 1P when reconstructed available total power is below 3600 W and at least 1500 W;
+- 3P → OFF below 1500 W;
+- 1P → 3P at or above 4400 W;
+- 1P → OFF below 1100 W.
+
+The 3P → 1P physical transition is:
+
+`pause → locked 1P command → confirmed 1P → 5 s deadtime → temporary symmetric circuit cap → resume → requested current → charging confirmation → restore original circuit cap`.
