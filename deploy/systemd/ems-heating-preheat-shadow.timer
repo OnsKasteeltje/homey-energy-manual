@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh EMS Heating Preheat V0.3 shadow every five minutes
+
+[Timer]
+# Honeywell state runs at :00/5 and Quatt current at :02/5.
+# This local-only builder runs afterwards and performs no Homey calls.
+OnCalendar=*-*-* *:04/5:00
+Persistent=true
+AccuracySec=15s
+Unit=ems-heating-preheat-shadow.service
+
+[Install]
+WantedBy=timers.target
