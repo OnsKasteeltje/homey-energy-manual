@@ -6,11 +6,8 @@ on:
       - main
     paths:
       - 'frontend-version.txt'
-      - 'frontend/**'
-      - 'scripts/build_frontend_v2.py'
       - 'mkdocs.yml'
       - 'scripts/build_frontend_bundles.py'
-      - 'scripts/sync_energy_contract.py'
       - 'scripts/recover_energy_history.py'
       - 'docs/javascripts/**'
       - 'docs/stylesheets/**'
@@ -20,7 +17,6 @@ on:
       - 'docs/data/energy-planner-shadow-pi.json'
       - 'docs/data/energy-planner-shadow-dynamic.json'
       - 'docs/data/energy-planner-shadow.json'
-      - 'docs/data/energy-state-v2.json'
       - 'docs/data/energy-state-v2.schema.json'
       - 'docs/data/energy-day-v2.json'
       - 'docs/data/energy-day-series-7d.json'
@@ -72,24 +68,6 @@ jobs:
           pip install -r requirements.lock
           pip check
 
-      - name: Synchronize Energy State contract version
-        run: python scripts/sync_energy_contract.py
-
-      - name: Persist synchronized Energy State contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          SCHEMA="docs/data/energy-state-v2.schema.json"
-          if git diff --quiet -- "$SCHEMA"; then
-            echo "Canonical Energy State contract already matches runtime."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$SCHEMA"
-          git commit -m "chore: sync Energy State publisher contract"
-          git push origin HEAD:main
-
       - name: Recover missed completed-day archives
         run: python scripts/recover_energy_history.py
 
@@ -136,19 +114,8 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
 
-      - name: Remove legacy generated V2 docs before MkDocs
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf docs/v2
-
       - name: Build MkDocs strictly
         run: mkdocs build --strict
-
-      # V2 is an isolated static app and is deliberately not interpreted by
-      # MkDocs. Stage it only after MkDocs has finished constructing site/.
-      - name: Stage isolated Frontend V2 preview
-        run: python scripts/build_frontend_v2.py
 
       - name: Verify built site references active frontend
         shell: bash
@@ -161,9 +128,6 @@ jobs:
           test -s site/data/energy-planner-shadow.json
           test -s site/data/energy-day-series-7d.json
           test -s site/data/energy-daily-history.json
-          test -s site/v2/live/index.html
-          test -s site/v2/live/render/live.js
-          test -s site/v2/live/styles/live.css
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
