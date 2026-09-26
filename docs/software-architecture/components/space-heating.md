@@ -151,7 +151,9 @@ Historische geaggregeerde Homey Insights blijven bruikbaar voor grove seizoens- 
 
 ## Visualisatie
 
-De plannerwebsite is onderdeel van de validatie. Voor de vier zones in scope moet de visualisatie uiteindelijk op dezelfde tijdas onderscheid maken tussen:
+De plannerwebsite is onderdeel van de validatie. **PV Flex is de primaire forward-looking commissioning-surface voor Heating Preheat**: een actuele SHADOW-preheat candidate moet daar zichtbaar zijn voordat fysieke Honeywell-control wordt overwogen. Ontbrekende Heating Preheat-data mag PV Flex niet onbeschikbaar maken; de presentatie degradeert read-only naar "niet beschikbaar".
+
+Voor de vier zones in scope moet de visualisatie uiteindelijk op dezelfde tijdas onderscheid maken tussen:
 
 - oorspronkelijke Honeywell baseline;
 - EMS SHADOW-vervroeging;
