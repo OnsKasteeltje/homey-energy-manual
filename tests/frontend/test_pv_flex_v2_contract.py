@@ -26,6 +26,10 @@ assert 'loadFlexPriorityShadow' in render
 assert 'Heating eerst' in render
 assert 'EV eerst' in render
 assert 'EV residual via P1' in render
+assert 'roomPlannerState' in render
+assert 'SHADOW_GRANT' in render
+assert 'Kamer niet klaar voor planner-grant' in render
+assert 'Planner:' in render
 assert 'PREHEAT_READY_FOR_GRANT' in render
 assert 'Volgende shadow-stap' in render
 assert 'Planner grant' in render
