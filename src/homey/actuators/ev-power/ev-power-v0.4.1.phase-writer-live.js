@@ -247,6 +247,36 @@ const stageAge=t.stageSince?nowMs-Date.parse(t.stageSince):0;
 const liveEnabled=liveVar?.value===true;
 const canWrite=PHASE_EXECUTION_ENABLED&&liveEnabled;
 
+// A previous fail-closed transition must not deadlock the actuator forever.
+// Recovery is allowed only from the safest observable boundary: session
+// already paused, zero offered/load, known restored circuit limit and valid
+// control contract. From there restart as STABLE and re-evaluate the current
+// authoritative request.
+const safePausedRecovery=
+  t.stage==='FAILED' &&
+  paused &&
+  circuitTargetA!==null &&
+  circuitTargetA>=6 &&
+  circuitTargetA<=64 &&
+  contractAligned &&
+  fresh &&
+  requestValid &&
+  deadlinePhaseOK;
+
+if(safePausedRecovery){
+  t={
+    schema:TRANSITION_SCHEMA,
+    stage:'STABLE',
+    transitionId:null,
+    requestedMode:confirmedMode==='1P'||confirmedMode==='3P'?confirmedMode:'OFF',
+    requestedA:0,
+    originalCircuitA:null,
+    startedAt:null,
+    stageSince:iso(),
+    failure:null
+  };
+}
+
 const save=async(status,reason,action='NOOP',write=false,extra={})=>{
   const value=JSON.stringify({
     schema:VERSION,
