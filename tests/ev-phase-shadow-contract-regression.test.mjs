@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.2.phase-readback-shadow.js','utf8');
+const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.3.phase-readback-observability.js','utf8');
 const adapter=fs.readFileSync('src/homey/adapters/ev-power/ev-power-v0.1.11.phase-shadow.js','utf8');
 const gate=fs.readFileSync('src/homey/validation/ev-power-adapter-gate-v0.2.12.phase-shadow.js','utf8');
 
@@ -76,4 +76,13 @@ test('unconfirmed active phase readback fails phase shadow closed only',()=>{
   assert.match(bridge,/PHASE_READBACK_UNCONFIRMED/);
   assert.match(bridge,/phaseReadbackValid=currentA===0\|\|actualProductionPhaseCount===1\|\|actualProductionPhaseCount===3/);
   assert.match(bridge,/production remains the proven fixed-3P controller below/);
+});
+
+
+test('phase readback is observability even when Pi realtime envelope is disabled',()=>{
+  const obsIndex=bridge.indexOf('let easeeObs=null');
+  const envIndex=bridge.indexOf('const envValid=');
+  assert.ok(obsIndex>=0 && envIndex>=0 && obsIndex<envIndex);
+  assert.match(bridge,/confirmedPhaseRaw=phaseRawObs/);
+  assert.match(bridge,/confirmedPhaseMode=normalizePhaseMode\(phaseRawObs\)/);
 });
