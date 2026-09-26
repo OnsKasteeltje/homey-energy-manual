@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.3.phase-readback-observability.js','utf8');
+const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.4.pause-aware-phase-shadow.js','utf8');
 const adapter=fs.readFileSync('src/homey/adapters/ev-power/ev-power-v0.1.11.phase-shadow.js','utf8');
 const gate=fs.readFileSync('src/homey/validation/ev-power-adapter-gate-v0.2.12.phase-shadow.js','utf8');
 
@@ -85,4 +85,17 @@ test('phase readback is observability even when Pi realtime envelope is disabled
   assert.ok(obsIndex>=0 && envIndex>=0 && obsIndex<envIndex);
   assert.match(bridge,/confirmedPhaseRaw=phaseRawObs/);
   assert.match(bridge,/confirmedPhaseMode=normalizePhaseMode\(phaseRawObs\)/);
+});
+
+
+test('paused session contributes zero physical EV addback to phase shadow',()=>{
+  assert.match(bridge,/chargeState==='plugged_in_charging'\s*\?currentA\s*:0/);
+  assert.match(bridge,/actualProductionA:phaseShadowPhysicalA/);
+  assert.match(bridge,/controllerStateA:currentA/);
+  assert.match(bridge,/phaseShadowPhysicalA\*230\*\(actualProductionPhaseCount\|\|0\)/);
+});
+
+test('production current loop still uses controller current state independently',()=>{
+  assert.match(bridge,/let candidateA=currentA/);
+  assert.match(bridge,/evW=candidateA\*EV_W_PER_A/);
 });
