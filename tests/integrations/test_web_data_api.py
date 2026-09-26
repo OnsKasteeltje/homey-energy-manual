@@ -203,5 +203,78 @@ class HistoryResourceTest(unittest.TestCase):
             server.history_resource("month", "2026-13")
 
 
+class PvFlexDeviceActualsTest(unittest.TestCase):
+    def make_db(self):
+        handle = tempfile.NamedTemporaryFile(delete=False)
+        handle.close()
+        path = handle.name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+        with sqlite3.connect(path) as db:
+            db.executescript("""
+                CREATE TABLE house_energy_intervals (
+                    start_ts_utc TEXT NOT NULL,
+                    end_ts_utc TEXT NOT NULL PRIMARY KEY,
+                    duration_seconds INTEGER NOT NULL,
+                    import_kwh REAL, export_kwh REAL,
+                    pv_total_kwh REAL, house_kwh REAL,
+                    quality TEXT NOT NULL, discontinuity_reason TEXT
+                );
+                CREATE TABLE devices (
+                    id INTEGER PRIMARY KEY,
+                    device_key TEXT NOT NULL
+                );
+                CREATE TABLE metrics (
+                    id INTEGER PRIMARY KEY,
+                    metric_key TEXT NOT NULL
+                );
+                CREATE TABLE measurements_15m (
+                    slot_start_utc TEXT NOT NULL,
+                    device_id INTEGER NOT NULL,
+                    metric_id INTEGER NOT NULL,
+                    value_avg REAL,
+                    energy_wh REAL,
+                    quality TEXT NOT NULL
+                );
+                CREATE TABLE pv_forecast_v2_archive (
+                    slot_start_utc TEXT NOT NULL,
+                    forecast_w REAL NOT NULL,
+                    confidence REAL,
+                    model_basis TEXT,
+                    generated_at TEXT NOT NULL
+                );
+            """)
+            db.execute("INSERT INTO devices(id,device_key) VALUES (1,'tesla')")
+            db.execute("INSERT INTO metrics(id,metric_key) VALUES (1,'electrical_power_w')")
+            db.executemany(
+                """
+                INSERT INTO measurements_15m
+                (slot_start_utc,device_id,metric_id,value_avg,energy_wh,quality)
+                VALUES (?,?,?,?,?,?)
+                """,
+                [
+                    ("2026-09-26T08:00:00Z", 1, 1, 3450.0, 862.5, "complete"),
+                    ("2026-09-26T08:15:00Z", 1, 1, 1380.0, 345.0, "partial"),
+                    ("2026-09-26T08:30:00Z", 1, 1, 9999.0, 2499.75, "held"),
+                ],
+            )
+        return path
+
+    def test_pv_flex_accepts_canonical_15m_device_quality(self):
+        server.HISTORY_DB = self.make_db()
+        result = server.pv_flex_analysis_resource("2026-09-26")
+        by_start = {item["start"]: item for item in result["series"]}
+        self.assertEqual(
+            by_start["2026-09-26T10:00:00+02:00"]["devices"]["evPowerW"],
+            3450.0,
+        )
+        self.assertEqual(
+            by_start["2026-09-26T10:15:00+02:00"]["devices"]["evPowerW"],
+            1380.0,
+        )
+        self.assertIsNone(
+            by_start["2026-09-26T10:30:00+02:00"]["devices"]["evPowerW"]
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

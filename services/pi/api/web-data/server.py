@@ -541,7 +541,7 @@ def pv_flex_analysis_resource(value):
             continue
         key = _utc_text(dt.replace(second=0, microsecond=0))
         item = slots.get(key)
-        if item is None or quality != "observed":
+        if item is None or quality not in {"complete", "partial"}:
             continue
         if device_key == "tesla":
             item["devices"]["evPowerW"] = value_avg
