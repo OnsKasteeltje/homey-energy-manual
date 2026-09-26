@@ -256,8 +256,11 @@ def main():
     print(f"PASS: {LIVE_NAME}")
 
     try:
+        trigger(ACTUATOR_FLOW_ID)
+        last_at = None
+        stagnant_polls = 0
+
         for step in range(1, MAX_STEPS + 1):
-            trigger(ACTUATOR_FLOW_ID)
             time.sleep(2)
 
             status = get_status()
@@ -300,6 +303,20 @@ def main():
                 print()
                 print("PASS: LIVE writer stable; Tesla charging and circuit limit restored")
                 return
+
+            current_at = status.get("at")
+            if current_at and current_at == last_at:
+                stagnant_polls += 1
+            else:
+                stagnant_polls = 0
+                last_at = current_at
+
+            # Self-trigger is the normal path. Only poke the flow if its
+            # persisted status has not changed for ~4 seconds.
+            if stagnant_polls >= 2:
+                print("fallback: actuator status stalled; issuing one external trigger")
+                trigger(ACTUATOR_FLOW_ID)
+                stagnant_polls = 0
 
         raise RuntimeError("LIVE_CUTOVER_TIMEOUT")
     except Exception:
