@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh EMS Heating Preheat V0.4 progression shadow every minute
+
+[Timer]
+# Local-only state machine. Runs after the usual :05-ish Flex Priority refresh.
+# Freshness/ordering guards fail closed if the priority state predates V0.3.
+OnCalendar=*-*-* *:*:20
+Persistent=true
+AccuracySec=5s
+Unit=ems-heating-preheat-progression-shadow.service
+
+[Install]
+WantedBy=timers.target
