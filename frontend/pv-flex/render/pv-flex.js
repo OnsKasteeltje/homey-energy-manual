@@ -73,7 +73,9 @@ function renderPreheat(d,priority,isCurrent){
  if(!d){status.textContent="Niet beschikbaar";empty.hidden=false;empty.textContent="Heating Preheat shadow is niet beschikbaar; PV & Flex blijft read-only actief.";return;}
  empty.hidden=true;
  const cv=d.cvGuard?.status==="OK"?(d.cvGuard.boilerAssistOn?"CV actief":"CV uit"):"CV onbekend";
- const pr=priority?.decision;\n const priorityText=pr?`${priorityLabel(pr.priorityOwner)} · ${evRoleLabel(pr.evRole)}`:"Prioriteit niet beschikbaar";\n status.textContent=`${priorityText} · ${d.house?.baselineHeatingDemandPresent?"Baselinevraag actief":"Baseline voldaan"} · ${cv}`;
+ const pr=priority?.decision;
+ const priorityText=pr?`${priorityLabel(pr.priorityOwner)} · ${evRoleLabel(pr.evRole)}`:"Prioriteit niet beschikbaar";
+ status.textContent=`${priorityText} · ${d.house?.baselineHeatingDemandPresent?"Baselinevraag actief":"Baseline voldaan"} · ${cv}`;
  for(const r of d.rooms||[]){
   const card=document.createElement("article");card.className="preheat-room";
   const head=document.createElement("div");head.className="preheat-room-head";
