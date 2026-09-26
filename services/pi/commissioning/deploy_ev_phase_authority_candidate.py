@@ -56,19 +56,31 @@ CHARGER_ID = "4d0b6913-d940-474e-95d6-b43f194c4119"
 def run(*args, capture=True):
     env = os.environ.copy()
     env["PATH"] = "/opt/node-v24.20.0/bin:" + env.get("PATH", "")
-    cp = subprocess.run(
-        [HOMEY, *args],
-        text=True,
-        capture_output=capture,
-        env=env,
-        check=False,
-    )
-    if cp.returncode != 0:
-        raise RuntimeError(
-            f"HOMEY_CLI_FAILED:{' '.join(args)}:"
-            f"{(cp.stderr or cp.stdout or '').strip()[:500]}"
+    delays = (0, 3, 6, 12)
+    last = None
+    for attempt, delay in enumerate(delays):
+        if delay:
+            time.sleep(delay)
+        cp = subprocess.run(
+            [HOMEY, *args],
+            text=True,
+            capture_output=capture,
+            env=env,
+            check=False,
         )
-    return cp.stdout if capture else ""
+        last = cp
+        if cp.returncode == 0:
+            return cp.stdout if capture else ""
+        msg = (cp.stderr or cp.stdout or "").strip()
+        throttled = "too many requests" in msg.lower()
+        if not throttled or attempt == len(delays) - 1:
+            raise RuntimeError(
+                f"HOMEY_CLI_FAILED:{' '.join(args)}:{msg[:500]}"
+            )
+    raise RuntimeError(
+        f"HOMEY_CLI_FAILED:{' '.join(args)}:"
+        f"{((last.stderr or last.stdout) if last else '')[:500]}"
+    )
 
 
 def jrun(*args):
