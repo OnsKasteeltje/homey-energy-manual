@@ -202,7 +202,7 @@ The controlled 2026-09-12 cutover validated Pi→Homey→Tesla and Pi→Homey→
 
 The 2026-09-14 history incident demonstrated that a separate Homey Insights pull chain is unsuitable as the production history transport; accepted Homey state pushes are archived locally instead.
 
-Heating Preheat V0.2 remains shadow-only. No Honeywell, Homey or Quatt physical control is introduced by this release, so no heating-control cutover is claimed.
+Heating Preheat V0.3 remains shadow-only. No Honeywell, Homey, Quatt or CV physical control is introduced by this release, so no heating-control cutover is claimed.
 
 The 2026-09-17 energy-state website incident was isolated to the GitHub observability publication path: canonical local Pi state remained fresh while `docs/data/energy-state-v2.json` stopped updating after 2026-09-14 20:03 local time. Restoring this publisher must not restore the retired Pi→Homey control-push timer.
 
