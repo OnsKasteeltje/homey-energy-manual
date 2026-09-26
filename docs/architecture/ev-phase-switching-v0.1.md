@@ -234,3 +234,41 @@ Current Homey readback on charger `ECHM6B9F` confirmed:
 - max charger current `16 A`
 
 For LIVE commissioning, requested `1P` must confirm as `Locked to single phase`; requested `3P` must confirm as `Locked to three phase`. `Auto` is valid observed state but is not treated as confirmation of a requested locked phase mode.
+
+
+## Commissioning finding: zero current is not a stable pause boundary
+
+During physical commissioning preparation on 2026-09-26, Homey Insights showed a repeatable pattern after writing charger current 0 A:
+
+- target current 0 A;
+- approximately one minute later the charger target returned to 32 A;
+- while the production actuator was enabled it subsequently re-applied the bounded 6 A target;
+- with the production actuator temporarily disabled, the restored target was able to produce approximately 3x16 A / 11.3 kW.
+
+This means a charger-current value of 0 A by itself is not accepted as the canonical safe hardware state for phase switching.
+
+Native Easee/Homey `Pause Charging` was then applied. The charger remained `plugged_in_paused`, offered 0 A and measured 0 W beyond the prior reset interval.
+
+The transition contract is therefore superseded by v0.2:
+
+`src/homey/actuators/ev-power/ev-phase-transition-v0.2.mjs`
+
+Canonical sequence:
+
+```text
+PAUSE_SESSION
+  ↓ confirmed plugged_in_paused + <=1 A offered + <=250 W
+SET_PHASE_MODE
+  ↓ confirmed locked phase readback
+DEADTIME
+  ↓
+SET_CURRENT desired A while paused
+  ↓ target current confirmed
+RESUME_SESSION
+  ↓ charging observed
+STABLE
+```
+
+Fail-closed now means `PAUSE_SESSION`, not merely setting dynamic current to 0 A.
+
+The one-shot commissioning tool at `services/pi/commissioning/ev_phase_commission.py` requires the same paused-session precondition before issuing a phase command.
