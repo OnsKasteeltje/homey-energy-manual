@@ -42,7 +42,8 @@ LIVE_NAME = "EM v2 | 60 Actuator | EV Power v0.4.1 PHASE-WRITER [LIVE]"
 ARMED_NAME = "EM v2 | 60 Actuator | EV Power v0.4.0 PHASE-WRITER [ARMED-DISABLED]"
 
 P1_MARGIN_W = 250
-MAX_STEPS = 18
+MAX_STEPS = 20
+ROLLBACK_BODY = None
 
 
 def run(*args):
@@ -135,11 +136,9 @@ def p1_power():
     return cap(d, "measure_power")
 
 
-def update_writer(source_path, flow_name):
+def build_writer_body(source_path, flow_name, base_flow):
     source = source_path.read_text(encoding="utf-8")
-    raw = jrun("api", "flow", "get-advanced-flow", "--id", ACTUATOR_FLOW_ID, "--json")
-    flow = unwrap_flow(raw)
-    cards = flow.get("cards") if isinstance(flow, dict) else None
+    cards = json.loads(json.dumps(base_flow.get("cards") or {}))
     if not isinstance(cards, dict):
         raise RuntimeError("ACTUATOR_FLOW_CARDS_INVALID")
     card = cards.get(SCRIPT_CARD)
@@ -157,7 +156,10 @@ def update_writer(source_path, flow_name):
             "v0.4.0 PHASE-WRITER ARMED-DISABLED: no physical execution."
         )
 
-    body = {"name": flow_name, "enabled": True, "cards": cards}
+    return {"name": flow_name, "enabled": True, "cards": cards}
+
+
+def push_writer_body(body):
     path = body_file(body)
     try:
         run(
@@ -172,21 +174,28 @@ def update_writer(source_path, flow_name):
             pass
 
 
+def update_writer(source_path, flow_name, base_flow=None):
+    if base_flow is None:
+        raw = jrun("api", "flow", "get-advanced-flow", "--id", ACTUATOR_FLOW_ID, "--json")
+        base_flow = unwrap_flow(raw)
+    body = build_writer_body(source_path, flow_name, base_flow)
+    push_writer_body(body)
+    return body
+
+
 def trigger(flow_id):
     run("api", "flow", "trigger-advanced-flow", "--id", flow_id)
 
 
 def rollback_armed():
+    global ROLLBACK_BODY
     try:
-        update_writer(ARMED_SOURCE, ARMED_NAME)
-        trigger(ACTUATOR_FLOW_ID)
-        time.sleep(2)
-        status = get_status()
-        print(
-            "ROLLBACK: actuator returned to ARMED-DISABLED "
-            f"(schema={status.get('schema')}, "
-            f"phaseExecutionEnabled={status.get('phaseExecutionEnabled')})"
-        )
+        if ROLLBACK_BODY is None:
+            raise RuntimeError("ROLLBACK_BODY_NOT_PREPARED")
+        push_writer_body(ROLLBACK_BODY)
+        # Do not immediately add more Homey reads here; the source itself is now
+        # hard ARMED-DISABLED. A later status refresh can confirm when rate limits allow.
+        print("ROLLBACK: actuator source returned to ARMED-DISABLED")
     except Exception as exc:
         print(f"ROLLBACK WARNING: {exc}", file=sys.stderr)
 
@@ -265,7 +274,12 @@ def main():
 
     print()
     print("=== PROMOTE SOLE ACTUATOR TO LIVE ===")
-    update_writer(LIVE_SOURCE, LIVE_NAME)
+    global ROLLBACK_BODY
+    raw_flow = jrun("api", "flow", "get-advanced-flow", "--id", ACTUATOR_FLOW_ID, "--json")
+    base_flow = unwrap_flow(raw_flow)
+    ROLLBACK_BODY = build_writer_body(ARMED_SOURCE, ARMED_NAME, base_flow)
+    live_body = build_writer_body(LIVE_SOURCE, LIVE_NAME, base_flow)
+    push_writer_body(live_body)
     print(f"PASS: {LIVE_NAME}")
 
     try:
@@ -274,10 +288,21 @@ def main():
         stagnant_polls = 0
 
         for step in range(1, MAX_STEPS + 1):
-            time.sleep(2)
+            time.sleep(3)
 
+            # The writer already persists its own Easee observations in status.
+            # Read only that single Logic variable during cutover to avoid Homey
+            # API throttling from separate device reads.
             status = get_status()
-            charger = charger_state()
+            observed = status.get("observed") or {}
+            charger = {
+                "chargeState": observed.get("chargeState"),
+                "charging": observed.get("charging"),
+                "targetA": observed.get("chargerTargetA"),
+                "offeredA": observed.get("offeredA"),
+                "powerW": observed.get("powerW"),
+                "circuitTargetA": observed.get("circuitTargetA"),
+            }
             public = {
                 "step": step,
                 "status": status.get("status"),
