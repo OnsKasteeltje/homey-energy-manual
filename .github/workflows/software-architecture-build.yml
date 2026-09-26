@@ -38,7 +38,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc libreoffice-writer poppler-utils
-          npm install --global @mermaid-js/mermaid-cli
+          npm install --global @mermaid-js/mermaid-cli@11.17.0
+          mmdc --version
 
       - name: Reject legacy hand-maintained Mermaid
         run: python3 scripts/migrate_legacy_mermaid.py --check
