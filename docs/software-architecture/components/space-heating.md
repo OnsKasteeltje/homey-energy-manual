@@ -151,7 +151,9 @@ Historische geaggregeerde Homey Insights blijven bruikbaar voor grove seizoens- 
 
 ## Visualisatie
 
-De plannerwebsite is onderdeel van de validatie. Voor de vier zones in scope moet de visualisatie uiteindelijk op dezelfde tijdas onderscheid maken tussen:
+De plannerwebsite is onderdeel van de validatie. Frontend V2 PV & Flex toont vanaf de V0.3-shadowvoorbereiding een afzonderlijk read-only preheat-paneel met actuele kandidaat-/guardstatus. Zodra de centrale planner een shadow grant en stapmoment kiest, moet diezelfde pagina de daadwerkelijke shadow-vervroeging op de tijdas kunnen tonen.
+
+Voor de vier zones in scope moet de visualisatie uiteindelijk op dezelfde tijdas onderscheid maken tussen:
 
 - oorspronkelijke Honeywell baseline;
 - EMS SHADOW-vervroeging;
@@ -193,13 +195,13 @@ De volgende plannerincrement mag deze ontwerpregels modelleren, maar blijft SHAD
 
 ## Vervolg
 
-1. Heating Preheat V0.3 SHADOW uitbreiden met expliciet onderscheid tussen baseline heating en pure EMS-preheat.
+1. Heating Preheat V0.3 SHADOW op de Pi valideren/commissionen met expliciet onderscheid tussen baseline heating en pure EMS-preheat; fysieke writes blijven verboden.
 2. Maximaal circa drie uur advancement als voorlopige bound behouden.
 3. Actuele ruimtetemperatuur als harde eligibility- en step-completion-input gebruiken.
 4. Iedere Honeywell-UP, ongeacht de totale spronggrootte, alleen binnen een echte preheat-kandidaat opdelen in EMS-stappen van maximaal 0,5 °C.
 5. Een volgende EMS-stap pas toelaten nadat de huidige preheat-target werkelijk is bereikt; bij gekoppelde ruimtes geldt dit voor alle geselecteerde ruimtes.
-6. CV-status op iedere actieve-preheat-iteratie bewaken en `CV_ASSIST_DURING_PURE_PREHEAT` als blokkerend/leerbaar event modelleren zonder normale baseline-CV-vraag te bestraffen.
+6. De voorbereide V0.3 CV-guard met Quatt `boilerAssistOn` live in shadow valideren en `CV_ASSIST_DURING_PURE_PREHEAT` als blokkerend/leerbaar event behouden zonder normale baseline-CV-vraag te bestraffen.
 7. Woonkamer + Eetkamer als expliciete opportunitygroep ondersteunen zonder hun afzonderlijke meet-/targetstatus te verliezen.
-8. Planner-/websitevisualisatie uitbreiden voor baseline versus shadow advancement en de reden waarom een preheatstap doorgaat, wacht of wordt geblokkeerd.
+8. PV Flex-observability gebruiken voor kandidaat/window/guardvalidatie en daarna uitbreiden met de door de centrale planner geselecteerde shadow advancement.
 9. Vanaf hervatting van de stookperiode fijnmazige thermal-learning data archiveren.
 10. Met die data 3-uursgrens, stapgedrag, CV-assist en rebound empirisch valideren voordat fysieke Honeywell-control wordt overwogen.

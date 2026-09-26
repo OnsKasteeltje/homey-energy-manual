@@ -290,6 +290,25 @@ Frontend V2 / Invoer
 
 Schema: `EMS_WEB_COMMANDS_CURRENT_V1`. This endpoint exposes only the last accepted command fields required by Invoer. It does not write commands, does not convert command state into runtime state, and does not alter the existing authenticated command route. Missing or malformed command sources fail closed with the standard generic resource-unavailable response.
 
+## 15.2 Heating Preheat shadow resource
+
+PV Flex may consume the current read-only Heating Preheat commissioning state through:
+
+```text
+/home/jeroen/ems/data/heating-preheat-shadow-v0.3.json
+                 |
+                 v
+allowlisted Web Data API projection
+                 |
+                 v
+GET /web/planner/heating-preheat-shadow
+                 |
+                 v
+Frontend V2 / PV Flex
+```
+
+Schema: `EMS_WEB_HEATING_PREHEAT_SHADOW_V1`. The endpoint accepts only the canonical `EMS_HEATING_PREHEAT_SHADOW_V0.3` source with `mode=READ_ONLY`, `controlMode=SHADOW`, `controlWrites=false` and Honeywell baseline authority. It exposes only the room/window/guard fields required for commissioning. The Web Data API does not calculate eligibility, CV-assist policy, PV priority or step progression. Missing or invalid source data affects only this presentation resource and has zero control impact.
+
 ## 16. Planned resource families
 
 This first endpoint establishes the boundary for the entire website. Expected resource families include:
@@ -297,6 +316,7 @@ This first endpoint establishes the boundary for the entire website. Expected re
 ```text
 /web/state/current
 /web/planner/current
+/web/planner/heating-preheat-shadow
 /web/history/day
 /web/history/daily
 /web/status/ev

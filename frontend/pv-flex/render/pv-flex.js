@@ -1,4 +1,4 @@
-import {loadPvFlex,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
+import {loadHeatingPreheatShadow,loadPvFlex,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
 const $=id=>document.getElementById(id); let day=todayAmsterdam();
 const kwh=v=>`${Number(v||0).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:2})} kWh`;
 const pct=v=>`${Math.round(Number(v||0)*100)}%`;
@@ -48,5 +48,54 @@ function chart(d){
  });
  if(points.length>1)add("polyline",{points:points.join(" "),class:"forecast-line",fill:"none"});
 }
-async function refresh(){ $("quality").textContent="Laden…";try{const d=await loadPvFlex(day);summary(d);chart(d);}catch(e){$("quality").textContent="Analyse niet beschikbaar";$("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;}}
+const temp=v=>typeof v==="number"&&Number.isFinite(v)?`${v.toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})} °C`:"—";
+const label=s=>({
+ PREHEAT_READY_FOR_GRANT:"Klaar voor planner",
+ PREHEAT_BLOCKED_CV_ASSIST:"Geblokkeerd · CV-assist",
+ PREHEAT_BLOCKED_CV_STATUS_UNKNOWN:"Geblokkeerd · CV-status",
+ BASELINE_HEATING:"Normale warmtevraag",
+ NOT_ELIGIBLE:"Niet kandidaat"
+}[s]||s||"—");
+function renderPreheat(d,isCurrent){
+ const root=$("preheat-rooms"),empty=$("preheat-empty"),status=$("preheat-status");root.replaceChildren();
+ if(!isCurrent){status.textContent="Live shadow";empty.hidden=false;empty.textContent="Preheat shadow wordt alleen voor vandaag getoond.";return;}
+ if(!d){status.textContent="Niet beschikbaar";empty.hidden=false;empty.textContent="Heating Preheat shadow is niet beschikbaar; PV & Flex blijft read-only actief.";return;}
+ empty.hidden=true;
+ const cv=d.cvGuard?.status==="OK"?(d.cvGuard.boilerAssistOn?"CV actief":"CV uit"):"CV onbekend";
+ status.textContent=`${d.house?.baselineHeatingDemandPresent?"Baselinevraag actief":"Baseline voldaan"} · ${cv}`;
+ for(const r of d.rooms||[]){
+  const card=document.createElement("article");card.className="preheat-room";
+  const head=document.createElement("div");head.className="preheat-room-head";
+  const name=document.createElement("strong");name.textContent=r.displayName||r.key;
+  const badge=document.createElement("span");badge.className=`preheat-state ${r.shadow?.state==="PREHEAT_READY_FOR_GRANT"?"ready":"blocked"}`;badge.textContent=label(r.shadow?.state);
+  head.append(name,badge);
+  const metrics=document.createElement("div");metrics.className="preheat-metrics";
+  const entries=[
+   ["Nu",temp(r.current?.temperature_C)],
+   ["Baseline",temp(r.baseline?.currentTargetTemperature_C)],
+   ["Volgende Honeywell-UP",r.baseline?.direction==="UP"?temp(r.baseline?.targetTemperature_C):"—"],
+   ["Volgende shadow-stap",temp(r.shadow?.nextStepTarget_C)],
+   ["Preheat-window",r.candidate?.opportunityOpensAt&&r.candidate?.opportunityClosesAt?`${time(r.candidate.opportunityOpensAt)}–${time(r.candidate.opportunityClosesAt)}`:"—"],
+   ["Planner grant",r.shadow?.plannerGrant||"—"]
+  ];
+  for(const [k,v] of entries){const row=document.createElement("span");const b=document.createElement("b");b.textContent=k;const val=document.createTextNode(v);row.append(b,val);metrics.append(row);}
+  const reason=document.createElement("small");reason.className="preheat-reason";reason.textContent=r.shadow?.reason||r.candidate?.reason||"—";
+  card.append(head,metrics,reason);root.append(card);
+ }
+}
+async function refresh(){
+ $("quality").textContent="Laden…";
+ try{
+  const isCurrent=day===todayAmsterdam();
+  const [d,h]=await Promise.all([
+   loadPvFlex(day),
+   isCurrent?loadHeatingPreheatShadow().catch(()=>null):Promise.resolve(null)
+  ]);
+  summary(d);chart(d);renderPreheat(h,isCurrent);
+ }catch(e){
+  $("quality").textContent="Analyse niet beschikbaar";
+  $("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;
+  renderPreheat(null,day===todayAmsterdam());
+ }
+}
 $("prev").addEventListener("click",()=>{day=shiftDay(day,-1);refresh();});$("next").addEventListener("click",()=>{if(day<todayAmsterdam()){day=shiftDay(day,1);refresh();}});refresh();

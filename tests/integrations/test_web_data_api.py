@@ -276,5 +276,93 @@ class PvFlexDeviceActualsTest(unittest.TestCase):
         )
 
 
+class HeatingPreheatShadowResourceTest(unittest.TestCase):
+    def write_source(self, payload):
+        handle = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False)
+        json.dump(payload, handle)
+        handle.close()
+        self.addCleanup(lambda: Path(handle.name).unlink(missing_ok=True))
+        return handle.name
+
+    def source(self):
+        rooms = []
+        for key in ("woonkamer", "eetkamer", "keuken", "serre"):
+            rooms.append({
+                "key": key,
+                "displayName": key.title(),
+                "preheatScope": True,
+                "group": "living_area" if key in {"woonkamer", "eetkamer"} else None,
+                "current": {"temperature_C": 18.0, "baselineDemand": False},
+                "baseline": {
+                    "currentTargetTemperature_C": 15.5,
+                    "changeAt": "2026-09-26T16:00:00+02:00",
+                    "targetTemperature_C": 19.0,
+                    "direction": "UP",
+                },
+                "candidate": {
+                    "status": "ELIGIBLE_UP_TRANSITION",
+                    "reason": "AWAITING_PV_OPPORTUNITY_EVALUATION",
+                    "opportunityOpensAt": "2026-09-26T13:00:00+02:00",
+                    "opportunityClosesAt": "2026-09-26T16:00:00+02:00",
+                    "steps_C": [18.5, 19.0],
+                },
+                "shadow": {
+                    "state": "PREHEAT_READY_FOR_GRANT",
+                    "reason": "AWAITING_CENTRAL_PV_PRIORITY",
+                    "plannerGrant": "NOT_EVALUATED",
+                    "activeStepTarget_C": None,
+                    "activeStepReached": None,
+                    "nextStepTarget_C": 18.5,
+                },
+                "secret": "must-not-leak",
+            })
+        return {
+            "schema": "EMS_HEATING_PREHEAT_SHADOW_V0.3",
+            "mode": "READ_ONLY",
+            "controlMode": "SHADOW",
+            "controlWrites": False,
+            "generatedAt": "2026-09-26T12:00:00Z",
+            "baselineAuthority": "HONEYWELL",
+            "allocationAuthority": "DYNAMIC_PI_PLANNER",
+            "house": {
+                "baselineHeatingDemandPresent": False,
+                "baselineDemandRooms": [],
+            },
+            "cvGuard": {
+                "status": "OK",
+                "reason": "CURRENT_QUATT_OBSERVER",
+                "boilerAssistOn": False,
+                "ageSeconds": 30,
+            },
+            "policy": {
+                "maxStep_C": 0.5,
+                "cvCheckedEveryIteration": True,
+                "advanceOnlyAfterCurrentStepReached": True,
+                "normalBaselineCvIsNotPreheatFault": True,
+                "purePreheatCvAssistBlocksFurtherSteps": True,
+            },
+            "rooms": rooms,
+            "internalSecretLikeField": "no",
+        }
+
+    def test_allowlisted_preheat_projection(self):
+        server.HEATING_PREHEAT_SHADOW_FILE = self.write_source(self.source())
+        result = server.heating_preheat_shadow_resource()
+        self.assertEqual(result["schema"], "EMS_WEB_HEATING_PREHEAT_SHADOW_V1")
+        self.assertEqual(len(result["rooms"]), 4)
+        self.assertFalse(result["controlWrites"])
+        self.assertEqual(result["baselineAuthority"], "HONEYWELL")
+        self.assertEqual(result["rooms"][0]["shadow"]["state"], "PREHEAT_READY_FOR_GRANT")
+        self.assertNotIn("secret", result["rooms"][0])
+        self.assertNotIn("internalSecretLikeField", result)
+
+    def test_write_capable_source_fails_closed(self):
+        payload = self.source()
+        payload["controlWrites"] = True
+        server.HEATING_PREHEAT_SHADOW_FILE = self.write_source(payload)
+        with self.assertRaises(ValueError):
+            server.heating_preheat_shadow_resource()
+
+
 if __name__ == "__main__":
     unittest.main()

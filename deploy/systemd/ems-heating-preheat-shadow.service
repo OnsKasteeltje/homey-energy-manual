@@ -1,0 +1,18 @@
+[Unit]
+Description=EMS Heating Preheat V0.3 shadow builder
+After=network-online.target ems-honeywell-state.service ems-quatt-current.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+WorkingDirectory=/home/jeroen/ems/repo/homey-energy-manual
+ExecStart=/usr/bin/python3 /home/jeroen/ems/repo/homey-energy-manual/services/pi/planner/heating/run_heating_preheat_shadow_v0_3.py
+TimeoutStartSec=60
+Nice=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jeroen/ems/data

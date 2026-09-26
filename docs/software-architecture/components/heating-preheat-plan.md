@@ -93,6 +93,48 @@ Preheat therefore exists only while the EMS is intentionally holding an advanced
 
 This distinction is a **design objective for V0.3+**. It does not change the current V0.2 READ_ONLY/SHADOW safety boundary.
 
+## V0.3 shadow preparation
+
+The next safe increment is implemented as a **separate read-only shadow layer** rather than changing V0.2 eligibility or adding Honeywell writes.
+
+Canonical implementation:
+
+- `services/pi/planner/heating/build_heating_preheat_shadow_v0_3.py`;
+- `services/pi/planner/heating/run_heating_preheat_shadow_v0_3.py`;
+- derived runtime artifact: `/home/jeroen/ems/data/heating-preheat-shadow-v0.3.json`.
+
+The runner consumes only already collected local Pi artifacts:
+
+- canonical Honeywell schedule;
+- canonical Honeywell current room state;
+- Heating Room Model V0.1;
+- Heating Preheat Plan V0.2;
+- read-only Quatt current state.
+
+It performs **no Homey call and no device write**. The five-minute shadow cadence is deliberately scheduled after the existing Honeywell-state and Quatt-current collectors.
+
+For CV-assist observation V0.3 uses the existing Quatt observer-only field `observerOnly.boilerAssistOn`. Missing, invalid or stale Quatt current state blocks a new shadow preheat increment; it does not alter normal Honeywell baseline heating.
+
+V0.3 derives house-wide `baselineHeatingDemandPresent` from all canonical Honeywell rooms, not only the four preheat rooms. Until Thermal Learning validates a suitable tolerance/hysteresis, V0.3 deliberately uses an exact/conservative comparison rather than inventing a thermal tolerance.
+
+V0.3 does **not** grant heating opportunity itself. Each room exposes `plannerGrant = NOT_EVALUATED`, no active physical step, the next thermally legal `+0.5 C` step and `opportunityClosesAt`. Central Heating/EV/WW priority remains a later Dynamic Pi Planner responsibility.
+
+## PV Flex observability
+
+Frontend V2 PV & Flex exposes the current V0.3 shadow state through the read-only Web Data API endpoint `/web/planner/heating-preheat-shadow`.
+
+The PV Flex page must show, per scoped room:
+
+- current measured temperature;
+- current Honeywell baseline;
+- next Honeywell UP target;
+- next shadow preheat step;
+- advancement window;
+- baseline-heating/CV guard state;
+- central planner grant state and decision reason.
+
+This is presentation only. The Web Data API remains allowlist-only and has no control route. Missing Heating Preheat shadow data must degrade only this panel and must not break PV/EV observability.
+
 ## Output and planner boundary
 
 V0.2 emits per room at least:
