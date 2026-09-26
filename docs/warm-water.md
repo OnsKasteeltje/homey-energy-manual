@@ -78,6 +78,20 @@ mode = true
 → timing, dagdoel, catch-up en opportunities worden beoordeeld
 ```
 
+### Pi-planner source gate
+
+De Pi WW-planner gebruikt de canonieke runtime-state `energy-state-v2.json -> hot_water.mode` als harde bron-gate voor **elektrische** WW-flex:
+
+```text
+hot_water.mode = true   -> BOILER -> electricalFlexEligible = true
+hot_water.mode = false  -> CV     -> electricalFlexEligible = false
+missing/ambiguous       -> UNKNOWN -> fail closed
+```
+
+Wanneer de bron `CV` of `UNKNOWN` is, zijn alle elektrische WW-plan-slots `0 W` en wordt geen PV-opportunity, fallback of deadline-run aan de elektrische boiler toegewezen. De historische/verwachte WW-vraag mag als observability behouden blijven, maar participeert dan niet in de elektrische flex-allocatie.
+
+Deze gate voorkomt dat WW nog PV kan reserveren of met EV/heating-preheat kan concurreren terwijl warm water feitelijk door de CV wordt geleverd.
+
 Na 19:00 wordt geen nieuwe elektrische warmwater-run gestart. Tijdens de E2E-retourtest naar Boiler was daarom terecht zichtbaar:
 
 ```text
