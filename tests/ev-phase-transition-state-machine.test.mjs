@@ -201,3 +201,48 @@ test('state machine never performs a physical write itself',()=>{
     assert.equal(r.action.physicalWriteAllowed,false);
   }
 });
+
+
+test('long transition age does not fail generically',()=>{
+  const prev={
+    ...initialTransitionState(t0),
+    stage:'ARMING_CIRCUIT_CAP',
+    transitionId:'x',
+    requestedMode:'1P',
+    requestedA:6,
+    originalCircuitA:40,
+    startedAt:new Date(t0-180000).toISOString(),
+    stageSince:new Date(t0-1000).toISOString(),
+  };
+  const r=decidePhaseTransition({
+    ...paused,
+    circuitTargetA:6,
+    desiredMode:'1P',
+    desiredA:6,
+    easeePhaseMode:'Locked to single phase',
+  },prev,t0);
+  assert.notEqual(r.state.stage,'FAILED');
+  assert.equal(r.action.type,'RESUME_SESSION');
+});
+
+test('phase confirmation timeout retries phase command while paused',()=>{
+  const prev={
+    ...initialTransitionState(t0),
+    stage:'CONFIRMING_PHASE',
+    transitionId:'x',
+    requestedMode:'1P',
+    requestedA:6,
+    originalCircuitA:40,
+    startedAt:new Date(t0-60000).toISOString(),
+    stageSince:new Date(t0-40000).toISOString(),
+  };
+  const r=decidePhaseTransition({
+    ...paused,
+    desiredMode:'1P',
+    desiredA:6,
+    easeePhaseMode:'Auto',
+  },prev,t0);
+  assert.notEqual(r.state.stage,'FAILED');
+  assert.equal(r.action.type,'SET_PHASE_MODE');
+  assert.equal(r.action.reason,'PHASE_CONFIRM_RETRY');
+});
