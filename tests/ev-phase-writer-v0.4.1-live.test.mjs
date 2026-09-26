@@ -1,0 +1,41 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const src=fs.readFileSync('src/homey/actuators/ev-power/ev-power-v0.4.1.phase-writer-live.js','utf8');
+
+test('live writer enables physical phase execution explicitly',()=>{
+  assert.match(src,/const PHASE_EXECUTION_ENABLED=true/);
+  assert.match(src,/const canWrite=PHASE_EXECUTION_ENABLED&&liveEnabled/);
+});
+
+test('same-phase current decreases are adopted during transition',()=>{
+  assert.match(src,/if\(desiredA<t\.requestedA\)/);
+  assert.match(src,/t=\{\.\.\.t,requestedA:desiredA\}/);
+  assert.match(src,/transitionA=desiredA/);
+});
+
+test('same-phase current increases are deferred until stable',()=>{
+  assert.match(src,/transitionA=t\.requestedA/);
+  assert.match(src,/if\(desiredA!==transitionA\)await scheduleNext\(500\)/);
+});
+
+test('phase mode changes during transition fail closed',()=>{
+  assert.match(src,/PHASE_MODE_CHANGED_DURING_TRANSITION/);
+});
+
+test('transition physical actions use latched transition current',()=>{
+  assert.match(src,/setCircuitA\(transitionA\)/);
+  assert.match(src,/setCurrentA\(transitionA\)/);
+  assert.match(src,/circuitTargetA!==transitionA/);
+  assert.match(src,/chargerTargetA!==transitionA/);
+});
+
+test('safe writer still uses native Homey cards plus phase-only cloud call',()=>{
+  assert.match(src,/runNative\('pauseCharging'/);
+  assert.match(src,/runNative\('resumeCharging'/);
+  assert.match(src,/runNative\('circuitCurrentControl'/);
+  assert.match(src,/runNative\('setDynamicChargerCurrent'/);
+  assert.match(src,/commands\/set_phase_mode/);
+  assert.doesNotMatch(src,/setCapabilityValue\(/);
+});
