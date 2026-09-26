@@ -1,6 +1,6 @@
 # EV 1P/3P phase switching
 
-Status: phase-aware EV contract and writer v0.4.1 are LIVE; v0.4.2 stale-readback correction is prepared for guarded validation/deployment.
+Status: phase-aware EV contract and writer v0.4.2 are LIVE; fresh natural 1P↔3P validation of the stale-readback latency correction remains pending.
 
 ## Functional contract
 
@@ -305,7 +305,7 @@ Current observed production chain on 2026-09-26:
 - Bridge policy revision `PI_DYNAMIC_PLANNER_BRIDGE_V1.5.3_PHASE_AUTHORITY`
 - Adapter `EM2_EV_POWER_ADAPTER_V0.2`
 - Gate `EM2_EV_ADAPTER_GATE_V0.3`
-- Actuator `EM2_EV_ACTUATOR_V0.4.1_PHASE_WRITER`
+- Actuator `EM2_EV_ACTUATOR_V0.4.2_PHASE_WRITER`
 
 The sole-writer invariant remains unchanged: Pi decides policy/power intent; Homey owns physical execution.
 
@@ -608,3 +608,5 @@ Writer v0.4.2 keeps phase confirmation mandatory but changes the confirmation so
 Deployment uses the existing actuator Flow ID in place; no second writer is created. Guarded upgrade helper:
 
 `services/pi/commissioning/upgrade_ev_phase_writer_v0_4_2.py`
+
+Guarded production cutover completed successfully on 2026-09-26 from a stable 1P charging state. Post-deploy actuator status was `STABLE`, requested and confirmed mode were both `1P`, and confirmation source was `ELECTRICAL_TELEMETRY`. The existing Advanced Flow ID remained the sole EV writer. Earlier same-day v0.4.1 validation proved the full 3P→1P physical chain but also exposed the excessive paused transition duration that motivated v0.4.2. The next natural 1P↔3P event is the remaining live validation for the v0.4.2 latency improvement.
