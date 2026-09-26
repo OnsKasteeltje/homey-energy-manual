@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const production=fs.readFileSync('src/homey/actuators/ev-power/ev-power-v0.2.15.control-authority.js','utf8');
-const transition=fs.readFileSync('src/homey/actuators/ev-power/ev-phase-transition-v0.2.mjs','utf8');
-const transport=fs.readFileSync('src/homey/actuators/ev-power/easee-phase-command-transport-v0.1.mjs','utf8');
+const transition=fs.readFileSync('src/homey/actuators/ev-power/ev-phase-transition-v0.3.mjs','utf8');
+const transport=fs.readFileSync('src/homey/actuators/ev-power/easee-transition-command-transport-v0.2.mjs','utf8');
 
 test('current production actuator has no phase-mode writer',()=>{
   assert.doesNotMatch(production,/set_phase_mode/);
@@ -15,6 +15,7 @@ test('current production actuator has no phase-mode writer',()=>{
 test('transition state machine is decision-only',()=>{
   assert.match(transition,/physicalWriteAllowed:false/);
   assert.match(transition,/PAUSE_SESSION/);
+  assert.match(transition,/SET_TRANSITION_CIRCUIT_CAP/);
   assert.doesNotMatch(transition,/Homey\.devices/);
   assert.doesNotMatch(transition,/fetch\(/);
   assert.doesNotMatch(transition,/setCapabilityValue/);
@@ -22,6 +23,8 @@ test('transition state machine is decision-only',()=>{
 
 test('Easee transport contains no policy or credential persistence',()=>{
   assert.match(transport,/commands\/set_phase_mode/);
+  assert.match(transport,/dynamicCurrent/);
+  assert.match(transport,/phase1:a,phase2:a,phase3:a/);
   assert.match(transport,/secretMaterialPersisted:false/);
   assert.doesNotMatch(transport,/userName/);
   assert.doesNotMatch(transport,/password/);
