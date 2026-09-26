@@ -1,4 +1,5 @@
 const API_ROOT="/web/analysis/pv-flex/day";
+const HEATING_PREHEAT_API="/web/planner/heating-preheat";
 function pad(v){return String(v).padStart(2,"0");}
 export function todayAmsterdam(){
  const p=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Amsterdam",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()).map(x=>[x.type,x.value]));
@@ -12,4 +13,11 @@ export async function loadPvFlex(day){
  const r=await fetch(`${API_ROOT}/${encodeURIComponent(day)}`,{cache:"no-store"});
  if(!r.ok) throw new Error(`PV & Flex API ${r.status}`);
  const d=await r.json(); if(d.schema!=="EMS_WEB_PV_FLEX_ANALYSIS_V1") throw new Error("Onbekend PV & Flex-schema"); return d;
+}
+export async function loadHeatingPreheat(){
+ const r=await fetch(HEATING_PREHEAT_API,{cache:"no-store"});
+ if(!r.ok) throw new Error(`Heating Preheat API ${r.status}`);
+ const d=await r.json();
+ if(d.schema!=="EMS_WEB_HEATING_PREHEAT_V1"||d.mode!=="READ_ONLY"||d.controlMode!=="SHADOW"||d.controlWrites!==false) throw new Error("Onbekend Heating Preheat-schema");
+ return d;
 }
