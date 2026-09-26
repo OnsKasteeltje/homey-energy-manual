@@ -1,6 +1,6 @@
 # EV 1P/3P phase switching
 
-Status: SHADOW contract validated end-to-end; physical 1P and 3P commissioning passed; LIVE actuator integration not yet promoted.
+Status: phase-aware EV contract and writer v0.4.1 are LIVE; v0.4.2 stale-readback correction is prepared for guarded validation/deployment.
 
 ## Functional contract
 
@@ -298,16 +298,16 @@ Do not promote phase switching into the sole EV Actuator until all are true:
 
 ## Current production state
 
-Physical 1P and 3P are proven, but automatic phase switching is **not yet LIVE**.
+Automatic phase-aware EV execution is LIVE through the single Homey actuator path.
 
-Production remains:
+Current observed production chain on 2026-09-26:
 
-- Bridge production v1.4.1 FAST-IMPORT-CUTBACK; v1.4.4 PAUSE-AWARE-PHASE-SHADOW pending regression validation
-- Adapter v0.1.11 PHASE-SHADOW
-- Gate v0.2.12 PHASE-SHADOW
-- Actuator v0.2.15 CONTROL-AUTHORITY
+- Bridge policy revision `PI_DYNAMIC_PLANNER_BRIDGE_V1.5.3_PHASE_AUTHORITY`
+- Adapter `EM2_EV_POWER_ADAPTER_V0.2`
+- Gate `EM2_EV_ADAPTER_GATE_V0.3`
+- Actuator `EM2_EV_ACTUATOR_V0.4.1_PHASE_WRITER`
 
-Phase promotion requires an explicit actuator version bump after the remaining LIVE-gate checks pass.
+The sole-writer invariant remains unchanged: Pi decides policy/power intent; Homey owns physical execution.
 
 
 ## Realtime P1 import cutback v1.4.1
@@ -579,3 +579,32 @@ The former generic 90 s transition timeout is not a control-failure boundary.
 This keeps the rule set small:
 
 `P1 decides power; Easee confirms hardware state; safe transitions retry instead of deadlocking.`
+
+## v0.4.2 stale phase-readback correction
+
+Live observation on 2026-09-26 exposed a long paused interval even though Pi continued to request positive EV power and Adapter/Gate remained executable/PASS. The v0.4.1 writer status showed:
+
+- transition state `DEADTIME`;
+- transition age >120 s;
+- Easee session safely `plugged_in_paused`;
+- requested/confirmed mode both eventually 3P;
+- no transition failure.
+
+The 5 s deadtime itself was not the cause. The long interval occurred before the writer obtained a usable phase confirmation.
+
+Writer v0.4.2 keeps phase confirmation mandatory but changes the confirmation sources:
+
+1. While charging, live per-phase current plus charger power may prove the already-active physical mode:
+   - one active output phase -> 1P;
+   - two or more active output phases -> 3P.
+   This electrical proof prevents a stale Homey phase setting from creating an unnecessary same-phase pause.
+
+2. During a real paused phase transition, Homey settings remain valid readback, but the writer may also query the official Easee Observations endpoint for observation id 38 (`PHASE MODE`). A matching cloud observation is latched for the remainder of that transition.
+
+3. A successful phase-command HTTP response is still not treated as physical confirmation. Session pause, 5 s deadtime, temporary symmetric circuit cap, resume/current re-application, and circuit-cap restore remain unchanged.
+
+4. Cloud phase observation is rate-bounded and queried only while safely paused in phase-confirmation stages.
+
+Deployment uses the existing actuator Flow ID in place; no second writer is created. Guarded upgrade helper:
+
+`services/pi/commissioning/upgrade_ev_phase_writer_v0_4_2.py`

@@ -11,12 +11,15 @@ test('pre-cutover refreshes armed actuator status after bridge',()=>{
   assert.ok(bridge>=0 && actuator>bridge && status>actuator);
 });
 
-test('rollback restores source and refreshes armed-disabled status',()=>{
-  const rb=src.indexOf('def rollback_armed():');
-  const update=src.indexOf('update_writer(ARMED_SOURCE, ARMED_NAME)',rb);
-  const trigger=src.indexOf('trigger(ACTUATOR_FLOW_ID)',update);
-  const status=src.indexOf('status = get_status()',trigger);
-  assert.ok(rb>=0 && update>rb && trigger>update && status>trigger);
+test('rollback restores the prebuilt armed-disabled body without extra Homey reads',()=>{
+  const start=src.indexOf('def rollback_armed():');
+  const end=src.indexOf('\ndef main():',start);
+  assert.ok(start>=0 && end>start);
+  const rollback=src.slice(start,end);
+  assert.match(rollback,/ROLLBACK_BODY_NOT_PREPARED/);
+  assert.match(rollback,/push_writer_body\(ROLLBACK_BODY\)/);
+  assert.doesNotMatch(rollback,/trigger\(ACTUATOR_FLOW_ID\)/);
+  assert.doesNotMatch(rollback,/get_status\(\)/);
 });
 
 test('cutover guard still requires paused zero-load state and enough PV',()=>{
