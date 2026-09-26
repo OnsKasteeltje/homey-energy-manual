@@ -98,7 +98,7 @@ test('writer uses authoritative adapter and gate schemas',()=>{
 
 test('writer self-retriggers in bounded short steps',()=>{
   assert.match(src,/scheduleNext/);
-  assert.match(src,/programmatic_trigger/);
+  assert.match(src,/Homey\.flow\.triggerAdvancedFlow\(\{id:FLOW_ID\}\)/);
   assert.match(src,/TRANSITION_TIMEOUT_MS=90000/);
   assert.match(src,/PHASE_CONFIRM_TIMEOUT_MS=30000/);
 });
