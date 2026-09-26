@@ -1,4 +1,4 @@
-import {loadPvFlex,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
+import {loadPvFlex,loadHeatingPreheat,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
 const $=id=>document.getElementById(id); let day=todayAmsterdam();
 const kwh=v=>`${Number(v||0).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:2})} kWh`;
 const pct=v=>`${Math.round(Number(v||0)*100)}%`;
@@ -48,5 +48,54 @@ function chart(d){
  });
  if(points.length>1)add("polyline",{points:points.join(" "),class:"forecast-line",fill:"none"});
 }
-async function refresh(){ $("quality").textContent="Laden…";try{const d=await loadPvFlex(day);summary(d);chart(d);}catch(e){$("quality").textContent="Analyse niet beschikbaar";$("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;}}
+function preheat(h){
+ const status=$("preheat-status"), rooms=$("preheat-rooms");
+ rooms.replaceChildren();
+ if(day!==todayAmsterdam()){
+  status.textContent="Heating Preheat SHADOW wordt alleen voor vandaag getoond.";
+  return;
+ }
+ if(!h){
+  status.textContent="Actuele Heating Preheat SHADOW-output is nog niet beschikbaar.";
+  return;
+ }
+ const eligible=(h.rooms||[]).filter(r=>r.candidate?.status==="ELIGIBLE_UP_TRANSITION");
+ status.textContent=eligible.length
+  ? `${eligible.length} preheat-opportunity${eligible.length===1?"":"s"} binnen de huidige 3-uurs horizon.`
+  : "Geen preheat-opportunity binnen de huidige 3-uurs horizon.";
+ for(const r of (h.rooms||[])){
+  const card=document.createElement("article");
+  const eligibleRoom=r.candidate?.status==="ELIGIBLE_UP_TRANSITION";
+  card.className=`preheat-room ${eligibleRoom?"eligible":"inactive"}`;
+  const steps=(r.candidate?.stepsC||[]).map(v=>`${Number(v).toLocaleString("nl-NL",{maximumFractionDigits:1})}°`).join(" → ")||"—";
+  const window=(r.candidate?.earliestStartAt&&r.changeAt)
+    ? `${time(r.candidate.earliestStartAt)}–${time(r.changeAt)}`
+    : "—";
+  card.innerHTML=`<div class="preheat-room-head"><strong>${r.displayName}</strong><span>${eligibleRoom?"KANDIDAAT":"HOLD"}</span></div>
+    <div class="preheat-room-grid">
+      <span>Nu <b>${Number(r.currentTemperatureC).toLocaleString("nl-NL",{maximumFractionDigits:1})} °C</b></span>
+      <span>Honeywell <b>${Number(r.baselineTargetC).toLocaleString("nl-NL",{maximumFractionDigits:1})} → ${Number(r.futureTargetC).toLocaleString("nl-NL",{maximumFractionDigits:1})} °C</b></span>
+      <span>Window <b>${window}</b></span>
+      <span>Reden <b>${r.candidate?.reason||"—"}</b></span>
+    </div>
+    <div class="preheat-steps"><small>SHADOW-STAPPEN · MAX +0,5 °C</small><span>${steps}</span></div>`;
+  rooms.appendChild(card);
+ }
+}
+
+async function refresh(){
+ $("quality").textContent="Laden…";
+ try{
+  const d=await loadPvFlex(day);
+  let h=null;
+  if(day===todayAmsterdam()){
+   try{h=await loadHeatingPreheat();}catch(_){h=null;}
+  }
+  summary(d);chart(d);preheat(h);
+ }catch(e){
+  $("quality").textContent="Analyse niet beschikbaar";
+  $("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;
+  preheat(null);
+ }
+}
 $("prev").addEventListener("click",()=>{day=shiftDay(day,-1);refresh();});$("next").addEventListener("click",()=>{if(day<todayAmsterdam()){day=shiftDay(day,1);refresh();}});refresh();
