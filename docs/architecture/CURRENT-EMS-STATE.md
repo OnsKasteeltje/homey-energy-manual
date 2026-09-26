@@ -154,6 +154,14 @@ The active general planner remains the hardened rolling 24-hour Pi planner with 
 
 Heating Preheat V0.2 does not alter the active Dynamic Pi Planner. It exposes only validated shadow advancement candidates; PV-slot selection and any later competition/allocation between WW, heating-preheat and EV remain outside the heating candidate builder.
 
+### Heating Preheat observability preparation
+
+Heating Preheat remains **READ_ONLY / SHADOW** and has no physical control path. The read-only Web Data API may expose an allowlisted presentation projection at `GET /web/planner/heating-preheat` from the canonical Heating Preheat shadow artifact `/home/jeroen/ems/data/heating-preheat-plan.json`. The projection accepts only schema `EMS_HEATING_PREHEAT_PLAN_V0.2` with `mode=READ_ONLY` and `controlMode=SHADOW`, publishes `controlWrites=false`, and does not create planner policy, advance a Honeywell setpoint or write Homey, Honeywell, Quatt, CV or another device.
+
+Frontend V2 PV Flex is the forward-looking commissioning surface for this Heating Preheat shadow evidence. It may show scoped-room temperature, Honeywell baseline-to-future target, the provisional three-hour opportunity window and bounded candidate steps. Missing or invalid Heating Preheat data must degrade only that presentation surface and must not make PV Flex, planning, live state or control unavailable.
+
+This observability path is preparation only. No automatic Heating Preheat runtime producer/timer, stateful V0.3 progression, joint Heating↔EV priority policy or physical heating actuator is introduced by this release.
+
 Planner decisions are archived best-effort in `/home/jeroen/ems/data/planner-history.sqlite`; measured actuals remain in `/home/jeroen/ems/data/ems-history.sqlite`. Retrospective performance analysis must distinguish measured actuals, archived decision context and any unconstrained upper-bound benchmark from a future constrained replay optimum.
 
 ## 5. Current control endpoint
