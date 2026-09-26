@@ -364,5 +364,73 @@ class HeatingPreheatShadowResourceTest(unittest.TestCase):
             server.heating_preheat_shadow_resource()
 
 
+class FlexPriorityShadowResourceTest(unittest.TestCase):
+    def write_source(self, payload):
+        handle = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False)
+        json.dump(payload, handle)
+        handle.close()
+        self.addCleanup(lambda: Path(handle.name).unlink(missing_ok=True))
+        return handle.name
+
+    def source(self):
+        return {
+            "schema": "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1",
+            "mode": "READ_ONLY",
+            "controlMode": "SHADOW",
+            "controlWrites": False,
+            "generatedAt": "2026-09-26T12:00:00Z",
+            "policy": {
+                "strategy": "CONSTRAINT_FIRST_THEN_EARLIEST_CLOSING_FLEX",
+                "powerReservationW": 0,
+                "realtimeOpportunityAuthority": "P1",
+                "evMayUseResidualWhenHeatingFirst": True,
+            },
+            "heating": {
+                "readyRooms": ["woonkamer"],
+                "earliestOpportunityClosesAt": "2026-09-26T15:00:00Z",
+            },
+            "ev": {
+                "deadlineActive": True,
+                "remainingKWh": 4.0,
+                "urgency": "AVAILABLE_LATER",
+                "latestSafeStartAt": "2026-09-26T16:00:00Z",
+            },
+            "decision": {
+                "priorityOwner": "HEATING",
+                "heatingShadowGrant": "SHADOW_GRANT",
+                "evRole": "RESIDUAL_OPPORTUNITY",
+                "reason": "HEATING_WINDOW_CLOSES_FIRST",
+                "appliesOnlyWhenPvOpportunityExists": True,
+                "physicalWriteAllowed": False,
+            },
+            "internalSecretLikeField": "no",
+        }
+
+    def test_allowlisted_priority_projection(self):
+        server.FLEX_PRIORITY_SHADOW_FILE = self.write_source(self.source())
+        result = server.flex_priority_shadow_resource()
+        self.assertEqual(result["schema"], "EMS_WEB_FLEX_PRIORITY_SHADOW_V1")
+        self.assertFalse(result["controlWrites"])
+        self.assertEqual(result["policy"]["powerReservationW"], 0)
+        self.assertEqual(result["policy"]["realtimeOpportunityAuthority"], "P1")
+        self.assertEqual(result["decision"]["priorityOwner"], "HEATING")
+        self.assertEqual(result["decision"]["evRole"], "RESIDUAL_OPPORTUNITY")
+        self.assertNotIn("internalSecretLikeField", result)
+
+    def test_nonzero_power_reservation_fails_closed(self):
+        payload = self.source()
+        payload["policy"]["powerReservationW"] = 3000
+        server.FLEX_PRIORITY_SHADOW_FILE = self.write_source(payload)
+        with self.assertRaises(ValueError):
+            server.flex_priority_shadow_resource()
+
+    def test_physical_write_capability_fails_closed(self):
+        payload = self.source()
+        payload["decision"]["physicalWriteAllowed"] = True
+        server.FLEX_PRIORITY_SHADOW_FILE = self.write_source(payload)
+        with self.assertRaises(ValueError):
+            server.flex_priority_shadow_resource()
+
+
 if __name__ == "__main__":
     unittest.main()
