@@ -1,5 +1,6 @@
 const API_ROOT="/web/analysis/pv-flex/day";
 const PREHEAT_ROOT="/web/planner/heating-preheat-shadow";
+const FLEX_PRIORITY_ROOT="/web/planner/flex-priority-shadow";
 function pad(v){return String(v).padStart(2,"0");}
 export function todayAmsterdam(){
  const p=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Amsterdam",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()).map(x=>[x.type,x.value]));
@@ -19,5 +20,13 @@ export async function loadHeatingPreheatShadow(){
  if(!r.ok) throw new Error(`Heating Preheat API ${r.status}`);
  const d=await r.json();
  if(d.schema!=="EMS_WEB_HEATING_PREHEAT_SHADOW_V1") throw new Error("Onbekend Heating Preheat-schema");
+ return d;
+}
+
+export async function loadFlexPriorityShadow(){
+ const r=await fetch(FLEX_PRIORITY_ROOT,{cache:"no-store"});
+ if(!r.ok) throw new Error(`Flex Priority API ${r.status}`);
+ const d=await r.json();
+ if(d.schema!=="EMS_WEB_FLEX_PRIORITY_SHADOW_V1") throw new Error("Onbekend Flex Priority-schema");
  return d;
 }
