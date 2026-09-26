@@ -66,7 +66,7 @@ test('bridge keeps upward PV capture bounded to one amp per cycle',()=>{
 
 test('phase shadow reconstructs active EV load from confirmed Easee phase readback',()=>{
   assert.match(bridge,/confirmedPhaseMode=normalizePhaseMode\(confirmedPhaseRaw\)/);
-  assert.match(bridge,/actualProductionPhaseCount=currentA<=0/);
+  assert.match(bridge,/actualProductionPhaseCount=phaseShadowPhysicalA<=0/);
   assert.match(bridge,/confirmedPhaseMode==='1P'/);
   assert.match(bridge,/confirmedPhaseMode==='3P'/);
   assert.match(bridge,/currentA\*230\*\(actualProductionPhaseCount\|\|0\)/);
