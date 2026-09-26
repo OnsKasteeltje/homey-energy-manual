@@ -1,16 +1,11 @@
-# GitHub publication integration
+# GitHub integration
 
-This directory contains Pi-side egress integrations that publish derived observability artifacts to GitHub.
+This directory contains the remaining Pi-side GitHub integration used for the authenticated Tesla deadline command transfer.
 
-`publish_energy_state.py` reads the canonical local state at `/home/jeroen/ems/data/energy-state-v2.json` and publishes a derived snapshot to `docs/data/energy-state-v2.json` for the website and human-facing observability.
+## Active scope
 
-## Boundary
-
-- GitHub publication is **observability only**.
+- `ev/fetch_deadline_command.py` retrieves the accepted Tesla deadline command from the existing GitHub command-transfer boundary.
 - GitHub is **not** a runtime transport dependency for Homey → Pi state or Pi → Homey control.
-- Publication failure must not interrupt state ingest, planning, `/control/current`, Homey execution or physical devices.
-- The publisher never writes Homey, Easee, boiler, Honeywell, Quatt or any other actuator.
-- The publisher does not create or modify `EM2_Power_Intent`.
-- Source freshness and schema are validated before publication; stale/invalid source state fails closed for publication only.
+- The former Pi energy-state publisher was retired from production and removed from the repository on 2026-09-26 after the private Pi-hosted Frontend V2 cutover to `GET /web/state/current`.
 
-Production scheduling is owned by `deploy/systemd/ems-energy-state-publication.timer` and runs every 15 minutes. The corresponding service is a oneshot observability task.
+No energy-state publication service or timer is supported here.
