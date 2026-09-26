@@ -38,7 +38,6 @@ const num=x=>{if(x===null||x===undefined||x==='')return null;const n=Number(x);r
 const age=x=>{const t=Date.parse(String(x||''));return Number.isFinite(t)?Date.now()-t:Infinity;};
 const iso=()=>new Date().toISOString();
 const cap=(d,id)=>d?.capabilitiesObj?.[id]?.value;
-const uri=`homey:device:${CHARGER_ID}`;
 
 const normalizePhaseMode=raw=>{
   const s=String(raw??'').trim().toLowerCase();
@@ -72,14 +71,20 @@ const readPhaseMode=async charger=>{
   return null;
 };
 
+const ACTION_IDS={
+  pause:`homey:device:${CHARGER_ID}:pauseCharging`,
+  resume:`homey:device:${CHARGER_ID}:resumeCharging`,
+  circuit:`homey:device:${CHARGER_ID}:circuitCurrentControl`,
+  current:`homey:device:${CHARGER_ID}:setDynamicChargerCurrent`
+};
 const runNative=async(id,args={})=>{
-  return await Homey.flow.runFlowCardAction({uri,id,args});
+  return await Homey.flow.runFlowCardAction({id,args});
 };
 
-const pauseSession=()=>runNative('pauseCharging',{});
-const resumeSession=()=>runNative('resumeCharging',{});
-const setCircuitA=a=>runNative('circuitCurrentControl',{current:a});
-const setCurrentA=a=>runNative('setDynamicChargerCurrent',{current:a});
+const pauseSession=()=>runNative(ACTION_IDS.pause,{});
+const resumeSession=()=>runNative(ACTION_IDS.resume,{});
+const setCircuitA=a=>runNative(ACTION_IDS.circuit,{current:a});
+const setCurrentA=a=>runNative(ACTION_IDS.current,{current:a});
 
 const postJson=async(url,body,accessToken)=>{
   const r=await fetch(url,{
