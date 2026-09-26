@@ -427,7 +427,7 @@ After the no-write actuator candidate exposed that the legacy production path co
 
 Prepared contract:
 
-- Bridge v1.5.2: `EM2_EV_PHASE_CONTROL_V0.1`
+- Bridge v1.5.3: `EM2_EV_PHASE_CONTROL_V0.1`
   - authoritative `OFF | 1P | 3P`
   - `phase_requested_A`
   - `phase_requested_W`
@@ -510,7 +510,7 @@ A live proof test lowered charger current to 7 A manually, triggered only the Br
 
 ### Physical EV-load reconstruction
 
-Bridge v1.5.2 keeps P1 total net power authoritative, but the EV load already being consumed is now reconstructed from live Easee `measure_current.offered` together with confirmed 1P/3P mode. The previous controller command is only a fallback.
+Bridge v1.5.3 keeps P1 total net power authoritative, but the EV load already being consumed is now reconstructed from live Easee `measure_current.offered` together with confirmed 1P/3P mode. The previous controller command is only a fallback.
 
 This prevents a stale controller target from inflating available PV after commissioning/manual intervention.
 
@@ -537,39 +537,45 @@ The 3P → 1P physical transition is:
 
 `pause → locked 1P command → confirmed 1P → 5 s deadtime → temporary symmetric circuit cap → resume → requested current → charging confirmation → restore original circuit cap`.
 
-
 ## Stale / transient Easee handling
 
-The live commissioning exposed two separate failure modes that must not be conflated with energy policy.
+Keep this deliberately simple.
 
-### Transition timeout
+### Energy authority
 
-The former 90 s generic transition timeout is no longer a control failure boundary.
+P1 total net grid power remains authoritative for available-energy decisions.
 
-In the LIVE writer:
+Easee telemetry is not used to decide how much PV is available.
+
+### Connection authority
+
+Easee connection state is used directly:
+
+- `plugged_in`
+- `plugged_in_paused`
+- `plugged_in_charging`
+
+mean connected.
+
+There is no time-based disconnect grace or debounce timer.
+
+Only clear active electrical evidence may override a contradictory non-connected state:
+
+- `evcharger_charging = true`
+- offered current > 1 A
+- charger power > 250 W
+
+This covers the narrow stale-state case where Easee reports a contradictory connection label while current is demonstrably flowing, without inventing a separate connectivity state machine.
+
+### Transition readback
+
+The former generic 90 s transition timeout is not a control-failure boundary.
 
 - 90 s is observability only (`transitionSlow`);
-- it does not force `FAILED`;
-- phase confirmation has a 30 s watchdog, but expiry retries the locked phase command while the session remains paused;
-- delayed pause/phase readback keeps the writer in a safe transition stage and retries instead of permanently deadlocking.
+- slow phase confirmation retries while the session remains safely paused;
+- a failed transition may recover from a known-safe paused / zero-load / valid-circuit boundary;
+- stale or slow Easee readback may delay a hardware transition but must not permanently deadlock the EV writer.
 
-Therefore stale or slow Easee readback can delay a hardware transition but cannot by itself strand the EV actuator in a permanent timeout failure.
+This keeps the rule set small:
 
-### Disconnect debounce
-
-Bridge v1.5.2 no longer maps one raw Easee `plugged_out` sample directly to EV OFF.
-
-Effective connectivity combines:
-
-- Homey Easee connected charge-state;
-- Easee `evcharger_charging=true`;
-- offered current > 1 A;
-- charger power > 250 W;
-- canonical/core Tesla connected state or connected charge-state;
-- bounded recent connected intent.
-
-When all direct connection evidence disappears after a previously connected state, a 180 s disconnect grace starts. Only a continuous disconnect beyond that grace, with no other connection evidence, becomes `REALTIME_TESLA_NOT_CONNECTED_CONFIRMED`.
-
-This debounce affects connection qualification only. P1 remains authoritative for available-energy decisions.
-
-A true physical unplug therefore settles to OFF after the bounded grace period; a transient/stale `plugged_out` does not immediately stop PV charging.
+`P1 decides power; Easee confirms hardware state; safe transitions retry instead of deadlocking.`
