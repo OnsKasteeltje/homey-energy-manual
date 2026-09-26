@@ -20,7 +20,7 @@ export const DEFAULTS=Object.freeze({
   zeroConfirmA:1,
   deadTimeMs:5000,
   commandConfirmTimeoutMs:30000,
-  transitionTimeoutMs:90000,
+  transitionWarnMs:90000,
   maxCircuitA:64,
 });
 
@@ -113,7 +113,6 @@ export function decidePhaseTransition(input, previous=initialTransitionState(), 
 
   if(!gatePass||!controlFresh)return fail(!gatePass?'GATE_NOT_PASS':'CONTROL_NOT_FRESH');
   if(!validRequest(desiredMode,desiredA,cfg))return fail('INVALID_PHASE_REQUEST');
-  if(state.startedAt&&transitionAgeMs>cfg.transitionTimeoutMs)return fail('TRANSITION_TIMEOUT');
 
   const base={
     desiredMode,desiredA,confirmedMode,liveEnabled,chargeState,charging,
@@ -210,13 +209,28 @@ export function decidePhaseTransition(input, previous=initialTransitionState(), 
         ...base,remainingMs:cfg.deadTimeMs,reason:'PHASE_CONFIRMED'
       })};
     }
-    if(stageAgeMs>cfg.commandConfirmTimeoutMs)return fail('PHASE_CONFIRM_TIMEOUT');
+    if(stageAgeMs>cfg.commandConfirmTimeoutMs){
+      const next={...state,stageSince:nowIso(nowMs),phaseCommandSentAt:null};
+      return {state:next,action:action('SET_PHASE_MODE',{
+        ...base,phaseModeValue:easeeCommandForMode(desiredMode),
+        reason:'PHASE_CONFIRM_RETRY'
+      })};
+    }
     return {state,action:action('WAIT_PHASE_CONFIRM',{...base,reason:'PHASE_NOT_CONFIRMED'})};
   }
 
   if(state.stage==='DEADTIME'){
-    if(!paused)return fail('PAUSE_CONFIRMATION_LOST');
-    if(confirmedMode!==desiredMode)return fail('PHASE_CONFIRMATION_LOST');
+    if(!paused){
+      const next={...state,stage:'PAUSING',stageSince:nowIso(nowMs)};
+      return {state:next,action:action('PAUSE_SESSION',{...base,reason:'WAIT_PAUSE_CONFIRMATION'})};
+    }
+    if(confirmedMode!==desiredMode){
+      const next={...state,stage:'CONFIRMING_PHASE',stageSince:nowIso(nowMs),phaseCommandSentAt:null};
+      return {state:next,action:action('SET_PHASE_MODE',{
+        ...base,phaseModeValue:easeeCommandForMode(desiredMode),
+        reason:'PHASE_CONFIRM_RETRY'
+      })};
+    }
     const remaining=Math.max(0,cfg.deadTimeMs-stageAgeMs);
     if(remaining>0)return {state,action:action('WAIT_DEADTIME',{...base,remainingMs:remaining})};
     const next={...state,stage:'ARMING_CIRCUIT_CAP',stageSince:nowIso(nowMs)};
@@ -226,8 +240,16 @@ export function decidePhaseTransition(input, previous=initialTransitionState(), 
   }
 
   if(state.stage==='ARMING_CIRCUIT_CAP'){
-    if(!paused)return fail('PAUSE_CONFIRMATION_LOST');
-    if(confirmedMode!==desiredMode)return fail('PHASE_CONFIRMATION_LOST');
+    if(!paused){
+      return {state,action:action('PAUSE_SESSION',{...base,reason:'WAIT_PAUSE_CONFIRMATION'})};
+    }
+    if(confirmedMode!==desiredMode){
+      const next={...state,stage:'CONFIRMING_PHASE',stageSince:nowIso(nowMs),phaseCommandSentAt:null};
+      return {state:next,action:action('SET_PHASE_MODE',{
+        ...base,phaseModeValue:easeeCommandForMode(desiredMode),
+        reason:'PHASE_CONFIRM_RETRY'
+      })};
+    }
     if(currentCircuitA===desiredA){
       const next={...state,stage:'RESUMING',stageSince:nowIso(nowMs)};
       return {state:next,action:action('RESUME_SESSION',{
