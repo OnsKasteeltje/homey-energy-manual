@@ -138,11 +138,7 @@ const setPhaseMode=async(mode,vars)=>{
 
 const scheduleNext=async(ms=1200)=>{
   await new Promise(resolve=>setTimeout(resolve,ms));
-  await Homey.flow.runFlowCardAction({
-    uri:'homey:manager:flow',
-    id:'homey:manager:flow:programmatic_trigger',
-    args:{flow:{id:FLOW_ID,name:'EV phase writer',type:'advanced'}}
-  });
+  await Homey.flow.triggerAdvancedFlow({id:FLOW_ID});
 };
 
 const [liveVar,statusVar,intentVar,adapterVar,gateVar,accessVar,refreshVar,expiresVar]=await Promise.all([
