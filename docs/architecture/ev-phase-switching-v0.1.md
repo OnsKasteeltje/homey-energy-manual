@@ -1,341 +1,310 @@
 # EV 1P/3P phase switching
 
-Status: design validated, SHADOW implementation in progress, not LIVE.
+Status: SHADOW contract validated end-to-end; physical 1P and 3P commissioning passed; LIVE actuator integration not yet promoted.
 
 ## Functional contract
 
-The EMS decision is:
+The EMS decides only:
 
 - `OFF`
 - `1P + A`
 - `3P + A`
 
-The EMS does not select L1/L2/L3 during 1P operation. Physical phase selection and fuse protection remain the responsibility of Easee/Equalizer.
+The EMS does not select L1/L2/L3. In 1P operation the physical phase remains owned by Easee/Equalizer.
 
-Total net P1 power is the authoritative energy-control feedback signal. Per-phase P1 values remain observability/safety context, not the EMS selector for a physical 1P phase.
+Total net P1 power is authoritative for PV opportunity control. Per-phase P1 remains observability/safety context, not EMS phase-selection policy.
 
 ## Ownership
 
 ```text
-P1 / planner policy
-        ↓
+P1 / Pi policy
+      ↓
 EV phase/current policy
-        ↓
+      ↓
 Power Intent
-        ↓
+      ↓
 EV Adapter
-        ↓
+      ↓
 EV Gate
-        ↓
-sole EV Actuator
-        ↓
-Easee phase mode + dynamic charger current
-        ↓
-Easee Equalizer local phase/fuse safety
-        ↓
+      ↓
+sole Homey EV Actuator
+      ├─ native Homey: pause/resume/current/circuit cap
+      └─ minimal Easee Cloud call: set_phase_mode only
+      ↓
+Easee / Equalizer local fuse + physical phase selection
+      ↓
 Tesla
 ```
 
-No second physical writer may be introduced.
+No independent Pi/device writer is introduced.
 
-## Easee interface research
+## Pi phase policy
 
-Validated public interfaces:
+`/control/current.realtime.ev.phasePolicy` exposes:
 
-- Easee command endpoint:
-  `POST /api/chargers/{serialNumber}/commands/set_phase_mode`
-  - 1 = locked to 1 phase
-  - 2 = auto
-  - 3 = locked to 3 phase
-- Dynamic charger current remains the runtime current-control interface.
-- Easee warns against frequent writes through the generic charger `/settings` endpoint.
-- The existing Homey Easee action-card surface exposes dynamic charger/circuit current but currently does not expose Set Phase Mode.
-- The historical Homey Easee implementation already reads charger observation 38 as `phaseMode`, so phase state exists in the integration even though a Flow write card is absent.
-- evcc and Home Assistant both model charger phase mode explicitly rather than treating phase selection as an EMS optimization dimension.
-
-References:
-- https://developer.easee.com/reference/charger_set_phase_mode
-- https://developer.easee.com/docs/current-limits-and-control
-- https://developer.easee.com/reference/charger_set_dynamic_charger_current
-- https://github.com/evcc-io/evcc/blob/master/charger/easee.go
-- https://github.com/nordicopen/easee_hass/blob/master/custom_components/easee/services.yaml
-- https://community.homey.app/t/app-pro-easee-charger-small-smart-full-of-power/31647?page=21
-
-## Phase selector policy
-
-Initial thresholds:
-
-- 1P start: total available PV >= 1500 W
-- 1P stop: total available PV < 1100 W
-- 3P enter: total available PV >= 4400 W
-- 3P leave: total available PV < 3600 W
-- minimum mode dwell: 120 s
-- current range: 6..16 A
-
-For a physically idle EV:
-
-`availableTotalW = max(0, -P1_total_W)`
-
-For an active EV session:
-
-`availableTotalW = max(0, -P1_total_W + actual EV commanded power)`
-
-Previous SHADOW recommendations are never added back as physical load.
+- schema `EMS_PI_EV_PHASE_POLICY_V0.1`
+- allowed modes `OFF | 1P | 3P`
+- current range 6..16 A
+- 1P start 1500 W
+- 1P stop 1100 W
+- 3P enter 4400 W
+- 3P leave 3600 W
+- minimum mode dwell 120 s
+- physical phase owner `EASEE_EQUALIZER`
 
 Current sizing:
 
 - 1P: `floor(availableTotalW / 230)`
 - 3P: `floor(availableTotalW / 690)`
-- clamp to 6..16 A
+- clamp 6..16 A
 
-The Equalizer may further limit actual current for local fuse/load safety.
-
-## Stateful transition contract
-
-A mode transition is not a simple write. Candidate LIVE actuator sequence:
-
-1. validate fresh upstream intent and fresh PASS gate;
-2. request 0 A / pause;
-3. confirm charging current/power is effectively zero;
-4. issue Easee phase-mode command;
-5. confirm the requested phase mode;
-6. apply dead-time;
-7. resume/start session;
-8. apply requested dynamic charger current;
-9. separately record requested / commanded / confirmed state;
-10. timeout or incoherent state -> fail closed to 0 A.
-
-A 1P→3P transition may require a new/resumed charging session before the EV adopts three phases. This is therefore implemented as an explicit state machine.
-
-## LIVE gate
-
-Do not promote until:
-
-- phase-mode command path is accessible from the existing sole EV Actuator;
-- the Homey/Easee integration path does not create a second writer;
-- phase-mode readback/confirmation is available;
-- OFF→1P, 1P→3P, 3P→1P, and transition timeout are tested in SHADOW/replay;
-- physical validation confirms current and phase behavior at Easee/Tesla;
-- existing deadline behavior remains 3P-capable and fail-closed;
-- architecture gate and EV regression suite pass.
-
-## Current implementation
+When EV is active, actual commanded EV power is added back to total P1 to reconstruct available PV. Previous SHADOW recommendations are never treated as physical load.
 
 Canonical selector:
+
 `services/pi/planner/ev/ev_phase_selector_shadow_v0.2.mjs`
 
-One-shot observer:
-`services/pi/planner/ev/run_ev_phase_shadow_once.mjs`
+## Homey SHADOW chain
 
-The selector is SHADOW-only and performs no device/control writes.
+Deployed into the existing flow IDs:
 
+- Bridge `8bf53fdb-76f4-47db-8ccb-773ac515f06e` → v1.4.0 PHASE-SHADOW
+- Adapter `953e9b18-3576-4557-b940-ed4a64eb2516` → v0.1.11 PHASE-SHADOW
+- Gate `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` → v0.2.12 PHASE-SHADOW
+- physical actuator remains `fea23193-a03f-49dd-9780-7e72ee48747d` v0.2.15 until LIVE promotion
 
-## Contract staging 2026-09-26
+Validated live SHADOW example:
 
-The Pi realtime EV envelope now carries additive SHADOW phase policy:
-
-`realtime.ev.phasePolicy = EMS_PI_EV_PHASE_POLICY_V0.1`
-
-It declares allowed modes, thresholds, mode dwell, current bounds and `EASEE_EQUALIZER` as physical phase owner. The existing production bridge ignores these additive fields.
-
-Prepared non-live Homey candidates:
-
-- `src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.0.phase-shadow.js`
-- `src/homey/adapters/ev-power/ev-power-v0.1.11.phase-shadow.js`
-- `src/homey/validation/ev-power-adapter-gate-v0.2.12.phase-shadow.js`
-
-The candidate bridge computes phase mode from fresh Homey P1 only inside the bounded Pi phase policy. It publishes `phase_mode_shadow` and `phase_requested_A_shadow` while retaining the existing fixed-3P production current target. Adapter and Gate validate and expose the phase contract without any physical phase write. The phase Gate result is observability-only until the LIVE release gate is explicitly completed.
-
-
-## Homey SHADOW deployment 2026-09-26
-
-The additive phase contract has been deployed into the existing production control-chain flow IDs without adding a writer:
-
-- Bridge ID `8bf53fdb-76f4-47db-8ccb-773ac515f06e` → `v1.4.0 PHASE-SHADOW`
-- Adapter ID `953e9b18-3576-4557-b940-ed4a64eb2516` → `v0.1.11 PHASE-SHADOW`
-- Gate ID `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` → `v0.2.12 PHASE-SHADOW`
-
-Topology, triggers, Logic variable IDs and the sole physical EV Actuator were left unchanged. The phase path is observability-only and performs no Easee phase-mode write.
-
-Immediate live validation after the Bridge trigger showed the existing fixed-3P production path still functioning: Easee charged at approximately 3x6 A / 4.31 kW while net P1 power was approximately -14 W. This is production-current validation only; it is not yet proof of a physical 1P phase transition.
-
-
-## End-to-end SHADOW validation 2026-09-26
-
-Live evidence after deploying the SHADOW contract through the existing Homey chain:
-
-- Bridge phase shadow: `3P + 6 A`
-- reconstructed available total power: `4336 W`
+- reconstructed available PV: 4336 W
+- previous phase mode: 3P
+- result: `3P + 6 A`
 - reason: `HOLD`
-- Intent: `phase_mode_shadow=3P`, `phase_requested_A_shadow=6`
-- Adapter phase shadow: valid `3P + 6 A`
-- Gate phase shadow: `PASS`, all phase-shadow checks true
-- production Gate: `PASS`, requested current `6 A`
+- 4336 W is below 4400 W enter-3P but above 3600 W leave-3P
+- Bridge → Intent → Adapter → Gate all coherent
+- phase Gate PASS
+- production Gate PASS
 
-This is the expected hysteresis case: `4336 W` is below the `enter3p_W=4400` threshold but above `leave3p_W=3600`. Because SHADOW was already in 3P, it correctly remains in 3P rather than oscillating back to 1P.
+This confirms the intended hysteresis behavior.
 
-The physical production path remained the existing fixed-3P path during this validation.
+## Easee phase interface
 
-## Homey Easee phase-mode interface constraint
+Homey's Easee app exposes phase mode as readback:
 
-Inspection of the public Easee Homey app source shows that charger observation 38 is decoded into the device setting `phaseMode`, but that setting is defined as an informational label and no capability listener / writable phase-mode Flow card is exposed. Therefore programmatically changing the Homey setting is not a valid charger command path.
+- `Auto`
+- `Locked to single phase`
+- `Locked to three phase`
 
-The official Easee charger API does expose a dedicated runtime command:
+The app does not expose a writable phase-mode Flow card.
+
+The official Easee API provides:
 
 `POST /api/chargers/{serialNumber}/commands/set_phase_mode`
 
-with `1=1P`, `2=Auto`, `3=3P`.
+with:
 
-LIVE promotion therefore remains blocked until the sole EV Actuator has a validated command transport for that dedicated Easee command plus phase-mode readback. No per-phase circuit-current workaround is promoted as the canonical design while physical phase ownership remains assigned to Easee/Equalizer.
+- 1 = locked 1P
+- 2 = Auto
+- 3 = locked 3P
 
+EMS uses only locked 1P or locked 3P for commanded modes.
 
-## Stateful actuator preparation 2026-09-26
+References:
 
-Prepared pure transition logic:
+- https://developer.easee.com/reference/charger_set_phase_mode
+- https://developer.easee.com/reference/account_authenticate
+- https://developer.easee.com/reference/account_refreshtoken
 
-`src/homey/actuators/ev-power/ev-phase-transition-v0.1.mjs`
+## Physical commissioning 2026-09-26
 
-The transition machine has no Homey/Easee side effects. It emits only the next requested actuator action.
+Charger: `ECHM6B9F`
 
-Canonical transition:
+Observed settings:
+
+- grid type `TN_3_PHASE`
+- main fuse 25 A
+- circuit fuse 20 A
+- max charger current 16 A
+
+### Locked 1P
+
+Commissioning precondition:
+
+- session `plugged_in_paused`
+- offered 0 A
+- charger power 0 W
+- initial phase mode `Auto`
+
+Commanded locked 1P and confirmed Homey readback:
+
+`Locked to single phase`
+
+After resume/current commissioning, Tesla physically charged at approximately:
+
+- phase 1: ~0 A
+- phase 2: ~0 A
+- phase 3: ~6 A
+- charger power: ~1.4 kW
+
+Physical result: **1x6 A confirmed**.
+
+This proves that Easee/Equalizer selected the actual physical phase; EMS did not choose L3.
+
+### Locked 3P restore
+
+The charger was paused again and commanded to locked 3P.
+
+Homey readback confirmed:
+
+`Locked to three phase`
+
+After resuming at 6 A, charging stabilized at approximately 3x6 A / 4.3 kW.
+
+Physical result: **3P restore confirmed**.
+
+## Commissioning finding: 0 A is not a stable pause
+
+Homey Insights showed repeatedly:
 
 ```text
-STABLE
-  ↓ mode differs
-ZEROING
-  ↓ target 0 A + low power/current confirmed
-PHASE_COMMAND
-  ↓ dedicated Easee command accepted
-CONFIRMING
-  ↓ Homey readback phaseMode matches requested locked mode
+0 A
+  ↓ ~1 minute
+32 A charger target reset
+  ↓ production actuator active
+bounded target re-applied
+```
+
+With the production actuator temporarily disabled, that reset was able to result in approximately 3x16 A / 11.3 kW.
+
+Therefore dynamic charger current 0 A alone is **not** a safe transition boundary.
+
+Native `Pause Charging` remained stable beyond that reset interval:
+
+- `plugged_in_paused`
+- offered 0 A
+- measured 0 W
+
+Fail-closed for phase transitions therefore means **pause the charging session**, not merely write 0 A.
+
+## Commissioning finding: resume resets charger current
+
+The Easee app implementation documents and commissioning confirmed that `resume_charging` resets the dynamic charger-current limit.
+
+Observed sequence:
+
+```text
+paused, target 6 A
+  ↓ resume
+target becomes 32 A
+  ↓ desired current re-applied
+target 6 A
+```
+
+The car initially remained at 0 W during the observed reset, but LIVE design must not depend on this timing.
+
+## Canonical transition state machine v0.4
+
+Canonical pure logic:
+
+`src/homey/actuators/ev-power/ev-phase-transition-v0.4.mjs`
+
+Current transition:
+
+```text
+PAUSE_SESSION
+  ↓ confirmed plugged_in_paused + offered <=1 A + power <=250 W
+SET_PHASE_MODE
+  ↓ Homey readback confirms requested locked phase
 DEADTIME
   ↓ 5 s
-APPLY_CURRENT
-  ↓ charger target matches requested A
-STABLE
-```
-
-Fail-closed conditions include invalid request, Gate not PASS, stale control, phase-command error, phase-confirm timeout, transition timeout and loss of phase confirmation.
-
-Prepared official command transport:
-
-`src/homey/actuators/ev-power/easee-phase-command-transport-v0.1.mjs`
-
-This transport contains no credentials and no token persistence. It only knows the official command endpoint and accepts an injected Bearer access token. It never logs or returns the supplied token.
-
-Easee authentication remains a deployment concern. Official cloud authentication returns a one-hour Bearer access token plus a rotating refresh token. No username, password, access token or refresh token may be committed to this repository.
-
-Current Homey readback on charger `ECHM6B9F` confirmed:
-
-- `phaseMode = Auto`
-- grid type `TN_3_PHASE`
-- main fuse `25 A`
-- circuit fuse `20 A`
-- max charger current `16 A`
-
-For LIVE commissioning, requested `1P` must confirm as `Locked to single phase`; requested `3P` must confirm as `Locked to three phase`. `Auto` is valid observed state but is not treated as confirmation of a requested locked phase mode.
-
-
-## Commissioning finding: zero current is not a stable pause boundary
-
-During physical commissioning preparation on 2026-09-26, Homey Insights showed a repeatable pattern after writing charger current 0 A:
-
-- target current 0 A;
-- approximately one minute later the charger target returned to 32 A;
-- while the production actuator was enabled it subsequently re-applied the bounded 6 A target;
-- with the production actuator temporarily disabled, the restored target was able to produce approximately 3x16 A / 11.3 kW.
-
-This means a charger-current value of 0 A by itself is not accepted as the canonical safe hardware state for phase switching.
-
-Native Easee/Homey `Pause Charging` was then applied. The charger remained `plugged_in_paused`, offered 0 A and measured 0 W beyond the prior reset interval.
-
-The transition contract is therefore superseded by v0.2:
-
-`src/homey/actuators/ev-power/ev-phase-transition-v0.2.mjs`
-
-Canonical sequence:
-
-```text
-PAUSE_SESSION
-  ↓ confirmed plugged_in_paused + <=1 A offered + <=250 W
-SET_PHASE_MODE
-  ↓ confirmed locked phase readback
-DEADTIME
-  ↓
-SET_CURRENT desired A while paused
-  ↓ target current confirmed
+SET_TRANSITION_CIRCUIT_CAP
+  ↓ native Homey symmetric circuit limit A/A/A confirmed
 RESUME_SESSION
-  ↓ charging observed
-STABLE
-```
-
-Fail-closed now means `PAUSE_SESSION`, not merely setting dynamic current to 0 A.
-
-The one-shot commissioning tool at `services/pi/commissioning/ev_phase_commission.py` requires the same paused-session precondition before issuing a phase command.
-
-
-## Physical commissioning: 1P command accepted 2026-09-26
-
-With the production EV actuator disabled and the charger confirmed `plugged_in_paused`, offered current 0 A and measured power 0 W, the guarded commissioning tool sent the official Easee phase command for locked single-phase mode.
-
-Observed Homey readback sequence:
-
-- initial `phaseMode = Auto`
-- then `phaseMode = Locked to single phase`
-- commissioning result: `PASS`
-- charger remained paused at 0 A / 0 W after the phase-mode change
-
-This is the first physical proof that the dedicated Easee command path and Homey phase-mode readback work together on charger `ECHM6B9F`.
-
-The next commissioning step is to pre-set 6 A while paused, resume the session, and validate that physical charging uses exactly one phase before restoring locked 3P.
-
-
-## Physical commissioning: 1P charging confirmed and resume reset characterized
-
-After the successful locked-1P command/readback test, the paused charger was prepared with 6 A and resumed.
-
-Observed behavior:
-
-- `resume_charging` reset the dynamic charger-current limit to 32 A;
-- immediately after resume the car was connected but initially drew 0 W;
-- re-applying 6 A started charging;
-- Easee then measured approximately:
-  - phase 1: ~0 A
-  - phase 2: ~0 A
-  - phase 3: ~6 A
-  - charger power: ~1.4 kW
-- Tesla physically charged at 1x6 A.
-
-This confirms both:
-1. locked single-phase mode works physically on this charger/car combination;
-2. Easee/Equalizer chooses the physical phase (phase 3 during this commissioning run).
-
-The public Easee/Homey app source documents that `resume_charging` resets the dynamic charger-current output limit. This matches the observed 32 A target reset.
-
-### Resume safety barrier
-
-Transition state-machine v0.3 therefore adds a temporary symmetric dynamic circuit-current cap before resume:
-
-`phase1=A, phase2=A, phase3=A, timeToLive=1 minute`
-
-This is not phase selection. All three phases receive the same safety ceiling; physical phase ownership remains with Easee/Equalizer.
-
-Revised transition:
-
-```text
-PAUSE_SESSION
-  ↓ pause confirmed
-SET_PHASE_MODE
-  ↓ locked mode confirmed
-DEADTIME
-  ↓
-SET_TRANSITION_CIRCUIT_CAP A/A/A TTL=1m
-  ↓ cap accepted
-RESUME_SESSION
-  ↓ resume may reset charger-current target
+  ↓ Easee may reset charger-current target
 SET_CURRENT desired A
-  ↓ desired A + charging observed
+  ↓ desired A + charging confirmed
+RESTORE_CIRCUIT_CAP
+  ↓ original circuit limit confirmed
 STABLE
 ```
 
-The temporary cap protects the transient between resume and re-applying dynamic charger current.
+The transition captures the original dynamic circuit-current limit before changing it. Current commissioning value is 40 A.
+
+The temporary circuit cap is symmetric, so it does not select a physical phase. It is only a transient safety ceiling during the Easee resume-current reset.
+
+If execution fails while the temporary cap is active, leaving the lower circuit cap in place is fail-safe. Recovery can restore the captured original value after the session is paused.
+
+## Homey-first write policy
+
+Native Homey remains responsible for:
+
+- pause charging
+- resume charging
+- dynamic charger current
+- symmetric dynamic circuit-current cap
+- symmetric circuit-current restore
+- device/readback confirmation
+
+Custom Easee Cloud is used only because Homey does not expose `set_phase_mode`.
+
+Canonical cloud helper:
+
+`src/homey/actuators/ev-power/easee-phase-cloud-v0.3.mjs`
+
+It supports only:
+
+- rotating Easee token refresh
+- locked 1P/3P `set_phase_mode`
+
+It contains no current control, circuit control, pause/resume logic or EMS policy.
+
+## Easee credentials
+
+No username/password/token is committed to GitHub.
+
+One-time bootstrap:
+
+`services/pi/commissioning/bootstrap_easee_homey_tokens.py`
+
+The bootstrap:
+
+1. prompts username/password locally on the Pi;
+2. authenticates once against Easee;
+3. stores only access token, rotating refresh token and expiry in private Homey Logic;
+4. does not store username/password.
+
+Homey token variables:
+
+- `EM2_Easee_Access_Token`
+- `EM2_Easee_Refresh_Token`
+- `EM2_Easee_Access_Expires_At`
+
+Easee access tokens expire; refresh tokens rotate and the newest refresh token must replace the previous one.
+
+## LIVE gate
+
+Do not promote phase switching into the sole EV Actuator until all are true:
+
+- v0.4 transition tests PASS
+- phase cloud token refresh tests PASS
+- architecture gate PASS
+- token bootstrap succeeds on Homey
+- Homey actuator candidate performs requested/commanded/confirmed separation
+- native circuit-cap and restore are verified in SHADOW/commissioning
+- phase command is issued only while session pause is confirmed
+- 1P/3P readback confirmation is mandatory
+- timeout/failure pauses session fail-closed
+- deadline charging remains 3P-capable and bounded by deadline max A
+- no other automatic EV writer exists
+
+## Current production state
+
+Physical 1P and 3P are proven, but automatic phase switching is **not yet LIVE**.
+
+Production remains:
+
+- Bridge v1.4.0 PHASE-SHADOW
+- Adapter v0.1.11 PHASE-SHADOW
+- Gate v0.2.12 PHASE-SHADOW
+- Actuator v0.2.15 CONTROL-AUTHORITY
+
+Phase promotion requires an explicit actuator version bump after the remaining LIVE-gate checks pass.
