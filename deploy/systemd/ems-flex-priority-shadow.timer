@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh EMS Flex Priority V0.1 shadow every minute
+
+[Timer]
+# Pi-local only. Heating shadow is refreshed every five minutes and EV deadline
+# state has its own one-minute watchdog. This timer performs no Homey calls.
+OnBootSec=45s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Unit=ems-flex-priority-shadow.service
+
+[Install]
+WantedBy=timers.target

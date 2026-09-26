@@ -309,6 +309,25 @@ Frontend V2 / PV Flex
 
 Schema: `EMS_WEB_HEATING_PREHEAT_SHADOW_V1`. The endpoint accepts only the canonical `EMS_HEATING_PREHEAT_SHADOW_V0.3` source with `mode=READ_ONLY`, `controlMode=SHADOW`, `controlWrites=false` and Honeywell baseline authority. It exposes only the room/window/guard fields required for commissioning. The Web Data API does not calculate eligibility, CV-assist policy, PV priority or step progression. Missing or invalid source data affects only this presentation resource and has zero control impact.
 
+## 15.3 Flex Priority shadow resource
+
+PV Flex may also consume the current cross-domain Heating ↔ EV priority decision through:
+
+```text
+/home/jeroen/ems/data/flex-priority-shadow-v0.1.json
+                 |
+                 v
+allowlisted Web Data API projection
+                 |
+                 v
+GET /web/planner/flex-priority-shadow
+                 |
+                 v
+Frontend V2 / PV Flex
+```
+
+Schema: `EMS_WEB_FLEX_PRIORITY_SHADOW_V1`. The canonical source is `EMS_PI_FLEX_PRIORITY_SHADOW_V0.1` and is accepted only when it is `READ_ONLY / SHADOW`, `controlWrites=false`, `powerReservationW=0` and realtime opportunity authority remains `P1`. The API exposes only the chosen priority owner, Heating shadow-grant state, EV role/urgency and closing-time context needed for commissioning. It never computes priority itself and cannot authorize a physical write.
+
 ## 16. Planned resource families
 
 This first endpoint establishes the boundary for the entire website. Expected resource families include:
@@ -317,6 +336,7 @@ This first endpoint establishes the boundary for the entire website. Expected re
 /web/state/current
 /web/planner/current
 /web/planner/heating-preheat-shadow
+/web/planner/flex-priority-shadow
 /web/history/day
 /web/history/daily
 /web/status/ev

@@ -327,6 +327,22 @@ Een verwachte PV-piek kan dus bijvoorbeeld concurreren tussen EV-laden en het ee
 
 Het WW-schouderprincipe hieronder is een specifieke allocatiestrategie **binnen deze bredere gezamenlijke optimalisatie** en vormt geen afzonderlijke EV/WW-planner.
 
+### Heating ↔ EV priority shadow
+
+Before any Heating control is commissioned, the Joint Planner boundary validates the arbitration rule through `EMS_PI_FLEX_PRIORITY_SHADOW_V0.1`.
+
+This shadow layer does not allocate watts and does not create a second realtime controller. It answers only which flex objective has the first claim **if** a usable PV opportunity exists:
+
+1. an EV deadline that has reached `latestSafeStartAt` is `MUST` and Heating holds;
+2. otherwise compare the earliest closing valid Heating preheat window with the EV deadline `latestSafeStartAt`;
+3. the opportunity whose usable slack closes first gets first claim;
+4. with no deadline pressure and a valid Heating candidate, Heating gets first claim because its window is scarce;
+5. when Heating is first, EV remains `RESIDUAL_OPPORTUNITY` and may use remaining realtime PV through the existing P1-bounded executor path;
+6. no full Quatt maximum is reserved: `powerReservationW=0`;
+7. invalid/uncertain active EV deadline state fails closed for Heating priority.
+
+The priority shadow is policy evidence only. It does not select a Honeywell setpoint, does not write `EM2_Power_Intent`, and does not alter the existing EV realtime bridge.
+
 ### WW fase 2: PV-schouders bewaren
 
 Wanneer `wwMode = BOILER` wordt elektrische warmwaterproductie een flex-load binnen dezelfde Joint Planner. Daarbij blijft het eerder geïmplementeerde allocatieprincipe expliciet behouden:
