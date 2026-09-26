@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.1.fast-import-cutback.js','utf8');
+const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.2.phase-readback-shadow.js','utf8');
 const adapter=fs.readFileSync('src/homey/adapters/ev-power/ev-power-v0.1.11.phase-shadow.js','utf8');
 const gate=fs.readFileSync('src/homey/validation/ev-power-adapter-gate-v0.2.12.phase-shadow.js','utf8');
 
@@ -61,4 +61,19 @@ test('bridge cuts large grid import proportionally instead of one amp per cycle'
 
 test('bridge keeps upward PV capture bounded to one amp per cycle',()=>{
   assert.match(bridge,/candidateA=currentA\+1/);
+});
+
+
+test('phase shadow reconstructs active EV load from confirmed Easee phase readback',()=>{
+  assert.match(bridge,/confirmedPhaseMode=normalizePhaseMode\(confirmedPhaseRaw\)/);
+  assert.match(bridge,/actualProductionPhaseCount=currentA<=0/);
+  assert.match(bridge,/confirmedPhaseMode==='1P'/);
+  assert.match(bridge,/confirmedPhaseMode==='3P'/);
+  assert.match(bridge,/currentA\*230\*\(actualProductionPhaseCount\|\|0\)/);
+});
+
+test('unconfirmed active phase readback fails phase shadow closed only',()=>{
+  assert.match(bridge,/PHASE_READBACK_UNCONFIRMED/);
+  assert.match(bridge,/phaseReadbackValid=currentA===0\|\|actualProductionPhaseCount===1\|\|actualProductionPhaseCount===3/);
+  assert.match(bridge,/production remains the proven fixed-3P controller below/);
 });
