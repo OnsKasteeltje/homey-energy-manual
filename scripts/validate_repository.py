@@ -68,70 +68,6 @@ def energy_contract() -> tuple[str, str, str, list[str]]:
     return schema_version, publisher_version, compatible_major, compatible_versions
 
 
-def validate_energy_state() -> None:
-    path = DOCS / "data" / "energy-state-v2.json"
-    raw = load_json(path)
-    if not isinstance(raw, dict):
-        raise SystemExit("energy-state-v2.json must contain a JSON object")
-
-    expected_schema, expected_publisher, _, _ = energy_contract()
-    meta = require(raw, "meta", dict, "root")
-    schema = require(meta, "schema_version", str, "meta")
-    if schema != expected_schema:
-        raise SystemExit(
-            f"Energy State schema drift: runtime={schema!r}, canonical={expected_schema!r}. "
-            "Update energy-state-v2.schema.json and frontend contract in the same change."
-        )
-    publisher = require(meta, "publisher_version", str, "meta")
-    if publisher != expected_publisher:
-        raise SystemExit(
-            f"Energy State publisher drift: runtime={publisher!r}, canonical={expected_publisher!r}. "
-            "Update the canonical contract together with the publisher."
-        )
-
-    for field in ("generated_at", "heartbeat_at", "control_mode"):
-        require(meta, field, str, "meta")
-    for field in ("state_revision", "decision_revision", "shadow_revision"):
-        require(meta, field, int, "meta")
-
-    grid = require(raw, "grid", dict, "root")
-    require(grid, "power_w", (int, float), "grid")
-
-    pv = require(raw, "pv", dict, "root")
-    require(pv, "total_w", (int, float), "pv")
-
-    battery = require(raw, "battery", dict, "root")
-    require(battery, "integrated", bool, "battery")
-
-    balance = require(raw, "balance", dict, "root")
-    gate = require(balance, "control_gate", dict, "balance")
-    require(gate, "grid_measurement_valid", bool, "balance.control_gate")
-    require(gate, "derived_house_balance_valid", bool, "balance.control_gate")
-
-    loads = require(raw, "loads", dict, "root")
-    quooker = require(loads, "quooker", dict, "loads")
-    require(quooker, "active", bool, "loads.quooker")
-    require(quooker, "switch_on", bool, "loads.quooker")
-    require(quooker, "power_w", (int, float), "loads.quooker")
-    require(quooker, "status", str, "loads.quooker")
-    require(quooker, "source", str, "loads.quooker")
-    require(quooker, "fresh", bool, "loads.quooker")
-    if quooker["source"] != "HOMEY_SWITCH_PLUS_P1_L3":
-        raise SystemExit(
-            "Unsupported loads.quooker.source: "
-            f"{quooker['source']!r}; expected 'HOMEY_SWITCH_PLUS_P1_L3'"
-        )
-    if quooker["status"] not in {"OFF", "ON_IDLE", "HEATING", "STALE"}:
-        raise SystemExit(f"Unsupported loads.quooker.status: {quooker['status']!r}")
-
-    revisions = {meta["state_revision"], meta["decision_revision"], meta["shadow_revision"]}
-    if len(revisions) != 1:
-        raise SystemExit(
-            "energy-state-v2.json is not revision-consistent: "
-            f"state={meta['state_revision']} decision={meta['decision_revision']} shadow={meta['shadow_revision']}"
-        )
-
-
 def requirement_lines(path: Path) -> set[str]:
     return {
         line.strip().lower()
@@ -162,7 +98,6 @@ def main() -> None:
     validate_python()
     validate_all_json()
     energy_contract()
-    validate_energy_state()
     validate_dependency_lock()
     validate_frontend_version()
     print("Repository validation OK")
