@@ -15,7 +15,7 @@ import {decideEvPhaseShadow} from './ev_phase_selector_shadow_v0.2.mjs';
 const STATE_PATH='/home/jeroen/ems/data/energy-state-v2.json';
 const OUT_PATH='/home/jeroen/ems/data/ev-phase-shadow-state.json';
 const CONTROL_URL='http://127.0.0.1:3100/control/current';
-const MAX_P1_AGE_MS=180000;
+const SHADOW_FRESHNESS_MARGIN_MS=60000;
 
 const readJson=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const n=v=>Number.isFinite(Number(v))?Number(v):null;
@@ -56,11 +56,13 @@ const env=control?.realtime?.ev||{};
 
 const sampleMs=Date.parse(String(meta.source_sample_at||''));
 const p1AgeMs=Number.isFinite(sampleMs)?now-sampleMs:Infinity;
+const publishIntervalSec=Math.max(0,n(meta.min_publish_interval_sec)??0);
+const shadowSnapshotMaxAgeMs=Math.max(180000,publishIntervalSec*1000+SHADOW_FRESHNESS_MARGIN_MS);
 const p1Valid=
   gate.p1_fresh===true &&
   gate.grid_measurement_valid===true &&
   p1AgeMs>=0 &&
-  p1AgeMs<=MAX_P1_AGE_MS &&
+  p1AgeMs<=shadowSnapshotMaxAgeMs &&
   [grid.power_w,grid.l1_w,grid.l2_w,grid.l3_w].every(v=>n(v)!==null);
 
 const envelopeAllowed=
@@ -115,6 +117,8 @@ const out={
     control:CONTROL_URL,
     p1SampleAt:meta.source_sample_at??null,
     p1AgeSec:Number.isFinite(p1AgeMs)?Math.round(p1AgeMs/1000):null,
+    snapshotMaxAgeSec:Math.round(shadowSnapshotMaxAgeMs/1000),
+    freshnessPolicy:'CANONICAL_SNAPSHOT_CADENCE_PLUS_60S_SHADOW_ONLY',
     p1Fresh:gate.p1_fresh===true,
     gridMeasurementValid:gate.grid_measurement_valid===true,
     realtimeEnvelopeAllowed:envelopeAllowed,
