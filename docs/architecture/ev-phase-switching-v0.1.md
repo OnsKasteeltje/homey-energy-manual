@@ -68,7 +68,7 @@ Canonical selector:
 
 Deployed into the existing flow IDs:
 
-- Bridge `8bf53fdb-76f4-47db-8ccb-773ac515f06e` → production v1.4.1 FAST-IMPORT-CUTBACK; candidate v1.4.2 PHASE-READBACK-SHADOW
+- Bridge `8bf53fdb-76f4-47db-8ccb-773ac515f06e` → production v1.4.1 FAST-IMPORT-CUTBACK; candidate v1.4.3 PHASE-READBACK-OBS
 - Adapter `953e9b18-3576-4557-b940-ed4a64eb2516` → v0.1.11 PHASE-SHADOW
 - Gate `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` → v0.2.12 PHASE-SHADOW
 - physical actuator remains `fea23193-a03f-49dd-9780-7e72ee48747d` v0.2.15 until LIVE promotion
@@ -302,7 +302,7 @@ Physical 1P and 3P are proven, but automatic phase switching is **not yet LIVE**
 
 Production remains:
 
-- Bridge production v1.4.1 FAST-IMPORT-CUTBACK; v1.4.2 PHASE-READBACK-SHADOW pending regression validation
+- Bridge production v1.4.1 FAST-IMPORT-CUTBACK; v1.4.3 PHASE-READBACK-OBS pending regression validation
 - Adapter v0.1.11 PHASE-SHADOW
 - Gate v0.2.12 PHASE-SHADOW
 - Actuator v0.2.15 CONTROL-AUTHORITY
@@ -331,7 +331,7 @@ Before phase switching can become LIVE, active EV load reconstruction must use t
 
 Candidate bridge:
 
-`src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.2.phase-readback-shadow.js`
+`src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.3.phase-readback-observability.js`
 
 The bridge reads Easee `phaseMode` from the Homey device/settings API and normalizes:
 
@@ -348,3 +348,21 @@ where confirmed phase count is 1 or 3.
 If an active charger has no confirmed locked phase readback, only phase SHADOW fails closed with `PHASE_READBACK_UNCONFIRMED`; the proven fixed-3P production current controller remains unchanged.
 
 This candidate must pass Pi regression tests before deployment into the existing Homey Bridge flow.
+
+
+## Runtime connectivity ownership correction
+
+A post-drive validation exposed that the Pi realtime envelope still gated opportunity charging on `plan.tesla.connectedNow`, which reflects connectivity at planner-build time. Homey live state simultaneously showed `plugged_in_paused`.
+
+That coupling is removed in realtime envelope v0.4.
+
+Policy ownership is now:
+
+- Pi: whether realtime PV opportunity is allowed by strategy/deadline policy;
+- Homey/Easee live `evcharger_charging_state`: whether the car is physically connected and execution is possible.
+
+The Pi envelope now exposes `planConnectedAtBuild` only as observability and declares `liveConnectivityOwner = HOMEY_EASEE_CHARGE_STATE`.
+
+This allows a Tesla that arrives after planner build to participate in realtime PV capture without waiting for a planner rebuild, while physical execution still fails closed when Homey does not observe a connected charger state.
+
+Phase-mode readback is also observability and is therefore evaluated independently of realtime envelope eligibility in Bridge v1.4.3.
