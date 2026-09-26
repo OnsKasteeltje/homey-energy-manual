@@ -11,10 +11,12 @@ test('writer is armed but physically disabled by default',()=>{
 });
 
 test('native Homey Easee action cards own non-phase writes',()=>{
-  assert.match(src,/runNative\('pauseCharging'/);
-  assert.match(src,/runNative\('resumeCharging'/);
-  assert.match(src,/runNative\('circuitCurrentControl',\{current:a\}\)/);
-  assert.match(src,/runNative\('setDynamicChargerCurrent',\{current:a\}\)/);
+  assert.match(src,/homey:device:\$\{CHARGER_ID\}:pauseCharging/);
+  assert.match(src,/homey:device:\$\{CHARGER_ID\}:resumeCharging/);
+  assert.match(src,/homey:device:\$\{CHARGER_ID\}:circuitCurrentControl/);
+  assert.match(src,/homey:device:\$\{CHARGER_ID\}:setDynamicChargerCurrent/);
+  assert.match(src,/Homey\.flow\.runFlowCardAction\(\{id,args\}\)/);
+  assert.doesNotMatch(src,/runFlowCardAction\(\{uri,id,args\}\)/);
   assert.doesNotMatch(src,/setCapabilityValue\(/);
 });
 
