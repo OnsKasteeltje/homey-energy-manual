@@ -7,6 +7,10 @@ Bootstrap Easee cloud tokens into private Homey Logic variables.
 - Stores only tokens + expiry timestamp in Homey Logic.
 - Never prints token values or the password.
 - Does not store username/password.
+- Does not enumerate all Homey Logic variables: the EMS installation contains
+  large JSON variables and the Homey CLI can truncate that aggregate response.
+- Persists only the three non-secret Homey variable IDs in a local registry so
+  later bootstraps can update the exact variables directly.
 
 Required Homey CLI:
   /home/jeroen/ems-homey-adapter/node_modules/.bin/homey
@@ -17,18 +21,21 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 HOMEY = "/home/jeroen/ems-homey-adapter/node_modules/.bin/homey"
 LOGIN_URL = "https://api.easee.com/api/accounts/login"
+REGISTRY = Path("/home/jeroen/ems/data/easee-homey-token-variable-ids.json")
 
-VARS = {
-    "EM2_Easee_Access_Token": None,
-    "EM2_Easee_Refresh_Token": None,
-    "EM2_Easee_Access_Expires_At": None,
-}
+VAR_NAMES = (
+    "EM2_Easee_Access_Token",
+    "EM2_Easee_Refresh_Token",
+    "EM2_Easee_Access_Expires_At",
+)
 
 
 def post_json(url, payload):
@@ -52,19 +59,120 @@ def post_json(url, payload):
 def homey(*args):
     env = os.environ.copy()
     env["PATH"] = "/opt/node-v24.20.0/bin:" + env.get("PATH", "")
-    return subprocess.check_output([HOMEY, *args], text=True, env=env)
+    return subprocess.check_output(
+        [HOMEY, *args],
+        text=True,
+        env=env,
+        stderr=subprocess.STDOUT,
+    )
 
 
-def upsert_string(name, value, existing):
-    found = next((v for v in existing.values() if v.get("name") == name), None)
-    body = json.dumps({"value": value})
-    if found:
-        homey("api", "logic", "update-variable", "--id", found["id"], "--body", body)
-        return found["id"]
-    create = json.dumps({"name": name, "type": "string", "value": value})
-    raw = homey("api", "logic", "create-variable", "--body", create, "--json")
-    created = json.loads(raw)
-    return created.get("id")
+def homey_json(*args):
+    raw = homey(*args)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"HOMEY_JSON_INVALID:{args[0] if args else 'UNKNOWN'}:"
+            f"line={exc.lineno}:col={exc.colno}:chars={len(raw)}"
+        ) from exc
+
+
+def body_file(payload):
+    """Create a 0600 temp body file so tokens never appear in process argv."""
+    fd, path = tempfile.mkstemp(prefix="ems-easee-homey-", suffix=".json")
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        return path
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+        raise
+
+
+def homey_body(command, *, var_id=None, payload):
+    path = body_file(payload)
+    try:
+        args = ["api", "logic", command]
+        if var_id:
+            args += ["--id", var_id]
+        args += ["--body", f"@{path}"]
+        if command == "create-variable":
+            args += ["--json"]
+        return homey(*args)
+    finally:
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+
+
+def load_registry():
+    if not REGISTRY.exists():
+        return {}
+    try:
+        data = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"TOKEN_VARIABLE_REGISTRY_INVALID:{exc}") from exc
+    return {
+        name: str(data.get(name) or "").strip()
+        for name in VAR_NAMES
+        if str(data.get(name) or "").strip()
+    }
+
+
+def save_registry(ids):
+    REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    tmp = REGISTRY.with_suffix(".tmp")
+    tmp.write_text(json.dumps(ids, indent=2) + "\n", encoding="utf-8")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, REGISTRY)
+    os.chmod(REGISTRY, 0o600)
+
+
+def get_variable(var_id):
+    try:
+        return homey_json("api", "logic", "get-variable", "--id", var_id, "--json")
+    except subprocess.CalledProcessError:
+        return None
+
+
+def ensure_string_variable(name, value, registry):
+    var_id = registry.get(name)
+
+    if var_id:
+        existing = get_variable(var_id)
+        if existing and existing.get("name") == name:
+            homey_body(
+                "update-variable",
+                var_id=var_id,
+                payload={"value": value},
+            )
+            return var_id
+
+    # First install or stale registry entry. Create only this small variable;
+    # never enumerate the complete Logic store.
+    raw = homey_body(
+        "create-variable",
+        payload={"name": name, "type": "string", "value": value},
+    )
+    try:
+        created = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"HOMEY_CREATE_VARIABLE_JSON_INVALID:{name}") from exc
+
+    created_id = str(created.get("id") or "").strip()
+    if not created_id:
+        raise RuntimeError(f"HOMEY_CREATE_VARIABLE_ID_MISSING:{name}")
+    return created_id
 
 
 def main():
@@ -94,22 +202,28 @@ def main():
         datetime.now(timezone.utc) + timedelta(seconds=max(60, expires_in - 60))
     ).isoformat().replace("+00:00", "Z")
 
-    existing = json.loads(homey("api", "logic", "get-variables", "--json"))
     values = {
         "EM2_Easee_Access_Token": access,
         "EM2_Easee_Refresh_Token": refresh,
         "EM2_Easee_Access_Expires_At": expires_at,
     }
 
-    ids = {}
-    for name, value in values.items():
-        ids[name] = upsert_string(name, value, existing)
+    registry = load_registry()
+    ids = dict(registry)
+
+    for name in VAR_NAMES:
+        ids[name] = ensure_string_variable(name, values[name], ids)
+        # Save after every successful create/update so an interrupted first run
+        # can resume by exact ID without creating duplicates.
+        save_registry(ids)
 
     print("PASS: Easee tokens stored in private Homey Logic.")
     print("Stored variables:")
-    for name in values:
-        print(f"- {name}: {ids.get(name) or 'updated'}")
+    for name in VAR_NAMES:
+        print(f"- {name}: PRESENT ({ids[name]})")
+    print(f"Variable ID registry: {REGISTRY}")
     print("Username/password were not stored.")
+    print("Token values were not printed and were not passed in process arguments.")
 
 
 if __name__ == "__main__":
