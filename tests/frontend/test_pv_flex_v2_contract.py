@@ -17,12 +17,19 @@ assert 'EMS_WEB_PV_FLEX_ANALYSIS_V1' in state
 assert 'PREHEAT_ROOT="/web/planner/heating-preheat-shadow"' in state
 assert 'EMS_WEB_HEATING_PREHEAT_SHADOW_V1' in state
 assert 'FLEX_PRIORITY_ROOT="/web/planner/flex-priority-shadow"' in state
+assert 'PREHEAT_PROGRESSION_ROOT="/web/planner/heating-preheat-progression-shadow"' in state
 assert 'EMS_WEB_FLEX_PRIORITY_SHADOW_V1' in state
+assert 'EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1' in state
 assert "forecast?.confidence" in render
 assert 'function lane(' not in render
 assert 'evPowerW' in render
 assert 'loadHeatingPreheatShadow' in render
 assert 'loadFlexPriorityShadow' in render
+assert 'loadHeatingPreheatProgressionShadow' in render
+assert 'V0.4 progression' in render
+assert 'Actieve shadow-target' in render
+assert 'Target bereikt' in render
+assert 'Volgende V0.4-stap' in render
 assert 'Heating eerst' in render
 assert 'EV eerst' in render
 assert 'EV residual via P1' in render
