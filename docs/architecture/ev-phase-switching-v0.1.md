@@ -128,3 +128,20 @@ One-shot observer:
 `services/pi/planner/ev/run_ev_phase_shadow_once.mjs`
 
 The selector is SHADOW-only and performs no device/control writes.
+
+
+## Contract staging 2026-09-26
+
+The Pi realtime EV envelope now carries additive SHADOW phase policy:
+
+`realtime.ev.phasePolicy = EMS_PI_EV_PHASE_POLICY_V0.1`
+
+It declares allowed modes, thresholds, mode dwell, current bounds and `EASEE_EQUALIZER` as physical phase owner. The existing production bridge ignores these additive fields.
+
+Prepared non-live Homey candidates:
+
+- `src/homey/power-intent/pi-dynamic-planner-bridge-v1.4.0.phase-shadow.js`
+- `src/homey/adapters/ev-power/ev-power-v0.1.11.phase-shadow.js`
+- `src/homey/validation/ev-power-adapter-gate-v0.2.12.phase-shadow.js`
+
+The candidate bridge computes phase mode from fresh Homey P1 only inside the bounded Pi phase policy. It publishes `phase_mode_shadow` and `phase_requested_A_shadow` while retaining the existing fixed-3P production current target. Adapter and Gate validate and expose the phase contract without any physical phase write. The phase Gate result is observability-only until the LIVE release gate is explicitly completed.
