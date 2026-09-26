@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.5.0.phase-authority.js','utf8');
+const bridge=fs.readFileSync('src/homey/power-intent/pi-dynamic-planner-bridge-v1.5.1.phase-authority.js','utf8');
 const adapter=fs.readFileSync('src/homey/adapters/ev-power/ev-power-v0.2.0.phase-aware.js','utf8');
 const gate=fs.readFileSync('src/homey/validation/ev-power-adapter-gate-v0.3.0.phase-aware.js','utf8');
 const actuator=fs.readFileSync('src/homey/actuators/ev-power/ev-power-v0.3.1.phase-authority-candidate.js','utf8');
@@ -77,4 +77,12 @@ test('deadline is independently rejected if not 3P at actuator boundary',()=>{
 test('paused same phase requires safety cap before resume',()=>{
   assert.match(actuator,/SET_TRANSITION_CIRCUIT_CAP/);
   assert.match(actuator,/PAUSED_RESUME_REQUIRES_SAFETY_CAP/);
+});
+
+
+test('bridge reconstructs physical EV load from Easee offered current',()=>{
+  assert.match(bridge,/measure_current\.offered/);
+  assert.match(bridge,/offeredAUsable/);
+  assert.match(bridge,/EASEE_OFFERED_CURRENT/);
+  assert.match(bridge,/phaseShadowPhysicalA=/);
 });
