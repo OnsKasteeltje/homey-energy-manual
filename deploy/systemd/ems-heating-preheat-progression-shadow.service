@@ -1,0 +1,17 @@
+[Unit]
+Description=EMS Heating Preheat V0.4 progression shadow
+After=ems-heating-preheat-shadow.service ems-flex-priority-shadow.service
+
+[Service]
+Type=oneshot
+User=jeroen
+WorkingDirectory=/home/jeroen/ems/repo/homey-energy-manual
+ExecStart=/usr/bin/python3 /home/jeroen/ems/repo/homey-energy-manual/services/pi/planner/heating/run_heating_preheat_progression_shadow_v0_4.py
+TimeoutStartSec=30
+Nice=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jeroen/ems/data
