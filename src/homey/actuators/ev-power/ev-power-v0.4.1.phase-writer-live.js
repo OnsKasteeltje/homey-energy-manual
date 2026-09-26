@@ -20,7 +20,7 @@ const CHARGER_SERIAL='ECHM6B9F';
 const FRESH_MS=120000;
 const DEADTIME_MS=5000;
 const PHASE_CONFIRM_TIMEOUT_MS=30000;
-const TRANSITION_TIMEOUT_MS=90000;
+const TRANSITION_WARN_MS=90000;
 
 const IDS={
   live:'8d47e98d-e4bc-4f47-8c02-c2aca7f7a978',
@@ -293,6 +293,8 @@ const save=async(status,reason,action='NOOP',write=false,extra={})=>{
     candidateAction:action,
     confirmedMode,
     transition:t,
+    transitionAgeMs:transitionAge,
+    transitionSlow:t.startedAt&&transitionAge>TRANSITION_WARN_MS,
     observed:{
       chargeState,charging,paused,chargerTargetA,circuitTargetA,
       offeredA,powerW,confirmedPhaseRaw:phaseRaw
@@ -317,7 +319,6 @@ if(!contractAligned)return await failClosed('CONTROL_CONTRACT_NOT_ALIGNED');
 if(!fresh)return await failClosed('CONTROL_NOT_FRESH');
 if(!requestValid)return await failClosed('INVALID_PHASE_REQUEST');
 if(!deadlinePhaseOK)return await failClosed('DEADLINE_MUST_USE_3P');
-if(t.startedAt&&transitionAge>TRANSITION_TIMEOUT_MS)return await failClosed('TRANSITION_TIMEOUT');
 
 if(!canWrite){
   await save(
@@ -421,15 +422,33 @@ if(t.stage==='CONFIRMING_PHASE'){
     await scheduleNext();
     return true;
   }
-  if(stageAge>PHASE_CONFIRM_TIMEOUT_MS)return await failClosed('PHASE_CONFIRM_TIMEOUT');
+  if(stageAge>PHASE_CONFIRM_TIMEOUT_MS){
+    await setPhaseMode(desiredMode,vars);
+    t={...t,stageSince:iso()};
+    await save('TRANSITION','PHASE_CONFIRM_RETRY','SET_PHASE_MODE',true);
+    await scheduleNext();
+    return true;
+  }
   await save('TRANSITION','PHASE_NOT_CONFIRMED','WAIT_PHASE_CONFIRM',false);
   await scheduleNext();
   return true;
 }
 
 if(t.stage==='DEADTIME'){
-  if(!paused)return await failClosed('PAUSE_CONFIRMATION_LOST');
-  if(confirmedMode!==desiredMode)return await failClosed('PHASE_CONFIRMATION_LOST');
+  if(!paused){
+    await pauseSession();
+    t={...t,stage:'PAUSING',stageSince:iso()};
+    await save('TRANSITION','WAIT_PAUSE_CONFIRMATION','PAUSE_SESSION',true);
+    await scheduleNext();
+    return true;
+  }
+  if(confirmedMode!==desiredMode){
+    await setPhaseMode(desiredMode,vars);
+    t={...t,stage:'CONFIRMING_PHASE',stageSince:iso()};
+    await save('TRANSITION','PHASE_CONFIRM_RETRY','SET_PHASE_MODE',true);
+    await scheduleNext();
+    return true;
+  }
   if(stageAge<DEADTIME_MS){
     await save('TRANSITION','DEADTIME','WAIT_DEADTIME',false,{remainingMs:Math.max(0,DEADTIME_MS-stageAge)});
     await scheduleNext(Math.min(1500,Math.max(500,DEADTIME_MS-stageAge)));
@@ -443,8 +462,19 @@ if(t.stage==='DEADTIME'){
 }
 
 if(t.stage==='ARMING_CIRCUIT_CAP'){
-  if(!paused)return await failClosed('PAUSE_CONFIRMATION_LOST');
-  if(confirmedMode!==desiredMode)return await failClosed('PHASE_CONFIRMATION_LOST');
+  if(!paused){
+    await pauseSession();
+    await save('TRANSITION','WAIT_PAUSE_CONFIRMATION','PAUSE_SESSION',true);
+    await scheduleNext();
+    return true;
+  }
+  if(confirmedMode!==desiredMode){
+    await setPhaseMode(desiredMode,vars);
+    t={...t,stage:'CONFIRMING_PHASE',stageSince:iso()};
+    await save('TRANSITION','PHASE_CONFIRM_RETRY','SET_PHASE_MODE',true);
+    await scheduleNext();
+    return true;
+  }
   if(circuitTargetA!==transitionA){
     await setCircuitA(transitionA);
     await save('TRANSITION','WAIT_CIRCUIT_CAP_CONFIRMATION','SET_TRANSITION_CIRCUIT_CAP',true);
