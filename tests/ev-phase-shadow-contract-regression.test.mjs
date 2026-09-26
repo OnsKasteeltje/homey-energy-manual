@@ -74,7 +74,7 @@ test('phase shadow reconstructs active EV load from confirmed Easee phase readba
 
 test('unconfirmed active phase readback fails phase shadow closed only',()=>{
   assert.match(bridge,/PHASE_READBACK_UNCONFIRMED/);
-  assert.match(bridge,/phaseReadbackValid=currentA===0\|\|actualProductionPhaseCount===1\|\|actualProductionPhaseCount===3/);
+  assert.match(bridge,/phaseReadbackValid=phaseShadowPhysicalA===0\|\|actualProductionPhaseCount===1\|\|actualProductionPhaseCount===3/);
   assert.match(bridge,/production remains the proven fixed-3P controller below/);
 });
 
