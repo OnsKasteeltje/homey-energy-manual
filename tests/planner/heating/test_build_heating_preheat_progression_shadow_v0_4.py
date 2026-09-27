@@ -84,11 +84,13 @@ def priority(*, grant=True, ready=None, generated="2026-09-26T11:59:30Z",
 
 
 def previous_room(key="woonkamer", target=17.5, state="STEP_WAIT", group="living_area",
-                  close="2026-09-26T15:00:00Z", future=19.0, completed=None, reason="WAITING_FOR_MEASURED_TEMPERATURE"):
+                  close="2026-09-26T15:00:00Z", future=19.0, completed=None,
+                  reason="WAITING_FOR_MEASURED_TEMPERATURE", history=None):
     return {
         "key": key,
         "group": group,
         "opportunityId": f"{key}|{close}|{future:.3f}",
+        "stepHistory": list(history or []),
         "progression": {
             "state": state,
             "reason": reason,
@@ -165,6 +167,80 @@ def test_reached_step_advances_by_at_most_half_degree():
     assert p["activeStepReached"] is False
     assert p["completedSteps_C"] == [17.5]
     assert p["lastTransition"] == "ADVANCED_STEP"
+
+
+def test_advanced_step_archives_previous_shadow_intent_interval():
+    prev = previous(previous_room(target=17.5))
+    out = build(h=heating(room(actual=17.5, next_step=18.0)), prev=prev)
+    r = next(r for r in out["rooms"] if r["key"] == "woonkamer")
+
+    assert r["stepHistory"] == [{
+        "opportunityId": "woonkamer|2026-09-26T15:00:00Z|19.000",
+        "target_C": 17.5,
+        "startedAt": "2026-09-26T11:55:00Z",
+        "endedAt": "2026-09-26T12:00:00Z",
+        "outcome": "ADVANCED_STEP",
+        "reason": "ADVANCED_AFTER_MEASURED_STEP_COMPLETION",
+    }]
+    assert r["progression"]["activeStepTarget_C"] == 18.0
+    assert r["progression"]["activeStepStartedAt"] == "2026-09-26T12:00:00Z"
+
+
+def test_completed_final_step_remains_available_as_interval_history():
+    prev = previous(previous_room(target=19.0, future=19.0, completed=[17.5, 18.0, 18.5]))
+    out = build(h=heating(room(actual=19.0, future=19.0, next_step=None)), prev=prev)
+    r = next(r for r in out["rooms"] if r["key"] == "woonkamer")
+
+    assert r["progression"]["state"] == "COMPLETE_TARGET_REACHED"
+    assert r["progression"]["activeStepTarget_C"] is None
+    assert r["progression"]["activeStepStartedAt"] is None
+    assert r["stepHistory"][-1]["target_C"] == 19.0
+    assert r["stepHistory"][-1]["startedAt"] == "2026-09-26T11:55:00Z"
+    assert r["stepHistory"][-1]["endedAt"] == "2026-09-26T12:00:00Z"
+    assert r["stepHistory"][-1]["outcome"] == "TARGET_REACHED"
+
+
+def test_step_history_survives_new_honeywell_opportunity_and_closes_old_active_step():
+    prev = previous(previous_room(
+        target=17.5,
+        close="2026-09-26T15:00:00Z",
+        future=19.0,
+        history=[{
+            "opportunityId": "woonkamer|2026-09-25T15:00:00Z|18.500",
+            "target_C": 18.0,
+            "startedAt": "2026-09-26T10:00:00Z",
+            "endedAt": "2026-09-26T10:20:00Z",
+            "outcome": "TARGET_REACHED",
+            "reason": "FUTURE_HONEYWELL_TARGET_REACHED",
+        }],
+    ))
+    out = build(
+        h=heating(room(close="2026-09-26T16:00:00Z")),
+        prev=prev,
+    )
+    r = next(r for r in out["rooms"] if r["key"] == "woonkamer")
+
+    assert len(r["stepHistory"]) == 2
+    assert r["stepHistory"][0]["target_C"] == 18.0
+    assert r["stepHistory"][1]["target_C"] == 17.5
+    assert r["stepHistory"][1]["outcome"] == "OPPORTUNITY_CHANGED"
+    assert r["stepHistory"][1]["endedAt"] == "2026-09-26T12:00:00Z"
+
+
+def test_unchanged_active_step_does_not_duplicate_history():
+    history = [{
+        "opportunityId": "woonkamer|2026-09-26T15:00:00Z|19.000",
+        "target_C": 17.0,
+        "startedAt": "2026-09-26T11:00:00Z",
+        "endedAt": "2026-09-26T11:15:00Z",
+        "outcome": "ADVANCED_STEP",
+        "reason": "ADVANCED_AFTER_MEASURED_STEP_COMPLETION",
+    }]
+    prev = previous(previous_room(target=17.5, history=history))
+    out = build(h=heating(room(actual=17.4)), prev=prev)
+    r = next(r for r in out["rooms"] if r["key"] == "woonkamer")
+
+    assert r["stepHistory"] == history
 
 
 def test_grant_loss_holds_existing_step_and_never_advances():
@@ -296,3 +372,4 @@ def test_policy_keeps_shadow_boundaries_explicit():
     assert policy["plannerGrantRequiredForStartAndAdvance"] is True
     assert policy["intentionalGridImportAllowed"] is False
     assert policy["rollbackBehavior"] == "NOT_DEFINED_SHADOW_ONLY"
+    assert policy["stepHistoryRetentionHours"] == 48
