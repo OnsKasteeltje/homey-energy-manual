@@ -1036,8 +1036,8 @@ def heating_preheat_shadow_resource():
         "cvGuard": {
             "status": cv_guard.get("status"),
             "reason": cv_guard.get("reason"),
-            "boilerAssistOn": cv_guard.get("boilerAssistOn")
-            if isinstance(cv_guard.get("boilerAssistOn"), bool) else None,
+            "cvActive": cv_guard.get("cvActive")
+            if isinstance(cv_guard.get("cvActive"), bool) else None,
             "ageSeconds": cv_guard.get("ageSeconds"),
         },
         "policy": {
