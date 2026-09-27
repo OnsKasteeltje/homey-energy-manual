@@ -60,11 +60,15 @@ def fetch_device():
     return json.loads(result.stdout)
 
 
-def capability(caps, key):
+def capability(caps, key, observed_at):
     obj = caps.get(key)
     if not isinstance(obj, dict):
         return None
-    return {"value": obj.get("value"), "sourceLastUpdated": obj.get("lastUpdated")}
+    return {
+        "value": obj.get("value"),
+        "observedAt": observed_at,
+        "sourceLastUpdated": obj.get("lastUpdated"),
+    }
 
 
 def atomic_write_json(path, payload):
@@ -89,8 +93,14 @@ def main():
     observed_at = now_utc_iso()
     device = fetch_device()
     caps = device.get("capabilitiesObj") or {}
-    canonical_state = {metric_key: capability(caps, capability_key) for capability_key, metric_key in CANONICAL.items()}
-    observer_state = {output_key: capability(caps, capability_key) for capability_key, output_key in OBSERVER_ONLY.items()}
+    canonical_state = {
+        metric_key: capability(caps, capability_key, observed_at)
+        for capability_key, metric_key in CANONICAL.items()
+    }
+    observer_state = {
+        output_key: capability(caps, capability_key, observed_at)
+        for capability_key, output_key in OBSERVER_ONLY.items()
+    }
 
     payload = {
         "schema": "EMS_QUATT_CURRENT_STATE_V0.1",
