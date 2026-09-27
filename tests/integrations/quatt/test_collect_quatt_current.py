@@ -31,3 +31,8 @@ def test_quatt_collector_keeps_existing_schema_and_read_only_mode():
     assert '"EMS_QUATT_CURRENT_STATE_V0.1"' in source
     assert '"mode": "READ_ONLY"' in source
     assert "set-capability" not in source
+
+
+def test_cv_active_is_canonical_observer_name():
+    assert module.OBSERVER_ONLY["measure_boiler_cic_central_heating_onoff_boiler"] == "cvActive"
+    assert "boilerAssistOn" not in module.OBSERVER_ONLY.values()
