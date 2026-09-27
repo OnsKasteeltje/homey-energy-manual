@@ -340,6 +340,7 @@ allowlisted Web Data API projection
                  |
                  v
 GET /web/planner/heating-preheat-progression-shadow
+/web/heating/temperature-history
                  |
                  v
 Frontend V2 / PV Flex
@@ -348,6 +349,28 @@ Frontend V2 / PV Flex
 Schema: `EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1`. The source must be canonical `EMS_HEATING_PREHEAT_PROGRESSION_SHADOW_V0.4`, `READ_ONLY / SHADOW`, `controlWrites=false`, `physicalWriteAllowed=false`, Honeywell baseline authority, V0.3 eligibility authority and Flex Priority V0.1 allocation authority. The API rejects any room state reporting a physical write, any step bound other than `0.5 C`, intentional grid import, or any rollback mode other than `NOT_DEFINED_SHADOW_ONLY`.
 
 The endpoint is presentation-only. It exposes progression state, active/next shadow target, measured-step completion and transition history for the four scoped rooms. It does not calculate progression, planner grants, Honeywell targets, CV policy or device commands.
+
+## 15.5 Heating room-temperature history resource
+
+Frontend V2 / Verwarming may read the canonical six-hour room-temperature history through:
+
+```text
+ems-history.sqlite / measurements_15m
+  honeywell_<room> / room_temperature_c
+                 |
+                 v
+allowlisted Web Data API projection
+                 |
+                 v
+GET /web/heating/temperature-history
+                 |
+                 v
+Frontend V2 / Verwarming
+```
+
+Schema: `EMS_WEB_HEATING_TEMPERATURE_HISTORY_V1`. The resource is presentation-only and exposes only the four scoped rooms (`woonkamer`, `eetkamer`, `keuken`, `serre`) and canonical `room_temperature_c` 15-minute observations from the preceding six hours. Only `complete` and `partial` measurement buckets are presented; held/other quality states are not promoted to measured truth. The resource performs no interpolation and contains no planner, PV, CV or Honeywell-control policy.
+
+The Verwarming page joins this history only for presentation with the existing Honeywell baseline schedule, V0.3 current preheat eligibility/window and V0.4 current progression state. It must not invent historical V0.3/V0.4 events from a current snapshot. A current active shadow target may be drawn only from its recorded `activeStepStartedAt` through the current observation time.
 
 ## 16. Planned resource families
 
