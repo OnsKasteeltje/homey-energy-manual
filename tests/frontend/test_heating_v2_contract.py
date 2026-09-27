@@ -89,17 +89,17 @@ def test_preheat_window_is_derived_from_honeywell_up_transition_not_current_elig
     assert "hasPreheatWindow" in render
     assert 'candidate?.status === "ELIGIBLE_UP_TRANSITION"' not in render
     assert 'const windowText = hasPreheatWindow(s?.baseline,candidate)' in render
-    assert "preheatWindows(room)" in render
+    assert "preheatWindows(room,start,now,maxAdvanceMinutes)" in render
     assert "room.progressionSource?.opportunityHistory" in render
-    assert "for(const window of preheatWindows(room))" in render
-    assert 'if(hasPreheatWindow(room.shadowSource?.baseline,candidate))' not in render
+    assert "for(const window of preheatWindows(room,start,now,maxAdvanceMinutes))" in render
+    assert 'if(hasPreheatWindow(room.shadowSource?.baseline,candidate))' in render
     assert 'if(candidate?.opportunityOpensAt && candidate?.opportunityClosesAt)' not in render
 
 
 def test_heating_opportunity_windows_use_persisted_progression_history():
     render = RENDER.read_text()
 
-    assert "function preheatWindows(room)" in render
+    assert "function preheatWindows(room,start,now,maxAdvanceMinutes)" in render
     assert "room.progressionSource?.opportunityHistory" in render
     assert "window.opensAt" in render
     assert "window.closesAt" in render
@@ -121,3 +121,13 @@ def test_heating_history_reuses_existing_shadow_render_layer():
     assert render.count('class:"preheat-active"') == 1
     assert render.count("function render(") == 1
     assert render.count("function draw(") == 1
+
+
+def test_future_preheat_preview_uses_honeywell_schedule_and_backend_window_policy():
+    render = RENDER.read_text()
+
+    assert "shadow?.policy?.maxAdvanceMinutes" in render
+    assert "transition.t <= previous.t" in render
+    assert "closesAt <= now" in render
+    assert "maxAdvanceMinutes*60000" in render
+    assert "room.progressionSource?.opportunityHistory" in render

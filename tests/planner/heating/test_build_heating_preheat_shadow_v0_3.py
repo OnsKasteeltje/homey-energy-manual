@@ -49,6 +49,7 @@ def candidate(status="ELIGIBLE_UP_TRANSITION", reason="AWAITING_PV_OPPORTUNITY_E
         "generatedAt": "2026-09-26T12:00:00Z",
         "timezone": "Europe/Amsterdam",
         "baselineAuthority": "HONEYWELL",
+        "policy": {"maxAdvanceMinutes": 180},
         "rooms": [{
             "key": key,
             "displayName": key.title(),
@@ -184,6 +185,7 @@ def test_noneligible_v02_candidate_stays_noneligible():
 
 def test_policy_records_iteration_and_step_guards():
     policy = build()["policy"]
+    assert policy["maxAdvanceMinutes"] == 180.0
     assert policy["maxStep_C"] == 0.5
     assert policy["cvCheckedEveryIteration"] is True
     assert policy["advanceOnlyAfterCurrentStepReached"] is True

@@ -417,6 +417,7 @@ class HeatingPreheatShadowResourceTest(unittest.TestCase):
                 "sourceLastUpdated": "2026-09-24T07:15:32Z",
             },
             "policy": {
+                "maxAdvanceMinutes": 180.0,
                 "maxStep_C": 0.5,
                 "cvCheckedEveryIteration": True,
                 "advanceOnlyAfterCurrentStepReached": True,
@@ -438,9 +439,17 @@ class HeatingPreheatShadowResourceTest(unittest.TestCase):
         self.assertEqual(len(result["rooms"]), 4)
         self.assertFalse(result["controlWrites"])
         self.assertEqual(result["baselineAuthority"], "HONEYWELL")
+        self.assertEqual(result["policy"]["maxAdvanceMinutes"], 180.0)
         self.assertEqual(result["rooms"][0]["shadow"]["state"], "PREHEAT_READY_FOR_GRANT")
         self.assertNotIn("secret", result["rooms"][0])
         self.assertNotIn("internalSecretLikeField", result)
+
+    def test_invalid_max_advance_fails_closed(self):
+        payload = self.source()
+        payload["policy"]["maxAdvanceMinutes"] = 0
+        server.HEATING_PREHEAT_SHADOW_FILE = self.write_source(payload)
+        with self.assertRaises(ValueError):
+            server.heating_preheat_shadow_resource()
 
     def test_write_capable_source_fails_closed(self):
         payload = self.source()

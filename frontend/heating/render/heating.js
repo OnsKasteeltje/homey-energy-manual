@@ -180,38 +180,60 @@ function shadowStepIntervals(room,now){
   return out;
 }
 
-function preheatWindows(room){
+function preheatWindows(room,start,now,maxAdvanceMinutes){
   const out = [];
-  const byId = new Map();
+  const byWindow = new Map();
+  const addWindow = window => {
+    const openMs = new Date(window.opensAt).getTime();
+    const closeMs = new Date(window.closesAt).getTime();
+    if(!Number.isFinite(openMs) || !Number.isFinite(closeMs) || closeMs < openMs) return;
+    const key = `${openMs}|${closeMs}`;
+    const existing = byWindow.get(key);
+    if(existing){
+      existing.ready = existing.ready || window.ready === true;
+      existing.current = existing.current || window.current === true;
+      return;
+    }
+    const normalized = {...window,ready:window.ready === true,current:window.current === true};
+    out.push(normalized);
+    byWindow.set(key,normalized);
+  };
 
   for(const item of room.progressionSource?.opportunityHistory || []){
     if(!item?.opportunityId || !item?.opensAt || !item?.closesAt) continue;
-    const window = {
+    addWindow({
       opportunityId:item.opportunityId,
       opensAt:item.opensAt,
       closesAt:item.closesAt,
       ready:false,
       current:false,
-    };
-    out.push(window);
-    byId.set(item.opportunityId,window);
+    });
   }
 
   const candidate = room.shadowSource?.candidate;
   if(hasPreheatWindow(room.shadowSource?.baseline,candidate)){
-    const opportunityId = room.progressionSource?.opportunityId;
-    const existing = opportunityId ? byId.get(opportunityId) : null;
-    const ready = room.shadowSource?.shadow?.state === "PREHEAT_READY_FOR_GRANT";
-    if(existing){
-      existing.ready = ready;
-      existing.current = true;
-    }else{
-      out.push({
-        opportunityId:opportunityId || null,
-        opensAt:candidate.opportunityOpensAt,
-        closesAt:candidate.opportunityClosesAt,
-        ready,
-        current:true,
+    addWindow({
+      opportunityId:room.progressionSource?.opportunityId || null,
+      opensAt:candidate.opportunityOpensAt,
+      closesAt:candidate.opportunityClosesAt,
+      ready:room.shadowSource?.shadow?.state === "PREHEAT_READY_FOR_GRANT",
+      current:true,
+    });
+  }
+
+  if(numeric(maxAdvanceMinutes) && maxAdvanceMinutes > 0){
+    for(let i=1;i<room.points.length;i++){
+      const previous = room.points[i-1];
+      const transition = room.points[i];
+      if(!numeric(previous?.t) || !numeric(transition?.t) || transition.t <= previous.t) continue;
+      const closesAt = new Date(start.getTime()+transition.m*60000);
+      if(closesAt <= now) continue;
+      addWindow({
+        opportunityId:null,
+        opensAt:new Date(closesAt.getTime()-maxAdvanceMinutes*60000).toISOString(),
+        closesAt:closesAt.toISOString(),
+        ready:false,
+        current:false,
       });
     }
   }
@@ -301,14 +323,18 @@ async function load(){
       };
     });
 
+  const maxAdvanceMinutes = numeric(shadow?.policy?.maxAdvanceMinutes)
+    ? shadow.policy.maxAdvanceMinutes
+    : null;
+
   renderStatus(shadow,progression,rooms);
-  render(rooms,start,now);
+  render(rooms,start,now,maxAdvanceMinutes);
   fresh.textContent = "Verwarming · " + timeFmt.format(new Date(
     progression?.generatedAt || shadow?.generatedAt || history?.generatedAt || schedule.generatedAt || Date.now()
   ));
 }
 
-function render(rooms,start,now){
+function render(rooms,start,now,maxAdvanceMinutes){
   $("#cluster-summary").innerHTML = [
     "<span><b>Leefzone</b> · Woonkamer + Eetkamer</span>",
     "<span><b>Keuken</b> · zelfstandig</span>",
@@ -427,7 +453,7 @@ function render(rooms,start,now){
       add("text",{x:4,y:railY+8,class:"rail-label"},room.displayName);
       add("line",{x1:L,y1:railY+4,x2:W-R,y2:railY+4,class:"rail-base"});
 
-      for(const window of preheatWindows(room)){
+      for(const window of preheatWindows(room,start,now,maxAdvanceMinutes)){
         const rawFrom = minuteAt(window.opensAt,start);
         const rawTo = minuteAt(window.closesAt,start);
         if(rawTo < 0 || rawFrom > HORIZON_MIN || rawTo < rawFrom) continue;
