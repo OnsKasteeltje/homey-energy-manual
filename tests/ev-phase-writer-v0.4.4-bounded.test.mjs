@@ -141,12 +141,24 @@ test('normal OFF holds zero amps without pausing the EV session',()=>{
   assert.doesNotMatch(off,/pauseSession\(/);
 });
 
-test('legacy plugged-in pause is recovered once into enabled zero-amp hold',()=>{
+test('legacy plugged-in pause is recovered once and hold readback ignores Homey onoff',()=>{
   const start=src.indexOf('NORMAL_OFF_ZERO_A_HOLD');
   const end=src.indexOf('// If Easee already exposes',start);
   const off=src.slice(start,end);
+  assert.match(off,/previousWasZeroHold/);
+  assert.match(off,/recoverLegacyPause/);
   assert.match(off,/hw\.chargeState==='plugged_in_paused'/);
   assert.match(off,/await resumeSession\(\)/);
-  assert.match(off,/OFF_HOLD_RESUME_CONFIRM_TIMEOUT/);
-  assert.match(off,/x=>x\.sessionEnabled===true&&x\.chargerTargetA===0/);
+  assert.match(off,/OFF_ZERO_CURRENT_CONFIRM_TIMEOUT/);
+  assert.match(off,/x\.chargerTargetA===0/);
+  assert.match(off,/x\.offeredA!==null && x\.offeredA<=1/);
+  assert.match(off,/x\.powerW!==null && x\.powerW<=250/);
+  assert.doesNotMatch(off,/x=>x\.sessionEnabled===true&&x\.chargerTargetA===0/);
+});
+
+test('same-phase opportunity resumes directly from zero-amp hold',()=>{
+  assert.match(src,/ZERO_HOLD_RESUME_CURRENT_CONFIRM_TIMEOUT/);
+  assert.match(src,/RESUME_FROM_ZERO_HOLD/);
+  assert.match(src,/ZERO_HOLD_RESUMED/);
+  assert.match(src,/previousWasZeroHold &&/);
 });
