@@ -128,7 +128,11 @@ const postJson=async(url,body,accessToken)=>{
   });
   let payload=null;
   try{payload=await r.json();}catch(_){}
-  if(!r.ok)throw new Error('EASEE_HTTP_'+r.status);
+  if(!r.ok){
+    const err=new Error('EASEE_HTTP_'+r.status);
+    err.httpStatus=r.status;
+    throw err;
+  }
   return payload||{};
 };
 
@@ -142,7 +146,11 @@ const getJson=async(url,accessToken)=>{
   });
   let payload=null;
   try{payload=await r.json();}catch(_){}
-  if(!r.ok)throw new Error('EASEE_HTTP_'+r.status);
+  if(!r.ok){
+    const err=new Error('EASEE_HTTP_'+r.status);
+    err.httpStatus=r.status;
+    throw err;
+  }
   return payload;
 };
 
@@ -174,13 +182,13 @@ const readEaseeVars=async()=>{
   return {a,r,e};
 };
 
-const getAccessToken=async vars=>{
+const getAccessToken=async(vars,forceRefresh=false)=>{
   let access=String(vars.a?.value||'').trim();
   let refresh=String(vars.r?.value||'').trim();
   const expiresAt=Date.parse(String(vars.e?.value||''));
   if(!access||!refresh)throw new Error('EASEE_TOKEN_MISSING');
 
-  if(!Number.isFinite(expiresAt)||expiresAt<=Date.now()+60000){
+  if(forceRefresh||!Number.isFinite(expiresAt)||expiresAt<=Date.now()+60000){
     const payload=await postJson(
       'https://api.easee.com/api/accounts/refresh_token',
       {refreshToken:refresh},
@@ -203,23 +211,36 @@ const getAccessToken=async vars=>{
   return access;
 };
 
+// Easee documents that tokens should be refreshed when an API call returns 4xx.
+// For the physical phase boundary we keep that recovery deliberately bounded:
+// exactly one forced refresh + one retry, and only for HTTP 401.
+const withEasee401RefreshRetry=async(vars,request)=>{
+  let access=await getAccessToken(vars,false);
+  try{
+    return await request(access);
+  }catch(err){
+    if(err?.httpStatus!==401)throw err;
+    const latestVars=await readEaseeVars();
+    access=await getAccessToken(latestVars,true);
+    return await request(access);
+  }
+};
+
 const setPhaseMode=async(mode,vars)=>{
   const pv=phaseValue(mode);
   if(![1,3].includes(pv))throw new Error('PHASE_MODE_INVALID');
-  const access=await getAccessToken(vars);
-  await postJson(
+  await withEasee401RefreshRetry(vars,access=>postJson(
     'https://api.easee.com/api/chargers/'+encodeURIComponent(CHARGER_SERIAL)+'/commands/set_phase_mode',
     {phaseMode:pv},
     access
-  );
+  ));
 };
 
 const readCloudPhaseMode=async vars=>{
-  const access=await getAccessToken(vars);
-  const payload=await getJson(
+  const payload=await withEasee401RefreshRetry(vars,access=>getJson(
     'https://api.easee.com/state/'+encodeURIComponent(CHARGER_SERIAL)+'/observations?ids='+PHASE_OBSERVATION_ID,
     access
-  );
+  ));
   return findObservationValue(payload,PHASE_OBSERVATION_ID);
 };
 
