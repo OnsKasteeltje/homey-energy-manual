@@ -825,6 +825,8 @@ def heating_preheat_progression_resource():
         raise ValueError("HEATING_PREHEAT_PROGRESSION_GRID_IMPORT_INVALID")
     if policy.get("rollbackBehavior") != "NOT_DEFINED_SHADOW_ONLY":
         raise ValueError("HEATING_PREHEAT_PROGRESSION_ROLLBACK_INVALID")
+    if policy.get("opportunityHistoryRetentionHours") != 48:
+        raise ValueError("HEATING_PREHEAT_PROGRESSION_OPPORTUNITY_HISTORY_POLICY_INVALID")
 
     allowed_rooms = {"woonkamer", "eetkamer", "keuken", "serre"}
     allowed_states = {
@@ -878,6 +880,34 @@ def heating_preheat_progression_resource():
         if not isinstance(completed, list):
             raise ValueError("HEATING_PREHEAT_PROGRESSION_COMPLETED_STEPS_INVALID")
 
+        opportunity_history = room.get("opportunityHistory")
+        if opportunity_history is None:
+            opportunity_history = []
+        if not isinstance(opportunity_history, list):
+            raise ValueError("HEATING_PREHEAT_PROGRESSION_OPPORTUNITY_HISTORY_INVALID")
+        projected_opportunities = []
+        for interval in opportunity_history:
+            if not isinstance(interval, dict):
+                raise ValueError("HEATING_PREHEAT_PROGRESSION_OPPORTUNITY_HISTORY_INVALID")
+            opportunity_id = interval.get("opportunityId")
+            opens_at = interval.get("opensAt")
+            closes_at = interval.get("closesAt")
+            target = interval.get("target_C")
+            if not isinstance(opportunity_id, str) or not opportunity_id:
+                raise ValueError("HEATING_PREHEAT_PROGRESSION_OPPORTUNITY_HISTORY_INVALID")
+            if isinstance(target, bool) or not isinstance(target, (int, float)):
+                raise ValueError("HEATING_PREHEAT_PROGRESSION_OPPORTUNITY_HISTORY_INVALID")
+            opens_dt = parse_timestamp(opens_at)
+            closes_dt = parse_timestamp(closes_at)
+            if opens_dt is None or closes_dt is None or closes_dt < opens_dt:
+                raise ValueError("HEATING_PREHEAT_PROGRESSION_OPPORTUNITY_HISTORY_INVALID")
+            projected_opportunities.append({
+                "opportunityId": opportunity_id,
+                "opensAt": opens_at,
+                "closesAt": closes_at,
+                "target_C": float(target),
+            })
+
         step_history = room.get("stepHistory")
         if step_history is None:
             step_history = []
@@ -930,6 +960,7 @@ def heating_preheat_progression_resource():
                 "domainGrant": planner.get("domainGrant"),
                 "priorityReason": planner.get("priorityReason"),
             },
+            "opportunityHistory": projected_opportunities,
             "stepHistory": projected_history,
             "progression": {
                 "state": progression.get("state"),
@@ -977,6 +1008,7 @@ def heating_preheat_progression_resource():
             "intentionalGridImportAllowed": False,
             "rollbackBehavior": "NOT_DEFINED_SHADOW_ONLY",
             "stepHistoryRetentionHours": policy.get("stepHistoryRetentionHours"),
+            "opportunityHistoryRetentionHours": policy.get("opportunityHistoryRetentionHours"),
         },
         "rooms": rooms,
         "presentationOnly": True,

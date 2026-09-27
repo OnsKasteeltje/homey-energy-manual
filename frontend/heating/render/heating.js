@@ -180,6 +180,46 @@ function shadowStepIntervals(room,now){
   return out;
 }
 
+function preheatWindows(room){
+  const out = [];
+  const byId = new Map();
+
+  for(const item of room.progressionSource?.opportunityHistory || []){
+    if(!item?.opportunityId || !item?.opensAt || !item?.closesAt) continue;
+    const window = {
+      opportunityId:item.opportunityId,
+      opensAt:item.opensAt,
+      closesAt:item.closesAt,
+      ready:false,
+      current:false,
+    };
+    out.push(window);
+    byId.set(item.opportunityId,window);
+  }
+
+  const candidate = room.shadowSource?.candidate;
+  if(hasPreheatWindow(room.shadowSource?.baseline,candidate)){
+    const opportunityId = room.progressionSource?.opportunityId;
+    const existing = opportunityId ? byId.get(opportunityId) : null;
+    const ready = room.shadowSource?.shadow?.state === "PREHEAT_READY_FOR_GRANT";
+    if(existing){
+      existing.ready = ready;
+      existing.current = true;
+    }else{
+      out.push({
+        opportunityId:opportunityId || null,
+        opensAt:candidate.opportunityOpensAt,
+        closesAt:candidate.opportunityClosesAt,
+        ready,
+        current:true,
+      });
+    }
+  }
+
+  out.sort((a,b)=>new Date(a.opensAt)-new Date(b.opensAt));
+  return out;
+}
+
 function renderStatus(shadow,progression,rooms){
   const house = shadow?.house;
   const cv = shadow?.cvGuard;
@@ -387,15 +427,16 @@ function render(rooms,start,now){
       add("text",{x:4,y:railY+8,class:"rail-label"},room.displayName);
       add("line",{x1:L,y1:railY+4,x2:W-R,y2:railY+4,class:"rail-base"});
 
-      const candidate = room.shadowSource?.candidate;
-      if(hasPreheatWindow(room.shadowSource?.baseline,candidate)){
-        const from = clamp(minuteAt(candidate.opportunityOpensAt,start),0,HORIZON_MIN);
-        const to = clamp(minuteAt(candidate.opportunityClosesAt,start),0,HORIZON_MIN);
+      for(const window of preheatWindows(room)){
+        const rawFrom = minuteAt(window.opensAt,start);
+        const rawTo = minuteAt(window.closesAt,start);
+        if(rawTo < 0 || rawFrom > HORIZON_MIN || rawTo < rawFrom) continue;
+        const from = clamp(rawFrom,0,HORIZON_MIN);
+        const to = clamp(rawTo,0,HORIZON_MIN);
         if(to > from){
-          const ready = room.shadowSource?.shadow?.state === "PREHEAT_READY_FOR_GRANT";
           add("rect",{
             x:x(from),y:railY,width:Math.max(1,x(to)-x(from)),height:8,
-            fill:room.color,class:ready?"preheat-window ready":"preheat-window"
+            fill:room.color,class:window.ready?"preheat-window ready":"preheat-window"
           });
         }
       }

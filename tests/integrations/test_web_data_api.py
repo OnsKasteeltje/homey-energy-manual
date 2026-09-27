@@ -478,6 +478,12 @@ class HeatingPreheatProgressionResourceTest(unittest.TestCase):
                     "domainGrant": "SHADOW_GRANT",
                     "priorityReason": "HEATING_WINDOW_CLOSES_FIRST",
                 },
+                "opportunityHistory": [{
+                    "opportunityId": f"{key}|2026-09-26T16:00:00+02:00|19.000",
+                    "opensAt": "2026-09-26T11:00:00Z",
+                    "closesAt": "2026-09-26T14:00:00Z",
+                    "target_C": 19.0,
+                }],
                 "stepHistory": [{
                     "opportunityId": f"{key}|2026-09-26T16:00:00+02:00|19.000",
                     "target_C": 18.0,
@@ -527,6 +533,7 @@ class HeatingPreheatProgressionResourceTest(unittest.TestCase):
                 "rollbackBehavior": "NOT_DEFINED_SHADOW_ONLY",
                 "statePersistence": "LOCAL_SHADOW_ARTIFACT",
                 "stepHistoryRetentionHours": 48,
+                "opportunityHistoryRetentionHours": 48,
             },
             "rooms": rooms,
             "internalSecretLikeField": "no",
@@ -542,10 +549,20 @@ class HeatingPreheatProgressionResourceTest(unittest.TestCase):
         self.assertEqual(result["rooms"][0]["progression"]["state"], "STEP_WAIT")
         self.assertEqual(result["rooms"][0]["progression"]["activeStepTarget_C"], 18.5)
         self.assertEqual(result["policy"]["stepHistoryRetentionHours"], 48)
+        self.assertEqual(result["policy"]["opportunityHistoryRetentionHours"], 48)
+        self.assertEqual(result["rooms"][0]["opportunityHistory"][0]["target_C"], 19.0)
+        self.assertEqual(result["rooms"][0]["opportunityHistory"][0]["opensAt"], "2026-09-26T11:00:00Z")
         self.assertEqual(result["rooms"][0]["stepHistory"][0]["target_C"], 18.0)
         self.assertEqual(result["rooms"][0]["stepHistory"][0]["outcome"], "ADVANCED_STEP")
         self.assertNotIn("secret", result["rooms"][0])
         self.assertNotIn("internalSecretLikeField", result)
+
+    def test_invalid_opportunity_history_fails_closed(self):
+        payload = self.source()
+        payload["rooms"][0]["opportunityHistory"][0]["closesAt"] = "not-a-time"
+        server.HEATING_PREHEAT_PROGRESSION_FILE = self.write_source(payload)
+        with self.assertRaises(ValueError):
+            server.heating_preheat_progression_resource()
 
     def test_invalid_step_history_fails_closed(self):
         payload = self.source()
