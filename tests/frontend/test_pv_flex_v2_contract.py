@@ -50,3 +50,7 @@ assert '.evbar' not in css and '.evlane' not in css
 assert 'boilerPowerW' not in render
 assert "fetch(" not in render, "renderer must use state adapter"
 print("PASS: PV & Flex Analysis V2 single-render frontend contract")
+
+
+assert 'cvGuard.cvActive' in render
+assert 'cvGuard.boilerAssistOn' not in render
