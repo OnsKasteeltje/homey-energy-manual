@@ -309,8 +309,8 @@ the pause unnecessarily.
 Repository v0.4.4 removes inter-stage self-retrigger. A phase change is executed
 as one bounded HomeyScript transaction with explicit readback timeouts:
 pause/confirm, phase command/confirm, 5 s deadtime, temporary circuit cap,
-resume, current application, charging/electrical phase confirmation, and
-restoration of the captured circuit baseline. The writer re-reads the existing
+resume, current application, Easee command acceptance, and restoration of the
+captured circuit baseline. The writer re-reads the existing
 Bridge/Adapter/Gate command while safely paused so a changed PV command can be
 absorbed before resume. A short RUNNING lock prevents concurrent Gate-triggered
 executions from becoming a second writer.
@@ -320,7 +320,7 @@ Adapter/Gate contract, Easee physical-phase ownership, or single-writer boundary
 changes. The first v0.4.4 deployment attempt rolled back automatically because
 HomeyScript has no `setTimeout`; the bounded source now uses the native global
 `await wait(ms)` primitive and the upgrader rejects unsupported timer usage.
-A second guarded v0.4.4 attempt then aborted before deployment because the 10-second quiescence guard incorrectly required `controlRevision` and `targetA` to remain unchanged while normal same-phase PV control was legitimately adjusting current. The corrected guard now permits same-phase current/revision drift, while still requiring STABLE transition state, unchanged phase/confirmed phase, unchanged normal circuit limit, unchanged charge-state class, and physically coherent Easee requested/offered current. Production remains v0.4.3 until the corrected guarded v0.4.4 upgrade is executed and validated.
+A second guarded v0.4.4 attempt then aborted before deployment because the 10-second quiescence guard incorrectly required `controlRevision` and `targetA` to remain unchanged while normal same-phase PV control was legitimately adjusting current. The corrected guard now permits same-phase current/revision drift, while still requiring STABLE transition state, unchanged phase/confirmed phase, unchanged normal circuit limit, unchanged charge-state class, and physically coherent Easee requested/offered current. Production EV writer is v0.4.4. Opportunistic charging is explicitly an offer contract: EMS exposes phase/current/session availability through Easee; Tesla consumption is not controlled by EMS and is not a success condition. Zero Tesla draw is healthy and must not create a timeout, retry or fail-closed event.
 
 
 ## 12. Battery boundary

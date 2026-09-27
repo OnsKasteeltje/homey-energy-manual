@@ -698,7 +698,7 @@ transition is one bounded actuator transaction inside one HomeyScript invocation
 
 `pause -> confirm paused -> set locked phase -> confirm phase -> 5 s deadtime
 -> temporary symmetric circuit cap -> resume -> set charger current
--> confirm charging/electrical phase -> restore original circuit cap -> STABLE`.
+-> confirm Easee accepted the opportunity -> restore original circuit cap -> STABLE`.
 
 Safety and ownership remain unchanged:
 
@@ -709,7 +709,8 @@ Safety and ownership remain unchanged:
 - native Homey Easee cards remain pause/resume/current/circuit writers;
 - the original circuit limit is captured before transition and restored on both
   success and failure;
-- electrical telemetry must confirm the requested phase after charging resumes;
+- Tesla current/power is observability only and is never a success condition for opportunistic charging;
+- a Tesla that remains at 0 W (for example because it is full or not requesting charge) is a healthy outcome as long as Easee has accepted the requested phase/current opportunity;
 - a short RUNNING lock makes concurrent Gate-triggered invocations no-ops while
   one bounded transaction is active.
 
@@ -732,3 +733,18 @@ An initial guarded v0.4.4 deployment attempt on 2026-09-27 rolled back automatic
 A second guarded attempt correctly stopped before deployment because the original 10-second quiescence guard treated a normal same-phase PV current change as instability. For v0.4.4 source replacement, quiescence now means stable phase/confirmed-phase, STABLE transition state, unchanged normal circuit cap and unchanged charge-state class; `targetA` and `controlRevision` may advance if Easee remains physically coherent (`offeredA` follows its current charger target). This preserves protection against an in-flight phase transition without requiring the realtime PV current loop to freeze.
 
 Production remains on v0.4.3 until the corrected guarded v0.4.4 upgrade is executed from that structural quiescent state and the next natural phase transition is observed.
+
+
+### Opportunistic EV boundary: offer, not consumption
+
+The EMS does not command the Tesla to consume energy. For opportunistic PV charging it only exposes an allowed charging opportunity through Easee: selected phase mode, permitted current and session enablement. Tesla remains free to draw zero, partial or full offered current.
+
+Therefore Tesla behaviour must never create a control-path timeout or failure. In particular:
+
+- no minimum Tesla power is required after resume;
+- no timeout waits for Tesla current/power;
+- a full Tesla may remain at 0 W without causing pause/retry/fail-closed;
+- Easee command acceptance/readback remains the actuator success boundary;
+- actual Tesla current, power and electrically observed phase remain observability for later analysis only.
+
+This rule is architectural, not merely a timeout tuning choice.
