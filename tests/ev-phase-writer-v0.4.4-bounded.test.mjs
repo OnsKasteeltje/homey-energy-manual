@@ -128,3 +128,25 @@ test('pause timeout gets one final hardware read before fail-closed',()=>{
   assert.ok(accept>finalRead);
   assert.ok(rethrow>accept);
 });
+
+
+test('normal OFF holds zero amps without pausing the EV session',()=>{
+  const start=src.indexOf("if(control.mode==='OFF'){");
+  const end=src.indexOf('// If Easee already exposes',start);
+  const off=src.slice(start,end);
+  assert.match(src,/NORMAL_OFF_ZERO_A_HOLD/);
+  assert.match(off,/setCurrentA\(0\)/);
+  assert.match(off,/OFF_ZERO_A_HOLD/);
+  assert.doesNotMatch(off,/pauseAndConfirm\(/);
+  assert.doesNotMatch(off,/pauseSession\(/);
+});
+
+test('legacy plugged-in pause is recovered once into enabled zero-amp hold',()=>{
+  const start=src.indexOf('NORMAL_OFF_ZERO_A_HOLD');
+  const end=src.indexOf('// If Easee already exposes',start);
+  const off=src.slice(start,end);
+  assert.match(off,/hw\.chargeState==='plugged_in_paused'/);
+  assert.match(off,/await resumeSession\(\)/);
+  assert.match(off,/OFF_HOLD_RESUME_CONFIRM_TIMEOUT/);
+  assert.match(off,/x=>x\.sessionEnabled===true&&x\.chargerTargetA===0/);
+});
