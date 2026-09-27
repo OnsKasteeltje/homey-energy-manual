@@ -752,3 +752,10 @@ This rule is architectural, not merely a timeout tuning choice.
 ### Easee auth recovery on phase command
 
 A live 2026-09-27 1P→3P opportunity proved the opportunity-only contract but failed before the phase write with `EASEE_HTTP_401`. The writer now treats a 401 from the Easee phase-command/phase-observation REST boundary as an authentication recovery event: it performs exactly one forced refresh using the current Homey-stored refresh token, persists the returned access/refresh pair, and retries the original request exactly once. Other HTTP errors do not enter this retry path. A second 401 still fails closed. Tesla consumption remains unrelated to this auth handling.
+
+### Final pause read at bounded timeout boundary
+
+Live 3P→1P validation on 2026-09-27 showed that the native Easee pause command can become physically effective at the edge of the existing 6 s pause-confirm polling window. The writer recorded `PAUSE_CONFIRM_TIMEOUT`, while the immediately observed hardware state was already the required safe boundary: `plugged_in_paused`, charging false, offered current 0 A and power 0 W.
+
+The bounded transaction therefore keeps `PAUSE_TIMEOUT_MS=6000` and the existing strict paused predicate, but `pauseAndConfirm()` now performs exactly one definitive `readHardware()` after a `PAUSE_CONFIRM_TIMEOUT`. If that final read is safely paused, the transition proceeds. If it is not, the same timeout is rethrown and `safeAbort()` remains fail-closed. No polling extension, retry loop, Tesla-consumption dependency, phase-threshold change, or weakening of the 5 s electrical deadtime is introduced. The guarded v0.4.4 deployment helper requires the `FINAL_PAUSE_READ_AFTER_TIMEOUT` source marker so an older writer cannot be redeployed through the supported path.
+
