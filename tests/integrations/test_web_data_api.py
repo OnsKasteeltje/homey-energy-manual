@@ -331,7 +331,7 @@ class HeatingPreheatShadowResourceTest(unittest.TestCase):
             "cvGuard": {
                 "status": "OK",
                 "reason": "CURRENT_QUATT_OBSERVER",
-                "boilerAssistOn": False,
+                "cvActive": False,
                 "ageSeconds": 30,
             },
             "policy": {
