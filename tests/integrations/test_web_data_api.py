@@ -349,6 +349,8 @@ class HeatingPreheatShadowResourceTest(unittest.TestCase):
         server.HEATING_PREHEAT_SHADOW_FILE = self.write_source(self.source())
         result = server.heating_preheat_shadow_resource()
         self.assertEqual(result["schema"], "EMS_WEB_HEATING_PREHEAT_SHADOW_V1")
+        self.assertIn("cvActive", result["cvGuard"])
+        self.assertNotIn("boilerAssistOn", result["cvGuard"])
         self.assertEqual(len(result["rooms"]), 4)
         self.assertFalse(result["controlWrites"])
         self.assertEqual(result["baselineAuthority"], "HONEYWELL")
