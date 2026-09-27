@@ -64,3 +64,11 @@ jobs:
 
       - name: Run canonical Pi tests
         run: python -m pytest -q tests/state tests/planner
+
+      - name: Run EV phase writer contract tests
+        run: |
+          node --test \
+            tests/ev-phase-transition-state-machine.test.mjs \
+            tests/ev-phase-writer-v0.4.3-live.test.mjs \
+            tests/ev-phase-writer-v0.4.4-bounded.test.mjs \
+            tests/ev-phase-v044-upgrade-guard.test.mjs
