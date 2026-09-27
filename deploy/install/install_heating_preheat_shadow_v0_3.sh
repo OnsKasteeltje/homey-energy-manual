@@ -25,6 +25,11 @@ if data.get("controlWrites") is not False:
     raise SystemExit("FAIL: heating shadow unexpectedly permits control writes")
 if data.get("baselineAuthority") != "HONEYWELL":
     raise SystemExit("FAIL: Honeywell baseline authority lost")
+cv_guard = data.get("cvGuard") or {}
+if "cvActive" not in cv_guard:
+    raise SystemExit("FAIL: cvGuard.cvActive missing")
+if "boilerAssistOn" in cv_guard:
+    raise SystemExit("FAIL: legacy cvGuard.boilerAssistOn still present")
 print("PASS: Heating Preheat V0.3 one-shot is read-only and fail-closed")
 print("generatedAt:", data.get("generatedAt"))
 print("cvGuard:", data.get("cvGuard"))
