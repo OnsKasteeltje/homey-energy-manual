@@ -5,12 +5,17 @@
 // Transaction:
 // PAUSE -> confirm paused -> set locked phase -> confirm phase -> 5 s deadtime
 // -> temporary symmetric circuit cap -> RESUME -> set charger current
-// -> confirm charging/electrical phase -> restore original circuit cap -> STABLE.
+// -> confirm Easee accepted the opportunity -> restore original circuit cap -> STABLE.
+//
+// OPPORTUNITY CONTRACT: EMS offers charging capacity; Tesla decides whether to
+// consume it. Actual Tesla current/power is observability only and MUST NOT be a
+// success condition, timeout source or fail-closed trigger for opportunity charging.
 //
 // Bridge/Adapter/Gate remain command authority. P1/phase thresholds are unchanged.
 // The writer only executes an already validated command and re-reads that command
 // while safely paused so a PV-driven mode/current change can be absorbed before
-// resume. Any failure pauses the session and restores the captured circuit limit.
+// resume. Any Easee command/contract failure pauses the session and restores the
+// captured circuit limit.
 
 const VERSION='EM2_EV_ACTUATOR_V0.4.4_PHASE_WRITER';
 const TRANSITION_SCHEMA='EM2_EV_PHASE_TRANSITION_STATE_V0.4';
@@ -28,9 +33,7 @@ const PHASE_CONFIRM_TIMEOUT_MS=9000;
 const PHASE_CLOUD_CONFIRM_INTERVAL_MS=2500;
 const DEADTIME_MS=5000;
 const CIRCUIT_CONFIRM_TIMEOUT_MS=5000;
-const RESUME_TIMEOUT_MS=7000;
 const CURRENT_CONFIRM_TIMEOUT_MS=5000;
-const CHARGING_CONFIRM_TIMEOUT_MS=8000;
 const PHASE_OBSERVATION_ID=38;
 const EV_MIN_A=6,EV_MAX_A=16;
 const MAX_REPLANS_WHILE_PAUSED=3;
@@ -299,6 +302,7 @@ const readHardware=async()=>{
 
   const chargeState=String(cap(charger,'evcharger_charging_state')||'unknown').toLowerCase();
   const charging=cap(charger,'evcharger_charging')===true;
+  const sessionEnabled=cap(charger,'onoff')===true;
   const chargerTargetA=num(cap(charger,'target_charger_current'));
   const circuitTargetA=num(cap(charger,'target_circuit_current'));
   const offeredA=num(cap(charger,'measure_current.offered'));
@@ -324,7 +328,7 @@ const readHardware=async()=>{
     powerW!==null && powerW<=250;
 
   return {
-    chargeState,charging,paused,
+    chargeState,charging,sessionEnabled,paused,
     chargerTargetA,circuitTargetA,offeredA,powerW,p1A,p2A,p3A,
     phaseRaw,homeyMode,electricalMode,confirmedMode,phaseConfirmationSource
   };
@@ -364,6 +368,8 @@ const saveStatus=async(status,reason,stage,control,hw,originalCircuitA,extra={})
     confirmedMode:hw?.confirmedMode||'UNKNOWN',
     transition,
     boundedTransition:true,
+    opportunityOnly:true,
+    teslaConsumptionRequired:false,
     observed:hw||null,
     ...extra.statusExtra
   });
@@ -551,39 +557,56 @@ if(control.mode==='OFF'){
   }
 }
 
-// Stable same-phase charging is current control only; no transition transaction.
-if(hw.confirmedMode===control.mode&&!hw.paused&&hw.charging===true){
-  if(hw.circuitTargetA===null||hw.circuitTargetA<control.requestedA){
-    return await safeAbort('CIRCUIT_LIMIT_BELOW_REQUEST',control,null,liveEnabled,null);
-  }
-  let wrote=false;
-  if(hw.chargerTargetA!==control.requestedA){
-    await setCurrentA(control.requestedA);
-    wrote=true;
-    try{
-      hw=await waitHardware(
-        x=>x.chargerTargetA===control.requestedA,
-        CURRENT_CONFIRM_TIMEOUT_MS,
-        'CURRENT_TARGET_CONFIRM_TIMEOUT'
-      );
-    }catch(err){
-      return await safeAbort(
-        'STABLE_CURRENT_ADJUST_FAILED:'+String(err?.message||err),
-        control,
-        null,
-        liveEnabled,
-        null
-      );
-    }
-  }
+// If Easee already exposes the requested same-phase opportunity, Tesla draw is
+// irrelevant: 0 W is a valid healthy state (for example when the car is full).
+if(
+  hw.confirmedMode===control.mode &&
+  hw.sessionEnabled===true &&
+  hw.chargerTargetA===control.requestedA &&
+  hw.circuitTargetA!==null &&
+  hw.circuitTargetA>=control.requestedA
+){
   await saveStatus(
     'STABLE',
-    wrote?'STABLE_CURRENT_ADJUST':'STABLE',
+    hw.charging===true?'STABLE':'OPPORTUNITY_ARMED',
     'STABLE',
     control,
     hw,
     null,
-    {live:true,physicalWritePerformed:wrote,action:wrote?'SET_CURRENT':'NOOP'}
+    {live:true,physicalWritePerformed:false,action:'NOOP'}
+  );
+  return true;
+}
+
+// Same-phase current adjustment while the opportunity is already enabled.
+if(hw.confirmedMode===control.mode&&hw.sessionEnabled===true){
+  if(hw.circuitTargetA===null||hw.circuitTargetA<control.requestedA){
+    return await safeAbort('CIRCUIT_LIMIT_BELOW_REQUEST',control,null,liveEnabled,null);
+  }
+  await setCurrentA(control.requestedA);
+  try{
+    hw=await waitHardware(
+      x=>x.chargerTargetA===control.requestedA,
+      CURRENT_CONFIRM_TIMEOUT_MS,
+      'CURRENT_TARGET_CONFIRM_TIMEOUT'
+    );
+  }catch(err){
+    return await safeAbort(
+      'STABLE_CURRENT_ADJUST_FAILED:'+String(err?.message||err),
+      control,
+      null,
+      liveEnabled,
+      null
+    );
+  }
+  await saveStatus(
+    'STABLE',
+    hw.charging===true?'STABLE_CURRENT_ADJUST':'OPPORTUNITY_CURRENT_ADJUST',
+    'STABLE',
+    control,
+    hw,
+    null,
+    {live:true,physicalWritePerformed:true,action:'SET_CURRENT'}
   );
   return true;
 }
@@ -731,7 +754,7 @@ try{
 
     await resumeSession();
     await saveStatus(
-      'RUNNING','RESUME_SENT','RESUMING',
+      'RUNNING','OPPORTUNITY_RESUME_SENT','RESUMING',
       control,hw,originalCircuitA,
       {
         live:true,physicalWritePerformed:true,action:'RESUME_SESSION',
@@ -739,12 +762,10 @@ try{
       }
     );
 
-    hw=await waitHardware(
-      x=>x.charging===true||x.chargeState==='plugged_in_charging'||x.chargeState==='plugged_in',
-      RESUME_TIMEOUT_MS,
-      'RESUME_CONFIRM_TIMEOUT'
-    );
-
+    // Easee resume can reset dynamic charger current. Give Easee one short
+    // device-settle tick, then re-apply and confirm the bounded opportunity.
+    // This wait is for Easee command ordering, never for Tesla consumption.
+    await sleep(POLL_MS);
     await setCurrentA(control.requestedA);
     hw=await waitHardware(
       x=>x.chargerTargetA===control.requestedA,
@@ -753,34 +774,18 @@ try{
     );
 
     await saveStatus(
-      'RUNNING','CURRENT_TARGET_CONFIRMED','APPLY_CURRENT',
+      'RUNNING','OPPORTUNITY_CURRENT_CONFIRMED','RESTORING_CIRCUIT_CAP',
       control,hw,originalCircuitA,
       {
-        live:true,physicalWritePerformed:true,action:'SET_CURRENT',
-        transitionId,startedAt,statusExtra:{replansWhilePaused:replan}
-      }
-    );
-
-    hw=await waitHardware(
-      x=>
-        x.charging===true &&
-        x.offeredA!==null && x.offeredA>=EV_MIN_A-0.5 &&
-        x.powerW!==null && x.powerW>500 &&
-        x.electricalMode===control.mode,
-      CHARGING_CONFIRM_TIMEOUT_MS,
-      'CHARGING_PHASE_CONFIRM_TIMEOUT'
-    );
-
-    await saveStatus(
-      'RUNNING','CHARGING_PHASE_CONFIRMED','RESTORING_CIRCUIT_CAP',
-      control,hw,originalCircuitA,
-      {
-        live:true,physicalWritePerformed:false,action:'RESTORE_CIRCUIT_CAP',
+        live:true,physicalWritePerformed:true,action:'RESTORE_CIRCUIT_CAP',
         transitionId,startedAt,
         phaseConfirmedMode:control.mode,
         phaseConfirmedAt:iso(),
-        phaseConfirmationSource:'ELECTRICAL_TELEMETRY',
-        statusExtra:{replansWhilePaused:replan}
+        phaseConfirmationSource:hw.phaseConfirmationSource,
+        statusExtra:{
+          replansWhilePaused:replan,
+          teslaConsumptionObserved:hw.powerW!==null&&hw.powerW>0
+        }
       }
     );
 
@@ -805,13 +810,14 @@ try{
       {
         live:true,physicalWritePerformed:true,action:'NOOP',
         transitionId,startedAt,
-        phaseConfirmedMode:hw.electricalMode!=='UNKNOWN'?hw.electricalMode:control.mode,
+        phaseConfirmedMode:control.mode,
         phaseConfirmedAt:iso(),
         phaseConfirmationSource:hw.phaseConfirmationSource,
         statusExtra:{
           durationMs:Date.now()-Date.parse(startedAt),
           replansWhilePaused:replan,
-          selfRetriggerUsed:false
+          selfRetriggerUsed:false,
+          teslaConsumptionObserved:hw.powerW!==null&&hw.powerW>0
         }
       }
     );
