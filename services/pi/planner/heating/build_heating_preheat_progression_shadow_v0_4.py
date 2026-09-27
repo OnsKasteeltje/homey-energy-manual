@@ -11,7 +11,7 @@ Homey, Quatt, CV, Power Intent or another physical/control surface.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 HEATING_SCHEMA = "EMS_HEATING_PREHEAT_SHADOW_V0.3"
@@ -24,6 +24,8 @@ MAX_PRIORITY_AGE_SECONDS = 120
 MAX_FUTURE_SKEW_SECONDS = 30
 STEP_REACHED_TOLERANCE_C = 0.0
 MAX_STEP_C = 0.5
+STEP_HISTORY_RETENTION_HOURS = 48
+MAX_STEP_HISTORY_ITEMS = 128
 
 
 class ProgressionError(ValueError):
@@ -110,6 +112,95 @@ def _completed(previous_progression: dict[str, Any] | None) -> list[float]:
     return out
 
 
+def _step_history(previous_room: dict[str, Any] | None, now: datetime) -> list[dict[str, Any]]:
+    values = previous_room.get("stepHistory") if isinstance(previous_room, dict) else None
+    if not isinstance(values, list):
+        return []
+
+    cutoff = now - timedelta(hours=STEP_HISTORY_RETENTION_HOURS)
+    out: list[dict[str, Any]] = []
+    for item in values:
+        if not isinstance(item, dict):
+            continue
+        opportunity_id = item.get("opportunityId")
+        target = item.get("target_C")
+        started_at = item.get("startedAt")
+        ended_at = item.get("endedAt")
+        outcome = item.get("outcome")
+        reason = item.get("reason")
+        if not isinstance(opportunity_id, str) or not opportunity_id:
+            continue
+        if isinstance(target, bool) or not isinstance(target, (int, float)):
+            continue
+        if not isinstance(outcome, str) or not outcome:
+            continue
+        try:
+            started_dt = _aware(started_at, "stepHistory.startedAt")
+            ended_dt = _aware(ended_at, "stepHistory.endedAt")
+        except ProgressionError:
+            continue
+        if ended_dt < started_dt or ended_dt < cutoff:
+            continue
+        out.append({
+            "opportunityId": opportunity_id,
+            "target_C": float(target),
+            "startedAt": _iso(started_dt),
+            "endedAt": _iso(ended_dt),
+            "outcome": outcome,
+            "reason": reason if isinstance(reason, str) else None,
+        })
+
+    out.sort(key=lambda item: item["startedAt"])
+    return out[-MAX_STEP_HISTORY_ITEMS:]
+
+
+def _close_step_interval(
+    history: list[dict[str, Any]],
+    *,
+    opportunity_id: str | None,
+    target: Any,
+    started_at: Any,
+    ended_at: datetime,
+    outcome: str,
+    reason: str | None,
+) -> None:
+    if not isinstance(opportunity_id, str) or not opportunity_id:
+        return
+    if isinstance(target, bool) or not isinstance(target, (int, float)):
+        return
+    try:
+        started_dt = _aware(started_at, "activeStepStartedAt")
+    except ProgressionError:
+        return
+    if started_dt > ended_at:
+        return
+
+    normalized_started = _iso(started_dt)
+    normalized_target = float(target)
+    identity = (opportunity_id, normalized_target, normalized_started)
+    if any(
+        (
+            item.get("opportunityId"),
+            item.get("target_C"),
+            item.get("startedAt"),
+        ) == identity
+        for item in history
+    ):
+        return
+
+    history.append({
+        "opportunityId": opportunity_id,
+        "target_C": normalized_target,
+        "startedAt": normalized_started,
+        "endedAt": _iso(ended_at),
+        "outcome": outcome,
+        "reason": reason,
+    })
+    history.sort(key=lambda item: item["startedAt"])
+    if len(history) > MAX_STEP_HISTORY_ITEMS:
+        del history[:-MAX_STEP_HISTORY_ITEMS]
+
+
 def _next_increment(active: float, future_target: float) -> float | None:
     if active >= future_target:
         return None
@@ -192,14 +283,26 @@ def build_progression(
         opportunity_id = _opportunity_id(room)
 
         prev_room = previous_rooms.get(key)
-        prev_prog = prev_room.get("progression") if isinstance(prev_room, dict) else None
+        history = _step_history(prev_room, now)
+        raw_prev_prog = prev_room.get("progression") if isinstance(prev_room, dict) else None
         same_opportunity = (
             isinstance(prev_room, dict)
             and prev_room.get("opportunityId") == opportunity_id
-            and isinstance(prev_prog, dict)
+            and isinstance(raw_prev_prog, dict)
         )
-        if not same_opportunity:
-            prev_prog = None
+
+        if not same_opportunity and isinstance(raw_prev_prog, dict):
+            _close_step_interval(
+                history,
+                opportunity_id=prev_room.get("opportunityId"),
+                target=raw_prev_prog.get("activeStepTarget_C"),
+                started_at=raw_prev_prog.get("activeStepStartedAt"),
+                ended_at=now,
+                outcome="OPPORTUNITY_CHANGED",
+                reason="HONEYWELL_OPPORTUNITY_CHANGED",
+            )
+
+        prev_prog = raw_prev_prog if same_opportunity else None
 
         active_prev = None
         if isinstance(prev_prog, dict):
@@ -229,6 +332,7 @@ def build_progression(
             "activePrev": active_prev,
             "activeReached": active_reached,
             "completed": _completed(prev_prog),
+            "stepHistory": history,
             "canReceiveGrant": can_receive_grant,
             "heatingState": shadow.get("state"),
             "heatingReason": shadow.get("reason"),
@@ -257,6 +361,7 @@ def build_progression(
         active = c["activePrev"]
         reached = c["activeReached"]
         completed = list(c["completed"])
+        step_history = list(c["stepHistory"])
         state = "INACTIVE"
         reason = c["heatingReason"] or "HEATING_NOT_READY"
         transition = "NONE"
@@ -362,8 +467,34 @@ def build_progression(
         previous_state = prev.get("state") if isinstance(prev, dict) else None
         previous_reason = prev.get("reason") if isinstance(prev, dict) else None
         previous_target = prev.get("activeStepTarget_C") if isinstance(prev, dict) else None
+        previous_started_at = prev.get("activeStepStartedAt") if isinstance(prev, dict) else None
         previous_reached = prev.get("activeStepReached") if isinstance(prev, dict) else None
         previous_completed = _completed(prev)
+
+        if (
+            isinstance(previous_target, (int, float))
+            and not isinstance(previous_target, bool)
+            and previous_started_at
+            and active != float(previous_target)
+        ):
+            interval_outcome = (
+                "ADVANCED_STEP"
+                if transition == "ADVANCED_STEP"
+                else "TARGET_REACHED"
+                if state == "COMPLETE_TARGET_REACHED"
+                else "BASELINE_TAKEOVER"
+                if state == "ENDED_BASELINE_HEATING"
+                else "ENDED"
+            )
+            _close_step_interval(
+                step_history,
+                opportunity_id=c["opportunityId"],
+                target=previous_target,
+                started_at=previous_started_at,
+                ended_at=now,
+                outcome=interval_outcome,
+                reason=reason,
+            )
 
         progression_changed = (
             not isinstance(prev, dict)
@@ -405,6 +536,7 @@ def build_progression(
                 "domainGrant": "SHADOW_GRANT" if c["canReceiveGrant"] else "HOLD",
                 "priorityReason": decision.get("reason"),
             },
+            "stepHistory": step_history,
             "progression": {
                 "state": state,
                 "reason": reason,
@@ -445,6 +577,7 @@ def build_progression(
             "intentionalGridImportAllowed": False,
             "rollbackBehavior": "NOT_DEFINED_SHADOW_ONLY",
             "statePersistence": "LOCAL_SHADOW_ARTIFACT",
+            "stepHistoryRetentionHours": STEP_HISTORY_RETENTION_HOURS,
         },
         "rooms": output_rooms,
     }
