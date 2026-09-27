@@ -82,11 +82,12 @@ def test_heating_tooltip_shows_one_room_and_one_signal():
     assert 'visible.map(room =>' not in render
 
 
-def test_preheat_window_is_rendered_only_for_eligible_up_transition():
+def test_preheat_window_is_derived_from_honeywell_up_transition_not_current_eligibility():
     render = RENDER.read_text()
 
-    assert 'candidate?.status === "ELIGIBLE_UP_TRANSITION"' in render
-    assert "hasEligiblePreheatWindow(candidate)" in render
-    assert 'const windowText = hasEligiblePreheatWindow(candidate)' in render
-    assert 'if(hasEligiblePreheatWindow(candidate))' in render
+    assert 'baseline?.direction === "UP"' in render
+    assert "hasPreheatWindow" in render
+    assert 'candidate?.status === "ELIGIBLE_UP_TRANSITION"' not in render
+    assert 'const windowText = hasPreheatWindow(s?.baseline,candidate)' in render
+    assert 'if(hasPreheatWindow(room.shadowSource?.baseline,candidate))' in render
     assert 'if(candidate?.opportunityOpensAt && candidate?.opportunityClosesAt)' not in render
