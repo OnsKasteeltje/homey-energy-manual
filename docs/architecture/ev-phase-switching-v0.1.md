@@ -698,7 +698,7 @@ transition is one bounded actuator transaction inside one HomeyScript invocation
 
 `pause -> confirm paused -> set locked phase -> confirm phase -> 5 s deadtime
 -> temporary symmetric circuit cap -> resume -> set charger current
--> confirm charging/electrical phase -> restore original circuit cap -> STABLE`.
+-> confirm Easee accepted the opportunity -> restore original circuit cap -> STABLE`.
 
 Safety and ownership remain unchanged:
 
@@ -709,7 +709,8 @@ Safety and ownership remain unchanged:
 - native Homey Easee cards remain pause/resume/current/circuit writers;
 - the original circuit limit is captured before transition and restored on both
   success and failure;
-- electrical telemetry must confirm the requested phase after charging resumes;
+- Tesla current/power is observability only and is never a success condition for opportunistic charging;
+- a Tesla that remains at 0 W (for example because it is full or not requesting charge) is a healthy outcome as long as Easee has accepted the requested phase/current opportunity;
 - a short RUNNING lock makes concurrent Gate-triggered invocations no-ops while
   one bounded transaction is active.
 
@@ -727,5 +728,49 @@ Canonical sources:
 - `tests/ev-phase-writer-v0.4.4-bounded.test.mjs`
 - `tests/ev-phase-v044-upgrade-guard.test.mjs`
 
-Production remains on v0.4.3 until the guarded v0.4.4 upgrade is executed from a
-quiescent STABLE state and the next natural phase transition is observed.
+An initial guarded v0.4.4 deployment attempt on 2026-09-27 rolled back automatically because HomeyScript does not expose browser/node `setTimeout`; the bounded writer had used it for polling/deadtime. No v0.4.4 writer remained LIVE after rollback. The corrected source uses HomeyScript's native global `await wait(ms)` primitive, and deployment now rejects any v0.4.4 source containing `setTimeout(`.
+
+A second guarded attempt exposed that the deployment helper had become coupled to normal runtime dynamics. That coupling is removed. The supported v0.4.4 in-place source replacement now has only two pre-write safety invariants: (1) the sole writer must not have an active `RUNNING` bounded transition, and (2) the Easee circuit target must be above the EV transition-cap range of 6..16 A, proving that no temporary transition cap remains active. It does not require STABLE status, phase alignment, a particular charge state, PV export, unchanged current, or a timed quiescence window.
+
+The helper rechecks those two invariants immediately before replacement, verifies that the exact repository HomeyScript source was installed, triggers the sole writer once, and validates the v0.4.4 live/bounded schema. Rollback is reserved for source/deployment validation failure. If the newly installed writer itself reports a runtime `FAILED` state, that remains operational evidence for diagnosis and does not roll back an otherwise successful source deployment. Production EV writer is v0.4.4.
+
+
+### Opportunistic EV boundary: offer, not consumption
+
+The EMS does not command the Tesla to consume energy. For opportunistic PV charging it only exposes an allowed charging opportunity through Easee: selected phase mode, permitted current and session enablement. Tesla remains free to draw zero, partial or full offered current.
+
+Therefore Tesla behaviour must never create a control-path timeout or failure. In particular:
+
+- no minimum Tesla power is required after resume;
+- no timeout waits for Tesla current/power;
+- a full Tesla may remain at 0 W without causing pause/retry/fail-closed;
+- Easee command acceptance/readback remains the actuator success boundary;
+- actual Tesla current, power and electrically observed phase remain observability for later analysis only.
+
+This rule is architectural, not merely a timeout tuning choice.
+
+### Easee auth recovery on phase command
+
+A live 2026-09-27 1P→3P opportunity proved the opportunity-only contract but failed before the phase write with `EASEE_HTTP_401`. The writer now treats a 401 from the Easee phase-command/phase-observation REST boundary as an authentication recovery event: it performs exactly one forced refresh using the current Homey-stored refresh token, persists the returned access/refresh pair, and retries the original request exactly once. Other HTTP errors do not enter this retry path. A second 401 still fails closed. Tesla consumption remains unrelated to this auth handling.
+
+### Final pause read at bounded timeout boundary
+
+Live 3P→1P validation on 2026-09-27 showed that the native Easee pause command can become physically effective at the edge of the existing 6 s pause-confirm polling window. The writer recorded `PAUSE_CONFIRM_TIMEOUT`, while the immediately observed hardware state was already the required safe boundary: `plugged_in_paused`, charging false, offered current 0 A and power 0 W.
+
+The bounded transaction therefore keeps `PAUSE_TIMEOUT_MS=6000` and the existing strict paused predicate, but `pauseAndConfirm()` now performs exactly one definitive `readHardware()` after a `PAUSE_CONFIRM_TIMEOUT`. If that final read is safely paused, the transition proceeds. If it is not, the same timeout is rethrown and `safeAbort()` remains fail-closed. No polling extension, retry loop, Tesla-consumption dependency, phase-threshold change, or weakening of the 5 s electrical deadtime is introduced. The guarded v0.4.4 deployment helper requires the `FINAL_PAUSE_READ_AFTER_TIMEOUT` source marker so an older writer cannot be redeployed through the supported path.
+
+### Homey deployment 429 readback rule
+
+Live v0.4.4 source deployment on 2026-09-27 exposed that Homey may apply an
+`update-advanced-flow` write and still return `Too many requests` to the CLI.
+A write-side 429 is therefore an ambiguous transport result, not proof that the
+write failed.
+
+The supported upgrader never blindly repeats an Advanced Flow write or validation
+trigger after a 429. For an ambiguous flow-write response it reads the sole flow
+back once; an exact writable-flow match proves the intended source is installed
+and deployment continues without rollback. A mismatching readback remains a
+deployment failure. Validation-trigger 429 responses are not retriggered; writer
+status readback determines whether the invocation ran. This avoids self-induced
+Homey throttling and duplicate actuator invocations.
+

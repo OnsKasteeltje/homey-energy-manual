@@ -309,16 +309,20 @@ the pause unnecessarily.
 Repository v0.4.4 removes inter-stage self-retrigger. A phase change is executed
 as one bounded HomeyScript transaction with explicit readback timeouts:
 pause/confirm, phase command/confirm, 5 s deadtime, temporary circuit cap,
-resume, current application, charging/electrical phase confirmation, and
-restoration of the captured circuit baseline. The writer re-reads the existing
+resume, current application, Easee command acceptance, and restoration of the
+captured circuit baseline. The writer re-reads the existing
 Bridge/Adapter/Gate command while safely paused so a changed PV command can be
 absorbed before resume. A short RUNNING lock prevents concurrent Gate-triggered
 executions from becoming a second writer.
 
 No planner ownership, P1 authority, phase thresholds, deadline semantics,
 Adapter/Gate contract, Easee physical-phase ownership, or single-writer boundary
-changes. Production remains v0.4.3 until the guarded v0.4.4 upgrade is executed
-and validated.
+changes. The first v0.4.4 deployment attempt rolled back automatically because
+HomeyScript has no `setTimeout`; the bounded source now uses the native global
+`await wait(ms)` primitive and the upgrader rejects unsupported timer usage.
+A second guarded v0.4.4 attempt then showed that the deployment helper had accumulated runtime-policy checks that were not deployment safety requirements. The v0.4.4 deploy guard is now deliberately minimal: it refuses replacement only while the sole writer has an active `RUNNING` bounded transition or while the Easee circuit target is within the temporary EV transition-cap range (6..16 A). A circuit target above 16 A proves that no temporary transition cap is active without hard-coding the household baseline. Charging state, pause state, phase alignment, PV export, current target and a timed quiescence window are not deployment prerequisites. The helper verifies the exact installed HomeyScript source, triggers it once, and rolls back only on source/deployment validation failure; a runtime actuator `FAILED` result remains a runtime diagnosis and does not revert a successfully installed source. Production EV writer is v0.4.4. Opportunistic charging is explicitly an offer contract: EMS exposes phase/current/session availability through Easee; Tesla consumption is not controlled by EMS and is not a success condition. Zero Tesla draw is healthy and must not create a timeout, retry or fail-closed event.
+
+Live 3P→1P validation on 2026-09-27 exposed a separate false pause-timeout boundary: the native Easee pause command completed physically, but Homey only exposed the final `plugged_in_paused / 0 A / 0 W` state at the edge of the existing 6 s bounded polling window. The writer therefore recorded `PAUSE_CONFIRM_TIMEOUT` even though the required safe paused state was already present immediately afterwards. v0.4.4 keeps the 6 s bounded polling window unchanged, then performs exactly one final hardware read before declaring that timeout. If that read satisfies the existing strict paused predicate, the transaction continues; otherwise fail-closed behavior is unchanged. This does not extend the polling loop, weaken pause criteria, alter the 5 s phase deadtime, or change planner/P1/phase authority.
 
 
 ## 12. Battery boundary
@@ -358,3 +362,5 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - no automatic production timers for legacy Homey Insights/day-history polling or alternative Pi-side Homey control publishers.
 
 A failed architecture gate is a hard deployment stop and must not be bypassed in normal operation.
+
+The 2026-09-27 opportunity-only EV cutover also exposed a stale/invalid Easee access token during a 1P→3P phase command (`EASEE_HTTP_401`). The v0.4.4 writer now performs exactly one forced Easee token refresh and one retry on HTTP 401 for the phase-command/phase-observation REST boundary. Other HTTP failures remain fail-closed, and Tesla power draw is not part of this recovery logic.

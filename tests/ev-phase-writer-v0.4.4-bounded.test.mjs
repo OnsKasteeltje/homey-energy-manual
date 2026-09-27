@@ -20,6 +20,11 @@ test('v0.4.4 removes inter-stage self retrigger completely',()=>{
   assert.match(src,/selfRetriggerUsed:false/);
 });
 
+test('bounded writer uses HomeyScript native wait and never setTimeout',()=>{
+  assert.match(src,/const sleep=ms=>wait\(ms\)/);
+  assert.doesNotMatch(src,/setTimeout\s*\(/);
+});
+
 test('bounded transition keeps all physical safety stages in one invocation',()=>{
   const pause=src.indexOf('hw=await pauseAndConfirm()');
   const phase=src.indexOf('await setPhaseMode(control.mode,vars)');
@@ -44,13 +49,25 @@ test('writer re-reads authoritative control while safely paused',()=>{
   assert.match(src,/MODE_UNSTABLE_DURING_TRANSITION/);
 });
 
-test('writer confirms paused, phase, temporary cap, charging and final restore',()=>{
+test('writer confirms Easee opportunity settings without requiring Tesla consumption',()=>{
   assert.match(src,/PAUSE_CONFIRM_TIMEOUT/);
   assert.match(src,/PHASE_CONFIRM_TIMEOUT/);
   assert.match(src,/TRANSITION_CIRCUIT_CAP_CONFIRM_TIMEOUT/);
-  assert.match(src,/CHARGING_PHASE_CONFIRM_TIMEOUT/);
+  assert.match(src,/CURRENT_TARGET_CONFIRM_TIMEOUT/);
   assert.match(src,/CIRCUIT_RESTORE_TIMEOUT/);
-  assert.match(src,/electricalMode===control\.mode/);
+  assert.match(src,/teslaConsumptionRequired:false/);
+  assert.match(src,/OPPORTUNITY_CURRENT_CONFIRMED/);
+  assert.doesNotMatch(src,/CHARGING_CONFIRM_TIMEOUT_MS/);
+  assert.doesNotMatch(src,/CHARGING_PHASE_CONFIRM_TIMEOUT/);
+  assert.doesNotMatch(src,/RESUME_CONFIRM_TIMEOUT/);
+  assert.doesNotMatch(src,/x\.powerW!==null && x\.powerW>500/);
+});
+
+test('zero Tesla draw is explicitly a healthy armed opportunity',()=>{
+  assert.match(src,/OPPORTUNITY_ARMED/);
+  assert.match(src,/Tesla draw is\s*\/\/ irrelevant|Tesla draw is/);
+  assert.match(src,/Tesla decides whether to\s*\/\/ consume it|Tesla decides whether to consume it/);
+  assert.match(src,/teslaConsumptionObserved/);
 });
 
 test('all failure exits restore the captured circuit baseline through safeAbort',()=>{
@@ -66,10 +83,12 @@ test('concurrent gate triggers cannot start a second bounded transaction',()=>{
   assert.match(src,/age\(previous\?\.at\)<RUN_LOCK_MS/);
 });
 
-test('stable same-phase charging remains a short current-only path',()=>{
-  assert.match(src,/Stable same-phase charging is current control only/);
-  assert.match(src,/hw\.confirmedMode===control\.mode&&!hw\.paused&&hw\.charging===true/);
-  assert.match(src,/STABLE_CURRENT_ADJUST/);
+test('stable same-phase opportunity does not depend on active charging',()=>{
+  assert.match(src,/hw\.confirmedMode===control\.mode/);
+  assert.match(src,/hw\.sessionEnabled===true/);
+  assert.match(src,/hw\.chargerTargetA===control\.requestedA/);
+  assert.match(src,/OPPORTUNITY_ARMED/);
+  assert.match(src,/OPPORTUNITY_CURRENT_ADJUST/);
 });
 
 test('native Homey cards remain the only session/current/circuit writers',()=>{
@@ -78,4 +97,34 @@ test('native Homey cards remain the only session/current/circuit writers',()=>{
   assert.match(src,/circuitCurrentControl/);
   assert.match(src,/setDynamicChargerCurrent/);
   assert.doesNotMatch(src,/setCapabilityValue\(/);
+});
+
+
+test('Easee phase/cloud auth retries exactly once after HTTP 401',()=>{
+  assert.match(src,/const withEasee401RefreshRetry=async/);
+  assert.match(src,/if\(err\?\.httpStatus!==401\)throw err/);
+  assert.match(src,/const latestVars=await readEaseeVars\(\)/);
+  assert.match(src,/getAccessToken\(latestVars,true\)/);
+  assert.match(src,/setPhaseMode=async/);
+  assert.match(src,/readCloudPhaseMode=async/);
+});
+
+test('Easee HTTP errors preserve status for bounded auth recovery',()=>{
+  const matches=src.match(/err\.httpStatus=r\.status/g)||[];
+  assert.ok(matches.length>=2);
+});
+
+test('pause timeout gets one final hardware read before fail-closed',()=>{
+  const start=src.indexOf('FINAL_PAUSE_READ_AFTER_TIMEOUT');
+  const wait=src.indexOf("waitHardware(x=>x.paused,PAUSE_TIMEOUT_MS,'PAUSE_CONFIRM_TIMEOUT')",start);
+  const catchTimeout=src.indexOf("String(err?.message||err)!=='PAUSE_CONFIRM_TIMEOUT'",wait);
+  const finalRead=src.indexOf('hw=await readHardware()',catchTimeout);
+  const accept=src.indexOf('if(hw.paused)return hw',finalRead);
+  const rethrow=src.indexOf('throw err',accept);
+  assert.ok(start>=0);
+  assert.ok(wait>start);
+  assert.ok(catchTimeout>wait);
+  assert.ok(finalRead>catchTimeout);
+  assert.ok(accept>finalRead);
+  assert.ok(rethrow>accept);
 });
