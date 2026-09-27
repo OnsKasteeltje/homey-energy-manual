@@ -72,7 +72,7 @@ def quatt(assist=False, generated="2026-09-26T11:59:30Z"):
         "generatedAt": generated,
         "mode": "READ_ONLY",
         "observerOnly": {
-            "boilerAssistOn": {"value": assist, "sourceLastUpdated": generated},
+            "cvActive": {"value": assist, "sourceLastUpdated": generated},
         },
     }
 
@@ -112,7 +112,7 @@ def test_cv_assist_during_pure_preheat_blocks_further_preheat():
     result = build(q=quatt(assist=True))
     r = result["rooms"][0]
     assert result["house"]["baselineHeatingDemandPresent"] is False
-    assert result["cvGuard"]["boilerAssistOn"] is True
+    assert result["cvGuard"]["cvActive"] is True
     assert r["shadow"]["state"] == "PREHEAT_BLOCKED_CV_ASSIST"
     assert r["shadow"]["reason"] == "CV_ASSIST_DURING_PURE_PREHEAT"
 

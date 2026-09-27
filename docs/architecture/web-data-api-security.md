@@ -307,7 +307,7 @@ GET /web/planner/heating-preheat-shadow
 Frontend V2 / PV Flex
 ```
 
-Schema: `EMS_WEB_HEATING_PREHEAT_SHADOW_V1`. The endpoint accepts only the canonical `EMS_HEATING_PREHEAT_SHADOW_V0.3` source with `mode=READ_ONLY`, `controlMode=SHADOW`, `controlWrites=false` and Honeywell baseline authority. It exposes only the room/window/guard fields required for commissioning. The Web Data API does not calculate eligibility, CV-assist policy, PV priority or step progression. Missing or invalid source data affects only this presentation resource and has zero control impact.
+Schema: `EMS_WEB_HEATING_PREHEAT_SHADOW_V1`. The endpoint accepts only the canonical `EMS_HEATING_PREHEAT_SHADOW_V0.3` source with `mode=READ_ONLY`, `controlMode=SHADOW`, `controlWrites=false` and Honeywell baseline authority. It exposes only the room/window/guard fields required for commissioning; the CV observation is named `cvGuard.cvActive`. The Web Data API does not calculate eligibility, CV-assist policy, PV priority or step progression. Missing or invalid source data affects only this presentation resource and has zero control impact.
 
 ## 15.3 Flex Priority shadow resource
 

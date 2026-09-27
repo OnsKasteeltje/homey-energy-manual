@@ -200,7 +200,7 @@ De volgende plannerincrement mag deze ontwerpregels modelleren, maar blijft SHAD
 3. Actuele ruimtetemperatuur als harde eligibility- en step-completion-input gebruiken.
 4. Iedere Honeywell-UP, ongeacht de totale spronggrootte, alleen binnen een echte preheat-kandidaat opdelen in EMS-stappen van maximaal 0,5 °C.
 5. Een volgende EMS-stap pas toelaten nadat de huidige preheat-target werkelijk is bereikt; bij gekoppelde ruimtes geldt dit voor alle geselecteerde ruimtes.
-6. De voorbereide V0.3 CV-guard met Quatt `boilerAssistOn` live in shadow valideren en `CV_ASSIST_DURING_PURE_PREHEAT` als blokkerend/leerbaar event behouden zonder normale baseline-CV-vraag te bestraffen.
+6. De voorbereide V0.3 CV-guard met Quatt `cvActive` live in shadow valideren en `CV_ASSIST_DURING_PURE_PREHEAT` als blokkerend/leerbaar event behouden zonder normale baseline-CV-vraag te bestraffen.
 7. Woonkamer + Eetkamer als expliciete opportunitygroep ondersteunen zonder hun afzonderlijke meet-/targetstatus te verliezen.
 8. PV Flex-observability gebruiken voor kandidaat/window/guardvalidatie en daarna uitbreiden met de door de centrale planner geselecteerde shadow advancement.
 9. Vanaf hervatting van de stookperiode fijnmazige thermal-learning data archiveren.
