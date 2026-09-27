@@ -572,38 +572,44 @@ if(previousNeedsRecovery&&hw.circuitTargetA!==previousOriginal){
 }
 
 // NORMAL_OFF_ZERO_A_HOLD:
-// A normal loss of PV opportunity is not a session-safety event. Keep the EV
-// session alive and command 0 A so the vehicle remains attached/locked. The
-// native pause action is reserved for bounded phase transitions and safeAbort.
-// If this source is deployed while an older writer has already left the charger
-// in plugged_in_paused, recover that legacy state once by resuming with the
-// dynamic current forced back to 0 A immediately afterwards.
+// A normal loss of PV opportunity is not a session-safety event. Command 0 A
+// without calling pauseCharging(). Homey's Easee app represents both native
+// pause and dynamic-current 0 A as plugged_in_paused/onoff=false, so the hold
+// contract is confirmed from the dynamic-current/power readback, not onoff.
+// The writer-status reason distinguishes our zero-A hold from a true safety pause.
+const previousReason=String(previous?.reason||'');
+const previousWasZeroHold=
+  previous?.schema===VERSION &&
+  previous?.status==='STABLE' &&
+  previousReason.startsWith('OFF_ZERO_A_HOLD');
+
 if(control.mode==='OFF'){
   try{
     let physicalWrite=false;
-    const legacyPaused=
-      hw.sessionEnabled!==true &&
-      hw.chargeState==='plugged_in_paused';
+    const recoverLegacyPause=
+      !previousWasZeroHold &&
+      hw.chargeState==='plugged_in_paused' &&
+      hw.chargerTargetA===0;
 
-    if(hw.chargerTargetA!==0){
-      await setCurrentA(0);
-      physicalWrite=true;
-      hw=await waitHardware(
-        x=>x.chargerTargetA===0,
-        CURRENT_CONFIRM_TIMEOUT_MS,
-        'OFF_ZERO_CURRENT_CONFIRM_TIMEOUT'
-      );
-    }
-
-    if(legacyPaused){
+    // One-time migration from the old OFF->pause behavior: resume the authorised
+    // session, then immediately re-assert dynamic current 0 A. Future OFF
+    // invocations see OFF_ZERO_A_HOLD status and do not repeat this resume.
+    if(recoverLegacyPause){
       await resumeSession();
       physicalWrite=true;
       await sleep(POLL_MS);
+    }
+
+    if(hw.chargerTargetA!==0||recoverLegacyPause){
       await setCurrentA(0);
+      physicalWrite=true;
       hw=await waitHardware(
-        x=>x.sessionEnabled===true&&x.chargerTargetA===0,
+        x=>
+          x.chargerTargetA===0 &&
+          x.offeredA!==null && x.offeredA<=1 &&
+          x.powerW!==null && x.powerW<=250,
         CURRENT_CONFIRM_TIMEOUT_MS,
-        'OFF_HOLD_RESUME_CONFIRM_TIMEOUT'
+        'OFF_ZERO_CURRENT_CONFIRM_TIMEOUT'
       );
     }else{
       hw=await readHardware();
@@ -611,7 +617,7 @@ if(control.mode==='OFF'){
 
     await saveStatus(
       'STABLE',
-      legacyPaused?'OFF_ZERO_A_HOLD_RECOVERED':'OFF_ZERO_A_HOLD',
+      recoverLegacyPause?'OFF_ZERO_A_HOLD_RECOVERED':'OFF_ZERO_A_HOLD',
       'STABLE',
       control,
       hw,
@@ -619,13 +625,56 @@ if(control.mode==='OFF'){
       {
         live:true,
         physicalWritePerformed:physicalWrite,
-        action:legacyPaused?'RESUME_ZERO_A_HOLD':'SET_CURRENT_ZERO'
+        action:recoverLegacyPause?'RESUME_THEN_SET_CURRENT_ZERO':'SET_CURRENT_ZERO'
       }
     );
     return true;
   }catch(err){
     return await safeAbort(
       'OFF_ZERO_A_HOLD_FAILED:'+String(err?.message||err),
+      control,
+      null,
+      liveEnabled,
+      null
+    );
+  }
+}
+
+// A previous normal OFF hold may look paused in Homey even though it was created
+// by dynamic current 0 A rather than pauseCharging(). If the requested phase is
+// unchanged, resume directly from that hold and apply the new current; no phase
+// transition pause/deadtime is needed.
+if(
+  previousWasZeroHold &&
+  hw.confirmedMode===control.mode &&
+  hw.chargeState==='plugged_in_paused' &&
+  hw.chargerTargetA===0
+){
+  if(hw.circuitTargetA===null||hw.circuitTargetA<control.requestedA){
+    return await safeAbort('CIRCUIT_LIMIT_BELOW_REQUEST',control,null,liveEnabled,null);
+  }
+  try{
+    await resumeSession();
+    await sleep(POLL_MS);
+    await setCurrentA(control.requestedA);
+    hw=await waitHardware(
+      x=>x.chargerTargetA===control.requestedA,
+      CURRENT_CONFIRM_TIMEOUT_MS,
+      'ZERO_HOLD_RESUME_CURRENT_CONFIRM_TIMEOUT'
+    );
+    await saveStatus(
+      'STABLE',
+      hw.charging===true?'ZERO_HOLD_RESUMED':'ZERO_HOLD_OPPORTUNITY_ARMED',
+      'STABLE',
+      control,
+      hw,
+      null,
+      {live:true,physicalWritePerformed:true,action:'RESUME_FROM_ZERO_HOLD'}
+    );
+    return true;
+  }catch(err){
+    return await safeAbort(
+      'ZERO_HOLD_RESUME_FAILED:'+String(err?.message||err),
       control,
       null,
       liveEnabled,

@@ -789,14 +789,22 @@ That behaviour is not acceptable for ordinary cloud-driven PV modulation. A
 normal `OFF / 0 A / 0 W` control command therefore has different actuator
 semantics from a safety pause:
 
-- normal PV opportunity loss sets the dynamic charger current to **0 A** while
-  leaving the charging session enabled;
+- normal PV opportunity loss sets the dynamic charger current to **0 A** and
+  does **not** call `pauseCharging`;
+- Homey's Easee app may still expose dynamic-current 0 A as
+  `plugged_in_paused / onoff=false`; therefore `onoff` is not the semantic
+  discriminator between a zero-A smart-charging hold and a native session pause;
+- zero-A hold success is confirmed from charger target 0 A, offered current <=1 A
+  and power <=250 W, and is tagged explicitly in writer status as
+  `OFF_ZERO_A_HOLD`;
 - `pauseCharging` remains reserved for the bounded 1P<->3P transition and
   fail-closed/safety recovery;
 - a charger that was already left in `plugged_in_paused` by the previous writer
-  is recovered once by resuming the session with the dynamic current forced to
-  0 A, then remains in zero-amp hold;
-- a disconnected vehicle is never resumed merely because the EMS command is OFF.
+  is recovered once by resume -> dynamic current 0 A; subsequent OFF invocations
+  do not repeat that resume because the writer-status hold marker is authoritative;
+- a disconnected vehicle is never resumed merely because the EMS command is OFF;
+- when PV returns in the same confirmed phase, the writer resumes directly from
+  zero-A hold and applies the requested current without a phase-transition pause.
 
 This preserves the architecture boundary: `OFF` means **no energy opportunity**,
 not **terminate/pause the vehicle session**. The deployment guard requires the
