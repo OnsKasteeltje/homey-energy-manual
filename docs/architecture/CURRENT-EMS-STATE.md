@@ -360,3 +360,5 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - no automatic production timers for legacy Homey Insights/day-history polling or alternative Pi-side Homey control publishers.
 
 A failed architecture gate is a hard deployment stop and must not be bypassed in normal operation.
+
+The 2026-09-27 opportunity-only EV cutover also exposed a stale/invalid Easee access token during a 1P→3P phase command (`EASEE_HTTP_401`). The v0.4.4 writer now performs exactly one forced Easee token refresh and one retry on HTTP 401 for the phase-command/phase-observation REST boundary. Other HTTP failures remain fail-closed, and Tesla power draw is not part of this recovery logic.
