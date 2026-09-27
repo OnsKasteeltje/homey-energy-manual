@@ -66,13 +66,24 @@ def candidate(status="ELIGIBLE_UP_TRANSITION", reason="AWAITING_PV_OPPORTUNITY_E
     }
 
 
-def quatt(assist=False, generated="2026-09-26T11:59:30Z"):
+def quatt(
+    assist=False,
+    generated="2026-09-26T11:59:30Z",
+    observed_at=None,
+    source_last_updated=None,
+):
+    observed_at = observed_at or generated
+    source_last_updated = source_last_updated or generated
     return {
         "schema": "EMS_QUATT_CURRENT_STATE_V0.1",
         "generatedAt": generated,
         "mode": "READ_ONLY",
         "observerOnly": {
-            "cvActive": {"value": assist, "sourceLastUpdated": generated},
+            "cvActive": {
+                "value": assist,
+                "observedAt": observed_at,
+                "sourceLastUpdated": source_last_updated,
+            },
         },
     }
 
@@ -122,6 +133,45 @@ def test_stale_cv_status_fails_closed_for_new_preheat_increment():
     r = result["rooms"][0]
     assert result["cvGuard"]["status"] == "STALE"
     assert r["shadow"]["state"] == "PREHEAT_BLOCKED_CV_STATUS_UNKNOWN"
+
+
+def test_old_source_change_time_does_not_make_fresh_observation_stale():
+    result = build(q=quatt(
+        assist=False,
+        generated="2026-09-26T11:59:30Z",
+        observed_at="2026-09-26T11:59:30Z",
+        source_last_updated="2026-09-24T07:15:32Z",
+    ))
+    guard = result["cvGuard"]
+    assert guard["status"] == "OK"
+    assert guard["cvActive"] is False
+    assert guard["ageSeconds"] == 30.0
+    assert guard["sourceLastUpdated"] == "2026-09-24T07:15:32Z"
+
+
+def test_stale_cv_observation_fails_closed_even_when_artifact_is_fresh():
+    result = build(q=quatt(
+        assist=False,
+        generated="2026-09-26T11:59:30Z",
+        observed_at="2026-09-26T11:45:00Z",
+        source_last_updated="2026-09-24T07:15:32Z",
+    ))
+    guard = result["cvGuard"]
+    r = result["rooms"][0]
+    assert guard["status"] == "STALE"
+    assert guard["reason"] == "CV_ACTIVE_OBSERVATION_STALE"
+    assert guard["cvActive"] is None
+    assert r["shadow"]["state"] == "PREHEAT_BLOCKED_CV_STATUS_UNKNOWN"
+
+
+def test_missing_cv_observation_time_fails_closed():
+    q = quatt()
+    del q["observerOnly"]["cvActive"]["observedAt"]
+    result = build(q=q)
+    guard = result["cvGuard"]
+    assert guard["status"] == "UNKNOWN"
+    assert guard["reason"] == "CV_ACTIVE_OBSERVED_AT_INVALID"
+    assert result["rooms"][0]["shadow"]["state"] == "PREHEAT_BLOCKED_CV_STATUS_UNKNOWN"
 
 
 def test_noneligible_v02_candidate_stays_noneligible():
