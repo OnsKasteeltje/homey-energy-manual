@@ -20,6 +20,11 @@ test('v0.4.4 removes inter-stage self retrigger completely',()=>{
   assert.match(src,/selfRetriggerUsed:false/);
 });
 
+test('bounded writer uses HomeyScript native wait and never setTimeout',()=>{
+  assert.match(src,/const sleep=ms=>wait\(ms\)/);
+  assert.doesNotMatch(src,/setTimeout\s*\(/);
+});
+
 test('bounded transition keeps all physical safety stages in one invocation',()=>{
   const pause=src.indexOf('hw=await pauseAndConfirm()');
   const phase=src.indexOf('await setPhaseMode(control.mode,vars)');

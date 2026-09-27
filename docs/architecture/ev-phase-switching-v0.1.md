@@ -727,5 +727,6 @@ Canonical sources:
 - `tests/ev-phase-writer-v0.4.4-bounded.test.mjs`
 - `tests/ev-phase-v044-upgrade-guard.test.mjs`
 
-Production remains on v0.4.3 until the guarded v0.4.4 upgrade is executed from a
-quiescent STABLE state and the next natural phase transition is observed.
+An initial guarded v0.4.4 deployment attempt on 2026-09-27 rolled back automatically because HomeyScript does not expose browser/node `setTimeout`; the bounded writer had used it for polling/deadtime. No v0.4.4 writer remained LIVE after rollback. The corrected source uses HomeyScript's native global `await wait(ms)` primitive, and deployment now rejects any v0.4.4 source containing `setTimeout(`.
+
+Production remains on v0.4.3 until the corrected guarded v0.4.4 upgrade is executed from a quiescent STABLE state and the next natural phase transition is observed.
