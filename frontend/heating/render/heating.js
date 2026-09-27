@@ -1,13 +1,427 @@
-const URL='/web/heating/schedule'; const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']; const COLORS=['#2f9e87','#2e86b7','#d08b33','#8d6cab']; const H=1440, HISTORY_MIN=360;
-const $=s=>document.querySelector(s), svg=$('#heating-chart'), legend=$('#legend'), empty=$('#empty'), fresh=$('#freshness');
-const parts=d=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{weekday:'long',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Europe/Amsterdam'}).formatToParts(d).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
-const dayName=d=>{const s=String(d?.day_of_week??'');return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase()};
-function points(schedule,start){let out=[],last=null; for(let m=0;m<=H;m++){let t=new Date(start.getTime()+m*60000),p=parts(t),mins=+p.hour*60 + +p.minute, today=(schedule||[]).find(x=>dayName(x)===p.weekday)?.switchpoints||[],v=null; for(const sp of today){let [hh,mm]=String(sp.time_of_day).split(':').map(Number);if(hh*60+mm<=mins)v=+sp.heat_setpoint} if(v===null){let di=DAYS.indexOf(p.weekday);for(let b=1;b<=7&&v===null;b++){let prev=(schedule||[]).find(x=>dayName(x)===DAYS[(di-b+7)%7])?.switchpoints||[];if(prev.length)v=+prev.at(-1).heat_setpoint}} if(v!==null&&v!==last){out.push({m,t:v});last=v}} if(out.length&&out.at(-1).m!==H)out.push({m:H,t:out.at(-1).t});return out}
-async function load(){let p=null;try{let r=await fetch(URL,{cache:'no-store'});if(r.ok)p=await r.json()}catch{} if(!p||p.schema!=='EMS_WEB_HEATING_SCHEDULE_V1'||p.baselineAuthority!=='HONEYWELL'||!Array.isArray(p.rooms)){empty.hidden=false;fresh.textContent='Geen schema';return} let now=new Date();let start=new Date(now.getTime()-HISTORY_MIN*60000);start.setSeconds(0,0);start.setMinutes(Math.floor(start.getMinutes()/15)*15);let rooms=p.rooms.filter(r=>['woonkamer','eetkamer','keuken','serre'].includes(r.key)).map((r,i)=>({...r,color:COLORS[i],points:points(r.weeklySchedule,start)})); render(rooms,start); fresh.textContent='Honeywell · '+new Intl.DateTimeFormat('nl-NL',{hour:'2-digit',minute:'2-digit'}).format(new Date(p.generatedAt||Date.now()))}
-function render(rooms,start){$('#cluster-summary').innerHTML='<span><b>Leefzone</b> · Woonkamer + Eetkamer</span><span><b>Keuken</b> · zelfstandig</span><span><b>Serre</b> · zelfstandig</span>';let off=new Set;rooms.forEach(r=>{let b=document.createElement('button');b.innerHTML='<i style="background:'+r.color+'"></i>'+r.displayName;b.onclick=()=>{off.has(r.key)?off.delete(r.key):off.add(r.key);b.classList.toggle('off');draw()};legend.append(b)});function draw(){let vis=rooms.filter(r=>!off.has(r.key)),ts=vis.flatMap(r=>r.points.map(p=>p.t)),min=Math.floor((Math.min(...ts)-.5)*2)/2,max=Math.ceil((Math.max(...ts)+.5)*2)/2,W=1180,HH=420,L=55,R=20,T=20,B=42,x=m=>L+m/H*(W-L-R),y=t=>T+(max-t)/(max-min)*(HH-T-B),ns='http://www.w3.org/2000/svg';svg.setAttribute('viewBox',`0 0 ${W} ${HH}`);svg.innerHTML='';let add=(tag,a,txt)=>{let e=document.createElementNS(ns,tag);Object.entries(a).forEach(([k,v])=>e.setAttribute(k,v));if(txt!=null)e.textContent=txt;svg.append(e);return e};for(let t=min;t<=max+.01;t+=.5){add('line',{x1:L,y1:y(t),x2:W-R,y2:y(t),class:'grid'});add('text',{x:L-8,y:y(t)+4,'text-anchor':'end',class:'axis'},t.toFixed(1)+'°')}for(let m=0;m<=H;m+=180){add('line',{x1:x(m),y1:T,x2:x(m),y2:HH-B,class:'grid'});add('text',{x:x(m),y:HH-16,'text-anchor':m===0?'start':m===H?'end':'middle',class:'axis'},new Intl.DateTimeFormat('nl-NL',{hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(start.getTime()+m*60000)))}vis.forEach(r=>{let d=`M ${x(r.points[0].m)} ${y(r.points[0].t)}`;for(let i=1;i<r.points.length;i++)d+=` H ${x(r.points[i].m)} V ${y(r.points[i].t)}`;add('path',{d,stroke:r.color,class:'room'})});let now=(Date.now()-start)/60000;if(now>=0&&now<=H)add('line',{x1:x(now),y1:T,x2:x(now),y2:HH-B,class:'now'});
-let cross=add('line',{x1:L,y1:T,x2:L,y2:HH-B,class:'crosshair'});cross.style.display='none';
-let hit=add('rect',{x:L,y:T,width:W-L-R,height:HH-T-B,fill:'transparent',class:'hit'});
-const tip=$('#tooltip');
-const show=e=>{let rect=svg.getBoundingClientRect(),px=Math.max(L,Math.min(W-R,(e.clientX-rect.left)/rect.width*W)),m=(px-L)/(W-L-R)*H,when=new Date(start.getTime()+m*60000);cross.setAttribute('x1',px);cross.setAttribute('x2',px);cross.style.display='';let vals=vis.map(r=>{let v=r.points[0]?.t;for(const p of r.points){if(p.m<=m)v=p.t;else break}return '<div><i style="background:'+r.color+'"></i><b>'+r.displayName+'</b> '+(v==null?'—':v.toFixed(1)+'°C')+'</div>'}).join('');tip.innerHTML='<strong>'+new Intl.DateTimeFormat('nl-NL',{weekday:'short',hour:'2-digit',minute:'2-digit'}).format(when)+'</strong>'+vals;tip.hidden=false;let left=(px/W)*rect.width;tip.style.left=Math.min(Math.max(8,left+10),Math.max(8,rect.width-tip.offsetWidth-8))+'px';tip.style.top='10px'};
-hit.addEventListener('pointermove',show);hit.addEventListener('pointerdown',show);hit.addEventListener('pointerleave',()=>{cross.style.display='none';tip.hidden=true})}draw()}
+const SCHEDULE_URL = "/web/heating/schedule";
+const TEMPERATURE_URL = "/web/heating/temperature-history";
+const SHADOW_URL = "/web/planner/heating-preheat-shadow";
+const PROGRESSION_URL = "/web/planner/heating-preheat-progression-shadow";
+
+const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const ROOM_KEYS = ["woonkamer","eetkamer","keuken","serre"];
+const COLORS = ["#2f9e87","#2e86b7","#d08b33","#8d6cab"];
+const HORIZON_MIN = 1440;
+const HISTORY_MIN = 360;
+
+const $ = selector => document.querySelector(selector);
+const svg = $("#heating-chart");
+const legend = $("#legend");
+const empty = $("#empty");
+const fresh = $("#freshness");
+
+const timeFmt = new Intl.DateTimeFormat("nl-NL",{hour:"2-digit",minute:"2-digit",hour12:false});
+const tipTimeFmt = new Intl.DateTimeFormat("nl-NL",{weekday:"short",hour:"2-digit",minute:"2-digit"});
+const partsFmt = new Intl.DateTimeFormat("en-US",{weekday:"long",hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Europe/Amsterdam"});
+
+const parts = d => Object.fromEntries(
+  partsFmt.formatToParts(d)
+    .filter(x => x.type !== "literal")
+    .map(x => [x.type,x.value])
+);
+
+const dayName = d => {
+  const s = String(d?.day_of_week ?? "");
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+};
+
+const numeric = value => typeof value === "number" && Number.isFinite(value);\nconst temp = value => numeric(value) ? value.toFixed(1) + " °C" : "—";
+const clock = value => value ? timeFmt.format(new Date(value)) : "—";
+const minuteAt = (value,start) => (new Date(value).getTime() - start.getTime()) / 60000;
+const clamp = (v,min,max) => Math.max(min,Math.min(max,v));
+
+const progressionLabels = {
+  INACTIVE:"Inactief",
+  WAITING_FOR_FRESH_PRIORITY:"Wacht op verse prioriteit",
+  WAITING_FOR_GRANT:"Wacht op planner-grant",
+  STEP_WAIT:"Stap actief · wacht op temperatuur",
+  STEP_REACHED:"Stap bereikt",
+  STEP_REACHED_GROUP_WAIT:"Stap bereikt · wacht op groep",
+  STEP_HOLD_PRIORITY_UNKNOWN:"Stap HOLD · prioriteit onzeker",
+  STEP_HOLD_NO_GRANT:"Stap HOLD · geen grant",
+  BLOCKED_CV_ASSIST:"Geblokkeerd · CV actief",
+  BLOCKED_CV_STATUS_UNKNOWN:"Geblokkeerd · CV-status onbekend",
+  ENDED_BASELINE_HEATING:"Beëindigd · baseline warmtevraag",
+  COMPLETE_TARGET_REACHED:"Gereed · Honeywell-target bereikt",
+  COMPLETE_NO_NEXT_STEP:"Gereed · geen volgende stap",
+};
+
+const eligibilityLabels = {
+  PREHEAT_READY_FOR_GRANT:"Kandidaat",
+  BASELINE_HEATING:"Baseline warmtevraag",
+  PREHEAT_BLOCKED_CV_ASSIST:"Geblokkeerd · CV actief",
+  PREHEAT_BLOCKED_CV_STATUS_UNKNOWN:"Geblokkeerd · CV-status onbekend",
+  NOT_ELIGIBLE:"Niet kandidaat",
+};
+
+function schedulePoints(schedule,start){
+  const out = [];
+  let last = null;
+  for(let m=0;m<=HORIZON_MIN;m++){
+    const at = new Date(start.getTime()+m*60000);
+    const p = parts(at);
+    const mins = Number(p.hour)*60 + Number(p.minute);
+    const today = (schedule||[]).find(x => dayName(x) === p.weekday)?.switchpoints || [];
+    let value = null;
+    for(const sp of today){
+      const [hh,mm] = String(sp.time_of_day).split(":").map(Number);
+      if(hh*60+mm <= mins) value = Number(sp.heat_setpoint);
+    }
+    if(value === null){
+      const di = DAYS.indexOf(p.weekday);
+      for(let back=1;back<=7 && value===null;back++){
+        const previous = (schedule||[]).find(x => dayName(x) === DAYS[(di-back+7)%7])?.switchpoints || [];
+        if(previous.length) value = Number(previous.at(-1).heat_setpoint);
+      }
+    }
+    if(value !== null && value !== last){
+      out.push({m,t:value});
+      last = value;
+    }
+  }
+  if(out.length && out.at(-1).m !== HORIZON_MIN){
+    out.push({m:HORIZON_MIN,t:out.at(-1).t});
+  }
+  return out;
+}
+
+function valueAtStep(points,m){
+  let value = points[0]?.t;
+  for(const point of points){
+    if(point.m <= m) value = point.t;
+    else break;
+  }
+  return value;
+}
+
+async function loadOptional(url,schema){
+  try{
+    const response = await fetch(url,{cache:"no-store"});
+    if(!response.ok) return null;
+    const payload = await response.json();
+    return payload?.schema === schema ? payload : null;
+  }catch{
+    return null;
+  }
+}
+
+function buildActualSeries(historyRoom,shadowRoom,start,now){
+  const series = [];
+  for(const item of historyRoom?.series || []){
+    const m = minuteAt(item.slotStart,start);
+    if(m < 0 || m > HORIZON_MIN || !Number.isFinite(Number(item.avg_C))) continue;
+    series.push({m,t:Number(item.avg_C),quality:item.quality,at:item.slotStart});
+  }
+
+  const current = shadowRoom?.current?.temperature_C;
+  const shadowAt = shadowRoom?._generatedAt;
+  if(Number.isFinite(current) && shadowAt){
+    const m = minuteAt(shadowAt,start);
+    if(m >= 0 && m <= HORIZON_MIN && m <= minuteAt(now,start)+1){
+      const last = series.at(-1);
+      if(!last || Math.abs(last.m-m) > 0.5){
+        series.push({m,t:current,quality:"current",at:shadowAt});
+      }
+    }
+  }
+  series.sort((a,b)=>a.m-b.m);
+  return series;
+}
+
+function actualPath(series,x,y){
+  let path = "";
+  let previous = null;
+  for(const point of series){
+    const command = !previous || point.m-previous.m > 30 ? "M" : "L";
+    path += `${command} ${x(point.m)} ${y(point.t)} `;
+    previous = point;
+  }
+  return path.trim();
+}
+
+function renderStatus(shadow,progression,rooms){
+  const house = shadow?.house;
+  const cv = shadow?.cvGuard;
+  $("#heating-status").innerHTML = [
+    `<span><b>Baseline</b> · ${house?.baselineHeatingDemandPresent ? "warmtevraag aanwezig" : "voldaan"}</span>`,
+    `<span><b>CV</b> · ${cv?.status === "OK" ? (cv.cvActive ? "actief" : "uit") : "onbekend"}</span>`,
+    `<span><b>Preheat</b> · V0.3 eligibility · V0.4 progression</span>`,
+  ].join("");
+
+  $("#signal-legend").innerHTML = [
+    '<span><i class="sample baseline-sample"></i>Honeywell baseline</span>',
+    '<span><i class="sample actual-sample"></i>Gemeten temperatuur</span>',
+    '<span><i class="sample shadow-sample"></i>EMS shadow-target</span>',
+    '<span><i class="sample rail-sample"></i>Preheat-window</span>',
+  ].join("");
+
+  $("#room-status").innerHTML = rooms.map(room => {
+    const s = room.shadowSource;
+    const p = room.progressionSource;
+    const eligibility = eligibilityLabels[s?.shadow?.state] || s?.shadow?.state || "Niet beschikbaar";
+    const progressionState = progressionLabels[p?.progression?.state] || p?.progression?.state || "Niet beschikbaar";
+    const grant = p?.planner?.domainGrant || "—";
+    const open = s?.candidate?.opportunityOpensAt;
+    const close = s?.candidate?.opportunityClosesAt;
+    const windowText = open && close ? `${clock(open)}–${clock(close)}` : "—";
+    const active = p?.progression?.activeStepTarget_C;
+
+    return `<article class="room-status-card" data-room="${room.key}">
+      <header><i style="background:${room.color}"></i><b>${room.displayName}</b></header>
+      <dl>
+        <div><dt>Nu</dt><dd>${temp(s?.current?.temperature_C ?? p?.currentTemperature_C)}</dd></div>
+        <div><dt>Honeywell baseline</dt><dd>${temp(s?.baseline?.currentTargetTemperature_C)}</dd></div>
+        <div><dt>Preheat-window</dt><dd>${windowText}</dd></div>
+        <div><dt>V0.3</dt><dd>${eligibility}</dd></div>
+        <div><dt>Planner grant</dt><dd>${grant}</dd></div>
+        <div><dt>V0.4</dt><dd>${progressionState}</dd></div>
+        <div><dt>Shadow-target</dt><dd>${temp(active)}</dd></div>
+      </dl>
+    </article>`;
+  }).join("");
+}
+
+async function load(){
+  const schedule = await loadOptional(SCHEDULE_URL,"EMS_WEB_HEATING_SCHEDULE_V1");
+  if(!schedule || schedule.baselineAuthority !== "HONEYWELL" || !Array.isArray(schedule.rooms)){
+    empty.hidden = false;
+    fresh.textContent = "Geen schema";
+    return;
+  }
+
+  const [history,shadow,progression] = await Promise.all([
+    loadOptional(TEMPERATURE_URL,"EMS_WEB_HEATING_TEMPERATURE_HISTORY_V1"),
+    loadOptional(SHADOW_URL,"EMS_WEB_HEATING_PREHEAT_SHADOW_V1"),
+    loadOptional(PROGRESSION_URL,"EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1"),
+  ]);
+
+  const now = new Date();
+  const start = new Date(now.getTime()-HISTORY_MIN*60000);
+  start.setSeconds(0,0);
+  start.setMinutes(Math.floor(start.getMinutes()/15)*15);
+
+  const historyMap = new Map((history?.rooms || []).map(r => [r.key,r]));
+  const shadowMap = new Map((shadow?.rooms || []).map(r => [r.key,{...r,_generatedAt:shadow.generatedAt}]));
+  const progressionMap = new Map((progression?.rooms || []).map(r => [r.key,r]));
+
+  const rooms = schedule.rooms
+    .filter(r => ROOM_KEYS.includes(r.key))
+    .sort((a,b)=>ROOM_KEYS.indexOf(a.key)-ROOM_KEYS.indexOf(b.key))
+    .map((room,index) => {
+      const shadowSource = shadowMap.get(room.key) || null;
+      return {
+        ...room,
+        color:COLORS[index],
+        points:schedulePoints(room.weeklySchedule,start),
+        actual:buildActualSeries(historyMap.get(room.key),shadowSource,start,now),
+        shadowSource,
+        progressionSource:progressionMap.get(room.key) || null,
+      };
+    });
+
+  renderStatus(shadow,progression,rooms);
+  render(rooms,start,now);
+  fresh.textContent = "Verwarming · " + timeFmt.format(new Date(
+    progression?.generatedAt || shadow?.generatedAt || history?.generatedAt || schedule.generatedAt || Date.now()
+  ));
+}
+
+function render(rooms,start,now){
+  $("#cluster-summary").innerHTML = [
+    "<span><b>Leefzone</b> · Woonkamer + Eetkamer</span>",
+    "<span><b>Keuken</b> · zelfstandig</span>",
+    "<span><b>Serre</b> · zelfstandig</span>",
+  ].join("");
+
+  legend.innerHTML = "";
+  const off = new Set();
+
+  rooms.forEach(room => {
+    const button = document.createElement("button");
+    button.innerHTML = `<i style="background:${room.color}"></i>${room.displayName}`;
+    button.onclick = () => {
+      off.has(room.key) ? off.delete(room.key) : off.add(room.key);
+      button.classList.toggle("off");
+      document.querySelector(`.room-status-card[data-room="${room.key}"]`)?.classList.toggle("off");
+      draw();
+    };
+    legend.append(button);
+  });
+
+  function draw(){
+    const visible = rooms.filter(r => !off.has(r.key));
+    const ySource = visible.length ? visible : rooms;
+    const temperatures = ySource.flatMap(room => [
+      ...room.points.map(p => p.t),
+      ...room.actual.map(p => p.t),
+      room.progressionSource?.progression?.activeStepTarget_C,
+    ]).filter(numeric);
+
+    const min = Math.floor((Math.min(...temperatures)-0.5)*2)/2;
+    const max = Math.ceil((Math.max(...temperatures)+0.5)*2)/2;
+
+    const W = 1180;
+    const HH = 500;
+    const L = 58;
+    const R = 20;
+    const T = 20;
+    const PLOT_B = 390;
+    const AXIS_Y = 414;
+    const RAIL_TOP = 435;
+    const RAIL_GAP = 14;
+
+    const x = m => L + m/HORIZON_MIN*(W-L-R);
+    const y = t => T + (max-t)/(max-min)*(PLOT_B-T);
+    const ns = "http://www.w3.org/2000/svg";
+
+    svg.setAttribute("viewBox",`0 0 ${W} ${HH}`);
+    svg.innerHTML = "";
+
+    const add = (tag,attributes,text) => {
+      const element = document.createElementNS(ns,tag);
+      Object.entries(attributes).forEach(([key,value]) => element.setAttribute(key,value));
+      if(text != null) element.textContent = text;
+      svg.append(element);
+      return element;
+    };
+
+    for(let t=min;t<=max+0.01;t+=0.5){
+      add("line",{x1:L,y1:y(t),x2:W-R,y2:y(t),class:"grid"});
+      add("text",{x:L-8,y:y(t)+4,"text-anchor":"end",class:"axis"},t.toFixed(1)+"°");
+    }
+
+    for(let m=0;m<=HORIZON_MIN;m+=180){
+      add("line",{x1:x(m),y1:T,x2:x(m),y2:PLOT_B,class:"grid"});
+      add("text",{
+        x:x(m),y:AXIS_Y,
+        "text-anchor":m===0?"start":m===HORIZON_MIN?"end":"middle",
+        class:"axis"
+      },timeFmt.format(new Date(start.getTime()+m*60000)));
+    }
+
+    visible.forEach(room => {
+      if(room.points.length){
+        let d = `M ${x(room.points[0].m)} ${y(room.points[0].t)}`;
+        for(let i=1;i<room.points.length;i++){
+          d += ` H ${x(room.points[i].m)} V ${y(room.points[i].t)}`;
+        }
+        add("path",{d,stroke:room.color,class:"room baseline-line"});
+      }
+
+      if(room.actual.length){
+        const d = actualPath(room.actual,x,y);
+        if(d) add("path",{d,stroke:room.color,class:"room actual-line"});
+        const latest = room.actual.at(-1);
+        add("circle",{cx:x(latest.m),cy:y(latest.t),r:2.8,fill:room.color,class:"actual-dot"});
+      }
+
+      const progressionState = room.progressionSource?.progression;
+      const activeTarget = progressionState?.activeStepTarget_C;
+      const activeStart = progressionState?.activeStepStartedAt;
+      if(numeric(activeTarget) && activeStart){
+        const from = clamp(minuteAt(activeStart,start),0,HORIZON_MIN);
+        const to = clamp(minuteAt(now,start),0,HORIZON_MIN);
+        if(to >= from){
+          add("line",{
+            x1:x(from),y1:y(activeTarget),x2:x(to),y2:y(activeTarget),
+            stroke:room.color,class:"shadow-target"
+          });
+        }
+      }
+    });
+
+    visible.forEach((room,index) => {
+      const railY = RAIL_TOP + index*RAIL_GAP;
+      add("text",{x:4,y:railY+8,class:"rail-label"},room.displayName);
+      add("line",{x1:L,y1:railY+4,x2:W-R,y2:railY+4,class:"rail-base"});
+
+      const candidate = room.shadowSource?.candidate;
+      if(candidate?.opportunityOpensAt && candidate?.opportunityClosesAt){
+        const from = clamp(minuteAt(candidate.opportunityOpensAt,start),0,HORIZON_MIN);
+        const to = clamp(minuteAt(candidate.opportunityClosesAt,start),0,HORIZON_MIN);
+        if(to > from){
+          const ready = room.shadowSource?.shadow?.state === "PREHEAT_READY_FOR_GRANT";
+          add("rect",{
+            x:x(from),y:railY,width:Math.max(1,x(to)-x(from)),height:8,
+            fill:room.color,class:ready?"preheat-window ready":"preheat-window"
+          });
+        }
+      }
+
+      const prog = room.progressionSource?.progression;
+      if(prog?.activeStepStartedAt && numeric(prog.activeStepTarget_C)){
+        const from = clamp(minuteAt(prog.activeStepStartedAt,start),0,HORIZON_MIN);
+        const to = clamp(minuteAt(now,start),0,HORIZON_MIN);
+        if(to > from){
+          add("rect",{
+            x:x(from),y:railY+1,width:Math.max(1,x(to)-x(from)),height:6,
+            fill:room.color,class:"preheat-active"
+          });
+        }
+      }
+    });
+
+    const nowM = (now.getTime()-start.getTime())/60000;
+    if(nowM>=0 && nowM<=HORIZON_MIN){
+      add("line",{x1:x(nowM),y1:T,x2:x(nowM),y2:RAIL_TOP+(visible.length-1)*RAIL_GAP+11,class:"now"});
+    }
+
+    const cross = add("line",{x1:L,y1:T,x2:L,y2:PLOT_B,class:"crosshair"});
+    cross.style.display = "none";
+    const hit = add("rect",{x:L,y:T,width:W-L-R,height:PLOT_B-T,fill:"transparent",class:"hit"});
+    const tip = $("#tooltip");
+
+    const show = event => {
+      const rect = svg.getBoundingClientRect();
+      const px = clamp((event.clientX-rect.left)/rect.width*W,L,W-R);
+      const m = (px-L)/(W-L-R)*HORIZON_MIN;
+      const when = new Date(start.getTime()+m*60000);
+
+      cross.setAttribute("x1",px);
+      cross.setAttribute("x2",px);
+      cross.style.display = "";
+
+      const vals = visible.map(room => {
+        const baseline = valueAtStep(room.points,m);
+        let actual = null;
+        for(const point of room.actual){
+          if(point.m <= m) actual = point;
+          else break;
+        }
+        const prog = room.progressionSource?.progression;
+        const activeStart = prog?.activeStepStartedAt ? minuteAt(prog.activeStepStartedAt,start) : null;
+        const shadowTarget = prog?.activeStepTarget_C;
+        const shadowVisible = numeric(shadowTarget) && activeStart !== null && m >= activeStart && when <= now;
+
+        return `<div class="tip-room">
+          <i style="background:${room.color}"></i><b>${room.displayName}</b>
+          <span>Baseline ${temp(baseline)}</span>
+          <span>Gemeten ${actual ? temp(actual.t) : "—"}</span>
+          <span>Shadow ${shadowVisible ? temp(shadowTarget) : "—"}</span>
+        </div>`;
+      }).join("");
+
+      tip.innerHTML = `<strong>${tipTimeFmt.format(when)}</strong>${vals}`;
+      tip.hidden = false;
+      const left = (px/W)*rect.width;
+      tip.style.left = Math.min(Math.max(8,left+10),Math.max(8,rect.width-tip.offsetWidth-8))+"px";
+      tip.style.top = "10px";
+    };
+
+    hit.addEventListener("pointermove",show);
+    hit.addEventListener("pointerdown",show);
+    hit.addEventListener("pointerleave",()=>{
+      cross.style.display = "none";
+      tip.hidden = true;
+    });
+  }
+
+  draw();
+}
+
 load();

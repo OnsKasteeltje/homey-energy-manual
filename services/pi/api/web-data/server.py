@@ -45,6 +45,7 @@ PV_FLEX_API_SCHEMA = "EMS_WEB_PV_FLEX_ANALYSIS_V1"
 PV_FORECAST_API_SCHEMA = "EMS_WEB_PV_FORECAST_V2"
 EV_REQUIREMENT_API_SCHEMA = "EMS_WEB_EV_REQUIREMENT_V1"
 HEATING_SCHEDULE_API_SCHEMA = "EMS_WEB_HEATING_SCHEDULE_V1"
+HEATING_TEMPERATURE_HISTORY_API_SCHEMA = "EMS_WEB_HEATING_TEMPERATURE_HISTORY_V1"
 HEATING_PREHEAT_SHADOW_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_SHADOW_V1"
 HEATING_PREHEAT_PROGRESSION_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1"
 FLEX_PRIORITY_SHADOW_API_SCHEMA = "EMS_WEB_FLEX_PRIORITY_SHADOW_V1"
@@ -719,6 +720,81 @@ def heating_schedule_resource():
         "rooms": rooms,
     }
 
+
+def heating_temperature_history_resource(*, generated_at=None):
+    """Return the last six hours of canonical Honeywell room-temperature history.
+
+    Presentation-only. No interpolation, control policy or planner decision is
+    introduced here; only complete/partial 15-minute observations are exposed.
+    """
+    now = generated_at or datetime.now(timezone.utc)
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("HEATING_TEMPERATURE_HISTORY_TIME_INVALID")
+    now = now.astimezone(timezone.utc)
+    start = now - timedelta(hours=6)
+
+    allowed_rooms = ("woonkamer", "eetkamer", "keuken", "serre")
+    device_keys = tuple(f"honeywell_{key}" for key in allowed_rooms)
+    placeholders = ",".join("?" for _ in device_keys)
+
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro&immutable=1", uri=True) as db:
+        rows = db.execute(
+            f"""
+            SELECT m.slot_start_utc,d.device_key,m.value_avg,m.value_min,m.value_max,
+                   m.sample_count,m.quality
+            FROM measurements_15m m
+            JOIN devices d ON d.id=m.device_id
+            JOIN metrics k ON k.id=m.metric_id
+            WHERE m.slot_start_utc >= ? AND m.slot_start_utc <= ?
+              AND d.device_key IN ({placeholders})
+              AND k.metric_key='room_temperature_c'
+              AND m.quality IN ('complete','partial')
+            ORDER BY m.slot_start_utc,d.device_key
+            """,
+            (_utc_text(start), _utc_text(now), *device_keys),
+        ).fetchall()
+
+    room_map = {
+        key: {
+            "key": key,
+            "displayName": key.replace("_", " ").title(),
+            "series": [],
+        }
+        for key in allowed_rooms
+    }
+
+    for slot_start, device_key, avg, minimum, maximum, sample_count, quality in rows:
+        key = device_key[len("honeywell_"):] if isinstance(device_key, str) else None
+        if key not in room_map or parse_timestamp(slot_start) is None:
+            continue
+        if avg is None:
+            continue
+        room_map[key]["series"].append({
+            "slotStart": slot_start,
+            "avg_C": round(float(avg), 3),
+            "min_C": round(float(minimum), 3) if minimum is not None else None,
+            "max_C": round(float(maximum), 3) if maximum is not None else None,
+            "sampleCount": int(sample_count) if sample_count is not None else None,
+            "quality": quality,
+        })
+
+    return {
+        "schema": HEATING_TEMPERATURE_HISTORY_API_SCHEMA,
+        "generatedAt": _utc_text(now),
+        "mode": "READ_ONLY",
+        "presentationOnly": True,
+        "source": "measurements_15m",
+        "metric": "room_temperature_c",
+        "period": {
+            "timezone": "Europe/Amsterdam",
+            "historyMinutes": 360,
+            "start": _utc_text(start),
+            "end": _utc_text(now),
+        },
+        "rooms": [room_map[key] for key in allowed_rooms],
+    }
+
+
 def heating_preheat_progression_resource():
     """Return allowlisted read-only Heating Preheat V0.4 progression observability."""
     source = load_json(HEATING_PREHEAT_PROGRESSION_FILE)
@@ -1127,6 +1203,13 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 send_json(self, 200, heating_preheat_shadow_resource())
             except (OSError, json.JSONDecodeError, ValueError):
+                send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
+            return
+
+        if path.path == "/web/heating/temperature-history":
+            try:
+                send_json(self, 200, heating_temperature_history_resource())
+            except (OSError, sqlite3.Error, ValueError):
                 send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
             return
 

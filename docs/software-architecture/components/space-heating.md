@@ -151,27 +151,21 @@ Historische geaggregeerde Homey Insights blijven bruikbaar voor grove seizoens- 
 
 ## Visualisatie
 
-De plannerwebsite is onderdeel van de validatie. Frontend V2 PV & Flex toont vanaf de V0.3-shadowvoorbereiding een afzonderlijk read-only preheat-paneel met actuele kandidaat-/guardstatus. Zodra de centrale planner een shadow grant en stapmoment kiest, moet diezelfde pagina de daadwerkelijke shadow-vervroeging op de tijdas kunnen tonen.
+De dedicated Frontend V2-pagina **Verwarming** is het primaire thermische analyse- en validatieoppervlak. Deze pagina blijft bewust gescheiden van PV & Flex: zij toont geen EV-, WW-, P1- of PV-plannerlogica en wordt geen tweede energieplanner.
 
-Voor de vier zones in scope moet de visualisatie uiteindelijk op dezelfde tijdas onderscheid maken tussen:
+Voor de vier zones in scope toont de rolling 24-uursweergave, op dezelfde tijdas:
 
-- oorspronkelijke Honeywell baseline;
-- EMS SHADOW-vervroeging;
-- actuele gemeten ruimtetemperatuur;
-- relevante PV-export opportunity;
-- gezamenlijke WW/heating-preheat/EV allocatie en resterende grid-export.
+- de oorspronkelijke Honeywell baseline als vaste comfort-authority;
+- maximaal zes uur canonieke gemeten kamertemperatuur uit `measurements_15m`;
+- het actuele V0.3 preheat-window en eligibility-state;
+- het actuele V0.4 shadow-target, uitsluitend vanaf het vastgelegde `activeStepStartedAt` tot het huidige moment;
+- actuele V0.3/V0.4 status per ruimte en de huisbrede baseline-/CV-guardstatus.
 
-De oorspronkelijke Honeywell-curve blijft altijd zichtbaar en wordt nooit visueel vervangen door de EMS-kandidaat. De visualisatie moet de beslisketen uitlegbaar maken:
+De oorspronkelijke Honeywell-curve blijft altijd zichtbaar en wordt nooit vervangen door de EMS-kandidaat. Baseline, gemeten temperatuur en EMS SHADOW-target moeten visueel verschillende lijnsemantiek hebben. Preheat-windows worden als afzonderlijke room-rails getoond zodat verschillende kamers niet als één gedeeld venster worden geïnterpreteerd.
 
-```text
-baseline
-  -> actuele temperatuur
-  -> toekomstige UP
-  -> mogelijke advancement window
-  -> resterende PV-export opportunity
-  -> geselecteerde shadow advancement + reden
-  -> achteraf rebound/resultaat
-```
+De huidige V0.3/V0.4 artifacts zijn actuele state, geen historische event store. De frontend mag daarom geen historische grants, progression-states of shadow-targets reconstrueren die niet als historische bron bestaan. Voor thermische analyse is de actuele shadow-target alleen aantoonbaar vanaf zijn eigen `activeStepStartedAt`. Historische measured-temperature buckets met andere quality dan `complete` of `partial` worden niet als gemeten waarheid gevisualiseerd.
+
+PV-opportunity, EV/WW-allocatie en realtime P1-context blijven op de afzonderlijke PV & Flex-analyseoppervlakken. Een latere cross-link mag analyse ondersteunen, maar mag de duidelijke authority-/observatie-/shadow-scheiding op de Verwarming-page niet aantasten.
 
 ## Architectuurgrenzen
 
@@ -202,6 +196,6 @@ De volgende plannerincrement mag deze ontwerpregels modelleren, maar blijft SHAD
 5. Een volgende EMS-stap pas toelaten nadat de huidige preheat-target werkelijk is bereikt; bij gekoppelde ruimtes geldt dit voor alle geselecteerde ruimtes.
 6. De voorbereide V0.3 CV-guard met Quatt `cvActive` live in shadow valideren en `CV_ASSIST_DURING_PURE_PREHEAT` als blokkerend/leerbaar event behouden zonder normale baseline-CV-vraag te bestraffen.
 7. Woonkamer + Eetkamer als expliciete opportunitygroep ondersteunen zonder hun afzonderlijke meet-/targetstatus te verliezen.
-8. PV Flex-observability gebruiken voor kandidaat/window/guardvalidatie en daarna uitbreiden met de door de centrale planner geselecteerde shadow advancement.
+8. De dedicated Verwarming-page gebruiken voor baseline/temperatuur/window/shadow-validatie; PV & Flex blijft apart voor cross-domain opportunity/allocatie.
 9. Vanaf hervatting van de stookperiode fijnmazige thermal-learning data archiveren.
 10. Met die data 3-uursgrens, stapgedrag, CV-assist en rebound empirisch valideren voordat fysieke Honeywell-control wordt overwogen.
