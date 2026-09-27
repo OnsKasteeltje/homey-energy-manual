@@ -30,6 +30,10 @@ if "cvActive" not in cv_guard:
     raise SystemExit("FAIL: cvGuard.cvActive missing")
 if "boilerAssistOn" in cv_guard:
     raise SystemExit("FAIL: legacy cvGuard.boilerAssistOn still present")
+if cv_guard.get("status") == "OK" and not cv_guard.get("observedAt"):
+    raise SystemExit("FAIL: current cvGuard missing observedAt")
+if cv_guard.get("status") == "OK" and cv_guard.get("ageSeconds") is None:
+    raise SystemExit("FAIL: current cvGuard missing observation age")
 print("PASS: Heating Preheat V0.3 one-shot is read-only and fail-closed")
 print("generatedAt:", data.get("generatedAt"))
 print("cvGuard:", data.get("cvGuard"))
