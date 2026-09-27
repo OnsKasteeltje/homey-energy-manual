@@ -106,7 +106,7 @@ function renderPreheat(d,priority,progression,isCurrent){
  if(!isCurrent){status.textContent="Live shadow";empty.hidden=false;empty.textContent="Preheat shadow wordt alleen voor vandaag getoond.";return;}
  if(!d){status.textContent="Niet beschikbaar";empty.hidden=false;empty.textContent="Heating Preheat shadow is niet beschikbaar; PV & Flex blijft read-only actief.";return;}
  empty.hidden=true;
- const cv=d.cvGuard?.status==="OK"?(d.cvGuard.boilerAssistOn?"CV actief":"CV uit"):"CV onbekend";
+ const cv=d.cvGuard?.status==="OK"?(d.cvGuard.cvActive?"CV actief":"CV uit"):"CV onbekend";
  const pr=priority?.decision;
  const priorityText=pr?`${priorityLabel(pr.priorityOwner)} · ${evRoleLabel(pr.evRole)}`:"Prioriteit niet beschikbaar";
  status.textContent=`${priorityText} · ${d.house?.baselineHeatingDemandPresent?"Baselinevraag actief":"Baseline voldaan"} · ${cv}`;
