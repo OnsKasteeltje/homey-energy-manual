@@ -610,3 +610,64 @@ Deployment uses the existing actuator Flow ID in place; no second writer is crea
 `services/pi/commissioning/upgrade_ev_phase_writer_v0_4_2.py`
 
 Guarded production cutover completed successfully on 2026-09-26 from a stable 1P charging state. Post-deploy actuator status was `STABLE`, requested and confirmed mode were both `1P`, and confirmation source was `ELECTRICAL_TELEMETRY`. The existing Advanced Flow ID remained the sole EV writer. Earlier same-day v0.4.1 validation proved the full 3P→1P physical chain but also exposed the excessive paused transition duration that motivated v0.4.2. The next natural 1P↔3P event is the remaining live validation for the v0.4.2 latency improvement.
+
+
+## v0.4.3 failed-transition circuit-cap recovery
+
+Live validation on 2026-09-27 exposed a separate fail-closed recovery defect in
+writer v0.4.2. The control chain itself was healthy:
+
+- Pi realtime envelope: `allowed=true`, `PV_OPPORTUNITY`;
+- P1 export: approximately 3.1-3.3 kW;
+- Bridge authoritative phase control: `1P + 13 A`;
+- Adapter: `EXECUTABLE`;
+- Gate: `PASS`;
+- Easee: `plugged_in_paused`, 0 A, 0 W.
+
+The sole LIVE actuator rejected the positive command with
+`CIRCUIT_LIMIT_BELOW_REQUEST` because Easee still reported a dynamic circuit
+limit of 6 A.
+
+Homey Insights established the preceding physical sequence:
+
+- normal dynamic circuit limit was 20 A;
+- during the interrupted transition it moved through 8 A to a temporary 6 A;
+- Easee resume briefly reset charger target to 32 A, matching the already
+  documented resume-reset behaviour;
+- charging stopped again before `RESTORE_CIRCUIT_CAP` completed;
+- the temporary 6 A circuit cap then remained in place.
+
+The defect was in `safePausedRecovery`: a FAILED transition could be reset to
+`STABLE` while clearing `originalCircuitA` before the original circuit limit
+had been restored and confirmed. Once that value was lost, the writer correctly
+refused a later 13 A request against the still-active 6 A circuit cap, but could
+no longer restore the pre-transition baseline itself.
+
+Writer v0.4.3 changes only this recovery boundary:
+
+1. `originalCircuitA` is retained across FAILED state.
+2. Recovery enters explicit `RECOVERING_CIRCUIT_CAP`.
+3. The captured original circuit limit is written back while the session remains
+   safely paused.
+4. The writer returns to `STABLE` only after readback confirms that original
+   limit.
+5. A legacy/orphaned FAILED state with no captured original value remains
+   fail-closed. It may resume only after an externally restored circuit limit is
+   observed above the executable EV range (>16 A), proving that the observed
+   value cannot itself be a temporary transition cap.
+6. The writer never hardcodes or guesses a 20 A/40 A baseline.
+
+Canonical sources:
+
+- `src/homey/actuators/ev-power/ev-power-v0.4.3.phase-writer-live.js`
+- `src/homey/actuators/ev-power/ev-phase-transition-v0.4.mjs`
+- `services/pi/commissioning/upgrade_ev_phase_writer_v0_4_3.py`
+
+The v0.4.3 upgrade helper supports both a normal quiescent STABLE upgrade and the
+specific safely-paused orphaned-cap incident. In the latter case the helper
+deploys the corrected writer but deliberately does not restore or guess a
+baseline; operator recovery of the independently proven pre-transition limit is
+a separate explicit action.
+
+Production remains on v0.4.2 until the guarded v0.4.3 upgrade has been executed
+and validated on Homey.

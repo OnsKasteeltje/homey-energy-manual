@@ -269,6 +269,32 @@ Invoer V2 private read cutover is repository-defined in this release. Invoer V2 
 
 The touched legacy `src/pi/ems-runtime/thermal/` subsystem is removed in this release. Its Quatt collector moves to the canonical integration boundary and its duplicate thermal observer is retired. The active general planner remains temporarily in `src/pi/ems-runtime/planner/` because moving that production path is a separate high-risk migration and is explicitly outside this release.
 
+
+### EV phase writer failed-transition recovery
+
+The 2026-09-27 live EV incident established that planner/P1/Bridge/Adapter/Gate
+were healthy while the sole Homey EV actuator remained fail-closed because a
+temporary 6 A dynamic circuit cap from an interrupted phase/start transition had
+not been restored. The v0.4.2 recovery path could clear its captured
+`originalCircuitA` before physical circuit-limit restoration was confirmed,
+leaving a later positive 1P command blocked by
+`CIRCUIT_LIMIT_BELOW_REQUEST`.
+
+The repository correction is writer v0.4.3. Failed transitions retain the
+captured pre-transition circuit limit, restore it through the existing sole
+Homey actuator path while the session is safely paused, confirm readback, and
+only then return to STABLE. If a legacy/orphaned state has already lost the
+captured baseline, runtime remains fail-closed and does not guess a value. The
+guarded v0.4.3 upgrade helper can deploy in that diagnosed paused/zero-load
+state; restoring the independently proven pre-transition baseline remains an
+explicit operator recovery step.
+
+This change does not alter Pi planner authority, realtime P1 authority, phase
+thresholds, Adapter/Gate semantics, deadline policy, or the single-writer
+boundary. Production remains on v0.4.2 until the guarded Homey upgrade is
+executed and validated.
+
+
 ## 12. Battery boundary
 
 The planned battery architecture is Victron AC-coupled. When commissioned, Victron/DESS remains the primary realtime battery optimizer. Pi/Homey may provide forecasts, load intent and policy constraints but must not create a competing realtime battery optimizer.
