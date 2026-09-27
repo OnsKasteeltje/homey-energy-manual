@@ -58,3 +58,7 @@ test('upgrade blocks unsupported HomeyScript timers',()=>{
   assert.match(src,/setTimeout\(/);
   assert.match(src,/const sleep=ms=>wait\(ms\);/);
 });
+
+test('upgrade requires bounded final pause-read fix',()=>{
+  assert.match(src,/FINAL_PAUSE_READ_AFTER_TIMEOUT/);
+});
