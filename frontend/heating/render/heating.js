@@ -146,6 +146,40 @@ function actualPath(series,x,y){
   return path.trim();
 }
 
+function shadowStepIntervals(room,now){
+  const out = [];
+  for(const item of room.progressionSource?.stepHistory || []){
+    if(
+      numeric(item?.target_C) &&
+      item?.startedAt &&
+      item?.endedAt
+    ){
+      out.push({
+        target_C:item.target_C,
+        startedAt:item.startedAt,
+        endedAt:item.endedAt,
+        outcome:item.outcome || "ENDED",
+        reason:item.reason || null,
+        active:false,
+      });
+    }
+  }
+
+  const progression = room.progressionSource?.progression;
+  if(progression?.activeStepStartedAt && numeric(progression.activeStepTarget_C)){
+    out.push({
+      target_C:progression.activeStepTarget_C,
+      startedAt:progression.activeStepStartedAt,
+      endedAt:now.toISOString(),
+      outcome:"ACTIVE",
+      reason:progression.reason || null,
+      active:true,
+    });
+  }
+
+  return out;
+}
+
 function renderStatus(shadow,progression,rooms){
   const house = shadow?.house;
   const cv = shadow?.cvGuard;
@@ -263,6 +297,7 @@ function render(rooms,start,now){
       ...room.points.map(p => p.t),
       ...room.actual.map(p => p.t),
       room.progressionSource?.progression?.activeStepTarget_C,
+      ...(room.progressionSource?.stepHistory || []).map(item => item?.target_C),
     ]).filter(numeric);
 
     const min = Math.floor((Math.min(...temperatures)-0.5)*2)/2;
@@ -329,20 +364,20 @@ function render(rooms,start,now){
         add("circle",{cx:x(latest.m),cy:y(latest.t),r:2.8,fill:room.color,class:"actual-dot"});
       }
 
-      const progressionState = room.progressionSource?.progression;
-      const activeTarget = progressionState?.activeStepTarget_C;
-      const activeStart = progressionState?.activeStepStartedAt;
-      if(numeric(activeTarget) && activeStart){
-        const from = clamp(minuteAt(activeStart,start),0,HORIZON_MIN);
-        const to = clamp(minuteAt(now,start),0,HORIZON_MIN);
+      for(const interval of shadowStepIntervals(room,now)){
+        const rawFrom = minuteAt(interval.startedAt,start);
+        const rawTo = minuteAt(interval.endedAt,start);
+        if(rawTo < 0 || rawFrom > HORIZON_MIN || rawTo < rawFrom) continue;
+        const from = clamp(rawFrom,0,HORIZON_MIN);
+        const to = clamp(rawTo,0,HORIZON_MIN);
         if(to >= from){
           const attributes = {
-            x1:x(from),y1:y(activeTarget),x2:x(to),y2:y(activeTarget),
+            x1:x(from),y1:y(interval.target_C),x2:x(to),y2:y(interval.target_C),
           };
           add("line",{
             ...attributes,stroke:room.color,class:"shadow-target"
           });
-          hoverTargets.push({kind:"shadow",room,tag:"line",attributes});
+          hoverTargets.push({kind:"shadow",room,interval,tag:"line",attributes});
         }
       }
     });
@@ -365,10 +400,12 @@ function render(rooms,start,now){
         }
       }
 
-      const prog = room.progressionSource?.progression;
-      if(prog?.activeStepStartedAt && numeric(prog.activeStepTarget_C)){
-        const from = clamp(minuteAt(prog.activeStepStartedAt,start),0,HORIZON_MIN);
-        const to = clamp(minuteAt(now,start),0,HORIZON_MIN);
+      for(const interval of shadowStepIntervals(room,now)){
+        const rawFrom = minuteAt(interval.startedAt,start);
+        const rawTo = minuteAt(interval.endedAt,start);
+        if(rawTo < 0 || rawFrom > HORIZON_MIN || rawTo < rawFrom) continue;
+        const from = clamp(rawFrom,0,HORIZON_MIN);
+        const to = clamp(rawTo,0,HORIZON_MIN);
         if(to > from){
           add("rect",{
             x:x(from),y:railY+1,width:Math.max(1,x(to)-x(from)),height:6,
@@ -428,11 +465,16 @@ function render(rooms,start,now){
         const valueTime = new Date(point.at);
         meta = `${tipTimeFmt.format(valueTime)} · ${point.quality === "complete" ? "compleet" : "partieel"}`;
       }else if(target.kind === "shadow"){
-        const progression = target.room.progressionSource?.progression;
         label = "EMS shadow-target";
-        value = progression?.activeStepTarget_C;
-        const state = progressionLabels[progression?.state] || progression?.state;
-        meta = [tipTimeFmt.format(hoverTime),state].filter(Boolean).join(" · ");
+        value = target.interval?.target_C;
+        const outcome = target.interval?.active
+          ? (progressionLabels[target.room.progressionSource?.progression?.state] || target.room.progressionSource?.progression?.state)
+          : target.interval?.outcome;
+        meta = [
+          tipTimeFmt.format(hoverTime),
+          target.interval?.active ? "actief" : "historisch",
+          outcome,
+        ].filter(Boolean).join(" · ");
       }
 
       if(!numeric(value)) return hideTip();

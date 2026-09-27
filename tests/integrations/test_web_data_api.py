@@ -478,6 +478,14 @@ class HeatingPreheatProgressionResourceTest(unittest.TestCase):
                     "domainGrant": "SHADOW_GRANT",
                     "priorityReason": "HEATING_WINDOW_CLOSES_FIRST",
                 },
+                "stepHistory": [{
+                    "opportunityId": f"{key}|2026-09-26T16:00:00+02:00|19.000",
+                    "target_C": 18.0,
+                    "startedAt": "2026-09-26T11:00:00Z",
+                    "endedAt": "2026-09-26T11:30:00Z",
+                    "outcome": "ADVANCED_STEP",
+                    "reason": "ADVANCED_AFTER_MEASURED_STEP_COMPLETION",
+                }],
                 "progression": {
                     "state": "STEP_WAIT",
                     "reason": "WAITING_FOR_MEASURED_TEMPERATURE",
@@ -518,6 +526,7 @@ class HeatingPreheatProgressionResourceTest(unittest.TestCase):
                 "intentionalGridImportAllowed": False,
                 "rollbackBehavior": "NOT_DEFINED_SHADOW_ONLY",
                 "statePersistence": "LOCAL_SHADOW_ARTIFACT",
+                "stepHistoryRetentionHours": 48,
             },
             "rooms": rooms,
             "internalSecretLikeField": "no",
@@ -532,8 +541,18 @@ class HeatingPreheatProgressionResourceTest(unittest.TestCase):
         self.assertEqual(result["policy"]["maxStep_C"], 0.5)
         self.assertEqual(result["rooms"][0]["progression"]["state"], "STEP_WAIT")
         self.assertEqual(result["rooms"][0]["progression"]["activeStepTarget_C"], 18.5)
+        self.assertEqual(result["policy"]["stepHistoryRetentionHours"], 48)
+        self.assertEqual(result["rooms"][0]["stepHistory"][0]["target_C"], 18.0)
+        self.assertEqual(result["rooms"][0]["stepHistory"][0]["outcome"], "ADVANCED_STEP")
         self.assertNotIn("secret", result["rooms"][0])
         self.assertNotIn("internalSecretLikeField", result)
+
+    def test_invalid_step_history_fails_closed(self):
+        payload = self.source()
+        payload["rooms"][0]["stepHistory"][0]["endedAt"] = "not-a-time"
+        server.HEATING_PREHEAT_PROGRESSION_FILE = self.write_source(payload)
+        with self.assertRaises(ValueError):
+            server.heating_preheat_progression_resource()
 
     def test_write_capable_progression_fails_closed(self):
         payload = self.source()

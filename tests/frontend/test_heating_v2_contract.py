@@ -91,3 +91,21 @@ def test_preheat_window_is_derived_from_honeywell_up_transition_not_current_elig
     assert 'const windowText = hasPreheatWindow(s?.baseline,candidate)' in render
     assert 'if(hasPreheatWindow(room.shadowSource?.baseline,candidate))' in render
     assert 'if(candidate?.opportunityOpensAt && candidate?.opportunityClosesAt)' not in render
+
+
+def test_heating_shadow_intent_uses_persisted_step_intervals():
+    render = RENDER.read_text()
+
+    assert "shadowStepIntervals(room,now)" in render
+    assert "room.progressionSource?.stepHistory" in render
+    assert 'outcome:"ACTIVE"' in render
+    assert 'target.interval?.active ? "actief" : "historisch"' in render
+
+
+def test_heating_history_reuses_existing_shadow_render_layer():
+    render = RENDER.read_text()
+
+    assert render.count('class:"shadow-target"') == 1
+    assert render.count('class:"preheat-active"') == 1
+    assert render.count("function render(") == 1
+    assert render.count("function draw(") == 1
