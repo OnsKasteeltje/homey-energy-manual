@@ -66,7 +66,7 @@ test('writer confirms Easee opportunity settings without requiring Tesla consump
 test('zero Tesla draw is explicitly a healthy armed opportunity',()=>{
   assert.match(src,/OPPORTUNITY_ARMED/);
   assert.match(src,/Tesla draw is\s*\/\/ irrelevant|Tesla draw is/);
-  assert.match(src,/consumption is Tesla-owned/);
+  assert.match(src,/Tesla decides whether to\s*\/\/ consume it|Tesla decides whether to consume it/);
   assert.match(src,/teslaConsumptionObserved/);
 });
 
