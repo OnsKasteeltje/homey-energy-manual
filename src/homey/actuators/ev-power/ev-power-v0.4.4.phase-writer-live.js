@@ -426,11 +426,23 @@ const restoreCircuit=async(originalCircuitA)=>{
   return hw;
 };
 
+// FINAL_PAUSE_READ_AFTER_TIMEOUT: keep pause confirmation bounded, but do one
+// definitive hardware read before declaring timeout. This accepts an Easee pause
+// that became safely observable at the timeout boundary without extending the
+// polling loop or weakening the paused-state criteria.
 const pauseAndConfirm=async()=>{
   let hw=await readHardware();
   if(hw.paused)return hw;
   await pauseSession();
-  return waitHardware(x=>x.paused,PAUSE_TIMEOUT_MS,'PAUSE_CONFIRM_TIMEOUT');
+  try{
+    return await waitHardware(x=>x.paused,PAUSE_TIMEOUT_MS,'PAUSE_CONFIRM_TIMEOUT');
+  }catch(err){
+    if(String(err?.message||err)!=='PAUSE_CONFIRM_TIMEOUT')throw err;
+    hw=await readHardware();
+    if(hw.paused)return hw;
+    if(err&&typeof err==='object')err.lastHardware=hw;
+    throw err;
+  }
 };
 
 const confirmLockedPhase=async(mode,vars)=>{
