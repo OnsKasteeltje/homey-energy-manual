@@ -35,7 +35,7 @@ const temp = value => numeric(value) ? value.toFixed(1) + " °C" : "—";
 const clock = value => value ? timeFmt.format(new Date(value)) : "—";
 const minuteAt = (value,start) => (new Date(value).getTime() - start.getTime()) / 60000;
 const clamp = (v,min,max) => Math.max(min,Math.min(max,v));
-const hasEligiblePreheatWindow = candidate => candidate?.status === "ELIGIBLE_UP_TRANSITION" && candidate?.opportunityOpensAt && candidate?.opportunityClosesAt;
+const hasPreheatWindow = (baseline,candidate) => baseline?.direction === "UP" && candidate?.opportunityOpensAt && candidate?.opportunityClosesAt;
 
 const progressionLabels = {
   INACTIVE:"Inactief",
@@ -171,7 +171,7 @@ function renderStatus(shadow,progression,rooms){
     const candidate = s?.candidate;
     const open = candidate?.opportunityOpensAt;
     const close = candidate?.opportunityClosesAt;
-    const windowText = hasEligiblePreheatWindow(candidate) ? `${clock(open)}–${clock(close)}` : "—";
+    const windowText = hasPreheatWindow(s?.baseline,candidate) ? `${clock(open)}–${clock(close)}` : "—";
     const active = p?.progression?.activeStepTarget_C;
 
     return `<article class="room-status-card" data-room="${room.key}">
@@ -353,7 +353,7 @@ function render(rooms,start,now){
       add("line",{x1:L,y1:railY+4,x2:W-R,y2:railY+4,class:"rail-base"});
 
       const candidate = room.shadowSource?.candidate;
-      if(hasEligiblePreheatWindow(candidate)){
+      if(hasPreheatWindow(room.shadowSource?.baseline,candidate)){
         const from = clamp(minuteAt(candidate.opportunityOpensAt,start),0,HORIZON_MIN);
         const to = clamp(minuteAt(candidate.opportunityClosesAt,start),0,HORIZON_MIN);
         if(to > from){
