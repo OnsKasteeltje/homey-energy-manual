@@ -276,6 +276,86 @@ class PvFlexDeviceActualsTest(unittest.TestCase):
         )
 
 
+
+class HeatingTemperatureHistoryResourceTest(unittest.TestCase):
+    def make_db(self):
+        handle = tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False)
+        handle.close()
+        path = handle.name
+        self.addCleanup(lambda: Path(path).unlink(missing_ok=True))
+        with sqlite3.connect(path) as db:
+            db.executescript("""
+                CREATE TABLE devices (
+                    id INTEGER PRIMARY KEY,
+                    device_key TEXT NOT NULL
+                );
+                CREATE TABLE metrics (
+                    id INTEGER PRIMARY KEY,
+                    metric_key TEXT NOT NULL
+                );
+                CREATE TABLE measurements_15m (
+                    slot_start_utc TEXT NOT NULL,
+                    device_id INTEGER NOT NULL,
+                    metric_id INTEGER NOT NULL,
+                    value_avg REAL,
+                    value_min REAL,
+                    value_max REAL,
+                    sample_count INTEGER,
+                    energy_wh REAL,
+                    quality TEXT
+                );
+            """)
+            db.executemany(
+                "INSERT INTO devices(id,device_key) VALUES (?,?)",
+                [
+                    (1, "honeywell_woonkamer"),
+                    (2, "honeywell_eetkamer"),
+                    (3, "honeywell_keuken"),
+                    (4, "honeywell_serre"),
+                ],
+            )
+            db.execute(
+                "INSERT INTO metrics(id,metric_key) VALUES (1,'room_temperature_c')"
+            )
+            db.executemany(
+                """
+                INSERT INTO measurements_15m
+                (slot_start_utc,device_id,metric_id,value_avg,value_min,value_max,
+                 sample_count,energy_wh,quality)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """,
+                [
+                    ("2026-09-27T06:00:00Z", 2, 1, 17.8, 17.7, 17.9, 12, None, "complete"),
+                    ("2026-09-27T06:15:00Z", 2, 1, 18.0, 17.9, 18.0, 8, None, "partial"),
+                    ("2026-09-27T06:30:00Z", 2, 1, 99.0, 99.0, 99.0, 1, None, "held"),
+                    ("2026-09-27T00:00:00Z", 1, 1, 16.0, 16.0, 16.0, 4, None, "complete"),
+                ],
+            )
+        return path
+
+    def test_temperature_history_projects_only_recent_measured_slots(self):
+        server.HISTORY_DB = self.make_db()
+        now = server.datetime.fromisoformat("2026-09-27T07:00:00+00:00")
+        result = server.heating_temperature_history_resource(generated_at=now)
+
+        self.assertEqual(result["schema"], "EMS_WEB_HEATING_TEMPERATURE_HISTORY_V1")
+        self.assertTrue(result["presentationOnly"])
+        self.assertEqual(result["period"]["historyMinutes"], 360)
+        self.assertEqual(
+            [room["key"] for room in result["rooms"]],
+            ["woonkamer", "eetkamer", "keuken", "serre"],
+        )
+
+        eetkamer = next(room for room in result["rooms"] if room["key"] == "eetkamer")
+        self.assertEqual([item["avg_C"] for item in eetkamer["series"]], [17.8, 18.0])
+        self.assertEqual([item["quality"] for item in eetkamer["series"]], ["complete", "partial"])
+        self.assertNotIn(99.0, [item["avg_C"] for item in eetkamer["series"]])
+
+        woonkamer = next(room for room in result["rooms"] if room["key"] == "woonkamer")
+        self.assertEqual(woonkamer["series"], [])
+
+
+
 class HeatingPreheatShadowResourceTest(unittest.TestCase):
     def write_source(self, payload):
         handle = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False)
