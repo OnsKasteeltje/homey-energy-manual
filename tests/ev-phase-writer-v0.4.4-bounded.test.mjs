@@ -98,3 +98,18 @@ test('native Homey cards remain the only session/current/circuit writers',()=>{
   assert.match(src,/setDynamicChargerCurrent/);
   assert.doesNotMatch(src,/setCapabilityValue\(/);
 });
+
+
+test('Easee phase/cloud auth retries exactly once after HTTP 401',()=>{
+  assert.match(src,/const withEasee401RefreshRetry=async/);
+  assert.match(src,/if\(err\?\.httpStatus!==401\)throw err/);
+  assert.match(src,/const latestVars=await readEaseeVars\(\)/);
+  assert.match(src,/getAccessToken\(latestVars,true\)/);
+  assert.match(src,/setPhaseMode=async/);
+  assert.match(src,/readCloudPhaseMode=async/);
+});
+
+test('Easee HTTP errors preserve status for bounded auth recovery',()=>{
+  const matches=src.match(/err\.httpStatus=r\.status/g)||[];
+  assert.ok(matches.length>=2);
+});
