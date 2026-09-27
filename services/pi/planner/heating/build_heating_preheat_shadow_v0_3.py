@@ -115,14 +115,57 @@ def _cv_guard(quatt_current: dict[str, Any], now: datetime) -> dict[str, Any]:
             "status": "UNKNOWN",
             "reason": "CV_ACTIVE_SIGNAL_UNKNOWN",
             "cvActive": None,
-            "ageSeconds": round(max(0.0, age), 1),
+            "ageSeconds": None,
+            "collectorAgeSeconds": round(max(0.0, age), 1),
+            "observedAt": None,
+            "sourceLastUpdated": signal.get("sourceLastUpdated") if isinstance(signal, dict) else None,
+        }
+
+    try:
+        observed_at = _aware(signal.get("observedAt"), "cvActive.observedAt")
+    except ShadowError:
+        return {
+            "status": "UNKNOWN",
+            "reason": "CV_ACTIVE_OBSERVED_AT_INVALID",
+            "cvActive": None,
+            "ageSeconds": None,
+            "collectorAgeSeconds": round(max(0.0, age), 1),
+            "observedAt": signal.get("observedAt") if isinstance(signal, dict) else None,
+            "sourceLastUpdated": signal.get("sourceLastUpdated") if isinstance(signal, dict) else None,
+        }
+
+    observation_age = (
+        now.astimezone(timezone.utc) - observed_at.astimezone(timezone.utc)
+    ).total_seconds()
+    if observation_age < -30:
+        return {
+            "status": "UNKNOWN",
+            "reason": "CV_ACTIVE_OBSERVATION_FROM_FUTURE",
+            "cvActive": None,
+            "ageSeconds": round(observation_age, 1),
+            "collectorAgeSeconds": round(max(0.0, age), 1),
+            "observedAt": signal.get("observedAt"),
+            "sourceLastUpdated": signal.get("sourceLastUpdated"),
+        }
+    if observation_age > MAX_QUATT_AGE_SECONDS:
+        return {
+            "status": "STALE",
+            "reason": "CV_ACTIVE_OBSERVATION_STALE",
+            "cvActive": None,
+            "ageSeconds": round(observation_age, 1),
+            "collectorAgeSeconds": round(max(0.0, age), 1),
+            "observedAt": signal.get("observedAt"),
+            "sourceLastUpdated": signal.get("sourceLastUpdated"),
         }
 
     return {
         "status": "OK",
         "reason": "CURRENT_QUATT_OBSERVER",
         "cvActive": value,
-        "ageSeconds": round(max(0.0, age), 1),
+        "ageSeconds": round(max(0.0, observation_age), 1),
+        "collectorAgeSeconds": round(max(0.0, age), 1),
+        "observedAt": signal.get("observedAt"),
+        "sourceLastUpdated": signal.get("sourceLastUpdated"),
     }
 
 
