@@ -26,13 +26,17 @@ test('bounded writer uses HomeyScript native wait and never setTimeout',()=>{
 });
 
 test('bounded transition keeps all physical safety stages in one invocation',()=>{
-  const pause=src.indexOf('hw=await pauseAndConfirm()');
-  const phase=src.indexOf('await setPhaseMode(control.mode,vars)');
-  const deadtime=src.indexOf('await sleep(DEADTIME_MS)');
-  const cap=src.indexOf('await setCircuitA(control.requestedA)');
-  const resume=src.indexOf('await resumeSession()');
+  // Scope ordering assertions to the bounded-transition transaction itself.
+  // OFF zero-amp recovery legitimately contains an earlier resumeSession().
+  const bounded=src.indexOf("const startedAt=iso();");
+  const pause=src.indexOf('hw=await pauseAndConfirm()',bounded);
+  const phase=src.indexOf('await setPhaseMode(control.mode,vars)',pause);
+  const deadtime=src.indexOf('await sleep(DEADTIME_MS)',phase);
+  const cap=src.indexOf('await setCircuitA(control.requestedA)',deadtime);
+  const resume=src.indexOf('await resumeSession()',cap);
   const current=src.indexOf('await setCurrentA(control.requestedA)',resume);
   const restore=src.indexOf('hw=await restoreCircuit(originalCircuitA)',current);
+  assert.ok(bounded>=0);
   assert.ok(pause>=0);
   assert.ok(phase>pause);
   assert.ok(deadtime>phase);
