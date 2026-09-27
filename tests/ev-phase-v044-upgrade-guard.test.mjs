@@ -7,30 +7,26 @@ const src=fs.readFileSync(
   'utf8'
 );
 
-test('upgrade requires a quiescent STABLE v0.4.3/v0.4.4 writer',()=>{
-  assert.match(src,/statusStable/);
-  assert.match(src,/transitionStable/);
-  assert.match(src,/normalCircuitCap/);
-  assert.match(src,/physicalStateCoherent/);
-  assert.match(src,/PRE_UPGRADE_NOT_QUIESCENT/);
+test('deploy guard checks only active transition and temporary circuit cap',()=>{
+  assert.match(src,/def deploy_guard/);
+  assert.match(src,/noActiveTransition/);
+  assert.match(src,/normalCircuitBaseline/);
+  assert.match(src,/EV_MAX_TRANSITION_CAP_A = 16/);
+  assert.match(src,/circuit_target > EV_MAX_TRANSITION_CAP_A/);
+  assert.doesNotMatch(src,/QUIESCENCE_SEC/);
+  assert.doesNotMatch(src,/statusStable/);
+  assert.doesNotMatch(src,/phaseAligned/);
+  assert.doesNotMatch(src,/physicalStateCoherent/);
+  assert.doesNotMatch(src,/samePhaseMode/);
+  assert.doesNotMatch(src,/sameChargeState/);
 });
 
-test('upgrade rechecks structural quiescence while allowing same-phase current drift',()=>{
-  assert.match(src,/QUIESCENCE_SEC = 10/);
-  assert.match(src,/samePhaseMode/);
-  assert.match(src,/sameConfirmedMode/);
-  assert.match(src,/sameCircuitTargetA/);
-  assert.match(src,/sameChargeState/);
-  assert.doesNotMatch(src,/"sameControlRevision"/);
-  assert.doesNotMatch(src,/"sameTargetA"/);
-  assert.match(src,/PRE_UPGRADE_CHANGED_DURING_QUIESCENCE/);
-  assert.match(src,/PRE_UPGRADE_CHANGED_BEFORE_PUSH/);
-});
-
-test('physical coherence follows Easee requested versus offered current',()=>{
-  assert.match(src,/abs\(offered_a - charger_target\) <= 0\.5/);
-  assert.doesNotMatch(src,/abs\(offered_a - target_a\)/);
-  assert.match(src,/physically_running or physically_paused/);
+test('guard does not require charging, paused, phase alignment or PV state',()=>{
+  assert.doesNotMatch(src,/physically_running/);
+  assert.doesNotMatch(src,/physically_paused/);
+  assert.doesNotMatch(src,/offered_a - charger_target/);
+  assert.doesNotMatch(src,/sameConfirmedMode/);
+  assert.doesNotMatch(src,/sameCircuitTargetA/);
 });
 
 test('upgrade rejects a source that still contains self retrigger',()=>{
@@ -38,20 +34,9 @@ test('upgrade rejects a source that still contains self retrigger',()=>{
   assert.match(src,/triggerAdvancedFlow/);
 });
 
-test('post-deploy validation requires live bounded v0.4.4',()=>{
-  assert.match(src,/V044_SCHEMA_NOT_ACTIVE/);
-  assert.match(src,/V044_NOT_LIVE/);
-  assert.match(src,/V044_EXECUTION_NOT_ENABLED/);
-  assert.match(src,/V044_BOUNDED_FLAG_MISSING/);
-  assert.match(src,/V044_FAILED/);
+test('upgrade requires bounded final pause-read fix',()=>{
+  assert.match(src,/FINAL_PAUSE_READ_AFTER_TIMEOUT/);
 });
-
-test('deployment failure restores exact prior Advanced Flow body',()=>{
-  assert.match(src,/backup = writable_flow\(flow\)/);
-  assert.match(src,/ROLLBACK: restoring exact previous EV Advanced Flow/);
-  assert.match(src,/push\(backup\)/);
-});
-
 
 test('upgrade blocks unsupported HomeyScript timers',()=>{
   assert.match(src,/SOURCE_UNSUPPORTED_HOMEYSCRIPT_TIMER/);
@@ -59,6 +44,20 @@ test('upgrade blocks unsupported HomeyScript timers',()=>{
   assert.match(src,/const sleep=ms=>wait\(ms\);/);
 });
 
-test('upgrade requires bounded final pause-read fix',()=>{
-  assert.match(src,/FINAL_PAUSE_READ_AFTER_TIMEOUT/);
+test('deployment verifies exact installed source before one validation trigger',()=>{
+  assert.match(src,/DEPLOYED_SOURCE_MISMATCH/);
+  assert.match(src,/deployed_source != source/);
+  assert.match(src,/trigger-advanced-flow/);
+  assert.match(src,/V044_VALIDATION_TRIGGER_DID_NOT_UPDATE_STATUS/);
+});
+
+test('runtime FAILED after validation does not cause deployment rollback',()=>{
+  assert.doesNotMatch(src,/raise RuntimeError\("V044_FAILED:/);
+  assert.match(src,/writer reported runtime FAILED after deployment/);
+});
+
+test('true deployment failure restores exact previous Advanced Flow body',()=>{
+  assert.match(src,/backup = writable_flow\(flow\)/);
+  assert.match(src,/ROLLBACK: restoring exact previous EV Advanced Flow/);
+  assert.match(src,/push\(backup\)/);
 });
