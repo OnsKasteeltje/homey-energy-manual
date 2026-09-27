@@ -50,3 +50,8 @@ def test_heating_ui_does_not_invent_historical_shadow_events():
     assert "activeStepStartedAt" in render
     assert "minuteAt(now,start)" in render
     assert "historicalShadow" not in render
+
+
+def test_heating_renderer_contains_no_literal_source_newline_escape():
+    render = RENDER.read_text()
+    assert r"\nconst " not in render
