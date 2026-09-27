@@ -30,7 +30,7 @@ const dayName = d => {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 };
 
-const temp = value => Number.isFinite(Number(value)) ? Number(value).toFixed(1) + " °C" : "—";
+const numeric = value => typeof value === "number" && Number.isFinite(value);\nconst temp = value => numeric(value) ? value.toFixed(1) + " °C" : "—";
 const clock = value => value ? timeFmt.format(new Date(value)) : "—";
 const minuteAt = (value,start) => (new Date(value).getTime() - start.getTime()) / 60000;
 const clamp = (v,min,max) => Math.max(min,Math.min(max,v));
@@ -118,7 +118,7 @@ function buildActualSeries(historyRoom,shadowRoom,start,now){
     series.push({m,t:Number(item.avg_C),quality:item.quality,at:item.slotStart});
   }
 
-  const current = Number(shadowRoom?.current?.temperature_C);
+  const current = shadowRoom?.current?.temperature_C;
   const shadowAt = shadowRoom?._generatedAt;
   if(Number.isFinite(current) && shadowAt){
     const m = minuteAt(shadowAt,start);
@@ -259,8 +259,8 @@ function render(rooms,start,now){
     const temperatures = ySource.flatMap(room => [
       ...room.points.map(p => p.t),
       ...room.actual.map(p => p.t),
-      Number(room.progressionSource?.progression?.activeStepTarget_C),
-    ]).filter(Number.isFinite);
+      room.progressionSource?.progression?.activeStepTarget_C,
+    ]).filter(numeric);
 
     const min = Math.floor((Math.min(...temperatures)-0.5)*2)/2;
     const max = Math.ceil((Math.max(...temperatures)+0.5)*2)/2;
@@ -321,9 +321,9 @@ function render(rooms,start,now){
       }
 
       const progressionState = room.progressionSource?.progression;
-      const activeTarget = Number(progressionState?.activeStepTarget_C);
+      const activeTarget = progressionState?.activeStepTarget_C;
       const activeStart = progressionState?.activeStepStartedAt;
-      if(Number.isFinite(activeTarget) && activeStart){
+      if(numeric(activeTarget) && activeStart){
         const from = clamp(minuteAt(activeStart,start),0,HORIZON_MIN);
         const to = clamp(minuteAt(now,start),0,HORIZON_MIN);
         if(to >= from){
@@ -354,7 +354,7 @@ function render(rooms,start,now){
       }
 
       const prog = room.progressionSource?.progression;
-      if(prog?.activeStepStartedAt && Number.isFinite(Number(prog.activeStepTarget_C))){
+      if(prog?.activeStepStartedAt && numeric(prog.activeStepTarget_C)){
         const from = clamp(minuteAt(prog.activeStepStartedAt,start),0,HORIZON_MIN);
         const to = clamp(minuteAt(now,start),0,HORIZON_MIN);
         if(to > from){
@@ -395,8 +395,8 @@ function render(rooms,start,now){
         }
         const prog = room.progressionSource?.progression;
         const activeStart = prog?.activeStepStartedAt ? minuteAt(prog.activeStepStartedAt,start) : null;
-        const shadowTarget = Number(prog?.activeStepTarget_C);
-        const shadowVisible = Number.isFinite(shadowTarget) && activeStart !== null && m >= activeStart && when <= now;
+        const shadowTarget = prog?.activeStepTarget_C;
+        const shadowVisible = numeric(shadowTarget) && activeStart !== null && m >= activeStart && when <= now;
 
         return `<div class="tip-room">
           <i style="background:${room.color}"></i><b>${room.displayName}</b>
