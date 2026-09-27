@@ -61,3 +61,16 @@ test('true deployment failure restores exact previous Advanced Flow body',()=>{
   assert.match(src,/ROLLBACK: restoring exact previous EV Advanced Flow/);
   assert.match(src,/push\(backup\)/);
 });
+
+test('Homey flow writes are single-shot and resolve 429 by exact readback',()=>{
+  assert.match(src,/retry_throttle=False/);
+  assert.match(src,/HOMEY_WRITE_429_READBACK/);
+  assert.match(src,/current_writable_flow\(\) == body/);
+  assert.match(src,/exact readback confirms write applied/);
+});
+
+test('validation trigger is never blindly retried after 429',()=>{
+  assert.match(src,/trigger-advanced-flow/);
+  assert.match(src,/validation trigger; checking status readback/);
+});
+
