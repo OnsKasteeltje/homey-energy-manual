@@ -242,7 +242,7 @@ function preheatWindows(room,start,now,maxAdvanceMinutes){
   return out;
 }
 
-function renderStatus(shadow,progression,rooms){
+function renderStatus(shadow,progression,rooms,start,now,maxAdvanceMinutes){
   const house = shadow?.house;
   const cv = shadow?.cvGuard;
   $("#heating-status").innerHTML = [
@@ -268,6 +268,11 @@ function renderStatus(shadow,progression,rooms){
     const open = candidate?.opportunityOpensAt;
     const close = candidate?.opportunityClosesAt;
     const windowText = hasPreheatWindow(s?.baseline,candidate) ? `${clock(open)}–${clock(close)}` : "—";
+    const nextPotential = preheatWindows(room,start,now,maxAdvanceMinutes)
+      .find(window => !window.current && new Date(window.closesAt) > now);
+    const nextPotentialText = nextPotential
+      ? `${clock(nextPotential.opensAt)}–${clock(nextPotential.closesAt)}`
+      : null;
     const active = p?.progression?.activeStepTarget_C;
 
     return `<article class="room-status-card" data-room="${room.key}">
@@ -276,6 +281,7 @@ function renderStatus(shadow,progression,rooms){
         <div><dt>Nu</dt><dd>${temp(s?.current?.temperature_C ?? p?.currentTemperature_C)}</dd></div>
         <div><dt>Honeywell baseline</dt><dd>${temp(s?.baseline?.currentTargetTemperature_C)}</dd></div>
         <div><dt>Preheat-window</dt><dd>${windowText}</dd></div>
+        ${nextPotentialText ? `<div><dt>Volgende potentieel</dt><dd>${nextPotentialText}</dd></div>` : ""}
         <div><dt>V0.3</dt><dd>${eligibility}</dd></div>
         <div><dt>Planner grant</dt><dd>${grant}</dd></div>
         <div><dt>V0.4</dt><dd>${progressionState}</dd></div>
@@ -327,7 +333,7 @@ async function load(){
     ? shadow.policy.maxAdvanceMinutes
     : null;
 
-  renderStatus(shadow,progression,rooms);
+  renderStatus(shadow,progression,rooms,start,now,maxAdvanceMinutes);
   render(rooms,start,now,maxAdvanceMinutes);
   fresh.textContent = "Verwarming · " + timeFmt.format(new Date(
     progression?.generatedAt || shadow?.generatedAt || history?.generatedAt || schedule.generatedAt || Date.now()
