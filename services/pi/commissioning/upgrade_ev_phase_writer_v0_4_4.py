@@ -195,6 +195,7 @@ def main():
         "selfRetriggerUsed:false",
         "const sleep=ms=>wait(ms);",
         "FINAL_PAUSE_READ_AFTER_TIMEOUT",
+        "NORMAL_OFF_ZERO_A_HOLD",
         "triggerAdvancedFlow",
     )
     for marker in required[:-1]:
