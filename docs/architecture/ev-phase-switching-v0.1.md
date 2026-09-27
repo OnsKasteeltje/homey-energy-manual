@@ -669,5 +669,63 @@ deploys the corrected writer but deliberately does not restore or guess a
 baseline; operator recovery of the independently proven pre-transition limit is
 a separate explicit action.
 
-Production remains on v0.4.2 until the guarded v0.4.3 upgrade has been executed
-and validated on Homey.
+The guarded v0.4.3 upgrade was executed and validated on 2026-09-27. The orphaned
+6 A cap was recovered to the independently proven 20 A baseline, and a full live
+1P resume sequence subsequently restored the temporary transition cap back to
+20 A. v0.4.3 is therefore the current production writer baseline for the next
+change.
+
+
+## v0.4.4 bounded transition runner
+
+The next live 1P→3P opportunity on 2026-09-27 exposed a separate execution-model
+problem. The phase policy itself behaved correctly: while charging 1P at about
+3.7 kW, residual P1 export lifted reconstructed available power to roughly the
+4.4 kW 3P entry threshold. The writer paused the charger as designed. However,
+the state remained at `PAUSING` until an external/manual actuator trigger
+occurred, even though Easee had already reached `plugged_in_paused / 0 A / 0 W`.
+
+Further live observation showed the same pattern at later stages: the physical
+write completed, but continuation depended on
+`Homey.flow.triggerAdvancedFlow({id: FLOW_ID})` successfully starting the same
+Advanced Flow again. While the writer waited for another invocation, realtime PV
+continued changing, so a 3P request could already have fallen back to 1P before
+the transition resumed. This turned a hardware transition that should take
+seconds into a multi-minute paused interval.
+
+Writer v0.4.4 removes inter-stage self-retrigger entirely. A required hardware
+transition is one bounded actuator transaction inside one HomeyScript invocation:
+
+`pause -> confirm paused -> set locked phase -> confirm phase -> 5 s deadtime
+-> temporary symmetric circuit cap -> resume -> set charger current
+-> confirm charging/electrical phase -> restore original circuit cap -> STABLE`.
+
+Safety and ownership remain unchanged:
+
+- Bridge/Adapter/Gate still own the authoritative `OFF | 1P | 3P + A` command;
+- P1 remains realtime energy authority;
+- 1500/1100 W 1P and 4400/3600 W 3P hysteresis thresholds are unchanged;
+- Easee Cloud remains phase-command/fallback phase-observation only;
+- native Homey Easee cards remain pause/resume/current/circuit writers;
+- the original circuit limit is captured before transition and restored on both
+  success and failure;
+- electrical telemetry must confirm the requested phase after charging resumes;
+- a short RUNNING lock makes concurrent Gate-triggered invocations no-ops while
+  one bounded transaction is active.
+
+The writer deliberately re-reads the authoritative control contract while the
+session is safely paused, before phase execution and again before resume. This
+allows falling/rising PV to change the pending mode/current without waiting for
+another Advanced Flow invocation. Up to three paused replans are allowed; an
+unstable command beyond that fails closed, pauses the session and restores the
+captured circuit baseline.
+
+Canonical sources:
+
+- `src/homey/actuators/ev-power/ev-power-v0.4.4.phase-writer-live.js`
+- `services/pi/commissioning/upgrade_ev_phase_writer_v0_4_4.py`
+- `tests/ev-phase-writer-v0.4.4-bounded.test.mjs`
+- `tests/ev-phase-v044-upgrade-guard.test.mjs`
+
+Production remains on v0.4.3 until the guarded v0.4.4 upgrade is executed from a
+quiescent STABLE state and the next natural phase transition is observed.

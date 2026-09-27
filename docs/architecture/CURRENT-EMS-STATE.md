@@ -291,8 +291,34 @@ explicit operator recovery step.
 
 This change does not alter Pi planner authority, realtime P1 authority, phase
 thresholds, Adapter/Gate semantics, deadline policy, or the single-writer
-boundary. Production remains on v0.4.2 until the guarded Homey upgrade is
-executed and validated.
+boundary. The guarded v0.4.3 upgrade and the one-time recovery of the proven
+20 A pre-transition baseline were completed and physically validated on
+2026-09-27.
+
+
+### EV bounded phase-transition execution
+
+A natural 1P→3P opportunity on 2026-09-27 proved that the phase selector and
+hysteresis were correct but that v0.4.3 continuation was not reliable. The
+writer physically paused Easee and persisted `PAUSING`, but its call to
+self-trigger the same Advanced Flow did not reliably produce the next actuator
+invocation. Manual/external triggers advanced the writer immediately. During the
+pause, changing PV caused the requested mode/current to move again, extending
+the pause unnecessarily.
+
+Repository v0.4.4 removes inter-stage self-retrigger. A phase change is executed
+as one bounded HomeyScript transaction with explicit readback timeouts:
+pause/confirm, phase command/confirm, 5 s deadtime, temporary circuit cap,
+resume, current application, charging/electrical phase confirmation, and
+restoration of the captured circuit baseline. The writer re-reads the existing
+Bridge/Adapter/Gate command while safely paused so a changed PV command can be
+absorbed before resume. A short RUNNING lock prevents concurrent Gate-triggered
+executions from becoming a second writer.
+
+No planner ownership, P1 authority, phase thresholds, deadline semantics,
+Adapter/Gate contract, Easee physical-phase ownership, or single-writer boundary
+changes. Production remains v0.4.3 until the guarded v0.4.4 upgrade is executed
+and validated.
 
 
 ## 12. Battery boundary
