@@ -571,17 +571,61 @@ if(previousNeedsRecovery&&hw.circuitTargetA!==previousOriginal){
   hw=await readHardware();
 }
 
+// NORMAL_OFF_ZERO_A_HOLD:
+// A normal loss of PV opportunity is not a session-safety event. Keep the EV
+// session alive and command 0 A so the vehicle remains attached/locked. The
+// native pause action is reserved for bounded phase transitions and safeAbort.
+// If this source is deployed while an older writer has already left the charger
+// in plugged_in_paused, recover that legacy state once by resuming with the
+// dynamic current forced back to 0 A immediately afterwards.
 if(control.mode==='OFF'){
   try{
-    hw=await pauseAndConfirm();
+    let physicalWrite=false;
+    const legacyPaused=
+      hw.sessionEnabled!==true &&
+      hw.chargeState==='plugged_in_paused';
+
+    if(hw.chargerTargetA!==0){
+      await setCurrentA(0);
+      physicalWrite=true;
+      hw=await waitHardware(
+        x=>x.chargerTargetA===0,
+        CURRENT_CONFIRM_TIMEOUT_MS,
+        'OFF_ZERO_CURRENT_CONFIRM_TIMEOUT'
+      );
+    }
+
+    if(legacyPaused){
+      await resumeSession();
+      physicalWrite=true;
+      await sleep(POLL_MS);
+      await setCurrentA(0);
+      hw=await waitHardware(
+        x=>x.sessionEnabled===true&&x.chargerTargetA===0,
+        CURRENT_CONFIRM_TIMEOUT_MS,
+        'OFF_HOLD_RESUME_CONFIRM_TIMEOUT'
+      );
+    }else{
+      hw=await readHardware();
+    }
+
     await saveStatus(
-      'STABLE','OFF_PAUSED','STABLE',control,hw,null,
-      {live:true,physicalWritePerformed:!hw.paused,action:'PAUSE_SESSION'}
+      'STABLE',
+      legacyPaused?'OFF_ZERO_A_HOLD_RECOVERED':'OFF_ZERO_A_HOLD',
+      'STABLE',
+      control,
+      hw,
+      null,
+      {
+        live:true,
+        physicalWritePerformed:physicalWrite,
+        action:legacyPaused?'RESUME_ZERO_A_HOLD':'SET_CURRENT_ZERO'
+      }
     );
     return true;
   }catch(err){
     return await safeAbort(
-      'OFF_PAUSE_FAILED:'+String(err?.message||err),
+      'OFF_ZERO_A_HOLD_FAILED:'+String(err?.message||err),
       control,
       null,
       liveEnabled,
