@@ -317,7 +317,10 @@ executions from becoming a second writer.
 
 No planner ownership, P1 authority, phase thresholds, deadline semantics,
 Adapter/Gate contract, Easee physical-phase ownership, or single-writer boundary
-changes. Production remains v0.4.3 until the guarded v0.4.4 upgrade is executed
+changes. The first v0.4.4 deployment attempt rolled back automatically because
+HomeyScript has no `setTimeout`; the bounded source now uses the native global
+`await wait(ms)` primitive and the upgrader rejects unsupported timer usage.
+Production remains v0.4.3 until the corrected guarded v0.4.4 upgrade is executed
 and validated.
 
 

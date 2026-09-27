@@ -195,6 +195,7 @@ def main():
         "BOUNDED_TRANSITION_START",
         "BOUNDED_TRANSITION_COMPLETE",
         "selfRetriggerUsed:false",
+        "const sleep=ms=>wait(ms);",
         "triggerAdvancedFlow",
     )
     for marker in required[:-1]:
@@ -202,6 +203,8 @@ def main():
             raise RuntimeError(f"SOURCE_MARKER_MISSING:{marker}")
     if required[-1] in source:
         raise RuntimeError("SOURCE_SELF_RETRIGGER_STILL_PRESENT")
+    if "setTimeout(" in source:
+        raise RuntimeError("SOURCE_UNSUPPORTED_HOMEYSCRIPT_TIMER")
 
     before_status = status()
     before_charger = charger_state()

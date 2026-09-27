@@ -44,3 +44,10 @@ test('deployment failure restores exact prior Advanced Flow body',()=>{
   assert.match(src,/ROLLBACK: restoring exact previous EV Advanced Flow/);
   assert.match(src,/push\(backup\)/);
 });
+
+
+test('upgrade blocks unsupported HomeyScript timers',()=>{
+  assert.match(src,/SOURCE_UNSUPPORTED_HOMEYSCRIPT_TIMER/);
+  assert.match(src,/setTimeout\(/);
+  assert.match(src,/const sleep=ms=>wait\(ms\);/);
+});

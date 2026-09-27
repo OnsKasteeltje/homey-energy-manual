@@ -57,7 +57,8 @@ const age=x=>{
   return Number.isFinite(t)?Date.now()-t:Infinity;
 };
 const iso=()=>new Date().toISOString();
-const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+// HomeyScript exposes global wait(ms); browser/node timers such as setTimeout are unavailable.
+const sleep=ms=>wait(ms);
 const cap=(d,id)=>d?.capabilitiesObj?.[id]?.value;
 
 const normalizePhaseMode=raw=>{
