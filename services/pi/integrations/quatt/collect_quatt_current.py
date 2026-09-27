@@ -38,7 +38,7 @@ CANONICAL = {
 }
 
 OBSERVER_ONLY = {
-    "measure_boiler_cic_central_heating_onoff_boiler": "boilerAssistOn",
+    "measure_boiler_cic_central_heating_onoff_boiler": "cvActive",
     "measure_flowmeter_water_flow_speed": "waterFlow_Lph",
     "measure_flowmeter_water_supply_temperature": "waterSupplyTemperature_C",
     "measure_thermostat_setpoint_water_supply_temperature": "waterSupplySetpoint_C",
@@ -145,7 +145,7 @@ def main():
     atomic_write_json(OUTPUT, payload)
     print(f"PASS: schema={payload['schema']} observedAt={observed_at} attempted={attempted} inserted={inserted} skipped_null={skipped_null}")
     print(f"output={OUTPUT}")
-    print("heating_on=" f"{(canonical_state.get('heating_on') or {}).get('value')} " "boilerAssistOn=" f"{(observer_state.get('boilerAssistOn') or {}).get('value')}")
+    print("heating_on=" f"{(canonical_state.get('heating_on') or {}).get('value')} " "cvActive=" f"{(observer_state.get('cvActive') or {}).get('value')}")
 
 
 if __name__ == "__main__":
