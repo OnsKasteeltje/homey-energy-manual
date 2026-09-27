@@ -149,17 +149,17 @@ def test_old_source_change_time_does_not_make_fresh_observation_stale():
     assert guard["sourceLastUpdated"] == "2026-09-24T07:15:32Z"
 
 
-def test_stale_cv_observation_fails_closed_even_when_artifact_is_fresh():
+def test_observed_at_must_match_same_successful_collector_fetch():
     result = build(q=quatt(
         assist=False,
         generated="2026-09-26T11:59:30Z",
-        observed_at="2026-09-26T11:45:00Z",
+        observed_at="2026-09-26T11:59:20Z",
         source_last_updated="2026-09-24T07:15:32Z",
     ))
     guard = result["cvGuard"]
     r = result["rooms"][0]
-    assert guard["status"] == "STALE"
-    assert guard["reason"] == "CV_ACTIVE_OBSERVATION_STALE"
+    assert guard["status"] == "UNKNOWN"
+    assert guard["reason"] == "CV_ACTIVE_OBSERVATION_MISMATCH"
     assert guard["cvActive"] is None
     assert r["shadow"]["state"] == "PREHEAT_BLOCKED_CV_STATUS_UNKNOWN"
 
