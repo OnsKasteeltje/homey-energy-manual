@@ -774,3 +774,31 @@ deployment failure. Validation-trigger 429 responses are not retriggered; writer
 status readback determines whether the invocation ran. This avoids self-induced
 Homey throttling and duplicate actuator invocations.
 
+
+
+### Normal OFF means zero-amp hold, not session pause
+
+Live Tesla/Easee validation on 2026-09-27 showed that using the native Easee
+`pauseCharging` action for an ordinary loss of PV opportunity can temporarily
+release the Tesla-side connector lock. The physical behaviour was reproduced:
+after the EMS changed from opportunistic charging to OFF, the Tesla connector
+became removable while Homey still reported `plugged_in_paused / 0 A / 0 W`;
+the vehicle could later lock again without a cable movement.
+
+That behaviour is not acceptable for ordinary cloud-driven PV modulation. A
+normal `OFF / 0 A / 0 W` control command therefore has different actuator
+semantics from a safety pause:
+
+- normal PV opportunity loss sets the dynamic charger current to **0 A** while
+  leaving the charging session enabled;
+- `pauseCharging` remains reserved for the bounded 1P<->3P transition and
+  fail-closed/safety recovery;
+- a charger that was already left in `plugged_in_paused` by the previous writer
+  is recovered once by resuming the session with the dynamic current forced to
+  0 A, then remains in zero-amp hold;
+- a disconnected vehicle is never resumed merely because the EMS command is OFF.
+
+This preserves the architecture boundary: `OFF` means **no energy opportunity**,
+not **terminate/pause the vehicle session**. The deployment guard requires the
+`NORMAL_OFF_ZERO_A_HOLD` source marker so the prior OFF->pause behaviour cannot
+be redeployed through the supported v0.4.4 path.
