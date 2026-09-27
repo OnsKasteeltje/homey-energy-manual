@@ -3,12 +3,14 @@
 Guarded in-place upgrade of the sole LIVE EV phase writer from v0.4.3 to v0.4.4.
 
 v0.4.4 replaces inter-invocation self-retrigger transitions with one bounded
-HomeyScript transaction. This helper only upgrades from a quiescent STABLE state
-with a normal circuit limit and physically coherent charger state. No second
-writer is created.
+HomeyScript transaction. Deployment safety is deliberately minimal: never
+replace the sole writer while a bounded transition is RUNNING, and never replace
+it while an EV transition circuit cap (6..16 A) may still be active.
 
-On any deployment or validation failure the exact previous Advanced Flow body
-is restored.
+Runtime phase, charging, PV and pause state are not deployment prerequisites.
+On a true deployment/source-validation failure the exact previous Advanced Flow
+body is restored. Runtime actuator failures after the new source starts remain
+runtime failures and do not roll back a successfully installed source.
 """
 
 import json
@@ -28,8 +30,7 @@ NOTE_CARD = "10a00000-0000-4000-8000-000000000003"
 STATUS_ID = "ea1f8a44-2f6c-490e-9b86-bae761886cf9"
 CHARGER_ID = "4d0b6913-d940-474e-95d6-b43f194c4119"
 
-QUIESCENCE_SEC = 10
-MIN_NORMAL_CIRCUIT_A = 16
+EV_MAX_TRANSITION_CAP_A = 16
 
 SOURCE = ROOT / "src/homey/actuators/ev-power/ev-power-v0.4.4.phase-writer-live.js"
 FLOW_NAME = "EM v2 | 60 Actuator | EV Power v0.4.4 BOUNDED-PHASE-WRITER [LIVE]"
@@ -140,48 +141,21 @@ def charger_state():
     }
 
 
-def stable_guard(st, charger):
-    observed = st.get("observed") or {}
-    offered_a = charger.get("offeredA")
-    power_w = charger.get("powerW")
-    charger_target = charger.get("chargerTargetA")
-
-    # Same-phase PV control may legitimately change target current during the
-    # quiescence window. Physical coherence therefore compares Easee's own
-    # requested/offered current, not a potentially older actuator targetA.
-    physically_running = (
-        charger.get("chargeState") == "plugged_in_charging"
-        and charger.get("charging") is True
-        and isinstance(offered_a, (int, float))
-        and isinstance(charger_target, (int, float))
-        and charger_target >= 6
-        and abs(offered_a - charger_target) <= 0.5
-        and isinstance(power_w, (int, float))
-        and power_w > 500
-    )
-
-    physically_paused = (
-        charger.get("chargeState") == "plugged_in_paused"
-        and charger.get("charging") is not True
-        and isinstance(offered_a, (int, float))
-        and offered_a <= 1
-        and isinstance(power_w, (int, float))
-        and power_w <= 250
-    )
-
+def deploy_guard(st, charger):
+    transition = st.get("transition") or {}
+    circuit_target = charger.get("circuitTargetA")
     return {
         "schema": st.get("schema") in ALLOWED_PREVIOUS_SCHEMAS,
-        "statusStable": st.get("status") == "STABLE",
-        "transitionStable": (st.get("transition") or {}).get("stage") == "STABLE",
-        "live": st.get("live") is True,
-        "phaseAligned": st.get("phaseMode") == st.get("confirmedMode"),
-        "normalCircuitCap": isinstance(charger.get("circuitTargetA"), (int, float))
-        and charger.get("circuitTargetA") >= MIN_NORMAL_CIRCUIT_A,
-        "physicalStateCoherent": physically_running or physically_paused,
-        "observedCircuitConsistent": observed.get("circuitTargetA")
-        in (None, charger.get("circuitTargetA")),
+        "noActiveTransition":
+            st.get("status") != "RUNNING"
+            and transition.get("stage") != "RUNNING",
+        # A temporary EV transition cap is always within the executable EV
+        # range 6..16 A. A value above 16 A therefore proves that no temporary
+        # transition cap is active without hard-coding the household baseline.
+        "normalCircuitBaseline":
+            isinstance(circuit_target, (int, float))
+            and circuit_target > EV_MAX_TRANSITION_CAP_A,
     }
-
 
 def all_true(checks):
     return all(checks.values())
@@ -209,7 +183,7 @@ def main():
 
     before_status = status()
     before_charger = charger_state()
-    guards1 = stable_guard(before_status, before_charger)
+    guards = deploy_guard(before_status, before_charger)
 
     print("=== PRE-UPGRADE STATUS ===")
     print(json.dumps({
@@ -221,34 +195,11 @@ def main():
         "targetA": before_status.get("targetA"),
         "transition": before_status.get("transition"),
         "charger": before_charger,
-        "guards": guards1,
+        "guards": guards,
     }, indent=2))
 
-    if not all_true(guards1):
-        raise RuntimeError("PRE_UPGRADE_NOT_QUIESCENT")
-
-    print(f"QUIESCENCE: waiting {QUIESCENCE_SEC}s and rechecking stable physical state")
-    time.sleep(QUIESCENCE_SEC)
-
-    confirm_status = status()
-    confirm_charger = charger_state()
-    guards2 = stable_guard(confirm_status, confirm_charger)
-    guards2.update({
-        # Dynamic same-phase current/revision changes are expected under realtime
-        # PV control and do not make an in-place writer source swap unsafe.
-        "samePhaseMode":
-            confirm_status.get("phaseMode") == before_status.get("phaseMode"),
-        "sameConfirmedMode":
-            confirm_status.get("confirmedMode") == before_status.get("confirmedMode"),
-        "sameCircuitTargetA":
-            confirm_charger.get("circuitTargetA") == before_charger.get("circuitTargetA"),
-        "sameChargeState":
-            confirm_charger.get("chargeState") == before_charger.get("chargeState"),
-    })
-
-    print("quiescenceGuards:", json.dumps(guards2, indent=2))
-    if not all_true(guards2):
-        raise RuntimeError("PRE_UPGRADE_CHANGED_DURING_QUIESCENCE")
+    if not all_true(guards):
+        raise RuntimeError("PRE_UPGRADE_UNSAFE_ACTIVE_TRANSITION_OR_CIRCUIT_CAP")
 
     raw = jrun("api", "flow", "get-advanced-flow", "--id", FLOW_ID, "--json")
     flow = unwrap_flow(raw)
@@ -271,28 +222,31 @@ def main():
 
     candidate = {"name": FLOW_NAME, "enabled": True, "cards": cards}
 
+    # Recheck only the two deployment safety invariants immediately before
+    # replacing the sole writer. Normal realtime current/phase/charge changes do
+    # not block source deployment.
     final_status = status()
     final_charger = charger_state()
-    final_guards = stable_guard(final_status, final_charger)
-    final_guards.update({
-        "samePhaseMode":
-            final_status.get("phaseMode") == confirm_status.get("phaseMode"),
-        "sameConfirmedMode":
-            final_status.get("confirmedMode") == confirm_status.get("confirmedMode"),
-        "sameCircuitTargetA":
-            final_charger.get("circuitTargetA") == confirm_charger.get("circuitTargetA"),
-        "sameChargeState":
-            final_charger.get("chargeState") == confirm_charger.get("chargeState"),
-    })
-
+    final_guards = deploy_guard(final_status, final_charger)
     if not all_true(final_guards):
         print("finalGuards:", json.dumps(final_guards, indent=2))
-        raise RuntimeError("PRE_UPGRADE_CHANGED_BEFORE_PUSH")
+        raise RuntimeError("PRE_UPGRADE_UNSAFE_BEFORE_PUSH")
 
     try:
         print()
         print("=== DEPLOY V0.4.4 ===")
         push(candidate)
+
+        # Verify the sole Advanced Flow now contains the exact repository source
+        # before executing it.
+        deployed_raw = jrun("api", "flow", "get-advanced-flow", "--id", FLOW_ID, "--json")
+        deployed_flow = unwrap_flow(deployed_raw)
+        deployed_card = ((deployed_flow.get("cards") or {}).get(SCRIPT_CARD) or {})
+        deployed_source = (deployed_card.get("args") or {}).get("code")
+        if deployed_source != source:
+            raise RuntimeError("DEPLOYED_SOURCE_MISMATCH")
+
+        before_trigger_at = before_status.get("at")
         run("api", "flow", "trigger-advanced-flow", "--id", FLOW_ID)
         time.sleep(5)
 
@@ -316,13 +270,19 @@ def main():
             raise RuntimeError("V044_NOT_LIVE")
         if after.get("phaseExecutionEnabled") is not True:
             raise RuntimeError("V044_EXECUTION_NOT_ENABLED")
-        if after.get("status") == "FAILED":
-            raise RuntimeError("V044_FAILED:" + str(after.get("reason")))
         if after.get("boundedTransition") is not True:
             raise RuntimeError("V044_BOUNDED_FLAG_MISSING")
+        if after.get("at") == before_trigger_at:
+            raise RuntimeError("V044_VALIDATION_TRIGGER_DID_NOT_UPDATE_STATUS")
 
         print()
-        print("PASS: v0.4.4 active; sole EV writer preserved; no self-retrigger chain")
+        print("PASS: v0.4.4 source installed and validation trigger executed")
+        if after.get("status") == "FAILED":
+            print(
+                "NOTE: writer reported runtime FAILED after deployment; "
+                "source remains installed because this is not a deployment failure: "
+                + str(after.get("reason"))
+            )
     except Exception:
         print("ROLLBACK: restoring exact previous EV Advanced Flow", file=sys.stderr)
         push(backup)
