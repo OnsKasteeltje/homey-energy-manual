@@ -1115,6 +1115,14 @@ def heating_preheat_shadow_resource():
     if not isinstance(house, dict) or not isinstance(cv_guard, dict) or not isinstance(policy, dict):
         raise ValueError("HEATING_PREHEAT_SHADOW_STRUCTURE_INVALID")
 
+    max_advance_minutes = policy.get("maxAdvanceMinutes")
+    if (
+        isinstance(max_advance_minutes, bool)
+        or not isinstance(max_advance_minutes, (int, float))
+        or max_advance_minutes <= 0
+    ):
+        raise ValueError("HEATING_PREHEAT_SHADOW_MAX_ADVANCE_INVALID")
+
     rooms = []
     allowed_rooms = {"woonkamer", "eetkamer", "keuken", "serre"}
     allowed_states = {
@@ -1197,6 +1205,7 @@ def heating_preheat_shadow_resource():
             "sourceLastUpdated": cv_guard.get("sourceLastUpdated"),
         },
         "policy": {
+            "maxAdvanceMinutes": float(max_advance_minutes),
             "maxStep_C": policy.get("maxStep_C"),
             "cvCheckedEveryIteration": policy.get("cvCheckedEveryIteration") is True,
             "advanceOnlyAfterCurrentStepReached": policy.get("advanceOnlyAfterCurrentStepReached") is True,

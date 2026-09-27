@@ -199,6 +199,14 @@ def build_shadow(
         if actual < baseline_target - BASELINE_TOLERANCE_C:
             baseline_demand_rooms.append(key)
 
+    candidate_policy = _dict(candidate_plan.get("policy"), "candidate policy")
+    max_advance_minutes = _number(
+        candidate_policy.get("maxAdvanceMinutes"),
+        "candidate policy.maxAdvanceMinutes",
+    )
+    if max_advance_minutes <= 0:
+        raise ShadowError("candidate policy.maxAdvanceMinutes must be positive")
+
     baseline_demand_present = bool(baseline_demand_rooms)
     cv_guard = _cv_guard(quatt_current, now)
 
@@ -282,6 +290,7 @@ def build_shadow(
         },
         "cvGuard": cv_guard,
         "policy": {
+            "maxAdvanceMinutes": max_advance_minutes,
             "maxStep_C": 0.5,
             "baselineTolerance_C": BASELINE_TOLERANCE_C,
             "stepReachedTolerance_C": STEP_REACHED_TOLERANCE_C,
