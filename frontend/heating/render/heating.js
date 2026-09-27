@@ -365,9 +365,12 @@ function render(rooms,start,now){
       }
 
       for(const interval of shadowStepIntervals(room,now)){
-        const from = clamp(minuteAt(interval.startedAt,start),0,HORIZON_MIN);
-        const to = clamp(minuteAt(interval.endedAt,start),0,HORIZON_MIN);
-        if(to >= from && to >= 0 && from <= HORIZON_MIN){
+        const rawFrom = minuteAt(interval.startedAt,start);
+        const rawTo = minuteAt(interval.endedAt,start);
+        if(rawTo < 0 || rawFrom > HORIZON_MIN || rawTo < rawFrom) continue;
+        const from = clamp(rawFrom,0,HORIZON_MIN);
+        const to = clamp(rawTo,0,HORIZON_MIN);
+        if(to >= from){
           const attributes = {
             x1:x(from),y1:y(interval.target_C),x2:x(to),y2:y(interval.target_C),
           };
@@ -398,9 +401,12 @@ function render(rooms,start,now){
       }
 
       for(const interval of shadowStepIntervals(room,now)){
-        const from = clamp(minuteAt(interval.startedAt,start),0,HORIZON_MIN);
-        const to = clamp(minuteAt(interval.endedAt,start),0,HORIZON_MIN);
-        if(to > from && to >= 0 && from <= HORIZON_MIN){
+        const rawFrom = minuteAt(interval.startedAt,start);
+        const rawTo = minuteAt(interval.endedAt,start);
+        if(rawTo < 0 || rawFrom > HORIZON_MIN || rawTo < rawFrom) continue;
+        const from = clamp(rawFrom,0,HORIZON_MIN);
+        const to = clamp(rawTo,0,HORIZON_MIN);
+        if(to > from){
           add("rect",{
             x:x(from),y:railY+1,width:Math.max(1,x(to)-x(from)),height:6,
             fill:room.color,class:"preheat-active"
