@@ -10,6 +10,10 @@ sudo systemctl daemon-reload
 
 sudo systemctl start ems-heating-preheat-progression-shadow.service
 
+# Seed the just-introduced bounded opportunity history from the canonical
+# Honeywell schedule so already-passed UP windows are visible immediately.
+python3 "$REPO/deploy/migrations/backfill_heating_preheat_opportunity_history_v0_4.py"
+
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -29,6 +33,7 @@ assert policy.get("plannerGrantRequiredForStartAndAdvance") is True
 assert policy.get("intentionalGridImportAllowed") is False
 assert policy.get("rollbackBehavior")=="NOT_DEFINED_SHADOW_ONLY"
 assert policy.get("stepHistoryRetentionHours")==48
+assert policy.get("opportunityHistoryRetentionHours")==48
 
 from datetime import datetime
 
@@ -49,6 +54,18 @@ def parse_ts(value):
 for room in d.get("rooms") or []:
     progression=room.get("progression") or {}
     assert progression.get("physicalWritePerformed") is False
+
+    opportunity_history=room.get("opportunityHistory")
+    assert isinstance(opportunity_history,list)
+    for interval in opportunity_history:
+        assert isinstance(interval,dict)
+        assert isinstance(interval.get("opportunityId"),str) and interval["opportunityId"]
+        target=interval.get("target_C")
+        assert isinstance(target,(int,float)) and not isinstance(target,bool)
+        opens=parse_ts(interval.get("opensAt"))
+        closes=parse_ts(interval.get("closesAt"))
+        assert closes >= opens
+
     history=room.get("stepHistory")
     assert isinstance(history,list)
     for interval in history:
@@ -63,7 +80,7 @@ for room in d.get("rooms") or []:
         assert "physicalWritePerformed" not in interval
 
 print("PASS: Heating Preheat V0.4 progression is read-only and physical-write-free")
-print("PASS: V0.4 stepHistory retention contract is valid")
+print("PASS: V0.4 opportunityHistory + stepHistory retention contracts are valid")
 for room in d.get("rooms") or []:
     pstate=room.get("progression") or {}
     print(

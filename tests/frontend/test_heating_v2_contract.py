@@ -89,8 +89,20 @@ def test_preheat_window_is_derived_from_honeywell_up_transition_not_current_elig
     assert "hasPreheatWindow" in render
     assert 'candidate?.status === "ELIGIBLE_UP_TRANSITION"' not in render
     assert 'const windowText = hasPreheatWindow(s?.baseline,candidate)' in render
-    assert 'if(hasPreheatWindow(room.shadowSource?.baseline,candidate))' in render
+    assert "preheatWindows(room)" in render
+    assert "room.progressionSource?.opportunityHistory" in render
+    assert "for(const window of preheatWindows(room))" in render
+    assert 'if(hasPreheatWindow(room.shadowSource?.baseline,candidate))' not in render
     assert 'if(candidate?.opportunityOpensAt && candidate?.opportunityClosesAt)' not in render
+
+
+def test_heating_opportunity_windows_use_persisted_progression_history():
+    render = RENDER.read_text()
+
+    assert "function preheatWindows(room)" in render
+    assert "room.progressionSource?.opportunityHistory" in render
+    assert "window.opensAt" in render
+    assert "window.closesAt" in render
 
 
 def test_heating_shadow_intent_uses_persisted_step_intervals():

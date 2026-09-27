@@ -85,11 +85,13 @@ def priority(*, grant=True, ready=None, generated="2026-09-26T11:59:30Z",
 
 def previous_room(key="woonkamer", target=17.5, state="STEP_WAIT", group="living_area",
                   close="2026-09-26T15:00:00Z", future=19.0, completed=None,
-                  reason="WAITING_FOR_MEASURED_TEMPERATURE", history=None):
+                  reason="WAITING_FOR_MEASURED_TEMPERATURE", history=None,
+                  opportunity_history=None):
     return {
         "key": key,
         "group": group,
         "opportunityId": f"{key}|{close}|{future:.3f}",
+        "opportunityHistory": list(opportunity_history or []),
         "stepHistory": list(history or []),
         "progression": {
             "state": state,
@@ -167,6 +169,50 @@ def test_reached_step_advances_by_at_most_half_degree():
     assert p["activeStepReached"] is False
     assert p["completedSteps_C"] == [17.5]
     assert p["lastTransition"] == "ADVANCED_STEP"
+
+
+def test_up_opportunity_window_is_persisted_even_without_planner_grant():
+    out = build(p=priority(grant=False, reason="EV_SLACK_CLOSES_BEFORE_HEATING_WINDOW"))
+    r = next(r for r in out["rooms"] if r["key"] == "woonkamer")
+
+    assert r["opportunityHistory"] == [{
+        "opportunityId": "woonkamer|2026-09-26T15:00:00Z|19.000",
+        "opensAt": "2026-09-26T12:00:00Z",
+        "closesAt": "2026-09-26T15:00:00Z",
+        "target_C": 19.0,
+    }]
+
+
+def test_opportunity_window_survives_after_honeywell_moves_to_next_transition():
+    first = build()
+    later_room = room(
+        state="NOT_ELIGIBLE",
+        reason="BASELINE_DOWN",
+        next_step=None,
+        close="2026-09-26T16:00:00Z",
+    )
+    later_room["baseline"]["direction"] = "DOWN"
+    later_room["candidate"]["status"] = "NOT_ELIGIBLE"
+    later_room["candidate"]["opportunityOpensAt"] = "2026-09-26T13:00:00Z"
+    later_room["candidate"]["opportunityClosesAt"] = "2026-09-26T16:00:00Z"
+
+    second = m.build_progression(
+        heating(later_room, generated="2026-09-26T12:00:30Z"),
+        priority(
+            grant=False,
+            ready=[],
+            generated="2026-09-26T12:00:45Z",
+            reason="NO_HEATING_GRANT",
+        ),
+        first,
+        generated_at=datetime(2026, 9, 26, 12, 1, tzinfo=timezone.utc),
+    )
+    r = next(r for r in second["rooms"] if r["key"] == "woonkamer")
+
+    assert len(r["opportunityHistory"]) == 1
+    assert r["opportunityHistory"][0]["opportunityId"] == "woonkamer|2026-09-26T15:00:00Z|19.000"
+    assert r["opportunityHistory"][0]["opensAt"] == "2026-09-26T12:00:00Z"
+    assert r["opportunityHistory"][0]["closesAt"] == "2026-09-26T15:00:00Z"
 
 
 def test_advanced_step_archives_previous_shadow_intent_interval():
@@ -373,3 +419,4 @@ def test_policy_keeps_shadow_boundaries_explicit():
     assert policy["intentionalGridImportAllowed"] is False
     assert policy["rollbackBehavior"] == "NOT_DEFINED_SHADOW_ONLY"
     assert policy["stepHistoryRetentionHours"] == 48
+    assert policy["opportunityHistoryRetentionHours"] == 48

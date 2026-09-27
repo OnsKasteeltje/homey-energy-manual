@@ -26,6 +26,8 @@ STEP_REACHED_TOLERANCE_C = 0.0
 MAX_STEP_C = 0.5
 STEP_HISTORY_RETENTION_HOURS = 48
 MAX_STEP_HISTORY_ITEMS = 128
+OPPORTUNITY_HISTORY_RETENTION_HOURS = 48
+MAX_OPPORTUNITY_HISTORY_ITEMS = 64
 
 
 class ProgressionError(ValueError):
@@ -152,6 +154,69 @@ def _step_history(previous_room: dict[str, Any] | None, now: datetime) -> list[d
 
     out.sort(key=lambda item: item["startedAt"])
     return out[-MAX_STEP_HISTORY_ITEMS:]
+
+
+def _opportunity_history(previous_room: dict[str, Any] | None, now: datetime) -> list[dict[str, Any]]:
+    values = previous_room.get("opportunityHistory") if isinstance(previous_room, dict) else None
+    if not isinstance(values, list):
+        return []
+
+    cutoff = now - timedelta(hours=OPPORTUNITY_HISTORY_RETENTION_HOURS)
+    out: list[dict[str, Any]] = []
+    for item in values:
+        if not isinstance(item, dict):
+            continue
+        opportunity_id = item.get("opportunityId")
+        opens_at = item.get("opensAt")
+        closes_at = item.get("closesAt")
+        target = item.get("target_C")
+        if not isinstance(opportunity_id, str) or not opportunity_id:
+            continue
+        if isinstance(target, bool) or not isinstance(target, (int, float)):
+            continue
+        try:
+            opens_dt = _aware(opens_at, "opportunityHistory.opensAt")
+            closes_dt = _aware(closes_at, "opportunityHistory.closesAt")
+        except ProgressionError:
+            continue
+        if closes_dt < opens_dt or closes_dt < cutoff:
+            continue
+        out.append({
+            "opportunityId": opportunity_id,
+            "opensAt": _iso(opens_dt),
+            "closesAt": _iso(closes_dt),
+            "target_C": float(target),
+        })
+
+    out.sort(key=lambda item: item["opensAt"])
+    return out[-MAX_OPPORTUNITY_HISTORY_ITEMS:]
+
+
+def _record_opportunity_window(history: list[dict[str, Any]], room: dict[str, Any]) -> None:
+    baseline = _dict(room.get("baseline"), "room.baseline")
+    if baseline.get("direction") != "UP":
+        return
+
+    candidate = _dict(room.get("candidate"), "room.candidate")
+    opportunity_id = _opportunity_id(room)
+    opens_dt = _aware(candidate.get("opportunityOpensAt"), "candidate.opportunityOpensAt")
+    closes_dt = _aware(candidate.get("opportunityClosesAt"), "candidate.opportunityClosesAt")
+    if closes_dt < opens_dt:
+        raise ProgressionError("candidate opportunity closes before it opens")
+    target = _number(baseline.get("targetTemperature_C"), "baseline.targetTemperature_C")
+
+    if any(item.get("opportunityId") == opportunity_id for item in history):
+        return
+
+    history.append({
+        "opportunityId": opportunity_id,
+        "opensAt": _iso(opens_dt),
+        "closesAt": _iso(closes_dt),
+        "target_C": target,
+    })
+    history.sort(key=lambda item: item["opensAt"])
+    if len(history) > MAX_OPPORTUNITY_HISTORY_ITEMS:
+        del history[:-MAX_OPPORTUNITY_HISTORY_ITEMS]
 
 
 def _close_step_interval(
@@ -284,6 +349,8 @@ def build_progression(
 
         prev_room = previous_rooms.get(key)
         history = _step_history(prev_room, now)
+        opportunity_history = _opportunity_history(prev_room, now)
+        _record_opportunity_window(opportunity_history, room)
         raw_prev_prog = prev_room.get("progression") if isinstance(prev_room, dict) else None
         same_opportunity = (
             isinstance(prev_room, dict)
@@ -333,6 +400,7 @@ def build_progression(
             "activeReached": active_reached,
             "completed": _completed(prev_prog),
             "stepHistory": history,
+            "opportunityHistory": opportunity_history,
             "canReceiveGrant": can_receive_grant,
             "heatingState": shadow.get("state"),
             "heatingReason": shadow.get("reason"),
@@ -362,6 +430,7 @@ def build_progression(
         reached = c["activeReached"]
         completed = list(c["completed"])
         step_history = list(c["stepHistory"])
+        opportunity_history = list(c["opportunityHistory"])
         state = "INACTIVE"
         reason = c["heatingReason"] or "HEATING_NOT_READY"
         transition = "NONE"
@@ -536,6 +605,7 @@ def build_progression(
                 "domainGrant": "SHADOW_GRANT" if c["canReceiveGrant"] else "HOLD",
                 "priorityReason": decision.get("reason"),
             },
+            "opportunityHistory": opportunity_history,
             "stepHistory": step_history,
             "progression": {
                 "state": state,
@@ -578,6 +648,7 @@ def build_progression(
             "rollbackBehavior": "NOT_DEFINED_SHADOW_ONLY",
             "statePersistence": "LOCAL_SHADOW_ARTIFACT",
             "stepHistoryRetentionHours": STEP_HISTORY_RETENTION_HOURS,
+            "opportunityHistoryRetentionHours": OPPORTUNITY_HISTORY_RETENTION_HOURS,
         },
         "rooms": output_rooms,
     }
