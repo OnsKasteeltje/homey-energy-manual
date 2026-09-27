@@ -1039,6 +1039,9 @@ def heating_preheat_shadow_resource():
             "cvActive": cv_guard.get("cvActive")
             if isinstance(cv_guard.get("cvActive"), bool) else None,
             "ageSeconds": cv_guard.get("ageSeconds"),
+            "collectorAgeSeconds": cv_guard.get("collectorAgeSeconds"),
+            "observedAt": cv_guard.get("observedAt"),
+            "sourceLastUpdated": cv_guard.get("sourceLastUpdated"),
         },
         "policy": {
             "maxStep_C": policy.get("maxStep_C"),
