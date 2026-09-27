@@ -41,10 +41,10 @@ ALLOWED_PREVIOUS_SCHEMAS = {
 }
 
 
-def run(*args):
+def run(*args, retry_throttle=True):
     env = os.environ.copy()
     env["PATH"] = "/opt/node-v24.20.0/bin:" + env.get("PATH", "")
-    delays = (0, 2, 4, 8)
+    delays = (0, 2, 4, 8) if retry_throttle else (0,)
     for attempt, delay in enumerate(delays):
         if delay:
             time.sleep(delay)
@@ -107,10 +107,34 @@ def body_file(payload):
         raise
 
 
+def current_writable_flow():
+    raw = jrun("api", "flow", "get-advanced-flow", "--id", FLOW_ID, "--json")
+    flow = unwrap_flow(raw)
+    if not isinstance(flow, dict):
+        raise RuntimeError("FLOW_INVALID")
+    return writable_flow(flow)
+
+
 def push(body):
     path = body_file(body)
     try:
-        run("api", "flow", "update-advanced-flow", "--id", FLOW_ID, "--body", f"@{path}")
+        try:
+            # Writes are not blindly retried: Homey can apply a write and still
+            # return a throttle response. Repeating it only increases pressure.
+            run(
+                "api", "flow", "update-advanced-flow",
+                "--id", FLOW_ID, "--body", f"@{path}",
+                retry_throttle=False,
+            )
+        except RuntimeError as exc:
+            if "too many requests" not in str(exc).lower():
+                raise
+            # HOMEY_WRITE_429_READBACK: resolve ambiguous 429 by reading the
+            # canonical flow back once. Exact match means the write did apply.
+            if current_writable_flow() == body:
+                print("NOTE: Homey returned 429 after write; exact readback confirms write applied")
+                return
+            raise
     finally:
         try:
             os.unlink(path)
@@ -247,7 +271,18 @@ def main():
             raise RuntimeError("DEPLOYED_SOURCE_MISMATCH")
 
         before_trigger_at = before_status.get("at")
-        run("api", "flow", "trigger-advanced-flow", "--id", FLOW_ID)
+        try:
+            run(
+                "api", "flow", "trigger-advanced-flow",
+                "--id", FLOW_ID,
+                retry_throttle=False,
+            )
+        except RuntimeError as exc:
+            # A trigger 429 is also ambiguous. Do not issue duplicate triggers;
+            # status readback below decides whether this invocation ran.
+            if "too many requests" not in str(exc).lower():
+                raise
+            print("NOTE: Homey returned 429 for validation trigger; checking status readback")
         time.sleep(5)
 
         after = status()
