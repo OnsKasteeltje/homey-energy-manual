@@ -151,6 +151,8 @@ Once a shadow step is active:
 
 V0.4 intentionally does **not** define LIVE rollback semantics when planner grant disappears or a guard trips. It records `rollbackBehavior = NOT_DEFINED_SHADOW_ONLY` rather than inventing actuator behaviour before a guarded Honeywell writer exists.
 
+For analysis, V0.4 retains each closed shadow step as a bounded `stepHistory` interval in the same local progression artifact. The retention is 48 hours. Each interval contains the opportunity id, shadow target, exact start and end timestamps, outcome and reason. The currently active step remains represented by the existing active-step fields until it closes. This history is observability only: it records actual V0.4 shadow intent and must not be reconstructed heuristically by the frontend or interpreted as a physical Honeywell write.
+
 The V0.4 minute cadence is Pi-local only and performs no Homey call. It accepts V0.3 only within its bounded freshness horizon and accepts Flex Priority only when the priority artifact is fresh and was generated at or after the V0.3 state it is granting. Otherwise progression fails closed to a waiting/hold state.
 
 ## PV Flex observability
