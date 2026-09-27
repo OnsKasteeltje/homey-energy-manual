@@ -38,6 +38,12 @@ test('upgrade requires bounded final pause-read fix',()=>{
   assert.match(src,/FINAL_PAUSE_READ_AFTER_TIMEOUT/);
 });
 
+
+
+test('upgrade requires normal OFF zero-amp hold semantics',()=>{
+  assert.match(src,/NORMAL_OFF_ZERO_A_HOLD/);
+});
+
 test('upgrade blocks unsupported HomeyScript timers',()=>{
   assert.match(src,/SOURCE_UNSUPPORTED_HOMEYSCRIPT_TIMER/);
   assert.match(src,/setTimeout\(/);
