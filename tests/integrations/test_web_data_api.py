@@ -333,7 +333,6 @@ class HeatingPreheatShadowResourceTest(unittest.TestCase):
                 "reason": "CURRENT_QUATT_OBSERVER",
                 "cvActive": False,
                 "ageSeconds": 30,
-                "collectorAgeSeconds": 31,
                 "observedAt": "2026-09-26T11:59:30Z",
                 "sourceLastUpdated": "2026-09-24T07:15:32Z",
             },
