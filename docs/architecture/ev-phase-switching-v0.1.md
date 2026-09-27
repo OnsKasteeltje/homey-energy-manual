@@ -759,3 +759,18 @@ Live 3P→1P validation on 2026-09-27 showed that the native Easee pause command
 
 The bounded transaction therefore keeps `PAUSE_TIMEOUT_MS=6000` and the existing strict paused predicate, but `pauseAndConfirm()` now performs exactly one definitive `readHardware()` after a `PAUSE_CONFIRM_TIMEOUT`. If that final read is safely paused, the transition proceeds. If it is not, the same timeout is rethrown and `safeAbort()` remains fail-closed. No polling extension, retry loop, Tesla-consumption dependency, phase-threshold change, or weakening of the 5 s electrical deadtime is introduced. The guarded v0.4.4 deployment helper requires the `FINAL_PAUSE_READ_AFTER_TIMEOUT` source marker so an older writer cannot be redeployed through the supported path.
 
+### Homey deployment 429 readback rule
+
+Live v0.4.4 source deployment on 2026-09-27 exposed that Homey may apply an
+`update-advanced-flow` write and still return `Too many requests` to the CLI.
+A write-side 429 is therefore an ambiguous transport result, not proof that the
+write failed.
+
+The supported upgrader never blindly repeats an Advanced Flow write or validation
+trigger after a 429. For an ambiguous flow-write response it reads the sole flow
+back once; an exact writable-flow match proves the intended source is installed
+and deployment continues without rollback. A mismatching readback remains a
+deployment failure. Validation-trigger 429 responses are not retriggered; writer
+status readback determines whether the invocation ran. This avoids self-induced
+Homey throttling and duplicate actuator invocations.
+
