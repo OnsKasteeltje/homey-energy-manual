@@ -113,3 +113,18 @@ test('Easee HTTP errors preserve status for bounded auth recovery',()=>{
   const matches=src.match(/err\.httpStatus=r\.status/g)||[];
   assert.ok(matches.length>=2);
 });
+
+test('pause timeout gets one final hardware read before fail-closed',()=>{
+  const start=src.indexOf('FINAL_PAUSE_READ_AFTER_TIMEOUT');
+  const wait=src.indexOf("waitHardware(x=>x.paused,PAUSE_TIMEOUT_MS,'PAUSE_CONFIRM_TIMEOUT')",start);
+  const catchTimeout=src.indexOf("String(err?.message||err)!=='PAUSE_CONFIRM_TIMEOUT'",wait);
+  const finalRead=src.indexOf('hw=await readHardware()',catchTimeout);
+  const accept=src.indexOf('if(hw.paused)return hw',finalRead);
+  const rethrow=src.indexOf('throw err',accept);
+  assert.ok(start>=0);
+  assert.ok(wait>start);
+  assert.ok(catchTimeout>wait);
+  assert.ok(finalRead>catchTimeout);
+  assert.ok(accept>finalRead);
+  assert.ok(rethrow>accept);
+});
