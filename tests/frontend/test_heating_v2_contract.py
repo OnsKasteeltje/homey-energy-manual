@@ -80,3 +80,13 @@ def test_heating_tooltip_shows_one_room_and_one_signal():
     assert 'label = "EMS shadow-target"' in render
     assert 'class="tip-line"' in render
     assert 'visible.map(room =>' not in render
+
+
+def test_preheat_window_is_rendered_only_for_eligible_up_transition():
+    render = RENDER.read_text()
+
+    assert 'candidate?.status === "ELIGIBLE_UP_TRANSITION"' in render
+    assert "hasEligiblePreheatWindow(candidate)" in render
+    assert 'const windowText = hasEligiblePreheatWindow(candidate)' in render
+    assert 'if(hasEligiblePreheatWindow(candidate))' in render
+    assert 'if(candidate?.opportunityOpensAt && candidate?.opportunityClosesAt)' not in render
