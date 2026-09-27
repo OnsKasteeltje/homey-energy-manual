@@ -320,8 +320,7 @@ Adapter/Gate contract, Easee physical-phase ownership, or single-writer boundary
 changes. The first v0.4.4 deployment attempt rolled back automatically because
 HomeyScript has no `setTimeout`; the bounded source now uses the native global
 `await wait(ms)` primitive and the upgrader rejects unsupported timer usage.
-Production remains v0.4.3 until the corrected guarded v0.4.4 upgrade is executed
-and validated.
+A second guarded v0.4.4 attempt then aborted before deployment because the 10-second quiescence guard incorrectly required `controlRevision` and `targetA` to remain unchanged while normal same-phase PV control was legitimately adjusting current. The corrected guard now permits same-phase current/revision drift, while still requiring STABLE transition state, unchanged phase/confirmed phase, unchanged normal circuit limit, unchanged charge-state class, and physically coherent Easee requested/offered current. Production remains v0.4.3 until the corrected guarded v0.4.4 upgrade is executed and validated.
 
 
 ## 12. Battery boundary
