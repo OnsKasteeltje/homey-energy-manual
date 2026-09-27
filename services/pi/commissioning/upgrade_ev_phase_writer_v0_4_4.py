@@ -142,19 +142,20 @@ def charger_state():
 
 def stable_guard(st, charger):
     observed = st.get("observed") or {}
-    target_a = st.get("targetA")
-    positive_target = isinstance(target_a, (int, float)) and target_a >= 6
     offered_a = charger.get("offeredA")
     power_w = charger.get("powerW")
     charger_target = charger.get("chargerTargetA")
 
+    # Same-phase PV control may legitimately change target current during the
+    # quiescence window. Physical coherence therefore compares Easee's own
+    # requested/offered current, not a potentially older actuator targetA.
     physically_running = (
         charger.get("chargeState") == "plugged_in_charging"
         and charger.get("charging") is True
         and isinstance(offered_a, (int, float))
-        and abs(offered_a - target_a) <= 0.5
         and isinstance(charger_target, (int, float))
-        and abs(charger_target - target_a) <= 0.5
+        and charger_target >= 6
+        and abs(offered_a - charger_target) <= 0.5
         and isinstance(power_w, (int, float))
         and power_w > 500
     )
@@ -176,8 +177,7 @@ def stable_guard(st, charger):
         "phaseAligned": st.get("phaseMode") == st.get("confirmedMode"),
         "normalCircuitCap": isinstance(charger.get("circuitTargetA"), (int, float))
         and charger.get("circuitTargetA") >= MIN_NORMAL_CIRCUIT_A,
-        "physicalStateCoherent":
-            physically_running if positive_target else physically_paused,
+        "physicalStateCoherent": physically_running or physically_paused,
         "observedCircuitConsistent": observed.get("circuitTargetA")
         in (None, charger.get("circuitTargetA")),
     }
@@ -233,12 +233,12 @@ def main():
     confirm_charger = charger_state()
     guards2 = stable_guard(confirm_status, confirm_charger)
     guards2.update({
-        "sameControlRevision":
-            confirm_status.get("controlRevision") == before_status.get("controlRevision"),
+        # Dynamic same-phase current/revision changes are expected under realtime
+        # PV control and do not make an in-place writer source swap unsafe.
         "samePhaseMode":
             confirm_status.get("phaseMode") == before_status.get("phaseMode"),
-        "sameTargetA":
-            confirm_status.get("targetA") == before_status.get("targetA"),
+        "sameConfirmedMode":
+            confirm_status.get("confirmedMode") == before_status.get("confirmedMode"),
         "sameCircuitTargetA":
             confirm_charger.get("circuitTargetA") == before_charger.get("circuitTargetA"),
         "sameChargeState":
@@ -274,12 +274,10 @@ def main():
     final_charger = charger_state()
     final_guards = stable_guard(final_status, final_charger)
     final_guards.update({
-        "sameControlRevision":
-            final_status.get("controlRevision") == confirm_status.get("controlRevision"),
         "samePhaseMode":
             final_status.get("phaseMode") == confirm_status.get("phaseMode"),
-        "sameTargetA":
-            final_status.get("targetA") == confirm_status.get("targetA"),
+        "sameConfirmedMode":
+            final_status.get("confirmedMode") == confirm_status.get("confirmedMode"),
         "sameCircuitTargetA":
             final_charger.get("circuitTargetA") == confirm_charger.get("circuitTargetA"),
         "sameChargeState":
