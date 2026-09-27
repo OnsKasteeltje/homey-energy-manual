@@ -113,7 +113,7 @@ The runner consumes only already collected local Pi artifacts:
 
 It performs **no Homey call and no device write**. The five-minute shadow cadence is deliberately scheduled after the existing Honeywell-state and Quatt-current collectors.
 
-For CV-assist observation V0.3 uses the existing Quatt observer-only field `observerOnly.boilerAssistOn`. Missing, invalid or stale Quatt current state blocks a new shadow preheat increment; it does not alter normal Honeywell baseline heating.
+For CV-assist observation V0.3 uses the existing Quatt observer-only field `observerOnly.cvActive`. Missing, invalid or stale Quatt current state blocks a new shadow preheat increment; it does not alter normal Honeywell baseline heating.
 
 V0.3 derives house-wide `baselineHeatingDemandPresent` from all canonical Honeywell rooms, not only the four preheat rooms. Until Thermal Learning validates a suitable tolerance/hysteresis, V0.3 deliberately uses an exact/conservative comparison rather than inventing a thermal tolerance.
 
