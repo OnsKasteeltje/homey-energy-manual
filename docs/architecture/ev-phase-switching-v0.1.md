@@ -729,4 +729,6 @@ Canonical sources:
 
 An initial guarded v0.4.4 deployment attempt on 2026-09-27 rolled back automatically because HomeyScript does not expose browser/node `setTimeout`; the bounded writer had used it for polling/deadtime. No v0.4.4 writer remained LIVE after rollback. The corrected source uses HomeyScript's native global `await wait(ms)` primitive, and deployment now rejects any v0.4.4 source containing `setTimeout(`.
 
-Production remains on v0.4.3 until the corrected guarded v0.4.4 upgrade is executed from a quiescent STABLE state and the next natural phase transition is observed.
+A second guarded attempt correctly stopped before deployment because the original 10-second quiescence guard treated a normal same-phase PV current change as instability. For v0.4.4 source replacement, quiescence now means stable phase/confirmed-phase, STABLE transition state, unchanged normal circuit cap and unchanged charge-state class; `targetA` and `controlRevision` may advance if Easee remains physically coherent (`offeredA` follows its current charger target). This preserves protection against an in-flight phase transition without requiring the realtime PV current loop to freeze.
+
+Production remains on v0.4.3 until the corrected guarded v0.4.4 upgrade is executed from that structural quiescent state and the next natural phase transition is observed.

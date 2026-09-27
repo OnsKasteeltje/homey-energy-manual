@@ -15,15 +15,22 @@ test('upgrade requires a quiescent STABLE v0.4.3/v0.4.4 writer',()=>{
   assert.match(src,/PRE_UPGRADE_NOT_QUIESCENT/);
 });
 
-test('upgrade rechecks unchanged state before replacing the sole writer',()=>{
+test('upgrade rechecks structural quiescence while allowing same-phase current drift',()=>{
   assert.match(src,/QUIESCENCE_SEC = 10/);
-  assert.match(src,/sameControlRevision/);
   assert.match(src,/samePhaseMode/);
-  assert.match(src,/sameTargetA/);
+  assert.match(src,/sameConfirmedMode/);
   assert.match(src,/sameCircuitTargetA/);
   assert.match(src,/sameChargeState/);
+  assert.doesNotMatch(src,/"sameControlRevision"/);
+  assert.doesNotMatch(src,/"sameTargetA"/);
   assert.match(src,/PRE_UPGRADE_CHANGED_DURING_QUIESCENCE/);
   assert.match(src,/PRE_UPGRADE_CHANGED_BEFORE_PUSH/);
+});
+
+test('physical coherence follows Easee requested versus offered current',()=>{
+  assert.match(src,/abs\(offered_a - charger_target\) <= 0\.5/);
+  assert.doesNotMatch(src,/abs\(offered_a - target_a\)/);
+  assert.match(src,/physically_running or physically_paused/);
 });
 
 test('upgrade rejects a source that still contains self retrigger',()=>{
