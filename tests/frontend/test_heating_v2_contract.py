@@ -139,3 +139,13 @@ def test_heating_room_card_distinguishes_current_window_from_future_potential():
     assert "Volgende potentieel" in render
     assert ".find(window => !window.current" in render
     assert "renderStatus(shadow,progression,rooms,start,now,maxAdvanceMinutes)" in render
+
+
+def test_heating_ui_uses_user_facing_preheat_layer_names():
+    render = RENDER.read_text()
+
+    assert "Preheat</b> · Poortwachter · Aansturing" in render
+    assert "<dt>Poortwachter</dt>" in render
+    assert "<dt>Aansturing</dt>" in render
+    assert "<dt>V0.3</dt>" not in render
+    assert "<dt>V0.4</dt>" not in render

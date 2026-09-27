@@ -248,7 +248,7 @@ function renderStatus(shadow,progression,rooms,start,now,maxAdvanceMinutes){
   $("#heating-status").innerHTML = [
     `<span><b>Baseline</b> · ${house?.baselineHeatingDemandPresent ? "warmtevraag aanwezig" : "voldaan"}</span>`,
     `<span><b>CV</b> · ${cv?.status === "OK" ? (cv.cvActive ? "actief" : "uit") : "onbekend"}</span>`,
-    `<span><b>Preheat</b> · V0.3 eligibility · V0.4 progression</span>`,
+    `<span><b>Preheat</b> · Poortwachter · Aansturing</span>`,
   ].join("");
 
   $("#signal-legend").innerHTML = [
@@ -282,9 +282,9 @@ function renderStatus(shadow,progression,rooms,start,now,maxAdvanceMinutes){
         <div><dt>Honeywell baseline</dt><dd>${temp(s?.baseline?.currentTargetTemperature_C)}</dd></div>
         <div><dt>Preheat-window</dt><dd>${windowText}</dd></div>
         ${nextPotentialText ? `<div><dt>Volgende potentieel</dt><dd>${nextPotentialText}</dd></div>` : ""}
-        <div><dt>V0.3</dt><dd>${eligibility}</dd></div>
+        <div><dt>Poortwachter</dt><dd>${eligibility}</dd></div>
         <div><dt>Planner grant</dt><dd>${grant}</dd></div>
-        <div><dt>V0.4</dt><dd>${progressionState}</dd></div>
+        <div><dt>Aansturing</dt><dd>${progressionState}</dd></div>
         <div><dt>Shadow-target</dt><dd>${temp(active)}</dd></div>
       </dl>
     </article>`;
