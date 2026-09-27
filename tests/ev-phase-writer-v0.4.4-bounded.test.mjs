@@ -49,13 +49,25 @@ test('writer re-reads authoritative control while safely paused',()=>{
   assert.match(src,/MODE_UNSTABLE_DURING_TRANSITION/);
 });
 
-test('writer confirms paused, phase, temporary cap, charging and final restore',()=>{
+test('writer confirms Easee opportunity settings without requiring Tesla consumption',()=>{
   assert.match(src,/PAUSE_CONFIRM_TIMEOUT/);
   assert.match(src,/PHASE_CONFIRM_TIMEOUT/);
   assert.match(src,/TRANSITION_CIRCUIT_CAP_CONFIRM_TIMEOUT/);
-  assert.match(src,/CHARGING_PHASE_CONFIRM_TIMEOUT/);
+  assert.match(src,/CURRENT_TARGET_CONFIRM_TIMEOUT/);
   assert.match(src,/CIRCUIT_RESTORE_TIMEOUT/);
-  assert.match(src,/electricalMode===control\.mode/);
+  assert.match(src,/teslaConsumptionRequired:false/);
+  assert.match(src,/OPPORTUNITY_CURRENT_CONFIRMED/);
+  assert.doesNotMatch(src,/CHARGING_CONFIRM_TIMEOUT_MS/);
+  assert.doesNotMatch(src,/CHARGING_PHASE_CONFIRM_TIMEOUT/);
+  assert.doesNotMatch(src,/RESUME_CONFIRM_TIMEOUT/);
+  assert.doesNotMatch(src,/x\.powerW!==null && x\.powerW>500/);
+});
+
+test('zero Tesla draw is explicitly a healthy armed opportunity',()=>{
+  assert.match(src,/OPPORTUNITY_ARMED/);
+  assert.match(src,/Tesla draw is\s*\/\/ irrelevant|Tesla draw is/);
+  assert.match(src,/consumption is Tesla-owned/);
+  assert.match(src,/teslaConsumptionObserved/);
 });
 
 test('all failure exits restore the captured circuit baseline through safeAbort',()=>{
@@ -71,10 +83,12 @@ test('concurrent gate triggers cannot start a second bounded transaction',()=>{
   assert.match(src,/age\(previous\?\.at\)<RUN_LOCK_MS/);
 });
 
-test('stable same-phase charging remains a short current-only path',()=>{
-  assert.match(src,/Stable same-phase charging is current control only/);
-  assert.match(src,/hw\.confirmedMode===control\.mode&&!hw\.paused&&hw\.charging===true/);
-  assert.match(src,/STABLE_CURRENT_ADJUST/);
+test('stable same-phase opportunity does not depend on active charging',()=>{
+  assert.match(src,/hw\.confirmedMode===control\.mode/);
+  assert.match(src,/hw\.sessionEnabled===true/);
+  assert.match(src,/hw\.chargerTargetA===control\.requestedA/);
+  assert.match(src,/OPPORTUNITY_ARMED/);
+  assert.match(src,/OPPORTUNITY_CURRENT_ADJUST/);
 });
 
 test('native Homey cards remain the only session/current/circuit writers',()=>{
