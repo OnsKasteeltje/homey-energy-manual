@@ -730,9 +730,9 @@ Canonical sources:
 
 An initial guarded v0.4.4 deployment attempt on 2026-09-27 rolled back automatically because HomeyScript does not expose browser/node `setTimeout`; the bounded writer had used it for polling/deadtime. No v0.4.4 writer remained LIVE after rollback. The corrected source uses HomeyScript's native global `await wait(ms)` primitive, and deployment now rejects any v0.4.4 source containing `setTimeout(`.
 
-A second guarded attempt correctly stopped before deployment because the original 10-second quiescence guard treated a normal same-phase PV current change as instability. For v0.4.4 source replacement, quiescence now means stable phase/confirmed-phase, STABLE transition state, unchanged normal circuit cap and unchanged charge-state class; `targetA` and `controlRevision` may advance if Easee remains physically coherent (`offeredA` follows its current charger target). This preserves protection against an in-flight phase transition without requiring the realtime PV current loop to freeze.
+A second guarded attempt exposed that the deployment helper had become coupled to normal runtime dynamics. That coupling is removed. The supported v0.4.4 in-place source replacement now has only two pre-write safety invariants: (1) the sole writer must not have an active `RUNNING` bounded transition, and (2) the Easee circuit target must be above the EV transition-cap range of 6..16 A, proving that no temporary transition cap remains active. It does not require STABLE status, phase alignment, a particular charge state, PV export, unchanged current, or a timed quiescence window.
 
-Production remains on v0.4.3 until the corrected guarded v0.4.4 upgrade is executed from that structural quiescent state and the next natural phase transition is observed.
+The helper rechecks those two invariants immediately before replacement, verifies that the exact repository HomeyScript source was installed, triggers the sole writer once, and validates the v0.4.4 live/bounded schema. Rollback is reserved for source/deployment validation failure. If the newly installed writer itself reports a runtime `FAILED` state, that remains operational evidence for diagnosis and does not roll back an otherwise successful source deployment. Production EV writer is v0.4.4.
 
 
 ### Opportunistic EV boundary: offer, not consumption
