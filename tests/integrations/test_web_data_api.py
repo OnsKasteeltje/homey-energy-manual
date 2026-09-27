@@ -333,6 +333,8 @@ class HeatingPreheatShadowResourceTest(unittest.TestCase):
                 "reason": "CURRENT_QUATT_OBSERVER",
                 "cvActive": False,
                 "ageSeconds": 30,
+                "observedAt": "2026-09-26T11:59:30Z",
+                "sourceLastUpdated": "2026-09-24T07:15:32Z",
             },
             "policy": {
                 "maxStep_C": 0.5,
@@ -351,6 +353,8 @@ class HeatingPreheatShadowResourceTest(unittest.TestCase):
         self.assertEqual(result["schema"], "EMS_WEB_HEATING_PREHEAT_SHADOW_V1")
         self.assertIn("cvActive", result["cvGuard"])
         self.assertNotIn("boilerAssistOn", result["cvGuard"])
+        self.assertEqual(result["cvGuard"]["observedAt"], "2026-09-26T11:59:30Z")
+        self.assertEqual(result["cvGuard"]["sourceLastUpdated"], "2026-09-24T07:15:32Z")
         self.assertEqual(len(result["rooms"]), 4)
         self.assertFalse(result["controlWrites"])
         self.assertEqual(result["baselineAuthority"], "HONEYWELL")

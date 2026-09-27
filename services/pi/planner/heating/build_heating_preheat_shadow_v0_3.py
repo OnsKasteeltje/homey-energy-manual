@@ -115,7 +115,38 @@ def _cv_guard(quatt_current: dict[str, Any], now: datetime) -> dict[str, Any]:
             "status": "UNKNOWN",
             "reason": "CV_ACTIVE_SIGNAL_UNKNOWN",
             "cvActive": None,
+            "ageSeconds": None,
+            "collectorAgeSeconds": round(max(0.0, age), 1),
+            "observedAt": None,
+            "sourceLastUpdated": signal.get("sourceLastUpdated") if isinstance(signal, dict) else None,
+        }
+
+    try:
+        observed_at = _aware(signal.get("observedAt"), "cvActive.observedAt")
+    except ShadowError:
+        return {
+            "status": "UNKNOWN",
+            "reason": "CV_ACTIVE_OBSERVED_AT_INVALID",
+            "cvActive": None,
             "ageSeconds": round(max(0.0, age), 1),
+            "observedAt": signal.get("observedAt") if isinstance(signal, dict) else None,
+            "sourceLastUpdated": signal.get("sourceLastUpdated") if isinstance(signal, dict) else None,
+        }
+
+    # observedAt is provenance for the same successful Homey current-state fetch
+    # that produced quatt.generatedAt. It must be coherent with that fetch, but it
+    # is deliberately NOT a second independent freshness gate.
+    observation_skew = (
+        observed_at.astimezone(timezone.utc) - generated.astimezone(timezone.utc)
+    ).total_seconds()
+    if abs(observation_skew) > 5:
+        return {
+            "status": "UNKNOWN",
+            "reason": "CV_ACTIVE_OBSERVATION_MISMATCH",
+            "cvActive": None,
+            "ageSeconds": round(max(0.0, age), 1),
+            "observedAt": signal.get("observedAt"),
+            "sourceLastUpdated": signal.get("sourceLastUpdated"),
         }
 
     return {
@@ -123,6 +154,8 @@ def _cv_guard(quatt_current: dict[str, Any], now: datetime) -> dict[str, Any]:
         "reason": "CURRENT_QUATT_OBSERVER",
         "cvActive": value,
         "ageSeconds": round(max(0.0, age), 1),
+        "observedAt": signal.get("observedAt"),
+        "sourceLastUpdated": signal.get("sourceLastUpdated"),
     }
 
 

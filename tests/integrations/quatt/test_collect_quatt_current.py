@@ -19,11 +19,12 @@ def test_numeric_value_preserves_numeric_semantics():
 
 def test_capability_is_read_only_projection():
     caps = {"measure_power": {"value": 321, "lastUpdated": "2026-09-16T12:00:00Z", "extra": "ignored"}}
-    assert module.capability(caps, "measure_power") == {
+    assert module.capability(caps, "measure_power", "2026-09-27T07:00:00Z") == {
         "value": 321,
+        "observedAt": "2026-09-27T07:00:00Z",
         "sourceLastUpdated": "2026-09-16T12:00:00Z",
     }
-    assert module.capability(caps, "missing") is None
+    assert module.capability(caps, "missing", "2026-09-27T07:00:00Z") is None
 
 
 def test_quatt_collector_keeps_existing_schema_and_read_only_mode():
@@ -36,3 +37,20 @@ def test_quatt_collector_keeps_existing_schema_and_read_only_mode():
 def test_cv_active_is_canonical_observer_name():
     assert module.OBSERVER_ONLY["measure_boiler_cic_central_heating_onoff_boiler"] == "cvActive"
     assert "boilerAssistOn" not in module.OBSERVER_ONLY.values()
+
+
+def test_observed_at_is_independent_of_source_last_updated():
+    caps = {
+        "measure_boiler_cic_central_heating_onoff_boiler": {
+            "value": False,
+            "lastUpdated": "2026-09-25T07:15:32Z",
+        }
+    }
+    state = module.capability(
+        caps,
+        "measure_boiler_cic_central_heating_onoff_boiler",
+        "2026-09-27T07:10:55Z",
+    )
+    assert state["value"] is False
+    assert state["observedAt"] == "2026-09-27T07:10:55Z"
+    assert state["sourceLastUpdated"] == "2026-09-25T07:15:32Z"
