@@ -26,8 +26,8 @@ test('bounded transition keeps all physical safety stages in one invocation',()=
   const deadtime=src.indexOf('await sleep(DEADTIME_MS)');
   const cap=src.indexOf('await setCircuitA(control.requestedA)');
   const resume=src.indexOf('await resumeSession()');
-  const current=src.indexOf('await setCurrentA(control.requestedA)');
-  const restore=src.indexOf('hw=await restoreCircuit(originalCircuitA)');
+  const current=src.indexOf('await setCurrentA(control.requestedA)',resume);
+  const restore=src.indexOf('hw=await restoreCircuit(originalCircuitA)',current);
   assert.ok(pause>=0);
   assert.ok(phase>pause);
   assert.ok(deadtime>phase);
