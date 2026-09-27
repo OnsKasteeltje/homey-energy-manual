@@ -843,6 +843,14 @@ def heating_preheat_progression_resource():
         "COMPLETE_NO_NEXT_STEP",
     }
 
+    allowed_history_outcomes = {
+        "ADVANCED_STEP",
+        "TARGET_REACHED",
+        "BASELINE_TAKEOVER",
+        "ENDED",
+        "OPPORTUNITY_CHANGED",
+    }
+
     rooms = []
     for room in source.get("rooms") or []:
         if not isinstance(room, dict) or room.get("preheatScope") is not True:
@@ -870,6 +878,42 @@ def heating_preheat_progression_resource():
         if not isinstance(completed, list):
             raise ValueError("HEATING_PREHEAT_PROGRESSION_COMPLETED_STEPS_INVALID")
 
+        step_history = room.get("stepHistory")
+        if step_history is None:
+            step_history = []
+        if not isinstance(step_history, list):
+            raise ValueError("HEATING_PREHEAT_PROGRESSION_STEP_HISTORY_INVALID")
+        projected_history = []
+        for interval in step_history:
+            if not isinstance(interval, dict):
+                raise ValueError("HEATING_PREHEAT_PROGRESSION_STEP_HISTORY_INVALID")
+            opportunity_id = interval.get("opportunityId")
+            target = interval.get("target_C")
+            started_at = interval.get("startedAt")
+            ended_at = interval.get("endedAt")
+            outcome = interval.get("outcome")
+            reason = interval.get("reason")
+            if not isinstance(opportunity_id, str) or not opportunity_id:
+                raise ValueError("HEATING_PREHEAT_PROGRESSION_STEP_HISTORY_INVALID")
+            if isinstance(target, bool) or not isinstance(target, (int, float)):
+                raise ValueError("HEATING_PREHEAT_PROGRESSION_STEP_HISTORY_INVALID")
+            started_dt = parse_timestamp(started_at)
+            ended_dt = parse_timestamp(ended_at)
+            if started_dt is None or ended_dt is None or ended_dt < started_dt:
+                raise ValueError("HEATING_PREHEAT_PROGRESSION_STEP_HISTORY_INVALID")
+            if outcome not in allowed_history_outcomes:
+                raise ValueError("HEATING_PREHEAT_PROGRESSION_STEP_HISTORY_INVALID")
+            if reason is not None and not isinstance(reason, str):
+                raise ValueError("HEATING_PREHEAT_PROGRESSION_STEP_HISTORY_INVALID")
+            projected_history.append({
+                "opportunityId": opportunity_id,
+                "target_C": float(target),
+                "startedAt": started_at,
+                "endedAt": ended_at,
+                "outcome": outcome,
+                "reason": reason,
+            })
+
         rooms.append({
             "key": key,
             "displayName": room.get("displayName") or key,
@@ -886,6 +930,7 @@ def heating_preheat_progression_resource():
                 "domainGrant": planner.get("domainGrant"),
                 "priorityReason": planner.get("priorityReason"),
             },
+            "stepHistory": projected_history,
             "progression": {
                 "state": progression.get("state"),
                 "reason": progression.get("reason"),
@@ -931,6 +976,7 @@ def heating_preheat_progression_resource():
             "plannerGrantRequiredForStartAndAdvance": policy.get("plannerGrantRequiredForStartAndAdvance") is True,
             "intentionalGridImportAllowed": False,
             "rollbackBehavior": "NOT_DEFINED_SHADOW_ONLY",
+            "stepHistoryRetentionHours": policy.get("stepHistoryRetentionHours"),
         },
         "rooms": rooms,
         "presentationOnly": True,
