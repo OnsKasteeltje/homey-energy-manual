@@ -99,7 +99,7 @@ export function decidePhaseTransition(input, previous=initialTransitionState(), 
   const phaseCommandResult=input?.phaseCommandResult||null;
   const paused=pauseConfirmed(input,cfg);
 
-  const state={...initialTransitionState(nowMs),...previous};
+  let state={...initialTransitionState(nowMs),...previous};
   const transitionAgeMs=state.startedAt?nowMs-Date.parse(state.startedAt):0;
   const stageAgeMs=state.stageSince?nowMs-Date.parse(state.stageSince):0;
 
@@ -118,6 +118,61 @@ export function decidePhaseTransition(input, previous=initialTransitionState(), 
     desiredMode,desiredA,confirmedMode,liveEnabled,chargeState,charging,
     pauseConfirmed:paused,currentCircuitA,originalCircuitA:state.originalCircuitA
   };
+
+  // A failed transition may have left the temporary symmetric circuit cap
+  // active. Preserve the captured pre-transition limit and restore/confirm it
+  // before any new control transition is allowed to become STABLE.
+  if(state.stage==='FAILED'||state.stage==='RECOVERING_CIRCUIT_CAP'){
+    if(!paused){
+      return {state,action:action('PAUSE_SESSION',{
+        ...base,reason:'CIRCUIT_RECOVERY_REQUIRES_PAUSED_SESSION',failClosed:true
+      })};
+    }
+
+    const restoreA=Number(state.originalCircuitA);
+    const restoreValid=
+      Number.isInteger(restoreA) &&
+      restoreA>=cfg.minA &&
+      restoreA<=cfg.maxCircuitA;
+
+    if(restoreValid){
+      if(currentCircuitA!==restoreA){
+        state={...state,stage:'RECOVERING_CIRCUIT_CAP',stageSince:nowIso(nowMs),failure:null};
+        return {state,action:action('RESTORE_CIRCUIT_CAP',{
+          ...base,amps:restoreA,reason:'RESTORE_FAILED_TRANSITION_CIRCUIT_CAP'
+        })};
+      }
+      state={
+        ...state,stage:'STABLE',transitionId:null,requestedMode:confirmedMode==='1P'||confirmedMode==='3P'?confirmedMode:'OFF',
+        requestedA:0,originalCircuitA:null,startedAt:null,stageSince:nowIso(nowMs),failure:null
+      };
+      return {state,action:action('NOOP',{
+        ...base,reason:'CIRCUIT_RECOVERY_COMPLETE',recoveredCircuitA:restoreA
+      })};
+    }
+
+    // Compatibility recovery for a legacy/orphaned FAILED state whose writer
+    // already lost originalCircuitA. A value above max EV current cannot be a
+    // temporary transition cap, so an operator-restored baseline can be
+    // accepted without guessing its value.
+    if(currentCircuitA!==null&&currentCircuitA>cfg.maxA&&currentCircuitA<=cfg.maxCircuitA){
+      state={
+        ...state,stage:'STABLE',transitionId:null,requestedMode:confirmedMode==='1P'||confirmedMode==='3P'?confirmedMode:'OFF',
+        requestedA:0,originalCircuitA:null,startedAt:null,stageSince:nowIso(nowMs),failure:null
+      };
+      return {state,action:action('NOOP',{
+        ...base,reason:'ORPHAN_CIRCUIT_BASELINE_CONFIRMED',recoveredCircuitA:currentCircuitA
+      })};
+    }
+
+    return {state,action:action('NOOP',{
+      ...base,reason:'CIRCUIT_RECOVERY_REQUIRES_KNOWN_BASELINE',failClosed:true
+    })};
+  }
+
+  if(state.stage!=='STABLE'&&state.requestedMode!==desiredMode){
+    return fail('PHASE_MODE_CHANGED_DURING_TRANSITION');
+  }
 
   if(desiredMode==='OFF'){
     const next={
@@ -154,8 +209,7 @@ export function decidePhaseTransition(input, previous=initialTransitionState(), 
     })};
   }
 
-  const requestChanged=state.requestedMode!==desiredMode||state.requestedA!==desiredA;
-  if(state.stage==='STABLE'||state.stage==='FAILED'||requestChanged){
+  if(state.stage==='STABLE'){
     if(currentCircuitA===null)return fail('CIRCUIT_TARGET_UNKNOWN');
     if(currentCircuitA<desiredA)return fail('CIRCUIT_LIMIT_BELOW_REQUEST');
     const transitionId=`${nowMs}:${desiredMode}:${desiredA}`;
