@@ -77,7 +77,7 @@ def _cv_guard(quatt_current: dict[str, Any], now: datetime) -> dict[str, Any]:
         return {
             "status": "UNKNOWN",
             "reason": "QUATT_SOURCE_INVALID",
-            "boilerAssistOn": None,
+            "cvActive": None,
             "ageSeconds": None,
         }
 
@@ -87,7 +87,7 @@ def _cv_guard(quatt_current: dict[str, Any], now: datetime) -> dict[str, Any]:
         return {
             "status": "UNKNOWN",
             "reason": "QUATT_GENERATED_AT_INVALID",
-            "boilerAssistOn": None,
+            "cvActive": None,
             "ageSeconds": None,
         }
 
@@ -96,32 +96,32 @@ def _cv_guard(quatt_current: dict[str, Any], now: datetime) -> dict[str, Any]:
         return {
             "status": "UNKNOWN",
             "reason": "QUATT_SOURCE_FROM_FUTURE",
-            "boilerAssistOn": None,
+            "cvActive": None,
             "ageSeconds": round(age, 1),
         }
     if age > MAX_QUATT_AGE_SECONDS:
         return {
             "status": "STALE",
             "reason": "QUATT_SOURCE_STALE",
-            "boilerAssistOn": None,
+            "cvActive": None,
             "ageSeconds": round(age, 1),
         }
 
     observer = quatt_current.get("observerOnly")
-    signal = observer.get("boilerAssistOn") if isinstance(observer, dict) else None
+    signal = observer.get("cvActive") if isinstance(observer, dict) else None
     value = signal.get("value") if isinstance(signal, dict) else None
     if not isinstance(value, bool):
         return {
             "status": "UNKNOWN",
-            "reason": "CV_ASSIST_SIGNAL_UNKNOWN",
-            "boilerAssistOn": None,
+            "reason": "CV_ACTIVE_SIGNAL_UNKNOWN",
+            "cvActive": None,
             "ageSeconds": round(max(0.0, age), 1),
         }
 
     return {
         "status": "OK",
         "reason": "CURRENT_QUATT_OBSERVER",
-        "boilerAssistOn": value,
+        "cvActive": value,
         "ageSeconds": round(max(0.0, age), 1),
     }
 
@@ -195,7 +195,7 @@ def build_shadow(
         elif cv_guard["status"] != "OK":
             state = "PREHEAT_BLOCKED_CV_STATUS_UNKNOWN"
             reason = cv_guard["reason"]
-        elif cv_guard["boilerAssistOn"] is True:
+        elif cv_guard["cvActive"] is True:
             state = "PREHEAT_BLOCKED_CV_ASSIST"
             reason = "CV_ASSIST_DURING_PURE_PREHEAT"
         else:
