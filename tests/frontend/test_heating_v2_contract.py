@@ -131,3 +131,11 @@ def test_future_preheat_preview_uses_honeywell_schedule_and_backend_window_polic
     assert "closesAt <= now" in render
     assert "maxAdvanceMinutes*60000" in render
     assert "room.progressionSource?.opportunityHistory" in render
+
+
+def test_heating_room_card_distinguishes_current_window_from_future_potential():
+    render = RENDER.read_text()
+
+    assert "Volgende potentieel" in render
+    assert ".find(window => !window.current" in render
+    assert "renderStatus(shadow,progression,rooms,start,now,maxAdvanceMinutes)" in render
