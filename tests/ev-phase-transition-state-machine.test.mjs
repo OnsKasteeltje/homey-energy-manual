@@ -246,3 +246,122 @@ test('phase confirmation timeout retries phase command while paused',()=>{
   assert.equal(r.action.type,'SET_PHASE_MODE');
   assert.equal(r.action.reason,'PHASE_CONFIRM_RETRY');
 });
+
+
+test('failed transition restores captured circuit limit before new control',()=>{
+  const failed={
+    ...initialTransitionState(t0),
+    stage:'FAILED',
+    transitionId:'x',
+    requestedMode:'1P',
+    requestedA:6,
+    originalCircuitA:20,
+    startedAt:new Date(t0-5000).toISOString(),
+    stageSince:new Date(t0-1000).toISOString(),
+    failure:'PHASE_MODE_CHANGED_DURING_TRANSITION',
+  };
+  const r=decidePhaseTransition({
+    ...paused,
+    circuitTargetA:6,
+    desiredMode:'1P',
+    desiredA:13,
+    easeePhaseMode:'Locked to single phase',
+  },failed,t0);
+  assert.equal(r.state.stage,'RECOVERING_CIRCUIT_CAP');
+  assert.equal(r.state.originalCircuitA,20);
+  assert.equal(r.action.type,'RESTORE_CIRCUIT_CAP');
+  assert.equal(r.action.amps,20);
+  assert.equal(r.action.reason,'RESTORE_FAILED_TRANSITION_CIRCUIT_CAP');
+});
+
+test('failed transition becomes stable only after original circuit limit is confirmed',()=>{
+  const recovering={
+    ...initialTransitionState(t0),
+    stage:'RECOVERING_CIRCUIT_CAP',
+    transitionId:'x',
+    requestedMode:'1P',
+    requestedA:6,
+    originalCircuitA:20,
+    startedAt:new Date(t0-5000).toISOString(),
+    stageSince:new Date(t0-1000).toISOString(),
+  };
+  const r=decidePhaseTransition({
+    ...paused,
+    circuitTargetA:20,
+    desiredMode:'1P',
+    desiredA:13,
+    easeePhaseMode:'Locked to single phase',
+  },recovering,t0);
+  assert.equal(r.state.stage,'STABLE');
+  assert.equal(r.state.originalCircuitA,null);
+  assert.equal(r.action.type,'NOOP');
+  assert.equal(r.action.reason,'CIRCUIT_RECOVERY_COMPLETE');
+});
+
+test('orphaned temporary cap without original baseline remains fail closed',()=>{
+  const failed={
+    ...initialTransitionState(t0),
+    stage:'FAILED',
+    requestedMode:'1P',
+    requestedA:0,
+    originalCircuitA:null,
+    failure:'CIRCUIT_LIMIT_BELOW_REQUEST',
+  };
+  const r=decidePhaseTransition({
+    ...paused,
+    circuitTargetA:6,
+    desiredMode:'1P',
+    desiredA:13,
+    easeePhaseMode:'Locked to single phase',
+  },failed,t0);
+  assert.equal(r.state.stage,'FAILED');
+  assert.equal(r.action.type,'NOOP');
+  assert.equal(r.action.reason,'CIRCUIT_RECOVERY_REQUIRES_KNOWN_BASELINE');
+  assert.equal(r.action.failClosed,true);
+});
+
+test('operator-restored orphan baseline above EV range permits safe legacy recovery',()=>{
+  const failed={
+    ...initialTransitionState(t0),
+    stage:'FAILED',
+    requestedMode:'1P',
+    requestedA:0,
+    originalCircuitA:null,
+    failure:'CIRCUIT_LIMIT_BELOW_REQUEST',
+  };
+  const r=decidePhaseTransition({
+    ...paused,
+    circuitTargetA:20,
+    desiredMode:'1P',
+    desiredA:13,
+    easeePhaseMode:'Locked to single phase',
+  },failed,t0);
+  assert.equal(r.state.stage,'STABLE');
+  assert.equal(r.state.originalCircuitA,null);
+  assert.equal(r.action.type,'NOOP');
+  assert.equal(r.action.reason,'ORPHAN_CIRCUIT_BASELINE_CONFIRMED');
+  assert.equal(r.action.recoveredCircuitA,20);
+});
+
+test('phase change during unfinished transition preserves original circuit limit',()=>{
+  const inFlight={
+    ...initialTransitionState(t0),
+    stage:'ARMING_CIRCUIT_CAP',
+    transitionId:'x',
+    requestedMode:'1P',
+    requestedA:6,
+    originalCircuitA:20,
+    startedAt:new Date(t0-5000).toISOString(),
+    stageSince:new Date(t0-1000).toISOString(),
+  };
+  const r=decidePhaseTransition({
+    ...paused,
+    circuitTargetA:6,
+    desiredMode:'OFF',
+    desiredA:0,
+    easeePhaseMode:'Locked to single phase',
+  },inFlight,t0);
+  assert.equal(r.state.stage,'FAILED');
+  assert.equal(r.state.originalCircuitA,20);
+  assert.equal(r.action.reason,'PHASE_MODE_CHANGED_DURING_TRANSITION');
+});
