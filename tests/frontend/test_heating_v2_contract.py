@@ -55,3 +55,28 @@ def test_heating_ui_does_not_invent_historical_shadow_events():
 def test_heating_renderer_contains_no_literal_source_newline_escape():
     render = RENDER.read_text()
     assert r"\nconst " not in render
+
+
+def test_heating_hover_is_bound_to_individual_lines():
+    render = RENDER.read_text()
+    style = STYLE.read_text()
+
+    assert "hoverTargets" in render
+    assert 'class:"line-hit"' in render
+    assert "showTarget(event,target)" in render
+    assert 'const hit = add("rect"' not in render
+    assert "crosshair" not in render
+
+    assert ".line-hit" in style
+    assert "pointer-events:stroke" in style
+    assert ".hover-marker" in style
+
+
+def test_heating_tooltip_shows_one_room_and_one_signal():
+    render = RENDER.read_text()
+
+    assert 'label = "Honeywell baseline"' in render
+    assert 'label = "Gemeten temperatuur"' in render
+    assert 'label = "EMS shadow-target"' in render
+    assert 'class="tip-line"' in render
+    assert 'visible.map(room =>' not in render

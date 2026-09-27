@@ -305,6 +305,8 @@ function render(rooms,start,now){
       },timeFmt.format(new Date(start.getTime()+m*60000)));
     }
 
+    const hoverTargets = [];
+
     visible.forEach(room => {
       if(room.points.length){
         let d = `M ${x(room.points[0].m)} ${y(room.points[0].t)}`;
@@ -312,11 +314,15 @@ function render(rooms,start,now){
           d += ` H ${x(room.points[i].m)} V ${y(room.points[i].t)}`;
         }
         add("path",{d,stroke:room.color,class:"room baseline-line"});
+        hoverTargets.push({kind:"baseline",room,tag:"path",attributes:{d}});
       }
 
       if(room.actual.length){
         const d = actualPath(room.actual,x,y);
-        if(d) add("path",{d,stroke:room.color,class:"room actual-line"});
+        if(d){
+          add("path",{d,stroke:room.color,class:"room actual-line"});
+          hoverTargets.push({kind:"actual",room,tag:"path",attributes:{d}});
+        }
         const latest = room.actual.at(-1);
         add("circle",{cx:x(latest.m),cy:y(latest.t),r:2.8,fill:room.color,class:"actual-dot"});
       }
@@ -328,10 +334,13 @@ function render(rooms,start,now){
         const from = clamp(minuteAt(activeStart,start),0,HORIZON_MIN);
         const to = clamp(minuteAt(now,start),0,HORIZON_MIN);
         if(to >= from){
-          add("line",{
+          const attributes = {
             x1:x(from),y1:y(activeTarget),x2:x(to),y2:y(activeTarget),
-            stroke:room.color,class:"shadow-target"
+          };
+          add("line",{
+            ...attributes,stroke:room.color,class:"shadow-target"
           });
+          hoverTargets.push({kind:"shadow",room,tag:"line",attributes});
         }
       }
     });
@@ -372,53 +381,87 @@ function render(rooms,start,now){
       add("line",{x1:x(nowM),y1:T,x2:x(nowM),y2:RAIL_TOP+(visible.length-1)*RAIL_GAP+11,class:"now"});
     }
 
-    const cross = add("line",{x1:L,y1:T,x2:L,y2:PLOT_B,class:"crosshair"});
-    cross.style.display = "none";
-    const hit = add("rect",{x:L,y:T,width:W-L-R,height:PLOT_B-T,fill:"transparent",class:"hit"});
     const tip = $("#tooltip");
+    const marker = add("circle",{cx:0,cy:0,r:4,class:"hover-marker"});
+    marker.style.display = "none";
 
-    const show = event => {
-      const rect = svg.getBoundingClientRect();
-      const px = clamp((event.clientX-rect.left)/rect.width*W,L,W-R);
-      const m = (px-L)/(W-L-R)*HORIZON_MIN;
-      const when = new Date(start.getTime()+m*60000);
-
-      cross.setAttribute("x1",px);
-      cross.setAttribute("x2",px);
-      cross.style.display = "";
-
-      const vals = visible.map(room => {
-        const baseline = valueAtStep(room.points,m);
-        let actual = null;
-        for(const point of room.actual){
-          if(point.m <= m) actual = point;
-          else break;
+    const nearestActualPoint = (series,m) => {
+      let nearest = null;
+      let distance = Infinity;
+      for(const point of series){
+        const current = Math.abs(point.m-m);
+        if(current < distance){
+          nearest = point;
+          distance = current;
         }
-        const prog = room.progressionSource?.progression;
-        const activeStart = prog?.activeStepStartedAt ? minuteAt(prog.activeStepStartedAt,start) : null;
-        const shadowTarget = prog?.activeStepTarget_C;
-        const shadowVisible = numeric(shadowTarget) && activeStart !== null && m >= activeStart && when <= now;
-
-        return `<div class="tip-room">
-          <i style="background:${room.color}"></i><b>${room.displayName}</b>
-          <span>Baseline ${temp(baseline)}</span>
-          <span>Gemeten ${actual ? temp(actual.t) : "—"}</span>
-          <span>Shadow ${shadowVisible ? temp(shadowTarget) : "—"}</span>
-        </div>`;
-      }).join("");
-
-      tip.innerHTML = `<strong>${tipTimeFmt.format(when)}</strong>${vals}`;
-      tip.hidden = false;
-      const left = (px/W)*rect.width;
-      tip.style.left = Math.min(Math.max(8,left+10),Math.max(8,rect.width-tip.offsetWidth-8))+"px";
-      tip.style.top = "10px";
+      }
+      return nearest;
     };
 
-    hit.addEventListener("pointermove",show);
-    hit.addEventListener("pointerdown",show);
-    hit.addEventListener("pointerleave",()=>{
-      cross.style.display = "none";
+    const hideTip = () => {
       tip.hidden = true;
+      marker.style.display = "none";
+    };
+
+    const showTarget = (event,target) => {
+      const rect = svg.getBoundingClientRect();
+      const px = clamp((event.clientX-rect.left)/rect.width*W,L,W-R);
+      const py = clamp((event.clientY-rect.top)/rect.height*HH,T,PLOT_B);
+      const m = (px-L)/(W-L-R)*HORIZON_MIN;
+      const hoverTime = new Date(start.getTime()+m*60000);
+
+      let label = "";
+      let value = null;
+      let meta = "";
+
+      if(target.kind === "baseline"){
+        label = "Honeywell baseline";
+        value = valueAtStep(target.room.points,m);
+        meta = tipTimeFmt.format(hoverTime);
+      }else if(target.kind === "actual"){
+        const point = nearestActualPoint(target.room.actual,m);
+        if(!point) return hideTip();
+        label = "Gemeten temperatuur";
+        value = point.t;
+        const valueTime = new Date(point.at);
+        meta = `${tipTimeFmt.format(valueTime)} · ${point.quality === "complete" ? "compleet" : "partieel"}`;
+      }else if(target.kind === "shadow"){
+        const progression = target.room.progressionSource?.progression;
+        label = "EMS shadow-target";
+        value = progression?.activeStepTarget_C;
+        const state = progressionLabels[progression?.state] || progression?.state;
+        meta = [tipTimeFmt.format(hoverTime),state].filter(Boolean).join(" · ");
+      }
+
+      if(!numeric(value)) return hideTip();
+
+      tip.innerHTML = `<div class="tip-line">
+        <strong><i style="background:${target.room.color}"></i>${target.room.displayName}</strong>
+        <span class="tip-signal">${label}</span>
+        <b class="tip-value">${temp(value)}</b>
+        <span class="tip-meta">${meta}</span>
+      </div>`;
+      tip.hidden = false;
+
+      marker.setAttribute("cx",px);
+      marker.setAttribute("cy",py);
+      marker.setAttribute("stroke",target.room.color);
+      marker.style.display = "";
+
+      const left = (px/W)*rect.width;
+      const top = (py/HH)*rect.height;
+      tip.style.left = Math.min(Math.max(8,left+12),Math.max(8,rect.width-tip.offsetWidth-8))+"px";
+      tip.style.top = Math.min(Math.max(8,top+12),Math.max(8,rect.height-tip.offsetHeight-8))+"px";
+    };
+
+    hoverTargets.forEach(target => {
+      const hit = add(target.tag,{
+        ...target.attributes,
+        class:"line-hit",
+      });
+      hit.addEventListener("pointermove",event => showTarget(event,target));
+      hit.addEventListener("pointerdown",event => showTarget(event,target));
+      hit.addEventListener("pointerleave",hideTip);
     });
   }
 

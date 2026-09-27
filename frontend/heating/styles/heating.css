@@ -27,19 +27,20 @@ h2{margin:3px 0;font-size:21px}
 .actual-dot{opacity:.9}
 .shadow-target{fill:none;stroke-width:2.2;stroke-dasharray:7 5;vector-effect:non-scaling-stroke}
 .now{stroke:var(--blue);stroke-width:1.5;stroke-dasharray:4 3}
-.crosshair{stroke:#334155;stroke-width:1;stroke-dasharray:2 2;pointer-events:none}
-.hit{cursor:crosshair}
+.line-hit{fill:none;stroke:transparent;stroke-width:14;vector-effect:non-scaling-stroke;pointer-events:stroke;cursor:pointer}
+.hover-marker{fill:#fff;stroke-width:2;vector-effect:non-scaling-stroke;pointer-events:none}
 .rail-base{stroke:#dbe4ee;stroke-width:1}
 .rail-label{fill:var(--muted);font-size:8.5px;font-weight:700}
 .preheat-window{opacity:.12}
 .preheat-window.ready{opacity:.3}
 .preheat-active{opacity:.8}
 .tooltip{position:absolute;background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 11px;box-shadow:var(--shadow);font-size:12px;pointer-events:none}
-.tooltip strong{display:block;margin-bottom:5px}
-.tip-room{display:grid;grid-template-columns:10px auto auto;gap:3px 6px;align-items:center;margin:5px 0;white-space:nowrap}
-.tip-room i{grid-row:1/4;width:7px;height:7px;border-radius:2px}
-.tip-room b{grid-column:2/4}
-.tip-room span{grid-column:2/4;color:var(--text-secondary)}
+.tooltip strong{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.tip-line{display:grid;gap:2px;min-width:150px}
+.tip-line strong i{width:7px;height:7px;border-radius:2px}
+.tip-signal,.tip-meta{color:var(--text-secondary)}
+.tip-value{font-size:15px;color:var(--text)}
+.tip-meta{font-size:10px}
 .room-status-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
 .room-status-card{border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--panel2)}
 .room-status-card.off{opacity:.35}
