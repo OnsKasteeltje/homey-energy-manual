@@ -748,3 +748,7 @@ Therefore Tesla behaviour must never create a control-path timeout or failure. I
 - actual Tesla current, power and electrically observed phase remain observability for later analysis only.
 
 This rule is architectural, not merely a timeout tuning choice.
+
+### Easee auth recovery on phase command
+
+A live 2026-09-27 1P→3P opportunity proved the opportunity-only contract but failed before the phase write with `EASEE_HTTP_401`. The writer now treats a 401 from the Easee phase-command/phase-observation REST boundary as an authentication recovery event: it performs exactly one forced refresh using the current Homey-stored refresh token, persists the returned access/refresh pair, and retries the original request exactly once. Other HTTP errors do not enter this retry path. A second 401 still fails closed. Tesla consumption remains unrelated to this auth handling.
