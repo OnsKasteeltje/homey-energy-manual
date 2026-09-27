@@ -30,7 +30,8 @@ const dayName = d => {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 };
 
-const numeric = value => typeof value === "number" && Number.isFinite(value);\nconst temp = value => numeric(value) ? value.toFixed(1) + " °C" : "—";
+const numeric = value => typeof value === "number" && Number.isFinite(value);
+const temp = value => numeric(value) ? value.toFixed(1) + " °C" : "—";
 const clock = value => value ? timeFmt.format(new Date(value)) : "—";
 const minuteAt = (value,start) => (new Date(value).getTime() - start.getTime()) / 60000;
 const clamp = (v,min,max) => Math.max(min,Math.min(max,v));
