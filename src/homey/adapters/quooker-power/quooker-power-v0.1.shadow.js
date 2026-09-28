@@ -4,7 +4,7 @@
 
 const POWER_INTENT_ID='04b57041-dd7f-41f7-a00a-f023afb1ccee';
 const P1_ROLLING_ID='5abde7ec-c426-4a9b-8d98-8b4ce544ef57';
-const CONTROL_VAR_NAME='EM2_Control_Quooker';
+const CONTROL_VAR_ID='c3bc28a2-e09e-427d-b697-bc01f3e924d3';
 const MAX_INTENT_AGE_MS=180000;
 const MAX_P1_AGE_MS=120000;
 
@@ -12,15 +12,16 @@ const parse=v=>{try{return JSON.parse(String(v??''));}catch{return null;}};
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null;};
 const now=Date.now();
 
-const [intentVar,p1Var,vars]=await Promise.all([
+const [intentVar,p1Var,outVar]=await Promise.all([
   Homey.logic.getVariable({id:POWER_INTENT_ID}),
   Homey.logic.getVariable({id:P1_ROLLING_ID}),
-  Homey.logic.getVariables()
+  Homey.logic.getVariable({id:CONTROL_VAR_ID})
 ]);
+
+if(!outVar)return false;
 
 const intent=parse(intentVar?.value);
 const rolling=parse(p1Var?.value);
-let outVar=Object.values(vars).find(v=>v.name===CONTROL_VAR_NAME)||null;
 const previous=parse(outVar?.value);
 
 const intentAt=Date.parse(String(intent?.generatedAt||''));
@@ -86,9 +87,7 @@ const out={
 };
 
 const value=JSON.stringify(out);
-if(!outVar){
-  outVar=await Homey.logic.createVariable({variable:{name:CONTROL_VAR_NAME,type:'string',value}});
-}else if(outVar.value!==value){
-  await Homey.logic.updateVariable({id:outVar.id,variable:{value}});
+if(outVar.value!==value){
+  await Homey.logic.updateVariable({id:CONTROL_VAR_ID,variable:{value}});
 }
 return true;
