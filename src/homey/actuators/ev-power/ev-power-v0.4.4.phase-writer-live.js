@@ -739,6 +739,33 @@ if(hw.confirmedMode===control.mode&&hw.sessionEnabled===true){
       'CURRENT_TARGET_CONFIRM_TIMEOUT'
     );
   }catch(err){
+    // Same-phase current readback can lag Easee/Homey. If the charger remains
+    // electrically bounded at or below the requested current, keep the active
+    // session intact. A readback timeout is not a reason to pause charging.
+    try{hw=await readHardware();}catch(_){}
+    const boundedExistingTarget=
+      Number.isInteger(hw?.chargerTargetA) &&
+      hw.chargerTargetA>=0 &&
+      hw.chargerTargetA<=control.requestedA &&
+      Number.isInteger(hw?.circuitTargetA) &&
+      hw.circuitTargetA>=control.requestedA;
+    if(boundedExistingTarget){
+      await saveStatus(
+        'DEGRADED',
+        'STABLE_CURRENT_ADJUST_CONFIRM_TIMEOUT_PRESERVED',
+        'STABLE',
+        control,
+        hw,
+        null,
+        {
+          live:true,
+          physicalWritePerformed:true,
+          action:'PRESERVE_BOUNDED_SAME_PHASE_TARGET',
+          statusExtra:{executionError:String(err?.message||err)}
+        }
+      );
+      return true;
+    }
     return await safeAbort(
       'STABLE_CURRENT_ADJUST_FAILED:'+String(err?.message||err),
       control,
