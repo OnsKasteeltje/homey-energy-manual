@@ -338,6 +338,12 @@ def current_control_command():
     command_valid_until = min(valid_until, current_end)
     ev_w = max(0, int(round(float(current.get("evPlanW") or 0))))
     ww_w = max(0, int(round(float(current.get("wwPlanW") or 0))))
+    quooker_mode = str(current.get("quookerMode") or "OFF").upper()
+    if quooker_mode not in {"OPPORTUNITY", "FORCED_ON", "OFF"}:
+        quooker_mode = "OFF"
+    quooker_power_w = max(0, int(round(float(current.get("quookerModeledPowerW") or 1580))))
+    quooker_start_export_w = max(0, int(round(float(current.get("quookerOpportunityStartExportW") or 1250))))
+    quooker_stop_import_w = max(0, int(round(float(current.get("quookerOpportunityStopImportW") or 600))))
     deadline = ev_deadline_execution_contract(now)
 
     return {
@@ -365,6 +371,15 @@ def current_control_command():
                 "target_W": ww_w,
                 "target_on": ww_w > 0,
                 "reason": current.get("wwAllocationReason") or current.get("wwReason") or "PI_DYNAMIC_SLOT"
+            },
+            "quooker": {
+                "mode": quooker_mode,
+                "target_on": quooker_mode == "FORCED_ON",
+                "opportunity_allowed": quooker_mode == "OPPORTUNITY",
+                "modeled_power_W": quooker_power_w,
+                "start_export_W": quooker_start_export_w,
+                "stop_import_W": quooker_stop_import_w,
+                "reason": "TIME_ENVELOPE_" + quooker_mode
             },
             "battery": {"target_W": 0}
         },
@@ -414,7 +429,7 @@ class Handler(BaseHTTPRequestHandler):
                     "readyForCutover": False,
                     "reason": str(exc),
                     "plannerOwner": "PI",
-                    "targets": {"ev": {"target_W": 0}, "ww": {"target_on": False}, "battery": {"target_W": 0}},
+                    "targets": {"ev": {"target_W": 0}, "ww": {"target_on": False}, "quooker": {"mode": "OFF", "target_on": False, "opportunity_allowed": False}, "battery": {"target_W": 0}},
                     "realtime": {
                         "ev": {
                             "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.4",
