@@ -40,6 +40,12 @@ SLOT_MIN = 15
 SLOT_H = SLOT_MIN / 60
 BOILER_W = 1900
 
+# Quooker simple flex policy. Pi owns the time envelope; Homey may execute
+# realtime PV opportunity inside that envelope using EM2_P1_Rolling.
+QUOOKER_W = 1580
+QUOOKER_START_EXPORT_W = 1250
+QUOOKER_STOP_IMPORT_W = 600
+
 # Legacy comfort/safety fallback. This is not the normal daily demand target.
 WW_FALLBACK_MIN = 240
 
@@ -121,6 +127,19 @@ def expected_tesla_home(local_dt):
     if wd == 0 and local_dt.hour < 8:
         return True
     return False
+
+
+def quooker_mode(local_dt):
+    """Return the planner-owned Quooker execution envelope for local time."""
+    weekend = local_dt.weekday() >= 5
+    forced_start_hour = 13 if weekend else 17
+    forced_end_hour = 14 if weekend else 18
+    minute = local_dt.hour * 60 + local_dt.minute
+    if minute < forced_start_hour * 60:
+        return "OPPORTUNITY"
+    if minute < forced_end_hour * 60:
+        return "FORCED_ON"
+    return "OFF"
 
 
 def is_consecutive(a, b):
@@ -1162,10 +1181,17 @@ def main():
         )
 
         expected_home = expected_tesla_home(local_dt)
+        q_mode = quooker_mode(local_dt)
 
         raw_slots.append({
             "slot_start_utc": ts,
             "localDate": local_dt.date().isoformat(),
+            "quookerMode": q_mode,
+            "quookerPlanW": QUOOKER_W if q_mode == "FORCED_ON" else 0,
+            "quookerOpportunityAllowed": q_mode == "OPPORTUNITY",
+            "quookerModeledPowerW": QUOOKER_W,
+            "quookerOpportunityStartExportW": QUOOKER_START_EXPORT_W,
+            "quookerOpportunityStopImportW": QUOOKER_STOP_IMPORT_W,
             "pvForecastW": round(pv_w),
             "baseLoadForecastW": round(base_w),
             "quattForecastW": round(quatt_w),
@@ -1457,8 +1483,9 @@ def main():
 
     for s in raw_slots:
         ww_w = BOILER_W if s["slot_start_utc"] in ww_selected_ts else 0
+        quooker_w = int(s.get("quookerPlanW") or 0)
         residual_after_ww = max(
-            0.0, float(s["correctedExportBeforeFlexW"]) - ww_w
+            0.0, float(s["correctedExportBeforeFlexW"]) - ww_w - quooker_w
         )
         s["wwPlanW"] = ww_w
         if ww_w:
@@ -1523,6 +1550,7 @@ def main():
             float(s["baseLoadForecastW"])
             + float(s["quattForecastW"])
             + float(s["wwPlanW"])
+            + float(s.get("quookerPlanW") or 0)
             + ev_w
             - float(s["pvForecastW"])
         )
@@ -1571,6 +1599,12 @@ def main():
         },
         "guardrails": {
             "wwComfortHardConstraint": True,
+            "quookerPolicy": "SIMPLE_TIME_ENVELOPE_WITH_REALTIME_P1_OPPORTUNITY",
+            "quookerModeledPowerW": QUOOKER_W,
+            "quookerOpportunityStartExportW": QUOOKER_START_EXPORT_W,
+            "quookerOpportunityStopImportW": QUOOKER_STOP_IMPORT_W,
+            "quookerWeekdayForcedLocal": "17:00-18:00",
+            "quookerWeekendForcedLocal": "13:00-14:00",
             "wwDeadlineLocal": "19:00",
             "wwMinRunMinutes": WW_MIN_RUN_SLOTS * SLOT_MIN,
             "wwShoulderMinPvCoverage": WW_SHOULDER_MIN_COVERAGE,
