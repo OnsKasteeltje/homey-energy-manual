@@ -759,6 +759,51 @@ if(hw.confirmedMode===control.mode&&hw.sessionEnabled===true){
   return true;
 }
 
+// KISS invariant: same confirmed phase is never a phase transition.
+// If Homey/Easee briefly reports the session disabled or paused while the
+// requested phase is already confirmed, just resume if needed and re-apply A.
+if(hw.confirmedMode===control.mode){
+  if(hw.circuitTargetA===null||hw.circuitTargetA<control.requestedA){
+    return await safeAbort('CIRCUIT_LIMIT_BELOW_REQUEST',control,null,liveEnabled,null);
+  }
+  try{
+    let resumed=false;
+    if(hw.sessionEnabled!==true||hw.chargeState==='plugged_in_paused'){
+      await resumeSession();
+      resumed=true;
+      await sleep(POLL_MS);
+    }
+    await setCurrentA(control.requestedA);
+    hw=await waitHardware(
+      x=>x.chargerTargetA===control.requestedA,
+      CURRENT_CONFIRM_TIMEOUT_MS,
+      'SAME_PHASE_CURRENT_CONFIRM_TIMEOUT'
+    );
+    await saveStatus(
+      'STABLE',
+      resumed?'SAME_PHASE_RESUMED':'SAME_PHASE_CURRENT_APPLIED',
+      'STABLE',
+      control,
+      hw,
+      null,
+      {
+        live:true,
+        physicalWritePerformed:true,
+        action:resumed?'RESUME_SAME_PHASE':'SET_CURRENT'
+      }
+    );
+    return true;
+  }catch(err){
+    return await safeAbort(
+      'SAME_PHASE_EXECUTION_FAILED:'+String(err?.message||err),
+      control,
+      null,
+      liveEnabled,
+      null
+    );
+  }
+}
+
 const originalCircuitA=hw.circuitTargetA;
 if(!Number.isInteger(originalCircuitA)||originalCircuitA<EV_MIN_A||originalCircuitA>64){
   return await safeAbort('CIRCUIT_TARGET_UNKNOWN',control,null,liveEnabled,null);
