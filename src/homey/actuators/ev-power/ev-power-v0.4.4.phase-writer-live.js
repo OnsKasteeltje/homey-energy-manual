@@ -664,12 +664,10 @@ if(control.mode==='OFF'){
   }
 }
 
-// A previous normal OFF hold may look paused in Homey even though it was created
-// by dynamic current 0 A rather than pauseCharging(). If the requested phase is
-// unchanged, resume directly from that hold and apply the new current; no phase
-// transition pause/deadtime is needed.
+// If the EV is already safely paused on the requested confirmed phase, there is
+// no phase transition to perform. Resume directly and apply the requested current;
+// do not touch the circuit cap.
 if(
-  previousWasZeroHold &&
   hw.confirmedMode===control.mode &&
   hw.chargeState==='plugged_in_paused' &&
   hw.chargerTargetA===0
@@ -688,17 +686,17 @@ if(
     );
     await saveStatus(
       'STABLE',
-      hw.charging===true?'ZERO_HOLD_RESUMED':'ZERO_HOLD_OPPORTUNITY_ARMED',
+      hw.charging===true?'SAME_PHASE_RESUMED':'SAME_PHASE_OPPORTUNITY_ARMED',
       'STABLE',
       control,
       hw,
       null,
-      {live:true,physicalWritePerformed:true,action:'RESUME_FROM_ZERO_HOLD'}
+      {live:true,physicalWritePerformed:true,action:'RESUME_SAME_PHASE_PAUSED'}
     );
     return true;
   }catch(err){
     return await safeAbort(
-      'ZERO_HOLD_RESUME_FAILED:'+String(err?.message||err),
+      'SAME_PHASE_RESUME_FAILED:'+String(err?.message||err),
       control,
       null,
       liveEnabled,
