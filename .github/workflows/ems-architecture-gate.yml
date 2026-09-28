@@ -65,6 +65,9 @@ jobs:
       - name: Run canonical Pi tests
         run: python -m pytest -q tests/state tests/planner
 
+      - name: Run history integration regression tests
+        run: python -m pytest -q tests/integrations/test_build_15m_history.py
+
       - name: Run EV phase writer contract tests
         run: |
           node --test \
