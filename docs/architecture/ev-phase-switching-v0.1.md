@@ -863,3 +863,19 @@ The invariant is now explicit and simple:
 
 This does not change PV thresholds, phase-selection policy or single-writer
 ownership.
+
+
+### 1P stop smoothing — 2026-09-28
+
+To avoid stop/start oscillation under short PV dips, the production phase selector
+now uses a 120-second rolling average of reconstructed `availableTotalW` only
+for the `1P -> OFF` decision.
+
+- `availableTotalW` remains P1-authoritative and adds back current EV load.
+- realtime current adjustment within 1P remains instantaneous;
+- the existing `stop1p_W` threshold remains unchanged;
+- `OFF -> 1P` still uses the existing instantaneous `start1p_W` threshold;
+- 1P stops only when `availableTotalAvg2mW < stop1p_W` (subject to the existing dwell rule).
+
+The rolling samples and `availableTotalAvg2mW` are exposed in
+`realtime.phaseShadow` for observability.
