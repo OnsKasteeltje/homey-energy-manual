@@ -287,7 +287,35 @@ De actuator controleert onder andere:
 
 De WW-keten is hiermee fysiek geïntegreerd, maar Homey bevat nog meer realtime WW state/safety policy dan bij Tesla.
 
-## 14. Quatt is observe-only comfort baseload
+## 14. Quooker flex integration — SHADOW
+
+Quooker is voorbereid als eenvoudige flexload zonder thermisch model. De Pi bezit uitsluitend het lokale tijdvenster:
+
+- maandag t/m vrijdag: `OPPORTUNITY` vóór 17:00, `FORCED_ON` van 17:00–18:00, daarna `OFF`;
+- zaterdag/zondag: `OPPORTUNITY` vóór 13:00, `FORCED_ON` van 13:00–14:00, daarna `OFF`.
+
+Het gemodelleerde Quooker-vermogen is 1580 W. Binnen `OPPORTUNITY` gebruikt Homey de bestaande `EM2_P1_Rolling` 120-secondenmeting als realtime executor-safety: start bij gemiddeld minstens 1250 W export (`avgGridW <= -1250`) en blijf aan totdat gemiddeld minstens 600 W import ontstaat (`avgGridW >= +600`).
+
+De keten is momenteel:
+
+```text
+Pi Dynamic Planner
+ -> /control/current targets.quooker
+ -> Homey PI bridge
+ -> EM2_Power_Intent.targets.quooker
+ -> EM v2 | 60 Adapter | Quooker Power v0.1 SHADOW
+ -> EM2_Control_Quooker
+ -> EM v2 | 60 Actuator | Quooker v0.1 SHADOW
+ -> Cooker readback only
+```
+
+De adapter en actuator-shadow zijn actief maar verrichten geen fysieke writes. De bestaande drie legacy Waterkoker-tijdflows blijven daarom voorlopig de fysieke writers. Een LIVE-cutover mag pas plaatsvinden nadat de shadow-output is gevalideerd en de legacy writers in dezelfde cutover worden uitgeschakeld, zodat nooit twee automatische physical writers naast elkaar worden geclaimd.
+
+Canonical Homey actuator-device:
+
+`Cooker` — device ID `42992d14-c4e4-43fc-aaf0-29a73a8e2eb9`, capability `onoff`.
+
+## 15. Quatt is observe-only comfort baseload
 
 Quatt blijft:
 
@@ -299,7 +327,7 @@ controllable = false
 
 Quatt wordt gemeten en gemodelleerd, maar niet door de EMS-planner aangestuurd.
 
-## 15. End-to-end validatie
+## 16. End-to-end validatie
 
 De gecontroleerde cutover van 2026-09-12 heeft beide primaire flexloads end-to-end gevalideerd.
 
@@ -315,7 +343,7 @@ Warm water:
 - restore target → boiler OFF;
 - fysieke keten PASS.
 
-## 16. Source-of-truth beleid
+## 17. Source-of-truth beleid
 
 ```text
 GitHub = canonical software + documentatie
@@ -325,7 +353,7 @@ Homey  = live edge, integratie, safety en actuatorlaag
 
 Runtimecode en GitHub moeten aantoonbaar synchroon blijven. Architectuurgevoelige wijzigingen horen in dezelfde release-range in `CURRENT-EMS-STATE.md` en relevante component-/flowdocumentatie te worden verwerkt.
 
-## 17. Resterende architectuurpunten
+## 18. Resterende architectuurpunten
 
 - verdere vereenvoudiging van WW ownership;
 - verwijderen van historische `deadline_requirement()` compatibiliteitscode;
