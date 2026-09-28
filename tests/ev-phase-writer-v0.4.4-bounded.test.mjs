@@ -178,3 +178,19 @@ test('startup recovery accepts only a safely paused live normal circuit baseline
   assert.match(src,/liveNormalCircuitBaseline/);
   assert.match(src,/statusExtra:\{startupRecoveryBaselineReconciled\}/);
 });
+
+
+test('same confirmed phase can never fall through to bounded phase transition',()=>{
+  const kiss=src.indexOf('KISS invariant: same confirmed phase is never a phase transition');
+  const bounded=src.indexOf('const originalCircuitA=hw.circuitTargetA;');
+  assert.ok(kiss>=0);
+  assert.ok(bounded>kiss);
+  const block=src.slice(kiss,bounded);
+  assert.match(block,/if\(hw\.confirmedMode===control\.mode\)/);
+  assert.match(block,/await resumeSession\(\)/);
+  assert.match(block,/await setCurrentA\(control\.requestedA\)/);
+  assert.match(block,/SAME_PHASE_CURRENT_CONFIRM_TIMEOUT/);
+  assert.match(block,/return true/);
+  assert.doesNotMatch(block,/setPhaseMode\(/);
+  assert.doesNotMatch(block,/setCircuitA\(/);
+});
