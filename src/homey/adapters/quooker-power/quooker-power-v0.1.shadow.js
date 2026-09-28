@@ -7,11 +7,6 @@ const P1_ROLLING_ID='5abde7ec-c426-4a9b-8d98-8b4ce544ef57';
 const CONTROL_VAR_ID='c3bc28a2-e09e-427d-b697-bc01f3e924d3';
 const MAX_INTENT_AGE_MS=180000;
 const MAX_P1_AGE_MS=120000;
-const OBS_NAMES={
-  target:'EM2_Quooker_Shadow_Target_On',
-  mode:'EM2_Quooker_Shadow_Mode_Code',
-  grid:'EM2_Quooker_Shadow_AvgGridW'
-};
 
 const parse=v=>{try{return JSON.parse(String(v??''));}catch{return null;}};
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null;};
@@ -95,22 +90,4 @@ const value=JSON.stringify(out);
 if(outVar.value!==value){
   await Homey.logic.updateVariable({id:CONTROL_VAR_ID,variable:{value}});
 }
-
-// Bootstrap historical observability variables; this broad read is temporary
-// and will be replaced with pinned IDs after the first successful run.
-const allVars=await Homey.logic.getVariables();
-const byName=Object.fromEntries(Object.values(allVars).map(v=>[v.name,v]));
-const ensure=async(name,type,initial)=>{
-  if(byName[name])return byName[name];
-  const created=await Homey.logic.createVariable({variable:{name,type,value:initial}});
-  byName[name]=created;
-  return created;
-};
-const targetObs=await ensure(OBS_NAMES.target,'boolean',false);
-const modeObs=await ensure(OBS_NAMES.mode,'number',0);
-const gridObs=await ensure(OBS_NAMES.grid,'number',0);
-const modeCode=mode==='FORCED_ON'?2:mode==='OPPORTUNITY'?1:0;
-if(targetObs.value!==targetOn)await Homey.logic.updateVariable({id:targetObs.id,variable:{value:targetOn}});
-if(Number(modeObs.value)!==modeCode)await Homey.logic.updateVariable({id:modeObs.id,variable:{value:modeCode}});
-if(avgGridW!==null&&Number(gridObs.value)!==Math.round(avgGridW))await Homey.logic.updateVariable({id:gridObs.id,variable:{value:Math.round(avgGridW)}});
 return true;
