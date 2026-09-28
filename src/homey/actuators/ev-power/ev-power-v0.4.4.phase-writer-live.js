@@ -760,15 +760,16 @@ if(hw.confirmedMode===control.mode&&hw.sessionEnabled===true){
 }
 
 // KISS invariant: same confirmed phase is never a phase transition.
-// If Homey/Easee briefly reports the session disabled or paused while the
-// requested phase is already confirmed, just resume if needed and re-apply A.
+// sessionEnabled is not authoritative enough to justify a resume: Easee/Homey
+// can report it false while electrical telemetry proves the EV is charging.
+// Resume only when the charger is actually paused; otherwise only adjust A.
 if(hw.confirmedMode===control.mode){
   if(hw.circuitTargetA===null||hw.circuitTargetA<control.requestedA){
     return await safeAbort('CIRCUIT_LIMIT_BELOW_REQUEST',control,null,liveEnabled,null);
   }
   try{
     let resumed=false;
-    if(hw.sessionEnabled!==true||hw.chargeState==='plugged_in_paused'){
+    if(hw.chargeState==='plugged_in_paused'||hw.paused===true){
       await resumeSession();
       resumed=true;
       await sleep(POLL_MS);
@@ -794,6 +795,35 @@ if(hw.confirmedMode===control.mode){
     );
     return true;
   }catch(err){
+    // A same-phase current-confirm timeout is not a phase-safety failure.
+    // Preserve an already bounded target (for example previous 8 A while 9 A
+    // is being requested) instead of turning a harmless readback lag into a
+    // physical pause. Only invoke fail-safe pause when the observed target is
+    // actually above the requested bound or otherwise unsafe/unknown.
+    try{hw=await readHardware();}catch(_){}
+    const boundedExistingTarget=
+      Number.isInteger(hw?.chargerTargetA) &&
+      hw.chargerTargetA>=0 &&
+      hw.chargerTargetA<=control.requestedA &&
+      Number.isInteger(hw?.circuitTargetA) &&
+      hw.circuitTargetA>=control.requestedA;
+    if(boundedExistingTarget){
+      await saveStatus(
+        'DEGRADED',
+        'SAME_PHASE_CURRENT_CONFIRM_TIMEOUT_PRESERVED',
+        'STABLE',
+        control,
+        hw,
+        null,
+        {
+          live:true,
+          physicalWritePerformed:true,
+          action:'PRESERVE_BOUNDED_SAME_PHASE_TARGET',
+          statusExtra:{executionError:String(err?.message||err)}
+        }
+      );
+      return true;
+    }
     return await safeAbort(
       'SAME_PHASE_EXECUTION_FAILED:'+String(err?.message||err),
       control,
