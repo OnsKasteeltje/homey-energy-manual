@@ -4,7 +4,7 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-09-27
+**Status date:** 2026-09-28
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
@@ -199,6 +199,14 @@ WW comfort remains a hard constraint above optimization. The Pi schedules remain
 Electrical WW flex is now hard-gated by canonical runtime source `energy-state-v2.json -> hot_water.mode`: `true = BOILER` permits electrical WW planning, while `false = CV` and missing/ambiguous source state fail closed to zero electrical WW allocation. When source is CV or UNKNOWN, the Pi WW plan retains forecast demand only as observability but sets electrical required/allocated energy to zero and all WW plan slots to `0 W`. WW therefore cannot reserve PV or compete with EV/heating-preheat unless the active source is explicitly BOILER.
 
 The Pi WW Seasonal Source Advisor is read-only and manual-switch-only. It runs daily at 00:05 Europe/Amsterdam against canonical Pi-local history, so the just-completed local calendar day is immediately eligible for `completeDaysOnly` analysis. It has no dependency on the retired `ems-day-history.service` or other Homey Insights polling; source-switch advice requires the configured multi-day confirmation before notification and never performs a physical source switch. Confirmation is counted once per unique analysis `asOfDate`; reruns, restarts and persistent-timer catch-up executions for the same analysis day are idempotent and must not advance the confirmation streak. On 2026-09-18 the manual BOILER→CV change was validated end-to-end: Homey `WW_Boilermodus=false` resolved to Pi `currentMode=CV`, the advisor retained `KEEP_CURRENT` because CV was economically preferable, and the prior switch-to-CV confirmation streak reset to 0 without any automatic source write.
+
+### 8.1 Quooker flex — SHADOW
+
+Quooker is geïntegreerd als eenvoudige flexload zonder thermisch state-model. De Pi blijft planner-owner en publiceert per current slot een `targets.quooker` envelope via `/control/current`: op werkdagen `OPPORTUNITY` vóór 17:00, `FORCED_ON` van 17:00–18:00 en daarna `OFF`; in het weekend `OPPORTUNITY` vóór 13:00, `FORCED_ON` van 13:00–14:00 en daarna `OFF`. Het gemodelleerde vermogen is 1580 W.
+
+Homey vertaalt dit envelope via de actieve PI bridge naar `EM2_Power_Intent.targets.quooker`. `EM v2 | 60 Adapter | Quooker Power v0.1 SHADOW` gebruikt binnen `OPPORTUNITY` de bestaande `EM2_P1_Rolling` 120-secondenmeting: start bij `avgGridW <= -1250 W` en behoud ON totdat `avgGridW >= +600 W`. Het resultaat wordt gepubliceerd als `EM2_Control_Quooker`.
+
+`EM v2 | 60 Actuator | Quooker v0.1 SHADOW` leest dit control-contract en het fysieke Homey-device `Cooker` (device ID `42992d14-c4e4-43fc-aaf0-29a73a8e2eb9`) uitsluitend voor readback/validatie. De actuator-shadow voert geen device writes uit. De bestaande drie legacy Waterkoker-tijdflows blijven voorlopig de fysieke writers. Een LIVE-cutover vereist eerst shadowvalidatie en vervolgens het uitschakelen van die legacy writers in dezelfde gecontroleerde overgang, zodat de single-writer boundary behouden blijft.
 
 ## 9. Live cutover validation
 
