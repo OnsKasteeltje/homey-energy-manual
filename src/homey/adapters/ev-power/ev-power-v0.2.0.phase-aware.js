@@ -9,14 +9,12 @@ const MIN_A=6,MAX_OPPORTUNITY_A=16,VOLTAGE_V=230;
 const IDS={
   intent:'04b57041-dd7f-41f7-a00a-f023afb1ccee',
   state:'8e1efbb0-7999-494c-9429-7d274afacd79',
-  maxA:'4a7398bb-9253-49ab-8850-820d1a622bd6',
   output:'f2118322-d59d-4aa8-b478-234effc3983c'
 };
 
-const [intentVar,stateVar,maxVar,outVar]=await Promise.all([
+const [intentVar,stateVar,outVar]=await Promise.all([
   Homey.logic.getVariable({id:IDS.intent}),
   Homey.logic.getVariable({id:IDS.state}),
-  Homey.logic.getVariable({id:IDS.maxA}),
   Homey.logic.getVariable({id:IDS.output})
 ]);
 
@@ -42,9 +40,16 @@ const deadlineTarget=
   targetStatus==='NUMERIC_DEADLINE_TARGET' ||
   targetSource==='REMAINING_KWH_OVER_TIME_TO_DEADLINE';
 
-const maxConfig=num(maxVar?.value);
-const deadlineCapA=Math.floor(Math.min(16,maxConfig??16));
-const maxA=deadlineTarget?deadlineCapA:MAX_OPPORTUNITY_A;
+// Deadline max current is owned by the Pi control contract projected into
+// Power Intent. Do not re-cap it with the legacy Homey "EV Max laadstroom A"
+// variable: that variable belongs to the disabled old deadline adapter and can
+// be stale across new requests.
+const deadlineCapRaw=num(intent?.policyProjection?.deadlineMaxA);
+const deadlineCapA=
+  Number.isInteger(deadlineCapRaw) && deadlineCapRaw>=MIN_A && deadlineCapRaw<=MAX_OPPORTUNITY_A
+    ? deadlineCapRaw
+    : null;
+const maxA=deadlineTarget?(deadlineCapA??0):MAX_OPPORTUNITY_A;
 
 const intentAgeMs=age(intent?.generatedAt);
 const stateAgeMs=age(state?.sampledAt);
