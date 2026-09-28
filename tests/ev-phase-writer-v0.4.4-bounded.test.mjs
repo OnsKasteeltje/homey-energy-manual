@@ -166,3 +166,14 @@ test('same-phase opportunity resumes directly from zero-amp hold',()=>{
   assert.match(src,/ZERO_HOLD_RESUMED/);
   assert.match(src,/previousWasZeroHold &&/);
 });
+
+
+test('startup recovery accepts only a safely paused live normal circuit baseline over stale saved normal baseline',()=>{
+  assert.match(src,/startupRecoveryBaselineReconciled=false/);
+  assert.match(src,/hw\.paused===true/);
+  assert.match(src,/previousOriginal>EV_MAX_A/);
+  assert.match(src,/hw\.circuitTargetA>EV_MAX_A/);
+  assert.match(src,/previousNormalCircuitBaseline/);
+  assert.match(src,/liveNormalCircuitBaseline/);
+  assert.match(src,/statusExtra:\{startupRecoveryBaselineReconciled\}/);
+});
