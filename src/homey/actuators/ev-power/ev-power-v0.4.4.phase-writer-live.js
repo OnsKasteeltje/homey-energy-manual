@@ -551,7 +551,31 @@ const previousNeedsRecovery=
   previousOriginal>=EV_MIN_A &&
   previousOriginal<=64;
 
-if(previousNeedsRecovery&&hw.circuitTargetA!==previousOriginal){
+// A previously captured baseline can itself become stale after Easee/Homey
+// normalizes the circuit limit outside the EMS transition. While safely paused,
+// any live circuit target above EV_MAX_A is independently proven not to be a
+// temporary transition cap, because this writer never sets a transition cap
+// above EV_MAX_A. In that narrow case, trust the live normal baseline instead
+// of repeatedly forcing an obsolete saved value.
+let startupRecoveryBaselineReconciled=false;
+const previousNormalCircuitBaseline=
+  Number.isInteger(previousOriginal) &&
+  previousOriginal>EV_MAX_A &&
+  previousOriginal<=64;
+const liveNormalCircuitBaseline=
+  Number.isInteger(hw.circuitTargetA) &&
+  hw.circuitTargetA>EV_MAX_A &&
+  hw.circuitTargetA<=64;
+
+if(
+  previousNeedsRecovery &&
+  hw.circuitTargetA!==previousOriginal &&
+  hw.paused===true &&
+  previousNormalCircuitBaseline &&
+  liveNormalCircuitBaseline
+){
+  startupRecoveryBaselineReconciled=true;
+}else if(previousNeedsRecovery&&hw.circuitTargetA!==previousOriginal){
   try{
     hw=await pauseAndConfirm();
     hw=await restoreCircuit(previousOriginal);
@@ -760,7 +784,8 @@ await saveStatus(
     physicalWritePerformed:false,
     action:'PAUSE_SESSION',
     transitionId,
-    startedAt
+    startedAt,
+    statusExtra:{startupRecoveryBaselineReconciled}
   }
 );
 
@@ -943,7 +968,8 @@ try{
           durationMs:Date.now()-Date.parse(startedAt),
           replansWhilePaused:replan,
           selfRetriggerUsed:false,
-          teslaConsumptionObserved:hw.powerW!==null&&hw.powerW>0
+          teslaConsumptionObserved:hw.powerW!==null&&hw.powerW>0,
+          startupRecoveryBaselineReconciled
         }
       }
     );
