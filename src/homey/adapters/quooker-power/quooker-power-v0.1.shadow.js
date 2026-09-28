@@ -7,6 +7,11 @@ const P1_ROLLING_ID='5abde7ec-c426-4a9b-8d98-8b4ce544ef57';
 const CONTROL_VAR_ID='c3bc28a2-e09e-427d-b697-bc01f3e924d3';
 const MAX_INTENT_AGE_MS=180000;
 const MAX_P1_AGE_MS=120000;
+const OBS_NAMES={
+  target:'EM2_Quooker_Shadow_Target_On',
+  mode:'EM2_Quooker_Shadow_Mode_Code',
+  grid:'EM2_Quooker_Shadow_AvgGridW'
+};
 
 const parse=v=>{try{return JSON.parse(String(v??''));}catch{return null;}};
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null;};
@@ -66,6 +71,36 @@ if(intentValid){
   }
 }
 
+let observabilityIds=previous?.observabilityIds||null;
+let obsVars=null;
+if(
+  !observabilityIds?.target ||
+  !observabilityIds?.mode ||
+  !observabilityIds?.grid
+){
+  // One-time bootstrap only. Normal runtime uses the persisted pinned IDs.
+  const allVars=await Homey.logic.getVariables();
+  const byName=Object.fromEntries(Object.values(allVars).map(v=>[v.name,v]));
+  const ensure=async(name,type,initial)=>{
+    if(byName[name])return byName[name];
+    const created=await Homey.logic.createVariable({variable:{name,type,value:initial}});
+    byName[name]=created;
+    return created;
+  };
+  const targetObs=await ensure(OBS_NAMES.target,'boolean',false);
+  const modeObs=await ensure(OBS_NAMES.mode,'number',0);
+  const gridObs=await ensure(OBS_NAMES.grid,'number',0);
+  observabilityIds={target:targetObs.id,mode:modeObs.id,grid:gridObs.id};
+  obsVars={target:targetObs,mode:modeObs,grid:gridObs};
+}else{
+  const [targetObs,modeObs,gridObs]=await Promise.all([
+    Homey.logic.getVariable({id:observabilityIds.target}),
+    Homey.logic.getVariable({id:observabilityIds.mode}),
+    Homey.logic.getVariable({id:observabilityIds.grid})
+  ]);
+  obsVars={target:targetObs,mode:modeObs,grid:gridObs};
+}
+
 const out={
   schema:'EM2_CONTROL_QUOOKER_V0.1',
   generatedAt:new Date(now).toISOString(),
@@ -76,6 +111,7 @@ const out={
   modeledPowerW,
   thresholds:{startExportW,stopImportW},
   p1:{avgGridW,p1Fresh},
+  observabilityIds,
   safety:{
     shadow:true,
     deviceWrites:false,
@@ -89,5 +125,16 @@ const out={
 const value=JSON.stringify(out);
 if(outVar.value!==value){
   await Homey.logic.updateVariable({id:CONTROL_VAR_ID,variable:{value}});
+}
+
+const modeCode=mode==='FORCED_ON'?2:mode==='OPPORTUNITY'?1:0;
+if(obsVars?.target?.value!==targetOn){
+  await Homey.logic.updateVariable({id:observabilityIds.target,variable:{value:targetOn}});
+}
+if(Number(obsVars?.mode?.value)!==modeCode){
+  await Homey.logic.updateVariable({id:observabilityIds.mode,variable:{value:modeCode}});
+}
+if(avgGridW!==null&&Number(obsVars?.grid?.value)!==Math.round(avgGridW)){
+  await Homey.logic.updateVariable({id:observabilityIds.grid,variable:{value:Math.round(avgGridW)}});
 }
 return true;
