@@ -160,11 +160,12 @@ test('legacy plugged-in pause is recovered once and hold readback ignores Homey 
   assert.doesNotMatch(off,/x=>x\.sessionEnabled===true&&x\.chargerTargetA===0/);
 });
 
-test('same-phase opportunity resumes directly from zero-amp hold',()=>{
+test('same-phase paused opportunity resumes directly without circuit-cap transition',()=>{
   assert.match(src,/ZERO_HOLD_RESUME_CURRENT_CONFIRM_TIMEOUT/);
-  assert.match(src,/RESUME_FROM_ZERO_HOLD/);
-  assert.match(src,/ZERO_HOLD_RESUMED/);
-  assert.match(src,/previousWasZeroHold &&/);
+  assert.match(src,/RESUME_SAME_PHASE_PAUSED/);
+  assert.match(src,/SAME_PHASE_RESUMED/);
+  assert.match(src,/hw\.confirmedMode===control\.mode/);
+  assert.doesNotMatch(src,/previousWasZeroHold &&/);
 });
 
 
