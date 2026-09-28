@@ -810,3 +810,32 @@ This preserves the architecture boundary: `OFF` means **no energy opportunity**,
 not **terminate/pause the vehicle session**. The deployment guard requires the
 `NORMAL_OFF_ZERO_A_HOLD` source marker so the prior OFF->pause behaviour cannot
 be redeployed through the supported v0.4.4 path.
+
+
+### v0.4.4 stale normal-baseline reconciliation — 2026-09-28
+
+A live paused 1P opportunity exposed a recovery-state edge case after the bounded
+writer had previously captured originalCircuitA=40 A, while current Easee
+readback reported a normal circuit target of 20 A. Pi policy, Power Intent,
+Adapter and Gate were all healthy (1P + 9 A, Gate PASS), but startup recovery
+repeatedly attempted to restore the obsolete 40 A value and failed with
+STARTUP_CIRCUIT_RECOVERY_FAILED:CIRCUIT_RESTORE_TIMEOUT.
+
+The writer now reconciles this narrow case without hardcoding a 20 A or 40 A
+baseline. A saved normal baseline may be superseded by current readback only
+when all of the following are true:
+
+- the session is safely paused / zero-load;
+- both the saved and current circuit limits are valid integers;
+- both are above the EMS executable EV range (>16 A);
+- the values differ.
+
+Because the writer never uses a temporary transition cap above 16 A, the current
+value in this state is independently proven not to be a leftover transition cap.
+The writer therefore keeps the live value as the baseline captured by the next
+bounded transaction instead of repeatedly forcing the stale saved value.
+
+If either value is within the transition-cap range (<=16 A), existing fail-closed
+restore behavior remains unchanged. No PV thresholds, phase policy,
+Bridge/Adapter/Gate semantics, deadline behavior or single-writer ownership are
+changed.
