@@ -380,6 +380,33 @@ try{
             ?phaseShadowPhysicalA*230*(actualProductionPhaseCount||0)
             :0;
           const availableTotalW=phaseReadbackValid?Math.max(0,-p1W+actualEvW):0;
+
+          // 1P stop decisions use a 2-minute rolling average of reconstructed
+          // total EV-available power. P1 remains authoritative; current EV load
+          // is added back so charging itself cannot create a false stop/start loop.
+          const avgWindowMs=120000;
+          const sampleMs=p1Ts!==null?p1Ts:Date.now();
+          const priorAvailableSamples=Array.isArray(previousPhase?.availableTotalSamples)
+            ?previousPhase.availableTotalSamples
+            :[];
+          const availableTotalSamples=priorAvailableSamples
+            .filter(s=>{
+              const at=Date.parse(String(s?.at||''));
+              return Number.isFinite(at) &&
+                at>=sampleMs-avgWindowMs &&
+                at<sampleMs &&
+                Number.isFinite(num(s?.w));
+            })
+            .slice(-59);
+          availableTotalSamples.push({
+            at:new Date(sampleMs).toISOString(),
+            w:Math.round(availableTotalW)
+          });
+          const availableTotalAvg2mW=Math.round(
+            availableTotalSamples.reduce((sum,s)=>sum+num(s.w),0) /
+            availableTotalSamples.length
+          );
+
           const start1pW=Math.max(0,Math.round(num(pp.start1p_W)||0));
           const stop1pW=Math.max(0,Math.round(num(pp.stop1p_W)||0));
           const enter3pW=Math.max(0,Math.round(num(pp.enter3p_W)||0));
@@ -393,7 +420,7 @@ try{
             }
           }else if(phaseReadbackValid&&previousMode==='1P'){
             if(availableTotalW>=enter3pW&&dwellOK){phaseMode='3P';phaseReason='1P_TO_3P_TOTAL_SURPLUS_HIGH';}
-            else if(availableTotalW<stop1pW&&dwellOK){phaseMode='OFF';phaseReason='1P_TO_OFF_TOTAL_SURPLUS_LOW';}
+            else if(availableTotalAvg2mW<stop1pW&&dwellOK){phaseMode='OFF';phaseReason='1P_TO_OFF_AVG2M_SURPLUS_LOW';}
           }else if(phaseReadbackValid){
             if(availableTotalW>=enter3pW){phaseMode='3P';phaseReason='OFF_TO_3P_TOTAL_SURPLUS';}
             else if(availableTotalW>=start1pW){phaseMode='1P';phaseReason='OFF_TO_1P_TOTAL_SURPLUS';}
@@ -409,6 +436,8 @@ try{
             requestedW:phaseMode==='1P'?phaseA*230:phaseMode==='3P'?phaseA*690:0,
             reason:phaseReason,
             availableTotalW:Math.round(availableTotalW),
+            availableTotalAvg2mW,
+            availableTotalSamples,
             controllerStateA:currentA,
             actualProductionA:phaseShadowPhysicalA,
             actualProductionCurrentSource:
