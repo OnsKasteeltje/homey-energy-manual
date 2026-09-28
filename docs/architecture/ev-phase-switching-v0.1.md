@@ -855,8 +855,12 @@ Homey/Easee briefly exposed a non-stable session flag.
 The invariant is now explicit and simple:
 
 - if confirmed mode equals requested mode, never execute a phase transition;
-- resume the session if needed;
+- resume only when Easee is actually `plugged_in_paused`; a transient
+  `sessionEnabled=false` while electrical telemetry shows charging is ignored;
 - apply the requested charger current;
+- if same-phase current readback times out but the observed charger target is
+  still bounded at or below the requested current, preserve that target and
+  report the degraded confirmation instead of pausing the session;
 - leave the circuit limit untouched;
 - use the bounded pause/phase/deadtime/circuit-cap transaction only when
   confirmed mode and requested mode differ.
