@@ -48,7 +48,7 @@ const readPhaseMode=async easee=>{
 };
 let devicesCache=null;
 const getDevice=async id=>{if(typeof Homey.devices?.getDevice==='function')return await Homey.devices.getDevice({id});if(!devicesCache)devicesCache=await Homey.devices.getDevices();return devicesCache?.[id]||null;};
-let stage='SELECTOR_READ',intentVar=null,diagVar=null,coreState=null,stateRev=null,plannerGeneratedAt=null,commandValidUntil=null,evW=0,evStatus='IDLE',wwOn=null,source='PI_FAIL_CLOSED',reason='UNINITIALIZED',valid=false,status='PI_BRIDGE_ERROR';
+let stage='SELECTOR_READ',intentVar=null,diagVar=null,coreState=null,stateRev=null,plannerGeneratedAt=null,commandValidUntil=null,evW=0,evStatus='IDLE',wwOn=null,quooker={mode:'OFF',target_on:false,opportunity_allowed:false,modeled_power_W:1580,start_export_W:1250,stop_import_W:600,reason:'FAIL_CLOSED'},source='PI_FAIL_CLOSED',reason='UNINITIALIZED',valid=false,status='PI_BRIDGE_ERROR';
 let deadlineGuardApplied=false,deadlineActive=false,deadlineTeslaConnected=false,deadlineChargeState='unknown',deadlineAt=null,latestStartAt=null,derivedLatestStartAt=null,forceFromAt=null,deadlineRemainingKWh=0,deadlineMaxA=null,deadlineOverdue=false;
 let evV2Shadow={schema:'EM2_EV_V2_ROLLING_SHADOW_V0.1',readOnly:true,samples:[],rolling5mW:null,lastSampleAt:null};
 let realtime={schema:'EM2_EV_REALTIME_EXECUTION_V0.1',eligible:false,applied:false,fallbackReason:null,envelopeSchema:null,envelopeAllowed:false,minA:0,maxA:0,p1W:null,p1AgeSec:null,chargeState:null,evActualW:null,evPowerAgeSec:null,counterfactualSurplusW:null,candidateA:null,candidateW:null,importReductionA:0,plannerTargetA:0,plannerTargetW:0,confirmedPhaseRaw:null,confirmedPhaseMode:'UNKNOWN',actualProductionPhaseCount:null,phasePolicy:null,phaseShadow:{schema:'EM2_EV_PHASE_EXECUTION_SHADOW_V0.1',mode:'OFF',requestedA:0,requestedW:0,reason:'NOT_EVALUATED',modeSinceAt:null,shadow:true,deviceWrites:false,controlWrites:false}};
@@ -103,6 +103,8 @@ const writeIntent=async()=>{
     evRequestedA:phaseControl.requestedA,
     wwTargetOn:wwOn,
     wwStatus:valid?'PI_BINARY_TARGET':'FAIL_CLOSED_PI_UNAVAILABLE',
+    quookerMode:valid?quooker.mode:'OFF',
+    quookerTargetOn:valid?quooker.target_on:false,
     authority:'PI'
   });
   const out={
@@ -117,7 +119,7 @@ const writeIntent=async()=>{
     deviceWrites:false,
     valid,
     status,
-    inputSemanticKey:JSON.stringify({stateRev,plannerGeneratedAt,commandValidUntil,evW,evStatus,wwOn,valid,stage,realtime,deadlineGuardApplied,deadlineTeslaConnected,deadlineChargeState,deadlineAt,forceFromAt,deadlineRemainingKWh,deadlineMaxA}),
+    inputSemanticKey:JSON.stringify({stateRev,plannerGeneratedAt,commandValidUntil,evW,evStatus,wwOn,quooker,valid,stage,realtime,deadlineGuardApplied,deadlineTeslaConnected,deadlineChargeState,deadlineAt,forceFromAt,deadlineRemainingKWh,deadlineMaxA}),
     inputRevisions:{state:stateRev,planner:plannerGeneratedAt},
     policyProjection:{
       plannerOwner:'PI',
@@ -159,6 +161,16 @@ const writeIntent=async()=>{
         target_on:valid?wwOn:false,
         status:valid?'PI_BINARY_TARGET':'FAIL_CLOSED_PI_UNAVAILABLE',
         sourceAction:wwOn===true?'BOILER_ON':wwOn===false?'BOILER_OFF':'HOLD'
+      },
+      quooker:{
+        mode:valid?quooker.mode:'OFF',
+        target_on:valid?quooker.target_on:false,
+        opportunity_allowed:valid?quooker.opportunity_allowed:false,
+        modeled_power_W:valid?quooker.modeled_power_W:1580,
+        start_export_W:valid?quooker.start_export_W:1250,
+        stop_import_W:valid?quooker.stop_import_W:600,
+        reason:valid?quooker.reason:'FAIL_CLOSED_PI_UNAVAILABLE',
+        status:valid?'PI_QUOOKER_ENVELOPE':'FAIL_CLOSED_PI_UNAVAILABLE'
       },
       battery:{target_W:0,status:'NOT_INTEGRATED'}
     },
@@ -222,7 +234,18 @@ try{
   const plannerEvA=Math.max(0,Math.round(num(t?.ev?.target_A)||0));
   evW=plannerEvW;evStatus=evW>0?'PI_NUMERIC_TARGET':'IDLE';
   wwOn=t?.ww?.target_on===true?true:t?.ww?.target_on===false?false:null;
-  valid=true;status='OK';source='PI_DYNAMIC_PLANNER_V0.3';reason=t?.ev?.reason||t?.ww?.reason||'PI_DYNAMIC_SLOT';
+  const q=t?.quooker||{};
+  const qMode=['OPPORTUNITY','FORCED_ON','OFF'].includes(String(q.mode||'').toUpperCase())?String(q.mode).toUpperCase():'OFF';
+  quooker={
+    mode:qMode,
+    target_on:qMode==='FORCED_ON'&&q.target_on===true,
+    opportunity_allowed:qMode==='OPPORTUNITY'&&q.opportunity_allowed===true,
+    modeled_power_W:Math.max(0,Math.round(num(q.modeled_power_W)||1580)),
+    start_export_W:Math.max(0,Math.round(num(q.start_export_W)||1250)),
+    stop_import_W:Math.max(0,Math.round(num(q.stop_import_W)||600)),
+    reason:String(q.reason||('TIME_ENVELOPE_'+qMode))
+  };
+  valid=true;status='OK';source='PI_DYNAMIC_PLANNER_V0.3';reason=t?.ev?.reason||t?.ww?.reason||t?.quooker?.reason||'PI_DYNAMIC_SLOT';
   realtime.plannerTargetA=plannerEvA;realtime.plannerTargetW=plannerEvW;
 
   // Bounded realtime PV execution. Invalid live inputs fall back to the exact Pi slot target.
