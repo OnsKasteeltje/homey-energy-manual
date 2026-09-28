@@ -869,6 +869,48 @@ This does not change PV thresholds, phase-selection policy or single-writer
 ownership.
 
 
+### EV gate test-scope finding — 2026-09-28
+
+Read-only analysis of the failing EV phase-writer CI gate confirmed that the
+current v0.4.4 runtime behaviour is aligned with the documented same-phase
+resume invariant and must not be changed merely to make the gate green.
+
+The failing test
+`same-phase paused opportunity resumes directly without circuit-cap transition`
+currently applies `assert.doesNotMatch(src,/previousWasZeroHold &&/)` to the
+entire v0.4.4 source file. That scope is too broad.
+
+`previousWasZeroHold` is still intentionally required in the separate normal
+OFF / legacy-pause recovery path. There it prevents repeated recovery-resume
+behaviour after an already established `OFF_ZERO_A_HOLD`.
+
+For a positive valid control command, the intended same-phase behaviour is
+different and already implemented correctly:
+
+- confirmed phase equals requested phase;
+- Easee is actually `plugged_in_paused`;
+- charger target is 0 A;
+- live circuit limit is at least the requested current;
+- resume the session directly and apply the requested current;
+- do not require `previousWasZeroHold`;
+- do not execute the bounded 1P<->3P transition;
+- do not modify the circuit cap.
+
+The implementation commit `7ef38b3032ee`, matching test commit
+`31d5e07f4889`, and documentation commit `4ec860d61805` all encode this
+same intended contract.
+
+Therefore, if this EV chain is materially touched again, the known gate failure
+must first be treated as a **test-scope defect**, not as evidence of a runtime
+regression. The safe correction is to scope the negative
+`previousWasZeroHold &&` assertion to the same-phase paused-resume source
+block only, consistent with the other block-scoped invariants in
+`tests/ev-phase-writer-v0.4.4-bounded.test.mjs`.
+
+No EV runtime, Homey flow, phase thresholds, safety behaviour or control
+ownership was changed as part of this analysis.
+
+
 ### 1P stop smoothing — 2026-09-28
 
 To avoid stop/start oscillation under short PV dips, the production phase selector
