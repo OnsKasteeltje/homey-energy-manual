@@ -2,7 +2,7 @@
 // Adds bounded realtime PV execution inside Pi envelope V0.3.
 // No direct device writes: output remains EM2_Power_Intent; EV Adapter/Gate/Actuator own execution.
 const SELECTOR_ID='ba9c22ba-4332-4b19-9bda-dfe476862176';
-const IDS={state:'8e1efbb0-7999-494c-9429-7d274afacd79',intent:'04b57041-dd7f-41f7-a00a-f023afb1ccee',diag:'14e6c83f-e881-4ad5-8876-af1ce9e2a1a1',maxA:'4a7398bb-9253-49ab-8850-820d1a622bd6'};
+const IDS={state:'8e1efbb0-7999-494c-9429-7d274afacd79',intent:'04b57041-dd7f-41f7-a00a-f023afb1ccee',diag:'14e6c83f-e881-4ad5-8876-af1ce9e2a1a1'};
 const P1_ID='7a696d77-15fb-4b68-9bce-f1e39bff5045';
 const EASEE_ID='4d0b6913-d940-474e-95d6-b43f194c4119';
 const URLS=['http://192.168.1.42:3100/control/current'];
@@ -193,9 +193,9 @@ const writeIntent=async()=>{
 };
 try{
   stage='LOGIC_READ';
-  const vars=await Promise.all([Homey.logic.getVariable({id:IDS.state}),Homey.logic.getVariable({id:IDS.intent}),Homey.logic.getVariable({id:IDS.diag}),Homey.logic.getVariable({id:IDS.maxA})]);
-  const stateVar=vars[0],maxAVar=vars[3];intentVar=vars[1];diagVar=vars[2];
-  if(!stateVar||!intentVar||!diagVar||!maxAVar)throw new Error('PI_BRIDGE_REQUIRED_VARIABLE_MISSING');
+  const vars=await Promise.all([Homey.logic.getVariable({id:IDS.state}),Homey.logic.getVariable({id:IDS.intent}),Homey.logic.getVariable({id:IDS.diag})]);
+  const stateVar=vars[0];intentVar=vars[1];diagVar=vars[2];
+  if(!stateVar||!intentVar||!diagVar)throw new Error('PI_BRIDGE_REQUIRED_VARIABLE_MISSING');
   stage='LOGIC_OK';
   coreState=parse(stateVar.value);stateRev=num(coreState?.revision);if(stateRev===null)throw new Error('STATE_REVISION_MISSING');
   const priorDiag=parse(diagVar.value);const priorSamples=Array.isArray(priorDiag?.evV2Shadow?.samples)?priorDiag.evV2Shadow.samples:[];evV2Shadow.samples=priorSamples.slice(-4);
@@ -530,10 +530,14 @@ try{
   deadlineTeslaConnected=(coreState?.tesla?.connected===true)||connectedState(deadlineChargeState);
   deadlineRemainingKWh=Math.max(0,num(dl.remainingKWh)||0);
   deadlineAt=dl.deadlineAt||null;latestStartAt=dl.latestStartAt||null;
-  const piMax=num(dl.maxA),configMax=num(maxAVar?.value);
+  // Pi deadline contract owns the request-specific maxA. The former Homey
+  // 'EV Max laadstroom A' variable was written by the now-disabled legacy
+  // deadline adapter and can therefore be stale across a new request.
+  // Physical safety remains independently enforced by the actuator against
+  // the live Easee circuit limit before any current write.
+  const piMax=num(dl.maxA);
   const piCap=piMax!==null?Math.max(0,Math.min(16,Math.floor(piMax))):0;
-  const configCap=configMax!==null?Math.max(0,Math.min(16,Math.floor(configMax))):16;
-  deadlineMaxA=Math.min(piCap,configCap);
+  deadlineMaxA=piCap;
   const deadlineMs=Date.parse(String(deadlineAt||'')),explicitLatestMs=Date.parse(String(latestStartAt||'')),maxKw=deadlineMaxA*0.69;
   const derivedLatestMs=Number.isFinite(deadlineMs)&&maxKw>0?deadlineMs-(deadlineRemainingKWh/maxKw)*3600000:NaN;
   derivedLatestStartAt=Number.isFinite(derivedLatestMs)?new Date(derivedLatestMs).toISOString():null;
