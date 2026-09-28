@@ -4,20 +4,21 @@
 
 const CONTROL_VAR_ID='c3bc28a2-e09e-427d-b697-bc01f3e924d3';
 const COOKER_DEVICE_ID='42992d14-c4e4-43fc-aaf0-29a73a8e2eb9';
-const STATUS_VAR_NAME='EM2_Quooker_Actuator_Status';
+const STATUS_VAR_ID='fa5e7753-4ad2-4335-900f-7b26ad980e1b';
 const MAX_CONTROL_AGE_MS=180000;
 
 const parse=v=>{try{return JSON.parse(String(v??''));}catch{return null;}};
 const now=Date.now();
 
-const [controlVar,cooker,vars]=await Promise.all([
+const [controlVar,cooker,statusVar]=await Promise.all([
   Homey.logic.getVariable({id:CONTROL_VAR_ID}),
   Homey.devices.getDevice({id:COOKER_DEVICE_ID}),
-  Homey.logic.getVariables()
+  Homey.logic.getVariable({id:STATUS_VAR_ID})
 ]);
 
+if(!statusVar)return false;
+
 const ctl=parse(controlVar?.value);
-let statusVar=Object.values(vars).find(v=>v.name===STATUS_VAR_NAME)||null;
 
 const ctlAt=Date.parse(String(ctl?.generatedAt||''));
 const fresh=Number.isFinite(ctlAt)&&now-ctlAt>=0&&now-ctlAt<=MAX_CONTROL_AGE_MS;
@@ -49,9 +50,7 @@ const out={
 };
 
 const value=JSON.stringify(out);
-if(!statusVar){
-  statusVar=await Homey.logic.createVariable({variable:{name:STATUS_VAR_NAME,type:'string',value}});
-}else if(statusVar.value!==value){
-  await Homey.logic.updateVariable({id:statusVar.id,variable:{value}});
+if(statusVar.value!==value){
+  await Homey.logic.updateVariable({id:STATUS_VAR_ID,variable:{value}});
 }
 return true;
