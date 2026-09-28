@@ -194,3 +194,22 @@ test('same confirmed phase can never fall through to bounded phase transition',(
   assert.doesNotMatch(block,/setPhaseMode\(/);
   assert.doesNotMatch(block,/setCircuitA\(/);
 });
+
+
+test('same-phase fallback ignores stale sessionEnabled false while charging',()=>{
+  const kiss=src.indexOf('KISS invariant: same confirmed phase is never a phase transition');
+  const bounded=src.indexOf('const originalCircuitA=hw.circuitTargetA;',kiss);
+  const block=src.slice(kiss,bounded);
+  assert.match(block,/hw\.chargeState==='plugged_in_paused'\|\|hw\.paused===true/);
+  assert.doesNotMatch(block,/hw\.sessionEnabled!==true\|\|/);
+});
+
+test('same-phase current-confirm lag preserves a bounded existing target instead of pausing',()=>{
+  const kiss=src.indexOf('KISS invariant: same confirmed phase is never a phase transition');
+  const bounded=src.indexOf('const originalCircuitA=hw.circuitTargetA;',kiss);
+  const block=src.slice(kiss,bounded);
+  assert.match(block,/boundedExistingTarget/);
+  assert.match(block,/hw\.chargerTargetA<=control\.requestedA/);
+  assert.match(block,/SAME_PHASE_CURRENT_CONFIRM_TIMEOUT_PRESERVED/);
+  assert.match(block,/PRESERVE_BOUNDED_SAME_PHASE_TARGET/);
+});
