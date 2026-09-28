@@ -839,3 +839,8 @@ If either value is within the transition-cap range (<=16 A), existing fail-close
 restore behavior remains unchanged. No PV thresholds, phase policy,
 Bridge/Adapter/Gate semantics, deadline behavior or single-writer ownership are
 changed.
+
+
+### Same-phase paused resume — 2026-09-28
+
+If Easee is already safely `plugged_in_paused` on the requested confirmed phase and the live circuit limit is at least the requested charger current, the writer now resumes the session and applies the requested charger current directly. It does not run the 1P↔3P bounded transition and does not modify the circuit cap. The bounded circuit-cap transaction remains only for an actual phase change.
