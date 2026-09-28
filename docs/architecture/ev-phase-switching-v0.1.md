@@ -844,3 +844,22 @@ changed.
 ### Same-phase paused resume — 2026-09-28
 
 If Easee is already safely `plugged_in_paused` on the requested confirmed phase and the live circuit limit is at least the requested charger current, the writer now resumes the session and applies the requested charger current directly. It does not run the 1P↔3P bounded transition and does not modify the circuit cap. The bounded circuit-cap transaction remains only for an actual phase change.
+
+
+### Same-phase no-transition invariant — 2026-09-28
+
+Runtime evidence showed a second unnecessary stop/start while both requested and
+confirmed mode were 1P. The actuator entered a bounded transition solely because
+Homey/Easee briefly exposed a non-stable session flag.
+
+The invariant is now explicit and simple:
+
+- if confirmed mode equals requested mode, never execute a phase transition;
+- resume the session if needed;
+- apply the requested charger current;
+- leave the circuit limit untouched;
+- use the bounded pause/phase/deadtime/circuit-cap transaction only when
+  confirmed mode and requested mode differ.
+
+This does not change PV thresholds, phase-selection policy or single-writer
+ownership.
