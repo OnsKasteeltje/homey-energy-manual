@@ -68,6 +68,9 @@ jobs:
       - name: Run history integration regression tests
         run: python -m pytest -q tests/integrations/test_build_15m_history.py
 
+      - name: Run PV surplus replay validation tests
+        run: python tests/replay/test_pv_surplus_absorption_backtest.py
+
       - name: Run EV phase writer contract tests
         run: |
           node --test \
