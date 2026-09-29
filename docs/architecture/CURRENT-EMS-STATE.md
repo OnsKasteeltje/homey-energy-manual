@@ -206,6 +206,8 @@ Quooker is geïntegreerd als eenvoudige flexload zonder thermisch state-model. D
 
 Homey vertaalt dit envelope via de actieve PI bridge naar `EM2_Power_Intent.targets.quooker`. `EM v2 | 60 Adapter | Quooker Power v0.1 SHADOW` gebruikt binnen `OPPORTUNITY` de bestaande `EM2_P1_Rolling` 120-secondenmeting: start bij `avgGridW <= -1250 W` en behoud ON totdat `avgGridW >= +600 W`. Het resultaat wordt gepubliceerd als `EM2_Control_Quooker`.
 
+Voor retrospectieve shadowvalidatie publiceert de adapter numerieke Insights-signalen `EM2_Quooker_Shadow_AvgGridW`, `EM2_Quooker_Shadow_Mode_Code` (`0=OFF`, `1=OPPORTUNITY`, `2=FORCED_ON`) en `EM2_Quooker_Shadow_Target_Code` (`0=OFF`, `1=ON`). `Mode_Code` volgt de effectieve fail-closed gevalideerde mode, niet de ruwe Pi-mode. De bestaande boolean `EM2_Quooker_Shadow_Target_On` blijft beschikbaar voor actuele Logic-status, maar historische analyse gebruikt de numerieke target-code.
+
 `EM v2 | 60 Actuator | Quooker v0.1 SHADOW` leest dit control-contract en het fysieke Homey-device `Cooker` (device ID `42992d14-c4e4-43fc-aaf0-29a73a8e2eb9`) uitsluitend voor readback/validatie. De actuator-shadow voert geen device writes uit. De bestaande drie legacy Waterkoker-tijdflows blijven voorlopig de fysieke writers. Een LIVE-cutover vereist eerst shadowvalidatie en vervolgens het uitschakelen van die legacy writers in dezelfde gecontroleerde overgang, zodat de single-writer boundary behouden blijft.
 
 ## 9. Live cutover validation

@@ -9,6 +9,7 @@ const MAX_INTENT_AGE_MS=180000;
 const MAX_P1_AGE_MS=120000;
 const OBS_NAMES={
   target:'EM2_Quooker_Shadow_Target_On',
+  targetCode:'EM2_Quooker_Shadow_Target_Code',
   mode:'EM2_Quooker_Shadow_Mode_Code',
   grid:'EM2_Quooker_Shadow_AvgGridW'
 };
@@ -75,6 +76,7 @@ let observabilityIds=previous?.observabilityIds||null;
 let obsVars=null;
 if(
   !observabilityIds?.target ||
+  !observabilityIds?.targetCode ||
   !observabilityIds?.mode ||
   !observabilityIds?.grid
 ){
@@ -88,17 +90,24 @@ if(
     return created;
   };
   const targetObs=await ensure(OBS_NAMES.target,'boolean',false);
+  const targetCodeObs=await ensure(OBS_NAMES.targetCode,'number',0);
   const modeObs=await ensure(OBS_NAMES.mode,'number',0);
   const gridObs=await ensure(OBS_NAMES.grid,'number',0);
-  observabilityIds={target:targetObs.id,mode:modeObs.id,grid:gridObs.id};
-  obsVars={target:targetObs,mode:modeObs,grid:gridObs};
+  observabilityIds={
+    target:targetObs.id,
+    targetCode:targetCodeObs.id,
+    mode:modeObs.id,
+    grid:gridObs.id
+  };
+  obsVars={target:targetObs,targetCode:targetCodeObs,mode:modeObs,grid:gridObs};
 }else{
-  const [targetObs,modeObs,gridObs]=await Promise.all([
+  const [targetObs,targetCodeObs,modeObs,gridObs]=await Promise.all([
     Homey.logic.getVariable({id:observabilityIds.target}),
+    Homey.logic.getVariable({id:observabilityIds.targetCode}),
     Homey.logic.getVariable({id:observabilityIds.mode}),
     Homey.logic.getVariable({id:observabilityIds.grid})
   ]);
-  obsVars={target:targetObs,mode:modeObs,grid:gridObs};
+  obsVars={target:targetObs,targetCode:targetCodeObs,mode:modeObs,grid:gridObs};
 }
 
 const out={
@@ -127,9 +136,14 @@ if(outVar.value!==value){
   await Homey.logic.updateVariable({id:CONTROL_VAR_ID,variable:{value}});
 }
 
-const modeCode=mode==='FORCED_ON'?2:mode==='OPPORTUNITY'?1:0;
+const effectiveMode=out.mode;
+const modeCode=effectiveMode==='FORCED_ON'?2:effectiveMode==='OPPORTUNITY'?1:0;
+const targetCode=targetOn?1:0;
 if(obsVars?.target?.value!==targetOn){
   await Homey.logic.updateVariable({id:observabilityIds.target,variable:{value:targetOn}});
+}
+if(Number(obsVars?.targetCode?.value)!==targetCode){
+  await Homey.logic.updateVariable({id:observabilityIds.targetCode,variable:{value:targetCode}});
 }
 if(Number(obsVars?.mode?.value)!==modeCode){
   await Homey.logic.updateVariable({id:observabilityIds.mode,variable:{value:modeCode}});
