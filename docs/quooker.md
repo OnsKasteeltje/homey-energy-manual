@@ -83,6 +83,20 @@ Tijdens `HEATING` werd op L3 circa **1.621 W** gezien. Na baselinecorrectie werd
 
 Hiermee zijn switchstatus, P1-heatingdetectie, historisering, Core-publicatie en Live View-contract end-to-end bewezen.
 
+## Historische planner-calibratie 30 september 2026
+
+De historische legacy-aanmomenten zijn gebruikt als ground-truth om de Quooker-opwarming uit totaal-P1 te herkennen. Een bekende Cooker OFF→ON-overgang gecombineerd met een korte P1-uptick rond de eerder gevalideerde ~1,58 kW heating-signatuur is voldoende voor energie-attributie; aparte L3-bevestiging is daarbij ondersteunend maar niet vereist.
+
+Over 6–30 september 2026 leverde de conservatief geselecteerde set normale cycli een centrale waarde rond **0,25–0,26 kWh per opwarming**. Voor de planner is dit afgerond naar een dagelijks **0,25 kWh energy-budget**. Bij 15-minuten-planslots is dat gelijk aan **1000 W gemiddeld in één forced-slot**. Het fysieke verwarmingsvermogen blijft circa **1580 W**, equivalent aan ongeveer **9,5 minuut** verwarmen voor 0,25 kWh.
+
+Plannerregel:
+
+- energy-budget: `0.25 kWh`;
+- forced planning-equivalent: `1000 W` in één 15-minuten-slot;
+- instantaneous heating/headroom: `1580 W`;
+- de resterende forced-slots reserveren geen tweede, derde of vierde 0,25 kWh;
+- realtime `OPPORTUNITY`/`FORCED_ON` control-envelope blijft afzonderlijk van deze energieboekhouding.
+
 ## Live View
 
 De Live View toont Quooker als afzonderlijke verbruiker:

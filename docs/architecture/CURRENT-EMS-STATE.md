@@ -202,7 +202,9 @@ The Pi WW Seasonal Source Advisor is read-only and manual-switch-only. It runs d
 
 ### 8.1 Quooker flex — SHADOW
 
-Quooker is geïntegreerd als eenvoudige flexload zonder thermisch state-model. De Pi blijft planner-owner en publiceert per current slot een `targets.quooker` envelope via `/control/current`: op werkdagen `OPPORTUNITY` vóór 17:00, `FORCED_ON` van 17:00–18:00 en daarna `OFF`; in het weekend `OPPORTUNITY` vóór 13:00, `FORCED_ON` van 13:00–14:00 en daarna `OFF`. Het gemodelleerde vermogen is 1580 W.
+Quooker is geïntegreerd als eenvoudige flexload zonder thermisch state-model. De Pi blijft planner-owner en publiceert per current slot een `targets.quooker` envelope via `/control/current`: op werkdagen `OPPORTUNITY` vóór 17:00, `FORCED_ON` van 17:00–18:00 en daarna `OFF`; in het weekend `OPPORTUNITY` vóór 13:00, `FORCED_ON` van 13:00–14:00 en daarna `OFF`. Het gemodelleerde momentane verwarmingsvermogen blijft 1580 W.
+
+Historische P1-analyse over fysieke legacy-inschakelmomenten van 6–30 september 2026 kalibreert de normale Quooker-opwarming op ongeveer **0,25 kWh**. De planner behandelt dit daarom als een dagelijks energy-budget van `0.25 kWh`, niet als 1580 W gedurende het volledige forced uur. Met kwartierslots wordt exact één forced-slot als `1000 W` gemiddeld planvermogen gereserveerd (= 0,25 kWh); de overige forced-slots reserveren geen extra Quooker-energie. De 1580 W blijft uitsluitend de momentane heating/headroom-parameter. Dit komt overeen met circa 9,5 minuut verwarmen bij 1580 W. De Homey realtime opportunity- en forced-on envelope blijft ongewijzigd.
 
 Homey vertaalt dit envelope via de actieve PI bridge naar `EM2_Power_Intent.targets.quooker`. `EM v2 | 60 Adapter | Quooker Power v0.1 SHADOW` gebruikt binnen `OPPORTUNITY` de bestaande `EM2_P1_Rolling` 120-secondenmeting: start bij `avgGridW <= -1250 W` en behoud ON totdat `avgGridW >= +600 W`. Het resultaat wordt gepubliceerd als `EM2_Control_Quooker`.
 

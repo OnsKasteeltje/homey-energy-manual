@@ -42,7 +42,16 @@ BOILER_W = 1900
 
 # Quooker simple flex policy. Pi owns the time envelope; Homey may execute
 # realtime PV opportunity inside that envelope using EM2_P1_Rolling.
+# Historical P1 fingerprint calibration (2026-09-06..2026-09-30) shows that
+# one normal heat-up needs about a quarter kWh. Energy planning is separate
+# from instantaneous headroom: the element still draws about 1.58 kW while
+# heating, but the planner reserves only 0.25 kWh once in the forced window.
 QUOOKER_W = 1580
+QUOOKER_ENERGY_BUDGET_KWH = 0.25
+QUOOKER_PLANNING_SLOT_W = round(QUOOKER_ENERGY_BUDGET_KWH * 1000 / SLOT_H)
+QUOOKER_EXPECTED_HEAT_MINUTES = round(
+    QUOOKER_ENERGY_BUDGET_KWH * 1000 / QUOOKER_W * 60, 1
+)
 QUOOKER_START_EXPORT_W = 1250
 QUOOKER_STOP_IMPORT_W = 600
 
@@ -140,6 +149,15 @@ def quooker_mode(local_dt):
     if minute < forced_end_hour * 60:
         return "FORCED_ON"
     return "OFF"
+
+
+def quooker_plan_w(local_dt):
+    """Quarter-hour average load for the daily 0.25 kWh Quooker heat budget."""
+    weekend = local_dt.weekday() >= 5
+    forced_start_hour = 13 if weekend else 17
+    if local_dt.hour == forced_start_hour and local_dt.minute == 0:
+        return QUOOKER_PLANNING_SLOT_W
+    return 0
 
 
 def is_consecutive(a, b):
@@ -1187,7 +1205,12 @@ def main():
             "slot_start_utc": ts,
             "localDate": local_dt.date().isoformat(),
             "quookerMode": q_mode,
-            "quookerPlanW": QUOOKER_W if q_mode == "FORCED_ON" else 0,
+            "quookerPlanW": quooker_plan_w(local_dt),
+            "quookerPlanEnergyKWh": round(
+                quooker_plan_w(local_dt) * SLOT_H / 1000, 3
+            ),
+            "quookerEnergyBudgetKWh": QUOOKER_ENERGY_BUDGET_KWH,
+            "quookerExpectedHeatMinutes": QUOOKER_EXPECTED_HEAT_MINUTES,
             "quookerOpportunityAllowed": q_mode == "OPPORTUNITY",
             "quookerModeledPowerW": QUOOKER_W,
             "quookerOpportunityStartExportW": QUOOKER_START_EXPORT_W,
@@ -1599,8 +1622,14 @@ def main():
         },
         "guardrails": {
             "wwComfortHardConstraint": True,
-            "quookerPolicy": "SIMPLE_TIME_ENVELOPE_WITH_REALTIME_P1_OPPORTUNITY",
+            "quookerPolicy": (
+                "SIMPLE_TIME_ENVELOPE_WITH_0_25KWH_ENERGY_BUDGET_"
+                "AND_REALTIME_P1_OPPORTUNITY"
+            ),
             "quookerModeledPowerW": QUOOKER_W,
+            "quookerEnergyBudgetKWh": QUOOKER_ENERGY_BUDGET_KWH,
+            "quookerPlanningSlotW": QUOOKER_PLANNING_SLOT_W,
+            "quookerExpectedHeatMinutes": QUOOKER_EXPECTED_HEAT_MINUTES,
             "quookerOpportunityStartExportW": QUOOKER_START_EXPORT_W,
             "quookerOpportunityStopImportW": QUOOKER_STOP_IMPORT_W,
             "quookerWeekdayForcedLocal": "17:00-18:00",
