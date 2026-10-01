@@ -467,6 +467,22 @@ def deadline_utc(date_key):
     return datetime(y, m, d, WW_DEADLINE_HOUR, tzinfo=TZ).astimezone(timezone.utc)
 
 
+def hot_water_source_gate(energy_state):
+    """Return canonical electrical-WW eligibility from runtime source state.
+
+    Electrical boiler flex is allowed only when Core explicitly publishes
+    hot_water.mode=true (BOILER). CV, missing or ambiguous state fail closed.
+    """
+    hot_water_state = energy_state.get("hot_water") or {}
+    hot_water_mode = hot_water_state.get("mode")
+
+    if hot_water_mode is True:
+        return "BOILER", True, None
+    if hot_water_mode is False:
+        return "CV", False, "BLOCKED_SOURCE_CV"
+    return "UNKNOWN", False, "BLOCKED_SOURCE_UNKNOWN"
+
+
 def weekday_ww_target(date_key):
     """Return validated weekday demand and slot-aligned target minutes."""
     local_date = datetime.fromisoformat(date_key).date()
@@ -1264,6 +1280,12 @@ def main():
         })
 
     ww = ww_doc.get("warmWater") or {}
+    (
+        hot_water_source,
+        ww_flex_eligible,
+        ww_source_block_reason,
+    ) = hot_water_source_gate(energy_state)
+
     by_date = {}
     for slot in raw_slots:
         by_date.setdefault(slot["localDate"], []).append(slot)
@@ -1393,8 +1415,13 @@ def main():
                 key=lambda x: x["slot_start_utc"]
             )
 
+        # Warm-water demand remains observable in CV mode, but electrical
+        # boiler flex must not participate in allocation unless the canonical
+        # runtime source is explicitly BOILER.
+        electrical_remaining_min = remaining_min if ww_flex_eligible else 0
         required_slots = (
-            int(math.ceil(remaining_min / SLOT_MIN)) if not goal_reached else 0
+            int(math.ceil(electrical_remaining_min / SLOT_MIN))
+            if not goal_reached else 0
         )
         required_slots = min(required_slots, len(candidates))
 
@@ -1474,7 +1501,11 @@ def main():
 
         # Current-day, live-connected Tesla only. This is deliberately a
         # small post-ranking optimizer rather than a competing planner.
-        if date_key == today_local and tesla_connected_now:
+        if (
+            date_key == today_local
+            and tesla_connected_now
+            and ww_flex_eligible
+        ):
             selected, joint_swap = optimize_joint_ww_ev_single_swap(
                 candidates,
                 selected,
@@ -1509,7 +1540,11 @@ def main():
             "expectedDailyEnergySource": WW_DEMAND_SOURCE,
             "plannedDemandMin": weekday_target_min,
             "remainingPlannedDemandMin": remaining_min,
+            "electricalRemainingDemandMin": electrical_remaining_min,
             "heatingMinToday": heating_min_today,
+            "sourceMode": hot_water_source,
+            "electricalFlexEligible": ww_flex_eligible,
+            "sourceBlockReason": ww_source_block_reason,
             "requiredSlots": required_slots,
             "allocatedSlots": len(selected),
             "publishedActionSlots": len(published_ts),
@@ -1544,7 +1579,7 @@ def main():
                 else "DYNAMIC_COMFORT_PV_SLOT"
             )
         else:
-            s["wwAllocationReason"] = "HOLD"
+            s["wwAllocationReason"] = ww_source_block_reason or "HOLD"
         s["evResidualExportW"] = round(residual_after_ww)
         ev_phase_mode, ev_candidate_a, ev_candidate_w = ev_phase_option(
             residual_after_ww
@@ -1655,6 +1690,10 @@ def main():
         },
         "guardrails": {
             "wwComfortHardConstraint": True,
+            "wwSourceGate": "CANONICAL_ENERGY_STATE_HOT_WATER_MODE_FAIL_CLOSED",
+            "wwSourceMode": hot_water_source,
+            "wwElectricalFlexEligible": ww_flex_eligible,
+            "wwSourceBlockReason": ww_source_block_reason,
             "quookerPolicy": (
                 "SIMPLE_TIME_ENVELOPE_WITH_0_25KWH_ENERGY_BUDGET_"
                 "AND_REALTIME_P1_OPPORTUNITY"
