@@ -1,148 +1,133 @@
 # Tesla deadline write-route
 
-De website schrijft **niet rechtstreeks naar Homey**. De veilige keten is:
+## Actuele productie-route
+
+De website schrijft **niet rechtstreeks naar Homey of Easee**.
 
 ```text
-Live energiestroom
-   ↓  POST + persoonlijke control-PIN
+Invoer V2
+  ↓ POST + control-PIN
 Cloudflare Worker
-   ↓  valideert SOC/deadline + rekent SOC-verschil om naar kWh
-GitHub Contents API
-   ↓
-Tesla deadline command JSON
-   ↓  iedere minuut lezen
-Homey — Tesla laden v2.7.4
-   ↓             ↑
-Easee ← besluit  M7 prijs/PV-context (read-only)
-   ↓
-Equalizer bewaakt 3×25 A en mag begrenzen of volledig pauzeren
+  ↓ GitHub Contents API PUT
+docs/data/tesla-deadline-command.json
+  ↓ 60 s Pi command fetch
+/home/jeroen/ems/data/tesla-deadline-command.json
+  ↓
+Pi deadline derived state
+  ↓
+Pi /control/current
+  ↓
+Homey PI Dynamic Planner Bridge v1.5.3
+  ↓
+EV Adapter v0.2.0 → Gate v0.3.0 → writer v0.4.4 [LIVE]
+  ↓
+Easee / Tesla
 ```
 
-## Waarom deze architectuur?
+De historische Homey `EV Deadline Goal Adapter` / `Tesla laden v2.7.4` route is **niet meer actief**. Deadline lifecycle, remaining energy en `latestStartAt` zijn Pi-owned. Homey is realtime executor/safety en de guarded EV writer blijft de enige automatische fysieke Easee-writer.
 
-De website draait publiek op GitHub Pages. Een Homey-token of GitHub-token mag daarom nooit in JavaScript op de website terechtkomen. De Cloudflare Worker bewaart uitsluitend een beperkt GitHub-token als secret. Homey blijft de enige centrale Tesla-writer; Easee/Equalizer blijft onafhankelijk de lokale installatiebeveiliging uitvoeren.
+Voor de volledige actuele trace en diagnosevolgorde:
 
-## Worker-code en SOC-kalibratie
+`docs/architecture/tesla-deadline-end-to-end.md`
 
-De bron staat in `cloudflare/tesla-deadline-worker.js`. De Worker accepteert alleen requests vanaf `https://onskasteeltje.github.io`, vereist de header `X-Tesla-Control-Pin` en valideert deadline, huidige SOC, doel-SOC en maximale laadstroom van 6–16 A.
+## Security boundary
 
-De eerste praktijkkalibratie is `71% → 90% · 3×10 A · circa 7,1 kW · Tesla ETA 1u35`. Daaruit volgt voorlopig **0,59 kWh per procentpunt**. Het command-JSON bewaart zowel `currentSoc` en `targetSoc` als het intern afgeleide `goalKWh`.
+De browser bevat geen GitHub- of Homey-token. De Cloudflare Worker bewaart het GitHub write-token als secret en vereist de aparte control-PIN.
 
-## Benodigde Cloudflare secrets
+Canonical Worker source:
 
-- `GITHUB_TOKEN` — fine-grained GitHub token met alleen **Contents: Read and write** voor repository `OnsKasteeltje/homey-energy-manual`.
-- `WRITE_PIN` — eigen, niet hergebruikte PIN/wachtwoordzin voor wijzigingen vanaf de website.
+`apps/cloudflare/tesla-deadline-worker.js`
 
-De PIN wordt niet in GitHub opgeslagen. De website vraagt hem alleen op het moment dat een wijziging wordt opgeslagen.
+De command-SOC is invoer voor de energie-opgave; er is geen live Tesla-SOC telemetry in deze route.
 
-## Homey v2.7.4
+## Command ownership
 
-`Tesla laden v2.7.4` is de enige automatische Easee-writer voor deze deadline-route en draait iedere minuut. Alleen een nieuwe `requestId` wordt als nieuwe gebruikersopdracht verwerkt. In dezelfde Homey-run wordt eerst de actuele Easee `meter_power` gelezen en daarna exact één **meetbaseline** voor die requestId opgeslagen. De baseline bevat minimaal:
+De Worker schrijft schema-2 commands naar:
 
-- requestId;
-- huidige SOC en doel-SOC;
-- `socEnteredAt` uit de website-opdracht;
-- gebruikte `calibrationKWhPerPercent`;
-- afgeleid `goalKWh`;
-- Easee `baseMeterKWh`;
-- exact `baselineCapturedAt`-tijdstip.
+`docs/data/tesla-deadline-command.json`
 
-De baseline is **immutable voor dezelfde requestId**. Een Homey-reboot, nieuwe flowversie, wijziging van prijs/PV-context of Equalizerstatus mag geen nieuwe meterbasis maken. Alleen een nieuwe website-opdracht met een nieuwe requestId maakt een nieuwe baseline.
+De Pi haalt deze command op en publiceert hem atomair als:
 
-De voortgang wordt daarna uitsluitend bepaald uit:
+`/home/jeroen/ems/data/tesla-deadline-command.json`
+
+De Pi valideert een command voordat deze de runtime command vervangt. Een foutieve of niet-ophaalbare command mag de laatste geldige command niet overschrijven.
+
+## Deadline lifecycle en voortgang
+
+Canonical builder:
+
+`services/pi/state/ev/deadline/build_deadline_state.py`
+
+Canonical runtime state:
+
+`/home/jeroen/ems/data/ev-deadline-shadow-state.json`
+
+De Pi bewaakt:
+
+- request identity;
+- deadline;
+- request-specifieke `maxA`;
+- delivered/remaining kWh;
+- `latestStartAt`;
+- lifecycle status;
+- canonical telemetry freshness.
+
+Realtime charging progress wordt uit canonical Homey Core measured Tesla power geïntegreerd. De Easee cumulative meter is checkpoint/validation only en niet de realtime integratiebron.
+
+## Homey execution
+
+De actieve bridge is:
+
+`EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.3 PHASE-AUTHORITY [READY]`
+
+De bridge consumeert `/control/current` en past de executor-side deadline guard toe. Vanaf de noodzakelijke starttijd vraagt hij voor een aangesloten Tesla:
 
 ```text
-deliveredSinceBaselineKWh = currentMeterKWh - baselineMeterKWh
-remainingKWh = max(0, goalKWh - deliveredSinceBaselineKWh)
+3P
+requestedA = Pi deadline maxA
+status = NUMERIC_DEADLINE_TARGET
 ```
 
-De deadline-lifecycle en het resterende energiedoel zijn vanaf v2.7.4 bewust van elkaar gescheiden. `EV Deadline actief` betekent uitsluitend dat de harde deadline nog loopt. Een na de deadline nog openstaand expliciet energiedoel wordt afzonderlijk in de runtime-state bijgehouden via `postDeadlineTargetOpen`.
-
-### Fail-safe bij baseline- of kalibratieproblemen
-
-Als een actieve deadline geen geldige baseline voor de actieve requestId heeft, publiceert v2.7.4 **`BASELINE_FOUT`** en vraagt Homey 0 A. De gebruiker kan dit herstellen door de actuele SOC en deadline opnieuw op te slaan, waardoor een nieuwe requestId en exacte baseline ontstaan.
-
-Daarnaast geldt een sanity-check op de gemeten energie. Wanneer de Easee-delta meer wordt dan **1,5× het berekende doel plus 0,25 kWh**, publiceert v2.7.4 **`KALIBRATIE_AFWIJKING`** en stopt de automatische aanvraag voor die afwijkende sessie. De software verandert de kalibratiefactor van 0,59 kWh/% daarbij nooit automatisch; eerst moet de sessie inhoudelijk worden beoordeeld.
-
-## Deadline, prijs en PV
-
-De deadline is een harde constraint. Vóór het berekende `EV Latest start` gebruikt v2.7.4 aanvullend de read-only M7-variabelen:
-
-- `M7_Price_Negative` — huidige prijs is negatief;
-- `M7_Price_Cheap_Next4h` — huidige prijs is lager dan de volgende vier uur;
-- `M7_Price_Expensive_Next4h` — huidige prijs is hoger dan de volgende vier uur;
-- `M7_PV_Top4h` — het huidige uur is één van de vier uren met de hoogste zonne-forecast tussen 09:00 en 18:00.
-
-Actueel PV-overschot heeft voorrang. Een gunstige prijs nu kan een actieve deadline versnellen met maximaal de ingestelde laadstroom. Als het huidige uur volgens de forecast tot de beste PV-uren behoort en de prijs niet ongunstig is, mag v2.7.4 met 6 A laden wanneer het actuele overschot nog niet voldoende is voor 6 A. **Vanaf Latest start blijft Homey maximaal de ingestelde laadstroom vragen**, ongeacht prijs of forecast.
-
-## Deadline-lifecycle
-
-De deadline-state machine kent conceptueel de volgende toestanden:
+De fysieke keten blijft:
 
 ```text
-NO_DEADLINE
-    ↓ nieuwe opdracht
-DEADLINE_ACTIVE
-    ├─ doel vóór/op deadline bereikt → DEADLINE_REACHED
-    └─ deadline verstreken + doel open → DEADLINE_MISSED
-                                         ↓
-                              postDeadlineTargetOpen=true
-                                         ↓
-                           doorladen op ingestelde maxA
-                                         ↓
-                           doel bereikt → normale policy
+Bridge
+  ↓
+EV Power Adapter v0.2.0
+  ↓
+EV Gate v0.3.0
+  ↓
+EV Power writer v0.4.4 [LIVE]
+  ↓
+Easee
 ```
 
-### Deadline bereikt
+Homey mag realtime safety afdwingen maar mag niet opnieuw zelfstandig de deadline of resterende energie plannen.
 
-Als `remainingKWh <= 0,01` terwijl de deadline nog actief is:
+## Huidige GitHub transportbeperking
 
-- wordt de lifecycle `DEADLINE_REACHED`;
-- wordt `EV Deadline actief = false`;
-- wordt `postDeadlineTargetOpen = false`;
-- wordt het bereiken van het doel met tijdstip in de runtime-state gelogd;
-- hervat daarna de normale Tesla/PV-policy.
+Per 2026-10-01 leest de Pi de command nog via een `raw.githubusercontent.com/main/...` branch-URL.
 
-### Deadline gemist
+Live evidence op 2026-10-01:
 
-Als het deadline-tijdstip is verstreken terwijl `remainingKWh > 0,01`:
+- website-request rond 22:08:19;
+- GitHub commit rond 22:08:20;
+- Pi-polls bleven meerdere minuten de vorige request zien;
+- nieuwe request werd pas om 22:12:28 als `UPDATED` geaccepteerd;
+- de Pi derived state werd vervolgens binnen ongeveer één seconde correct `TRACKING`;
+- Homey/Easee schakelde daarna naar de gevraagde deadline current.
 
-- wordt de lifecycle `DEADLINE_MISSED`;
-- wordt **direct** `EV Deadline actief = false`;
-- wordt `postDeadlineTargetOpen = true` zolang het expliciete energiedoel nog openstaat;
-- blijft Tesla laden op de **ingestelde `EV Max laadstroom A`**;
-- prijs- en PV-optimalisatie verlagen dit post-deadline laadverzoek niet;
-- Easee Equalizer blijft de harde veiligheidslaag en mag fysiek begrenzen of pauzeren;
-- zodra het energiedoel is bereikt, wordt `postDeadlineTargetOpen = false` en hervat de normale Tesla-policy;
-- de oude deadline wordt **nooit automatisch naar morgen doorgeschoven**. Een nieuwe harde deadline vereist een expliciete nieuwe gebruikersopdracht.
+Deze latency is dus command-transport technical debt en niet een reden om Pi deadline ownership of Homey executor ownership te veranderen.
 
-De normale post-deadline status bij een nog open doel is `DEADLINE_MISSED_DOORLADEN`. Als de Equalizer het daadwerkelijke laden aantoonbaar blokkeert, wordt dit als aparte blokkadestatus gepubliceerd zonder het ingestelde Homey-laadverzoek kunstmatig naar 0 A te verlagen.
+Geplande follow-up: de Pi read-route migreren van raw branch delivery naar de GitHub Contents REST API, met passende authenticatie/cache-semantiek en regressietests. Tot die wijziging is uitgevoerd beschrijft dit document bewust de **huidige** raw-fetch als productiegedrag.
 
-## Equalizer begrenzen en volledig blokkeren
+## Guardrails
 
-De werkelijk geleverde Tesla-kWh is leidend voor de voortgang. `Tesla laden v2.7.4` vergelijkt daarom het Homey-verzoek met het werkelijke Tesla-vermogen en bewaakt onder andere:
-
-- `normal` — geen zichtbare beperking;
-- `limited` — de Tesla laadt, maar aantoonbaar onder het gevraagde ampèrage;
-- `zero_pending` — Homey vraagt minimaal 6 A maar werkelijk vermogen is vrijwel 0 W; bevestiging loopt;
-- `blocked` / `blocked_unknown` — dezelfde toestand houdt circa vier minuten aan en geldt als blokkade.
-
-Bij een blokkade wordt **het Homey-laadverzoek niet verlaagd naar 0 A**. De Equalizer mag de lader lokaal gepauzeerd houden en Easee kan de sessie weer zelfstandig hervatten zodra andere grote verbruikers verdwijnen. Daardoor ontstaat geen conflict tussen Homey en de veiligheidslaag.
-
-Een langdurige beperking of blokkade verhoogt de resterende energie niet kunstmatig: alleen de gemeten Easee-delta sinds de opgeslagen baseline telt. Daardoor wordt `EV Latest start` tijdens de actieve deadline telkens opnieuw uit de resterende kWh berekend.
-
-## Gevalideerde post-deadline smoke test — 21 augustus 2026
-
-De praktijkdeadline van **21 augustus 2026 21:15** werd gemist met circa **2,74 kWh** resterend. Na activering van v2.7.4 is dezelfde sessie gebruikt als smoke test.
-
-Gevalideerd resultaat na Core/publicatie om circa 21:25:
-
-- `deadline_active = false`;
-- Tesla bleef fysiek laden;
-- werkelijk Tesla-vermogen circa **7,11 kW**;
-- ingestelde laadstroom **10 A**;
-- `remaining_kwh = 2,74` in de betreffende Core-snapshot;
-- de Core gaf niet langer `TESLA_CHARGE_DEADLINE` als actieve MUST-intent;
-- Easee/Equalizer bleef de fysieke veiligheidslaag.
-
-Daarmee is het afgesproken einde-deadlinegedrag functioneel aangetoond: **een gemiste deadline eindigt als deadline, maar een nog open expliciet energiedoel blijft op het ingestelde laadvermogen doorladen.**
+- Pi = enige deadline/planner authority.
+- Homey = realtime executor/safety.
+- EV writer = enige automatische fysieke Easee writer.
+- Geen browsersecret.
+- Geen Homey polling door de Pi voor deadline progress.
+- Canonical Homey telemetry blijft push-fed.
+- Een command-transferfout mag geen alternatieve planner of writer activeren.
+- Een gemiste/onhaalbare deadline mag niet worden verborgen door timestamps of targets te herschrijven.
