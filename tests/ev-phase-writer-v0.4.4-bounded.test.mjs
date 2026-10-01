@@ -161,11 +161,14 @@ test('legacy plugged-in pause is recovered once and hold readback ignores Homey 
 });
 
 test('same-phase paused opportunity resumes directly without circuit-cap transition',()=>{
-  assert.match(src,/ZERO_HOLD_RESUME_CURRENT_CONFIRM_TIMEOUT/);
-  assert.match(src,/RESUME_SAME_PHASE_PAUSED/);
-  assert.match(src,/SAME_PHASE_RESUMED/);
-  assert.match(src,/hw\.confirmedMode===control\.mode/);
-  assert.doesNotMatch(src,/previousWasZeroHold &&/);
+  const start=src.indexOf('// If the EV is already safely paused on the requested confirmed phase');
+  const end=src.indexOf('// If Easee already exposes the requested same-phase opportunity',start);
+  const paused=src.slice(start,end);
+  assert.match(paused,/ZERO_HOLD_RESUME_CURRENT_CONFIRM_TIMEOUT/);
+  assert.match(paused,/RESUME_SAME_PHASE_PAUSED/);
+  assert.match(paused,/SAME_PHASE_RESUMED/);
+  assert.match(paused,/hw\.confirmedMode===control\.mode/);
+  assert.doesNotMatch(paused,/previousWasZeroHold/);
 });
 
 

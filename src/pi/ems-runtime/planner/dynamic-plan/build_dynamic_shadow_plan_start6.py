@@ -24,7 +24,7 @@ spec.loader.exec_module(planner)
 
 planner.EV_KICKSTART_A = 6
 planner.EV_RUN_MIN_A = 6
-planner.EV_RUN_MIN_W = planner.EV_RUN_MIN_A * planner.EV_W_PER_A
+planner.EV_RUN_MIN_W = planner.EV_RUN_MIN_A * planner.EV_1P_W_PER_A
 planner.EV_MIN_WINDOW_SLOTS = 1
 
 if __name__ == "__main__":

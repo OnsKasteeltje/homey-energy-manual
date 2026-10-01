@@ -162,6 +162,8 @@ Ordering rule:
 
 The active general planner remains the hardened rolling 24-hour Pi planner with 96 quarter-hour slots. It owns joint strategic allocation of flexible demand while preserving hard comfort/safety feasibility. The term **dynamic planner** refers to rolling optimization, not a dynamic electricity contract.
 
+EV opportunity forecasting is phase-aware from 2026-10-01. The strategic 15-minute planner mirrors the production realtime phase-entry bands: OFF→1P at 1500 W residual PV and OFF/1P→3P at 4400 W. Within 1P it plans 6–16 A as 230 W/A (1380–3680 W); within 3P it plans 6–16 A as 690 W/A (4140–11040 W). Opportunity targets never intentionally exceed forecast residual PV. The realtime stop/downshift hysteresis (1P stop below 1100 W on the rolling 2-minute signal, 3P leave below 3600 W) and the 120-second minimum mode dwell remain Homey executor responsibilities and are not simulated as sub-slot state by the 15-minute planner. EV deadline charging remains a separate hard-constraint path and is forced to 3P. This removes the former planner-only 3P abstraction in which 6 A was always treated as 4140 W.
+
 Heating Preheat V0.2 does not alter the active Dynamic Pi Planner. It exposes only validated shadow advancement candidates; PV-slot selection and any later competition/allocation between WW, heating-preheat and EV remain outside the heating candidate builder.
 
 Planner decisions are archived best-effort in `/home/jeroen/ems/data/planner-history.sqlite`; measured actuals remain in `/home/jeroen/ems/data/ems-history.sqlite`. Retrospective performance analysis must distinguish measured actuals, archived decision context and any unconstrained upper-bound benchmark from a future constrained replay optimum.

@@ -79,16 +79,26 @@ WW_SHOULDER_BONUS_W = 350
 WW_IMPORT_PENALTY = 0.75
 WW_EV_OPPORTUNITY_COST_WEIGHT = 1.0
 
-EV_W_PER_A = 690
-EV_KICKSTART_A = 7
+EV_VOLTAGE_V = 230
+EV_1P_W_PER_A = EV_VOLTAGE_V
+EV_3P_W_PER_A = 3 * EV_VOLTAGE_V
+EV_KICKSTART_A = 6
 EV_RUN_MIN_A = 6
 EV_MAX_A = 16
-EV_RUN_MIN_W = EV_RUN_MIN_A * EV_W_PER_A
+EV_1P_MIN_W = EV_RUN_MIN_A * EV_1P_W_PER_A
+EV_1P_MAX_W = EV_MAX_A * EV_1P_W_PER_A
+EV_3P_MIN_W = EV_RUN_MIN_A * EV_3P_W_PER_A
+EV_3P_MAX_W = EV_MAX_A * EV_3P_W_PER_A
+EV_START_1P_W = 1500
+EV_STOP_1P_W = 1100
+EV_ENTER_3P_W = 4400
+EV_LEAVE_3P_W = 3600
+EV_MIN_MODE_DWELL_SEC = 120
+EV_RUN_MIN_W = EV_1P_MIN_W
 EV_MIN_WINDOW_SLOTS = 2
 EV_MIN_WINDOW_PV_COVERAGE = 0.0
 EV_SECONDARY_COVERAGE = 0.75
 EV_PURE_COVERAGE = 1.00
-EV_IMPORT_PENALTY = 0.75
 
 W_CONSISTENCY = 0.40
 W_CLOUD_STABILITY = 0.30
@@ -243,26 +253,40 @@ def apply_best_windows_first(windows):
     return windows
 
 
-def ev_best_option(residual_w):
-    """Return best EV target and marginal value for a residual-PV level."""
+def ev_phase_option(residual_w):
+    """Return phase-aware forecast mode, amps and watts from residual PV.
+
+    The 15-minute planner mirrors the realtime entry bands, but intentionally
+    leaves 2-minute hysteresis and mode dwell to Homey's realtime executor.
+    Opportunity planning never intentionally targets more power than forecast
+    residual PV; deadline charging remains the separate 3P grid-import-capable
+    path below.
+    """
     residual = max(0.0, float(residual_w))
-    best_w = 0
-    best_score = 0.0
-    for amps in range(EV_RUN_MIN_A, EV_MAX_A + 1):
-        target_w = amps * EV_W_PER_A
-        pv_capture_w = min(residual, target_w)
-        import_w = max(0.0, target_w - residual)
-        score = pv_capture_w - EV_IMPORT_PENALTY * import_w
-        if score > best_score + 1e-9:
-            best_score = score
-            best_w = target_w
-    return best_w, best_score
+
+    if residual >= EV_ENTER_3P_W:
+        amps = math.floor(residual / EV_3P_W_PER_A)
+        amps = max(EV_RUN_MIN_A, min(EV_MAX_A, amps))
+        return "3P", amps, amps * EV_3P_W_PER_A
+
+    if residual >= EV_START_1P_W:
+        amps = math.floor(residual / EV_1P_W_PER_A)
+        amps = max(EV_RUN_MIN_A, min(EV_MAX_A, amps))
+        return "1P", amps, amps * EV_1P_W_PER_A
+
+    return "OFF", 0, 0
+
+
+def ev_best_option(residual_w):
+    """Return executable phase-aware EV target and marginal PV value."""
+    _mode, _amps, target_w = ev_phase_option(residual_w)
+    return target_w, float(target_w)
 
 
 def ev_target_from_residual(residual_w):
-    """Choose 0 or 6..16 A by marginal PV capture minus grid-import penalty."""
-    best_w, _best_score = ev_best_option(residual_w)
-    return best_w
+    """Choose OFF, 1P or 3P using the production phase-entry thresholds."""
+    _mode, _amps, target_w = ev_phase_option(residual_w)
+    return target_w
 
 
 def apply_ev_deadline_constraint(slots, tesla_state, now_utc):
@@ -385,19 +409,19 @@ def apply_ev_deadline_constraint(slots, tesla_state, now_utc):
 
         # Deadline layer may raise the slot up to 16 A.
         # Only incremental power counts as deadline-required energy.
-        max_increment_w = max(0, deadline_max_a * EV_W_PER_A - base_w)
+        max_increment_w = max(0, deadline_max_a * EV_3P_W_PER_A - base_w)
         if max_increment_w <= 0:
             continue
 
         required_increment_w = remaining * 1000 / SLOT_H
         target_w = min(
-            deadline_max_a * EV_W_PER_A,
+            deadline_max_a * EV_3P_W_PER_A,
             base_w + required_increment_w,
         )
 
-        target_a = int(math.ceil(target_w / EV_W_PER_A))
+        target_a = int(math.ceil(target_w / EV_3P_W_PER_A))
         target_a = max(EV_RUN_MIN_A, min(deadline_max_a, target_a))
-        target_w = target_a * EV_W_PER_A
+        target_w = target_a * EV_3P_W_PER_A
 
         if target_w <= base_w:
             continue
@@ -406,6 +430,7 @@ def apply_ev_deadline_constraint(slots, tesla_state, now_utc):
 
         slot["evPlanW"] = target_w
         slot["evPlanA"] = target_a
+        slot["evPlanPhaseMode"] = "3P"
         slot["evAllocationReason"] = "DEADLINE_REQUIRED"
         slot["evDeadlineRequired"] = True
 
@@ -1521,10 +1546,13 @@ def main():
         else:
             s["wwAllocationReason"] = "HOLD"
         s["evResidualExportW"] = round(residual_after_ww)
-        s["evMarginalTargetCandidateW"] = ev_target_from_residual(
+        ev_phase_mode, ev_candidate_a, ev_candidate_w = ev_phase_option(
             residual_after_ww
         )
-        s["evMarginalEligible"] = s["evMarginalTargetCandidateW"] > 0
+        s["evMarginalPhaseMode"] = ev_phase_mode
+        s["evMarginalTargetCandidateA"] = ev_candidate_a
+        s["evMarginalTargetCandidateW"] = ev_candidate_w
+        s["evMarginalEligible"] = ev_candidate_w > 0
 
     qualified_windows = apply_best_windows_first(qualify_ev_windows(raw_slots))
     selected_by_index = {}
@@ -1539,6 +1567,8 @@ def main():
     slots = []
     for i, s in enumerate(raw_slots):
         ev_w = 0
+        ev_a = 0
+        ev_phase_mode = "OFF"
         ev_reason = (
             "NOT_CONNECTED"
             if not s["teslaOpportunityConnected"]
@@ -1560,6 +1590,8 @@ def main():
 
             if i in selected_by_index:
                 ev_w = int(s.get("evMarginalTargetCandidateW") or 0)
+                ev_a = int(s.get("evMarginalTargetCandidateA") or 0)
+                ev_phase_mode = str(s.get("evMarginalPhaseMode") or "OFF")
                 if s["evResidualExportW"] >= ev_w:
                     ev_reason = "DYNAMIC_PV_PEAK_ABSORBER"
                 elif window["class"] == "SECONDARY":
@@ -1580,7 +1612,8 @@ def main():
         slots.append({
             **s,
             "evPlanW": round(ev_w),
-            "evPlanA": round(ev_w / EV_W_PER_A) if ev_w else 0,
+            "evPlanA": ev_a,
+            "evPlanPhaseMode": ev_phase_mode,
             "evAllocationReason": ev_reason,
             "evOpportunityWindowId": window_id,
             "evOpportunityWindowClass": window_class,
@@ -1645,8 +1678,20 @@ def main():
             "fixedPvStartThresholdW": None,
             "evOpportunityWindowMinMinutes": EV_MIN_WINDOW_SLOTS * SLOT_MIN,
             "evOpportunityMinPvCoverage": EV_MIN_WINDOW_PV_COVERAGE,
-            "evMarginalImportPenalty": EV_IMPORT_PENALTY,
-            "evWindowSegmentation": "CONTIGUOUS_POSITIVE_MARGINAL_VALUE_SLOTS",
+            "evForecastPhaseAware": True,
+            "evForecastPhasePolicy": "ENTRY_BANDS_MATCH_HOMEY_PHASE_POLICY_V0.1",
+            "evOpportunityIntentionalGridImportAllowed": False,
+            "ev1pMinW": EV_1P_MIN_W,
+            "ev1pMaxW": EV_1P_MAX_W,
+            "ev1pStartW": EV_START_1P_W,
+            "ev1pStopWRealtime": EV_STOP_1P_W,
+            "ev3pMinW": EV_3P_MIN_W,
+            "ev3pMaxW": EV_3P_MAX_W,
+            "ev3pEnterW": EV_ENTER_3P_W,
+            "ev3pLeaveWRealtime": EV_LEAVE_3P_W,
+            "evRealtimeMinModeDwellSec": EV_MIN_MODE_DWELL_SEC,
+            "evRealtimeHysteresisOwner": "HOMEY_BOUNDED_REALTIME_EXECUTOR",
+            "evWindowSegmentation": "CONTIGUOUS_PHASE_AWARE_PV_OPPORTUNITY_SLOTS",
             "evStableRunA": EV_RUN_MIN_A,
             "evKickstartA": EV_KICKSTART_A,
             "realtimeP1Correction": True,
