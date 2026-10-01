@@ -24,6 +24,7 @@ Canonical diagnostic source-of-truth and mandatory root-cause documentation rule
 - SQLite `/home/jeroen/ems/data/planner-history.sqlite` is the canonical planner decision/replay history.
 - JSON under `/home/jeroen/ems/data/` and `docs/data/` is derived state, cache or publication output.
 - Homey Logic variable `EM2_Planner_Authority` is the sole runtime selector between Homey and Pi planner authority.
+- Electrical warm-water flex in every Pi planner, including the active Dynamic Pi Planner, is gated by canonical `energy-state-v2.json -> hot_water.mode`: `true` = BOILER and eligible; `false` = CV and ineligible; missing/ambiguous = UNKNOWN and fail closed. CV/UNKNOWN must produce `wwPlanW = 0` and must not reduce residual PV available to other flexloads.
 - GitHub is **not** a runtime transport dependency for live Homey ↔ Pi state or control.
 
 Operational energy history follows the canonical Homey → Pi state direction. Accepted Core state pushes are archived locally on the Pi; automatic Pi polling of Homey Insights is not a production history transport.
