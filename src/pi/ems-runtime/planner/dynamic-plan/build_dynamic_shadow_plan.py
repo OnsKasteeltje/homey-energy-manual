@@ -1444,7 +1444,8 @@ def main():
             ev_opportunity_cost = max(0.0, ev_before_score - ev_after_score)
 
             shoulder_eligible = (
-                ww_pv_coverage >= WW_SHOULDER_MIN_COVERAGE
+                ww_flex_eligible
+                and ww_pv_coverage >= WW_SHOULDER_MIN_PV_COVERAGE
                 and ww_grid_import <= WW_SHOULDER_MAX_IMPORT_W
                 and (not tesla_connected_now or ev_before_w == 0)
             )
@@ -1481,6 +1482,7 @@ def main():
             s["wwCandidateGridImportW"] = round(ww_grid_import)
             s["wwCandidateEvOpportunityCost"] = round(ev_opportunity_cost, 1)
             s["wwShoulderEligible"] = shoulder_eligible
+            s["wwCandidateSourceEligible"] = ww_flex_eligible
             s["wwShoulderBonus"] = round(shoulder_bonus, 1)
 
         selected, shoulder_selected = select_ww_slots(
