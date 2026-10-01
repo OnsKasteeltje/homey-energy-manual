@@ -1445,7 +1445,7 @@ def main():
 
             shoulder_eligible = (
                 ww_flex_eligible
-                and ww_pv_coverage >= WW_SHOULDER_MIN_PV_COVERAGE
+                and ww_pv_coverage >= WW_SHOULDER_MIN_COVERAGE
                 and ww_grid_import <= WW_SHOULDER_MAX_IMPORT_W
                 and (not tesla_connected_now or ev_before_w == 0)
             )
