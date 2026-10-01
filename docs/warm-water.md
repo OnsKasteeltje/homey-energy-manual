@@ -80,7 +80,7 @@ mode = true
 
 ### Pi-planner source gate
 
-De Pi WW-planner gebruikt de canonieke runtime-state `energy-state-v2.json -> hot_water.mode` als harde bron-gate voor **elektrische** WW-flex:
+Zowel de component-WW-planner als de actieve Dynamic Pi Planner gebruiken de canonieke runtime-state `energy-state-v2.json -> hot_water.mode` als harde bron-gate voor **elektrische** WW-flex:
 
 ```text
 hot_water.mode = true   -> BOILER -> electricalFlexEligible = true
@@ -89,6 +89,8 @@ missing/ambiguous       -> UNKNOWN -> fail closed
 ```
 
 Wanneer de bron `CV` of `UNKNOWN` is, zijn alle elektrische WW-plan-slots `0 W` en wordt geen PV-opportunity, fallback of deadline-run aan de elektrische boiler toegewezen. De historische/verwachte WW-vraag mag als observability behouden blijven, maar participeert dan niet in de elektrische flex-allocatie.
+
+De Dynamic Pi Planner past deze gate vóór de WW-slotselectie toe. Daardoor wordt in CV/UNKNOWN-modus geen fictieve `1900 W` van het PV-overschot afgetrokken en blijft het volledige resterende PV-potentieel beschikbaar voor EV, Quooker en andere toegestane flexloads. Slot-observability gebruikt dan expliciet `BLOCKED_SOURCE_CV` of `BLOCKED_SOURCE_UNKNOWN`.
 
 Deze gate voorkomt dat WW nog PV kan reserveren of met EV/heating-preheat kan concurreren terwijl warm water feitelijk door de CV wordt geleverd.
 
