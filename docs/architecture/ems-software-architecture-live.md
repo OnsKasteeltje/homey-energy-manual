@@ -292,7 +292,7 @@ De actuator controleert onder andere:
 
 De WW-keten is hiermee fysiek geïntegreerd, maar Homey bevat nog meer realtime WW state/safety policy dan bij Tesla.
 
-## 14. Quooker flex integration — SHADOW
+## 14. Quooker flex integration — LIVE
 
 Quooker is voorbereid als eenvoudige flexload zonder thermisch model. De Pi bezit uitsluitend het lokale tijdvenster:
 
@@ -310,11 +310,11 @@ Pi Dynamic Planner
  -> EM2_Power_Intent.targets.quooker
  -> EM v2 | 60 Adapter | Quooker Power v0.1 SHADOW
  -> EM2_Control_Quooker
- -> EM v2 | 60 Actuator | Quooker v0.1 SHADOW
- -> Cooker readback only
+ -> EM v2 | 60 Actuator | Quooker v0.2 LIVE
+ -> Cooker physical onoff
 ```
 
-De adapter en actuator-shadow zijn actief maar verrichten geen fysieke writes. De bestaande drie legacy Waterkoker-tijdflows blijven daarom voorlopig de fysieke writers. Een LIVE-cutover mag pas plaatsvinden nadat de shadow-output is gevalideerd en de legacy writers in dezelfde cutover worden uitgeschakeld, zodat nooit twee automatische physical writers naast elkaar worden geclaimd.
+De adapter blijft translation-only en verricht geen fysieke writes. Sinds 2 oktober 2026 is `EM v2 | 60 Actuator | Quooker v0.2 LIVE` de enige automatische fysieke writer voor `Cooker`. Hij gebruikt het gevalideerde `EM2_Control_Quooker`, schrijft idempotent en failt closed naar OFF bij ongeldig of stale control. De drie legacy Waterkoker-tijdflows zijn in dezelfde cutover disabled en mogen niet gelijktijdig met de LIVE-actuator worden geactiveerd.
 
 Canonical Homey actuator-device:
 
