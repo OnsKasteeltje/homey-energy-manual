@@ -29,6 +29,8 @@ Canonical diagnostic source-of-truth and mandatory root-cause documentation rule
 
 Operational energy history follows the canonical Homey → Pi state direction. Accepted Core state pushes are archived locally on the Pi; automatic Pi polling of Homey Insights is not a production history transport.
 
+Household-energy history is derived from cumulative P1/PV counters in `house_energy_intervals`. Cumulative counter rows with quality `held` remain valid monotonic state for derivation and must not truncate the timeline when a PV inverter sleeps or becomes stale after production has stopped. Intervals touching a held counter endpoint are retained with derived quality `held`; counter decreases remain discontinuities and true timing gaps remain `gap`. The Web History API treats `held` intervals as covered energy while preserving the stronger `gap` and `discontinuity` classifications.
+
 ### 1.1 Ruimteverwarming — Honeywell baseline, PV-voorverwarming and Thermal Learning
 
 Honeywell/Resideo remains the comfort and schedule authority. The canonical vendor acquisition boundary is `services/pi/integrations/honeywell/`; it produces `EMS_HONEYWELL_SCHEDULE_V0.2` and `EMS_HONEYWELL_STATE_V0.2` without physical writes. The Honeywell schedule collector refreshes the canonical weekly schedule hourly at `:07`; the current-state collector remains on its five-minute cadence.

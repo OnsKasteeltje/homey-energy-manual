@@ -163,7 +163,7 @@ def test_rebuild_removes_obsolete_derived_rows(tmp_path):
     assert count == 0
 
 
-def test_held_counter_snapshot_is_not_used_for_derived_energy(tmp_path):
+def test_held_counter_snapshot_preserves_energy_with_held_quality(tmp_path):
     db = tmp_path / "h.sqlite"
     con = _db(db)
     _snapshot(con, "2026-09-23T10:00:00Z", 100, 50, 1000, 2000, 3000)
@@ -179,13 +179,61 @@ def test_held_counter_snapshot_is_not_used_for_derived_energy(tmp_path):
     _load().build(db)
     con = sqlite3.connect(db)
     rows = con.execute("""
-        SELECT start_ts_utc,end_ts_utc,pv_total_kwh,quality
+        SELECT start_ts_utc,end_ts_utc,pv_total_kwh,house_kwh,quality
         FROM house_energy_intervals ORDER BY end_ts_utc
     """).fetchall()
     con.close()
 
-    assert len(rows) == 1
+    assert len(rows) == 2
     assert rows[0][0] == "2026-09-23T10:00:00Z"
-    assert rows[0][1] == "2026-09-23T10:10:00Z"
-    assert abs(rows[0][2] - 0.5) < 1e-9
-    assert rows[0][3] == "observed"
+    assert rows[0][1] == "2026-09-23T10:05:00Z"
+    assert abs(rows[0][2] - 0.1) < 1e-9
+    assert abs(rows[0][3] - 0.0) < 1e-9
+    assert rows[0][4] == "held"
+
+    assert rows[1][0] == "2026-09-23T10:05:00Z"
+    assert rows[1][1] == "2026-09-23T10:10:00Z"
+    assert abs(rows[1][2] - 0.4) < 1e-9
+    assert abs(rows[1][3] - 0.4) < 1e-9
+    assert rows[1][4] == "held"
+
+
+def test_sleeping_pv_counters_do_not_truncate_night_history(tmp_path):
+    db = tmp_path / "h.sqlite"
+    con = _db(db)
+    _snapshot(con, "2026-10-02T17:00:00Z", 100.0, 50.0, 1000.0, 2000.0, 3000.0)
+    _snapshot(con, "2026-10-02T17:05:00Z", 100.2, 50.0, 1000.0, 2000.0, 3000.0)
+    con.execute("""
+        UPDATE measurements
+        SET quality='held'
+        WHERE ts_utc='2026-10-02T17:05:00Z' AND device_id IN (2,3,4)
+    """)
+    _snapshot(con, "2026-10-02T17:10:00Z", 100.5, 50.0, 1000.0, 2000.0, 3000.0)
+    con.execute("""
+        UPDATE measurements
+        SET quality='held'
+        WHERE ts_utc='2026-10-02T17:10:00Z' AND device_id IN (2,3,4)
+    """)
+    con.close()
+
+    _load().build(db)
+    con = sqlite3.connect(db)
+    rows = con.execute("""
+        SELECT start_ts_utc,end_ts_utc,import_kwh,export_kwh,pv_total_kwh,
+               house_kwh,quality
+        FROM house_energy_intervals ORDER BY end_ts_utc
+    """).fetchall()
+    con.close()
+
+    assert len(rows) == 2
+    assert rows[0][0:2] == ("2026-10-02T17:00:00Z", "2026-10-02T17:05:00Z")
+    assert abs(rows[0][2] - 0.2) < 1e-9
+    assert abs(rows[0][4]) < 1e-9
+    assert abs(rows[0][5] - 0.2) < 1e-9
+    assert rows[0][6] == "held"
+
+    assert rows[1][0:2] == ("2026-10-02T17:05:00Z", "2026-10-02T17:10:00Z")
+    assert abs(rows[1][2] - 0.3) < 1e-9
+    assert abs(rows[1][4]) < 1e-9
+    assert abs(rows[1][5] - 0.3) < 1e-9
+    assert rows[1][6] == "held"

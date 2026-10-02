@@ -174,6 +174,21 @@ class HistoryResourceTest(unittest.TestCase):
         populated = [x for x in result["series"] if x["houseKWh"] > 0]
         self.assertEqual(len(populated), 6)
 
+    def test_held_counter_interval_is_served_as_covered_energy(self):
+        server.HISTORY_DB = self.make_db([
+            ("2026-01-01T20:00:00.000Z", "2026-01-01T21:00:00.000Z", 3600,
+             0.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.4, "held", None),
+        ])
+        result = server.history_resource("day", "2026-01-01")
+        self.assertAlmostEqual(result["summary"]["houseKWh"], 0.4)
+        self.assertAlmostEqual(result["summary"]["importKWh"], 0.4)
+        self.assertEqual(result["quality"]["gapCount"], 0)
+        self.assertEqual(result["quality"]["discontinuityCount"], 0)
+        populated = [x for x in result["series"] if x["houseKWh"] > 0]
+        self.assertEqual(len(populated), 1)
+        self.assertAlmostEqual(populated[0]["houseKWh"], 0.4)
+        self.assertGreater(populated[0]["coverage"], 0.99)
+
     def test_discontinuity_is_not_counted_as_energy(self):
         server.HISTORY_DB = self.make_db([
             ("2026-01-01T10:00:00.000Z", "2026-01-01T11:00:00.000Z", 3600,
