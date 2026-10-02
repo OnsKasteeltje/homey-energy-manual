@@ -91,6 +91,21 @@ test('OFF -> 3P requires sustained high surplus and uses 690 W per amp', () => {
   assert.equal(r.mappingWPerA, 690);
 });
 
+
+test('high rolling surplus does not force phase entry when instantaneous power cannot sustain 6 A', () => {
+  const r = evaluateEvPhaseCurrentCandidate(
+    inputForAvailable(1000),
+    previous('OFF', 0, {
+      modeAgeMs: 600000,
+      availableW: 5000,
+    }),
+    NOW,
+  );
+  assert.equal(r.rollingReady, true);
+  assert.equal(r.mode, 'OFF');
+  assert.equal(r.phaseChanged, false);
+});
+
 test('upward 1P -> 3P transition is blocked before 300 s dwell', () => {
   const r = evaluateEvPhaseCurrentCandidate(
     inputForAvailable(5000),
