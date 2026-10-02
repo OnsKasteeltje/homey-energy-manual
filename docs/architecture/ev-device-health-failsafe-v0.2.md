@@ -102,8 +102,8 @@ Writer v0.4.5 adds a separate, stronger operational signal at the physical comma
 Alert policy:
 
 - a first HTTP 401 that is successfully recovered by the existing one-refresh/one-retry path is silent;
-- terminal refresh 4xx, missing/invalid private token state, or 401/403 after refresh retry produces an auth alert;
-- the same active failure is deduplicated;
+- terminal refresh 400/401/403, missing/invalid private token state, primary phase 403, or 401/403 after refresh retry produces an auth alert;
+- the same active failure is deduplicated; if both push and Timeline delivery fail, alert delivery is retried no more often than every 15 minutes;
 - Owner push is preferred, with Homey Timeline fallback;
 - notification failure never changes actuator safety behavior;
 - no access token, refresh token, Homey user ID or other secret material is stored in the alert.
