@@ -185,127 +185,49 @@ Expected result:
 - current still follows available PV;
 - import correction remains faster than phase switching.
 
-## 8. Replay requirements
+## 8. Candidate implementation
 
-Replay source of truth is the canonical Pi history:
+The pure implementation lives at:
 
-`/home/jeroen/ems/data/ems-history.sqlite`
+`src/homey/ev/ev-phase-current-controller-v0.1.mjs`
 
-Use raw `measurements`, not 15-minute aggregates, for control replay.
+It is deliberately control-neutral:
 
-Required series:
+- no Homey API calls;
+- no Logic writes;
+- no device writes;
+- no Easee Cloud calls;
+- no adapter/gate/writer changes;
+- deadline path returns `BYPASS` because deadline authority remains outside opportunity control.
 
-- `grid_p1 / electrical_power_w`;
-- `tesla / electrical_power_w`.
+The candidate persists only pure controller state supplied by its caller:
 
-The replay must compare:
+- current mode and mode-since timestamp;
+- requested current;
+- upscale-confirmation timestamp;
+- bounded rolling available-power samples.
 
-1. CURRENT model:
-   - OFF->1P/3P and 1P<->3P using current production instantaneous semantics;
-   - 1P->OFF using current 120-second rolling semantics;
-   - 120-second phase dwell;
-   - phase-request A derived directly from instantaneous available power, matching the authoritative current phase-control path.
+Unit tests live at:
 
-2. CANDIDATE model:
-   - all phase transitions on 120-second sustained signal;
-   - 300-second phase dwell;
-   - independent phase-aware A regulator as specified above.
+`tests/ev-phase-current-controller-v0.1.test.mjs`
 
-Replay output must include:
+The tests cover 1P and 3P current regulation separately from physical phase transitions.
 
-- source sample cadence and rolling-window coverage;
-- OFF/1P/3P time;
-- number and timestamps of physical mode changes;
-- number of requested-A changes;
-- estimated target energy;
-- estimated grid import caused by EV target;
-- estimated residual export after EV target;
-- a focused event list for the requested local time window.
-
-No replay result may be called valid when the history cadence is too sparse to evaluate a 120-second rolling rule.
-
-## 9. Promotion gates
-
-Do not modify the production bridge or writer until replay evidence shows:
-
-- materially fewer physical phase transitions on 2026-10-02;
-- no increase in unsafe/fail-open behavior;
-- current-only changes do not require pause/resume;
-- opportunity energy capture remains comparable;
-- induced grid import remains bounded and explainable;
-- deadline path remains unaffected;
-- Adapter/Gate/Writer contracts remain unchanged or are explicitly versioned.
+## 9. Validation gates before any LIVE work
 
 This branch is analysis-only and must not be deployed to Homey.
 
+Before a later production integration is prepared, all of the following must be true:
 
-## 10. Replay finding — 2026-10-02 history resolution gap
+- Node unit tests PASS;
+- repository architecture gate PASS;
+- OFF/1P/3P thresholds remain aligned with the Pi policy contract;
+- current-only changes keep `requiresPhysicalPhaseTransition=false`;
+- proportional import down-regulation is proven in both 1P and 3P;
+- +1 A upscale confirmation is proven in both 1P and 3P;
+- sustained downward phase transitions cannot be trapped behind the 300 s upward dwell;
+- deadline requests remain outside this opportunity controller;
+- stale/invalid inputs fail closed;
+- no Adapter/Gate/Writer semantics are changed on this analysis branch.
 
-The first replay attempt against the canonical Pi history correctly refused to produce a control conclusion.
-
-Observed source cadence for 2026-10-02:
-
-```text
-sampleCount     256
-medianGapSec    300.0
-p95GapSec       300.1
-maxGapSec       300.4
-rollingReadyPct 0.0
-```
-
-This is expected from the current Homey -> Pi state-history contract: accepted state snapshots are archived with a source resolution of approximately five minutes.
-
-A five-minute series cannot validate a 120-second rolling control rule. Interpolation or `--allow-sparse` must not be used as promotion evidence.
-
-Existing observability does not close this gap:
-
-- `planner-history.sqlite` archives strategic planner decision snapshots, not the Homey realtime P1/EV executor trace;
-- `EM v2 | 81 Observability | EV Control Status v0.1` exposes current revision/adapter/gate/actuator coherence but publishes a current status snapshot rather than a local high-resolution time series;
-- GitHub publication is observability-only and is not an appropriate high-frequency runtime-history transport;
-- Homey Insights is not a canonical high-resolution source for the JSON control contracts used by the bridge.
-
-### Required evidence before promotion
-
-Add one control-neutral, Pi-local EV execution trace with enough cadence to evaluate the realtime rules.
-
-The trace should record only already-derived runtime evidence and MUST NOT become a control input.
-
-Minimum event payload:
-
-```text
-timestamp
-P1 W + age
-EV actual W + age
-reconstructed availableTotalW
-rolling120s availableTotalW
-rolling window sample count/span
-selected phase mode
-phase modeSinceAt
-phase transition reason
-requested A / W
-current-regulation reason
-Pi envelope minA/maxA/allowed
-deadlineGuardApplied
-writer status/stage where available
-```
-
-Recommended persistence:
-
-- local Pi SQLite;
-- event-driven on semantic EV intent/phase/current change, plus a bounded heartbeat while opportunity charging is active;
-- retention at least 14 days;
-- no GitHub publication requirement;
-- no Homey device reads solely for history if the values already exist in the bridge contract;
-- archive failure must be observable but failure-isolated from control.
-
-A 30-second heartbeat while EV opportunity control is active is sufficient for replay of a 120-second rolling rule while keeping the trace small. Semantic changes should be recorded immediately even between heartbeats.
-
-### Promotion sequence
-
-1. add the control-neutral trace;
-2. capture at least one naturally variable PV day;
-3. replay CURRENT vs CANDIDATE from that trace;
-4. compare physical phase transitions, A changes, target energy, induced import and residual export;
-5. only then consider a versioned production bridge change.
-
-The 2026-10-02 five-minute history remains useful for energy/day-level analysis, but not for validating the sub-five-minute control law.
+The existing 2026-10-02 five-minute Pi history is too coarse to validate a 120-second controller retrospectively. That limitation is noted, but no new observability or history subsystem is part of this focused change.
