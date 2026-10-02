@@ -42,12 +42,15 @@ User commands currently have an explicit transitional exception where GitHub com
 ```text
 V2 frontend -> authenticated Cloudflare Worker
  -> docs/data/tesla-deadline-command.json
- -> Homey EV Deadline Goal Adapter -> Homey Core
- -> direct Homey -> Pi state push
- -> /home/jeroen/ems/data/energy-state-v2.json
+ -> Pi ems-ev-deadline-command.service
+ -> /home/jeroen/ems/data/tesla-deadline-command.json
+ -> Pi derived deadline state
+ -> /control/current
+ -> Homey PI Bridge -> Adapter -> Gate -> EV writer
+ -> Easee / Tesla
 ```
 
-The command JSON proves only that the submitted command reached that command boundary. After Homey consumes it, diagnosis continues through Homey/Core and canonical Pi runtime state.
+The GitHub command JSON proves only that the submitted command reached the durable command-transfer boundary. Canonical deadline lifecycle/progress is Pi-owned after command ingress; the disabled legacy Homey EV Deadline Goal Adapter is not part of the active chain.
 
 ## 3. Mandatory diagnostic method
 
@@ -85,26 +88,28 @@ A troubleshooting task is not architecturally complete at "root cause found". It
 1. docs/data/tesla-deadline-command.json
    prove submitted command/requestId at command-transfer boundary
 
-2. Homey EV Deadline Goal Adapter / deadline Logic
-   prove command ingestion and goal lifecycle
+2. /home/jeroen/ems/data/tesla-deadline-command.json
+   prove Pi accepted the same requestId; measure command-transfer latency
 
-3. /home/jeroen/ems/data/energy-state-v2.json
-   prove canonical Homey -> Pi runtime state
-   check deadline_active, deadline_at, remaining_kwh, deadline_max_a
+3. /home/jeroen/ems/data/ev-deadline-shadow-state.json
+   prove Pi-owned lifecycle/progress/latestStart state
 
 4. Pi planner and /control/current
-   prove planning/allocation and current bounded command
+   prove planning/allocation, realtime envelope and deadline execution contract
 
 5. Homey PI Bridge -> EM2_Power_Intent
-   prove executor intent
+   prove executor intent including authoritative OFF/1P/3P phase control
 
-6. EV adapter -> gate -> actuator
-   prove translation, safety validation and physical-write decision
+6. EV adapter -> gate
+   prove translation, exact phase-power mapping and Gate PASS/FAIL
 
-7. Easee / Tesla
-   prove physical device state and delivered energy
+7. EM2_EV_Actuator_Status
+   prove writer decision, phase transition stage and any command/auth failure
 
-8. website/publication artifacts
+8. Easee / Tesla
+   prove physical phase, target current, offered current and delivered power
+
+9. website/publication artifacts
    diagnose presentation/publication only after runtime correctness is known
 ```
 
@@ -116,7 +121,36 @@ Canonical Pi runtime proved ingestion was already correct: `deadline_active=true
 
 Root cause of the apparent mismatch: a lagging GitHub website-publication artifact was consulted as though it were canonical runtime state.
 
-Reusable rule: after the Tesla command-transfer boundary, validate ingestion against Homey/Core and direct Pi runtime state. Do not use `docs/data/energy-state-v2.json` to decide whether Homey -> Pi runtime ingestion succeeded.
+Reusable rule: after the Tesla command-transfer boundary, validate the active Pi-owned deadline chain against the Pi runtime command, derived deadline state and `/control/current`. Do not use `docs/data/energy-state-v2.json` to decide whether the current Pi deadline command was accepted.
+
+### Verified diagnostic lesson — Easee phase authentication
+
+For opportunity charging, a healthy Pi planner or even Gate `PASS` does not prove a physical phase switch succeeded. The canonical downstream boundary is `EM2_EV_Actuator_Status`.
+
+On 2026-10-02, live evidence showed:
+
+```text
+Pi /control/current     allowed=true, PV_OPPORTUNITY
+Homey Bridge            authoritative 1P request
+EV Adapter              valid
+EV Gate                 PASS
+EV actuator             FAILED: Easee authentication
+Easee                    remained paused / previous phase
+```
+
+The failure was caused by the writer's separately provisioned Easee Cloud session, not by the Homey Easee app session and not by P1/planner logic. Re-running `services/pi/commissioning/bootstrap_easee_homey_tokens.py` restored the private rotating token pair; the next writer execution reached `STABLE`, `confirmedMode=1P` and physical charging.
+
+Reusable shortest check:
+
+```text
+1. /control/current -> realtime.ev.allowed / phase policy
+2. EM2_Power_Intent -> authoritative phase mode/A
+3. EV Adapter/Gate -> requested_A and Gate PASS
+4. EM2_EV_Actuator_Status -> reason/stage/authAlert
+5. Easee live state -> confirmed phase/current/power
+```
+
+A terminal writer auth failure is a trustworthy command-boundary signal. Writer v0.4.5 therefore keeps fail-closed control behavior and emits a deduplicated operational alert. A successfully auto-refreshed first 401 must not alert.
 
 
 
