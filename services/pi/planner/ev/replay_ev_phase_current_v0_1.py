@@ -278,8 +278,8 @@ def load_samples(db_path: str, start_utc: datetime, end_utc: datetime) -> list[S
             """
             SELECT
                 x.ts_utc,
-                MAX(CASE WHEN d.device_key='grid_p1' THEN x.value END) AS p1_w,
-                MAX(CASE WHEN d.device_key='tesla' THEN x.value END) AS ev_w
+                MAX(CASE WHEN d.device_key='grid_p1' THEN x.value_real END) AS p1_w,
+                MAX(CASE WHEN d.device_key='tesla' THEN x.value_real END) AS ev_w
             FROM measurements x
             JOIN devices d ON d.id=x.device_id
             JOIN metrics m ON m.id=x.metric_id
