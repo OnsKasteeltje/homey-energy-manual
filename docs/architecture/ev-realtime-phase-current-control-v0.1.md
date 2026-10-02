@@ -65,19 +65,23 @@ Candidate thresholds remain aligned with the existing policy:
 | OFF -> 1P | rolling available >= 1500 W |
 | OFF -> 3P | rolling available >= 4400 W |
 | 1P -> 3P | rolling available >= 4400 W |
-| 3P -> 1P | rolling available < 3600 W |
-| 3P -> OFF | rolling available < 1100 W |
+| 3P -> 1P | rolling available < 3600 W and >= 1500 W |
+| 3P -> OFF | rolling available < 1500 W |
 | 1P -> OFF | rolling available < 1100 W |
 
-The rolling signal is the trailing 120-second mean of valid `available_total_w` samples.
+The rolling signal is the trailing 120-second **time-weighted** mean of valid `available_total_w` samples.
 
-For a control decision to be called "sustained", the rolling window must contain at least two valid samples and span at least 90 seconds. A replay with insufficient source resolution must report that limitation instead of fabricating sub-minute data.
+For a control decision to be called "sustained", the rolling window must contain enough valid history to cover at least 90 seconds. A replay with insufficient source resolution must report that limitation instead of fabricating sub-minute data.
+
+An upward phase entry also requires the **current instantaneous** reconstructed power to sustain the physical 6 A minimum within the existing 250 W import deadband. A high rolling value alone may therefore not force a new 1P/3P entry during a fresh cloud dip.
 
 ### Dwell
 
-After each physical mode change, another physical phase-mode change is blocked for 300 seconds.
+The candidate uses a 300-second dwell for **upward/re-entry** transitions (`OFF -> 1P/3P` after a recent stop and `1P -> 3P`).
 
-This dwell applies only to phase changes. It must not block ordinary current corrections inside 1P or 3P.
+Sustained downward transitions (`3P -> 1P`, `3P -> OFF`, `1P -> OFF`) are allowed as soon as the 120-second rolling condition is confirmed. They are deliberately not held behind the 300-second dwell: otherwise a cloud dip directly after an upshift could leave 3P stuck at its 6 A minimum and intentionally import for several minutes.
+
+The dwell never blocks ordinary current corrections inside 1P or 3P.
 
 The 300-second value is a candidate validation setting, not yet a production constant.
 
