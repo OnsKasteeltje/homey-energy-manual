@@ -19,6 +19,7 @@
 // captured circuit limit.
 
 const VERSION='EM2_EV_ACTUATOR_V0.4.5_PHASE_WRITER';
+const PREVIOUS_COMPAT_VERSION='EM2_EV_ACTUATOR_V0.4.4_PHASE_WRITER';
 const TRANSITION_SCHEMA='EM2_EV_PHASE_TRANSITION_STATE_V0.4';
 const PHASE_EXECUTION_ENABLED=true;
 
@@ -621,7 +622,7 @@ const statusVar=await Homey.logic.getVariable({id:IDS.status});
 const previous=parse(statusVar?.value);
 const liveEnabled=liveVar?.value===true;
 
-if(previous?.schema===VERSION&&previous?.status==='RUNNING'&&age(previous?.at)<RUN_LOCK_MS){
+if([VERSION,PREVIOUS_COMPAT_VERSION].includes(previous?.schema)&&previous?.status==='RUNNING'&&age(previous?.at)<RUN_LOCK_MS){
   return true;
 }
 
@@ -645,11 +646,11 @@ if(!liveEnabled||!PHASE_EXECUTION_ENABLED){
   return true;
 }
 
-// If a previous v0.4.4 invocation died after applying a temporary cap, recover
-// its captured baseline before evaluating a new command.
+// If a previous v0.4.4/v0.4.5 invocation died after applying a temporary cap,
+// recover its captured baseline before evaluating a new command.
 const previousOriginal=num(previous?.transition?.originalCircuitA);
 const previousNeedsRecovery=
-  previous?.schema===VERSION &&
+  [VERSION,PREVIOUS_COMPAT_VERSION].includes(previous?.schema) &&
   ['RUNNING','FAILED','RECOVERY'].includes(String(previous?.status||'')) &&
   Number.isInteger(previousOriginal) &&
   previousOriginal>=EV_MIN_A &&
@@ -707,7 +708,7 @@ if(
 // The writer-status reason distinguishes our zero-A hold from a true safety pause.
 const previousReason=String(previous?.reason||'');
 const previousWasZeroHold=
-  previous?.schema===VERSION &&
+  [VERSION,PREVIOUS_COMPAT_VERSION].includes(previous?.schema) &&
   previous?.status==='STABLE' &&
   previousReason.startsWith('OFF_ZERO_A_HOLD');
 
