@@ -66,7 +66,12 @@ jobs:
         run: python -m pytest -q tests/state tests/planner
 
       - name: Run history integration regression tests
-        run: python -m pytest -q tests/integrations/test_build_15m_history.py
+        run: |
+          python -m pytest -q \
+            tests/integrations/test_build_15m_history.py \
+            tests/integrations/test_history_archive_counters.py \
+            tests/integrations/test_house_energy_history.py \
+            tests/integrations/test_web_data_api.py
 
       - name: Run PV surplus replay validation tests
         run: python tests/replay/test_pv_surplus_absorption_backtest.py
