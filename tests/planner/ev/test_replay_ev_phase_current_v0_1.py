@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -13,6 +14,7 @@ MODULE_PATH = (
 spec = importlib.util.spec_from_file_location("ev_replay_v01", MODULE_PATH)
 m = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
+sys.modules[spec.name] = m
 spec.loader.exec_module(m)
 
 
