@@ -95,4 +95,15 @@ This change does not make Easee health irrelevant. It changes how the signal is 
 - The EV actuator remains the single physical Easee writer.
 - Invalid/stale canonical control input still fails closed to 0 A.
 
-If future health logic obtains a trustworthy transport-level or command-acknowledgement signal that distinguishes an unreachable charger from merely unchanged values, that signal may be considered for a dedicated safety interlock. The current capability-timestamp heuristic must not be treated as that signal.
+The current capability-timestamp heuristic must not be treated as a control interlock.
+
+Writer v0.4.5 adds a separate, stronger operational signal at the physical command boundary: a terminal Easee Cloud authentication failure after the bounded single refresh/retry path. This is not inferred from stale telemetry; it is an explicit command/auth acknowledgement failure. The actuator already fails closed on that condition. The new signal therefore drives **warning only**, not an additional Gate veto or second safety authority.
+
+Alert policy:
+
+- a first HTTP 401 that is successfully recovered by the existing one-refresh/one-retry path is silent;
+- terminal refresh 4xx, missing/invalid private token state, or 401/403 after refresh retry produces an auth alert;
+- the same active failure is deduplicated;
+- Owner push is preferred, with Homey Timeline fallback;
+- notification failure never changes actuator safety behavior;
+- no access token, refresh token, Homey user ID or other secret material is stored in the alert.
