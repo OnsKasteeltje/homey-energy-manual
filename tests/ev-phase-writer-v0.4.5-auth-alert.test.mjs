@@ -224,7 +224,7 @@ test('v0.4.5 classifies refresh and phase retry authentication failures separate
   assert.match(src,/EASEE_PHASE_OBSERVATION_RETRY/);
   assert.match(src,/operation+'_HTTP_'+r\.status/);
   assert.match(src,/terminalEaseeAuthCode/);
-  assert.match(src,/EASEE_REFRESH_HTTP_4\\d\\d/);
+  assert.match(src,/EASEE_REFRESH_HTTP_\\(400\\|401\\|403\\)/);
   assert.match(src,/EASEE_PHASE_\(COMMAND\|OBSERVATION\)_RETRY_HTTP_\(401\|403\)/);
 });
 
@@ -253,7 +253,10 @@ test('terminal Easee auth failure sends owner push with timeline fallback and no
 test('auth alerts deduplicate while the same failed incident remains active',()=>{
   assert.match(src,/previousStatus\?\.status==='FAILED'/);
   assert.match(src,/prior\?\.code===code/);
-  assert.match(src,/prior\?\.delivered===true/);
+  assert.match(src,/deliveryAlreadySucceeded/);
+  assert.match(src,/retryStillSuppressed/);
+  assert.match(src,/AUTH_ALERT_RETRY_MS=15\*60\*1000/);
+  assert.match(src,/attemptedAt/);
   assert.match(src,/deduped:true/);
 });
 
