@@ -205,7 +205,7 @@ Electrical WW flex is now hard-gated by canonical runtime source `energy-state-v
 
 The Pi WW Seasonal Source Advisor is read-only and manual-switch-only. It runs daily at 00:05 Europe/Amsterdam against canonical Pi-local history, so the just-completed local calendar day is immediately eligible for `completeDaysOnly` analysis. It has no dependency on the retired `ems-day-history.service` or other Homey Insights polling; source-switch advice requires the configured multi-day confirmation before notification and never performs a physical source switch. Confirmation is counted once per unique analysis `asOfDate`; reruns, restarts and persistent-timer catch-up executions for the same analysis day are idempotent and must not advance the confirmation streak. On 2026-09-18 the manual BOILER→CV change was validated end-to-end: Homey `WW_Boilermodus=false` resolved to Pi `currentMode=CV`, the advisor retained `KEEP_CURRENT` because CV was economically preferable, and the prior switch-to-CV confirmation streak reset to 0 without any automatic source write.
 
-### 8.1 Quooker flex — SHADOW
+### 8.1 Quooker flex — LIVE
 
 Quooker is geïntegreerd als eenvoudige flexload zonder thermisch state-model. De Pi blijft planner-owner en publiceert per current slot een `targets.quooker` envelope via `/control/current`: op werkdagen `OPPORTUNITY` vóór 17:00, `FORCED_ON` van 17:00–18:00 en daarna `OFF`; in het weekend `OPPORTUNITY` vóór 13:00, `FORCED_ON` van 13:00–14:00 en daarna `OFF`. Het gemodelleerde momentane verwarmingsvermogen blijft 1580 W.
 
@@ -215,7 +215,7 @@ Homey vertaalt dit envelope via de actieve PI bridge naar `EM2_Power_Intent.targ
 
 Voor retrospectieve shadowvalidatie publiceert de adapter numerieke Insights-signalen `EM2_Quooker_Shadow_AvgGridW`, `EM2_Quooker_Shadow_Mode_Code` (`0=OFF`, `1=OPPORTUNITY`, `2=FORCED_ON`) en `EM2_Quooker_Shadow_Target_Code` (`0=OFF`, `1=ON`). `Mode_Code` volgt de effectieve fail-closed gevalideerde mode, niet de ruwe Pi-mode. De bestaande boolean `EM2_Quooker_Shadow_Target_On` blijft beschikbaar voor actuele Logic-status, maar historische analyse gebruikt de numerieke target-code.
 
-`EM v2 | 60 Actuator | Quooker v0.1 SHADOW` leest dit control-contract en het fysieke Homey-device `Cooker` (device ID `42992d14-c4e4-43fc-aaf0-29a73a8e2eb9`) uitsluitend voor readback/validatie. De actuator-shadow voert geen device writes uit. De bestaande drie legacy Waterkoker-tijdflows blijven voorlopig de fysieke writers. Een LIVE-cutover vereist eerst shadowvalidatie en vervolgens het uitschakelen van die legacy writers in dezelfde gecontroleerde overgang, zodat de single-writer boundary behouden blijft.
+`EM v2 | 60 Actuator | Quooker v0.2 LIVE` (stabiele Flow ID `2d0ca017-0d35-4071-bd06-87742032c399`) is sinds 2 oktober 2026 de sole physical writer voor het Homey-device `Cooker` (device ID `42992d14-c4e4-43fc-aaf0-29a73a8e2eb9`). De actuator consumeert `EM2_Control_Quooker`, schrijft idempotent alleen bij een stateverschil en failt closed naar OFF bij ongeldig of stale control. De drie legacy tijdflows `Waterkoker weekend Aan`, `Waterkoker doordeweeks Aan` en `Waterkoker Uit` zijn in dezelfde cutover disabled en blijven uitsluitend rollback-evidence; zij mogen niet naast de LIVE-actuator actief zijn.
 
 ## 9. Live cutover validation
 
