@@ -29,6 +29,7 @@ const CHARGER_SERIAL='ECHM6B9F';
 
 const FRESH_MS=120000;
 const RUN_LOCK_MS=35000;
+const AUTH_ALERT_RETRY_MS=15*60*1000;
 const POLL_MS=500;
 const PAUSE_TIMEOUT_MS=6000;
 const PHASE_CONFIRM_TIMEOUT_MS=9000;
@@ -493,7 +494,8 @@ const confirmLockedPhase=async(mode,vars)=>{
 const terminalEaseeAuthCode=reason=>{
   const base=String(reason||'').split(':RECOVERY=')[0];
   if(base==='EASEE_TOKEN_MISSING'||base==='EASEE_REFRESH_INVALID')return base;
-  if(/^EASEE_REFRESH_HTTP_4\d\d$/.test(base))return base;
+  if(/^EASEE_REFRESH_HTTP_(400|401|403)$/.test(base))return base;
+  if(/^EASEE_PHASE_(COMMAND|OBSERVATION)_HTTP_403$/.test(base))return base;
   if(/^EASEE_PHASE_(COMMAND|OBSERVATION)_RETRY_HTTP_(401|403)$/.test(base))return base;
   return null;
 };
@@ -503,11 +505,15 @@ const notifyEaseeAuthFailure=async(reason,previousStatus)=>{
   if(!code)return null;
 
   const prior=previousStatus?.authAlert;
-  if(
+  const priorAttemptMs=Date.parse(String(prior?.attemptedAt||prior?.sentAt||''));
+  const sameActiveFailure=
     previousStatus?.status==='FAILED' &&
-    prior?.code===code &&
-    prior?.delivered===true
-  ){
+    prior?.code===code;
+  const deliveryAlreadySucceeded=prior?.delivered===true;
+  const retryStillSuppressed=
+    Number.isFinite(priorAttemptMs) &&
+    Date.now()-priorAttemptMs<AUTH_ALERT_RETRY_MS;
+  if(sameActiveFailure&&(deliveryAlreadySucceeded||retryStillSuppressed)){
     return {
       ...prior,
       active:true,
@@ -516,6 +522,7 @@ const notifyEaseeAuthFailure=async(reason,previousStatus)=>{
     };
   }
 
+  const attemptedAt=iso();
   const message=
     'EMS Tesla PV-laden geblokkeerd: Easee Cloud-authenticatie faalt ('+
     code+
@@ -569,6 +576,7 @@ const notifyEaseeAuthFailure=async(reason,previousStatus)=>{
       :timelineSent
         ?'HOMEY_TIMELINE_FALLBACK'
         :'NONE',
+    attemptedAt,
     sentAt:delivered?iso():null,
     deduped:false,
     pushError,
