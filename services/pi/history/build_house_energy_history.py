@@ -30,12 +30,15 @@ def _counter_rows(con):
         )
         args.extend((device_key, metric_key))
     sql = f"""
-        SELECT x.ts_utc, MAX(x.source_resolution_seconds), {", ".join(parts)}
+        SELECT x.ts_utc,
+               MAX(x.source_resolution_seconds),
+               MAX(CASE WHEN x.quality='held' THEN 1 ELSE 0 END) AS has_held_input,
+               {", ".join(parts)}
         FROM measurements x
         JOIN devices d ON d.id=x.device_id
         JOIN metrics m ON m.id=x.metric_id
         WHERE x.value_real IS NOT NULL
-          AND x.quality='observed'
+          AND x.quality IN ('observed','held')
           AND (
             {" OR ".join("(d.device_key=? AND m.metric_key=?)" for _ in COUNTERS)}
           )
@@ -85,7 +88,7 @@ def build(db_path=DB):
         previous = None
 
         for row in rows:
-            ts, source_resolution_seconds, *values = row
+            ts, source_resolution_seconds, has_held_input, *values = row
             if any(value is None for value in values):
                 # Cumulative counters permit bridging incomplete intermediate snapshots.
                 # Retain the last complete baseline; the next complete point forms the
@@ -94,10 +97,10 @@ def build(db_path=DB):
             values = tuple(float(value) for value in values)
 
             if previous is None:
-                previous = (ts, source_resolution_seconds, values)
+                previous = (ts, source_resolution_seconds, bool(has_held_input), values)
                 continue
 
-            prev_ts, prev_resolution, prev_values = previous
+            prev_ts, prev_resolution, prev_has_held_input, prev_values = previous
             elapsed_seconds = (_parse_utc(ts) - _parse_utc(prev_ts)).total_seconds()
             deltas = tuple(cur - old for cur, old in zip(values, prev_values))
 
@@ -121,6 +124,12 @@ def build(db_path=DB):
                 expected_resolution = max(MAX_NORMAL_GAP_SECONDS, int(source_resolution_seconds or prev_resolution or MAX_NORMAL_GAP_SECONDS))
                 if elapsed_seconds > expected_resolution * GAP_MULTIPLIER:
                     quality = "gap"
+                elif prev_has_held_input or bool(has_held_input):
+                    # Cumulative counters are monotonic state. A sleeping/stale
+                    # inverter may keep exposing an unchanged total as "held".
+                    # Keep the household interval instead of truncating history,
+                    # but do not label the counter endpoints as freshly observed.
+                    quality = "held"
 
             if reason:
                 quality = "discontinuity"
@@ -154,7 +163,7 @@ def build(db_path=DB):
             """, (prev_ts, ts, seconds, imp, exp, se, gw42, gw20,
                   pv_total, house, quality, reason))
             written += 1
-            previous = (ts, source_resolution_seconds, values)
+            previous = (ts, source_resolution_seconds, bool(has_held_input), values)
 
         con.commit()
         return {"rows": written, "counter_snapshots": len(rows)}
