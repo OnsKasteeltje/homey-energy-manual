@@ -1,7 +1,7 @@
 # Quooker-regeling
 
 **Status:** 🟢 Actief en end-to-end gevalideerd  
-**Regeling:** bestaande Quooker-flows blijven leidend voor fysieke aan/uit-aansturing  
+**Regeling:** Pi-planner + Homey Quooker actuator v0.2 LIVE zijn leidend voor fysieke aan/uit-aansturing  
 **Detectie:** `EM v2 | 01 Quooker Detector | v0.3 SWITCH-AUTH + P1 HEATING`  
 **Publicatie:** Energy Core `EM2_CORE_PUBLISH_V0.10.5`, schema `2.11`
 
@@ -9,7 +9,7 @@
 
 De Quooker-integratie maakt onderscheid tussen **beschikbaar/ingeschakeld** en **daadwerkelijk elektrisch verwarmen**, zonder daarvoor zware of frequente volledige Homey-device-snapshots te gebruiken.
 
-De bestaande Quooker-flows blijven de fysieke regeling bepalen. De Energy Core-integratie observeert de toestand en publiceert die voor energiebalans, historie en Live View.
+Sinds 2 oktober 2026 bepaalt de Pi-planner het Quooker-envelope en voert Homey dit uit via `EM v2 | 60 Actuator | Quooker v0.2 LIVE`. De Energy Core-integratie observeert daarnaast de toestand en publiceert die voor energiebalans, historie en Live View.
 
 ## Waarheidsbronnen
 
@@ -109,6 +109,6 @@ Quooker-vermogen wordt één keer van `Overig` afgetrokken. Daardoor blijft de w
 
 ## Aansturing
 
-De detector en publicatielaag voeren **geen fysieke Quooker-write** uit. De bestaande Quooker-flows blijven verantwoordelijk voor de fysieke aan/uit-regeling.
+De detector en publicatielaag voeren **geen fysieke Quooker-write** uit. De fysieke write is exclusief eigendom van `EM v2 | 60 Actuator | Quooker v0.2 LIVE` (Flow ID `2d0ca017-0d35-4071-bd06-87742032c399`). De drie oude tijdflows zijn disabled en dienen alleen als rollback-evidence.
 
-> Laatste update: **21 augustus 2026** — switch-authoritative v0.3 + P1 heating assist, historisering, schema 2.11 en Live View-integratie end-to-end gevalideerd.
+> Laatste update: **2 oktober 2026** — plannergestuurde Quooker actuator v0.2 LIVE als sole physical writer; drie legacy tijdflows disabled.
