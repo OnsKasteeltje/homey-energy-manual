@@ -151,7 +151,7 @@ function baseState(previous, nowMs, cfg) {
   const requestedRaw = Math.floor(num(previous?.requestedA) ?? 0);
   const requestedA = mode === 'OFF'
     ? 0
-    : clamp(requestedRaw, cfg.minA, cfg.maxA);
+    : clamp(requestedRaw, 0, cfg.maxA);
   const upscaleSinceMs = sampleMs(previous?.upscaleSinceMs ?? previous?.upscaleSinceAt);
 
   return {
