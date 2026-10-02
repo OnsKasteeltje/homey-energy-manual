@@ -28,7 +28,7 @@ HOMEY DEVICES / P1 / PV / EASEE / BOILER / QUATT
                          ↓
                /control/current
                          ↓ LAN
-              HOMEY PI BRIDGE v1.2.6
+              HOMEY PI BRIDGE v1.5.3
                          ↓
                  EM2_Power_Intent
                   ↙             ↘
@@ -186,7 +186,7 @@ Er mag nooit gelijktijdig dubbele plannerauthority bestaan.
 
 ## 9. Pi → Homey control via /control/current
 
-De actieve bridge `EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.2.6 DEADLINE-GUARD [READY]` leest:
+De actieve bridge `EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.3 PHASE-AUTHORITY [READY]` leest:
 
 ```text
 http://192.168.1.42:3100/control/current
@@ -247,21 +247,26 @@ PLAN
 Actuele Homey-keten:
 
 ```text
-EV Power Adapter v0.1.5
- -> EV Power Adapter Gate v0.2.6
- -> EV Power Actuator v0.2.7 LIVE
+EV Power Adapter v0.2.0 PHASE-AWARE
+ -> EV Gate v0.3.0 PHASE-AWARE
+ -> EV Power writer v0.4.5 AUTH-ALERT LIVE
  -> Easee
 ```
 
 Mapping:
 
 ```text
-3 x 230 V = 690 W/A
-START_MIN_A = 6
-RUN_MIN_A   = 6
+1P = 230 W/A, 6..16 A
+3P = 690 W/A, 6..16 A
+OFF→1P = 1500 W residual export
+1P stop = 1100 W rolling 2-minute reconstructed signal
+OFF/1P→3P = 4400 W
+3P leave = 3600 W
+minimum phase dwell = 120 s
+deadline = forced 3P within Pi request maxA
 ```
 
-De adapter gebruikt `floor()` en verhoogt het upstream vermogensbudget niet zelfstandig. De gate controleert schema, revisions, freshness en mapping. Alleen de actuator schrijft fysiek naar Easee.
+De bridge owns de bounded realtime phase-selector binnen de Pi-envelope. De adapter vertaalt het authoritative phase contract exact; de Gate valideert schema, control revisions, freshness en de 230/690 W/A mapping. Alleen de actuator schrijft fysiek naar Easee. Voor 1P↔3P gebruikt de actuator een bounded pause/phase/deadtime/resume-transactie. De aparte Easee Cloud-authenticatie voor phase control is fail-closed. Writer v0.4.5 onderscheidt refresh-, phase-command- en retry-authfouten en stuurt bij een terminale authfout één gededupliceerde Owner-push, met Timeline fallback; melding heeft geen control impact.
 
 ## 13. Actieve WW execution chain
 
