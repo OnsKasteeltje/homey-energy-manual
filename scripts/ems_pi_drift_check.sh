@@ -22,7 +22,10 @@ TARGET_WEB_DATA_SOURCE="$REPO/services/pi/api/web-data"
 TARGET_WEB_DATA_RUNTIME="$RUNTIME/web-data-api"
 TARGET_ANALYSIS_SOURCE="$REPO/services/pi/api/analysis"
 TARGET_ANALYSIS_RUNTIME="$RUNTIME/analysis-api"
+TARGET_HEALTH_SOURCE="$REPO/services/pi/health"
+TARGET_HEALTH_RUNTIME="$RUNTIME/health"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
+HEALTH_COMMAND="/usr/local/bin/ems-health"
 SYSTEMD="$REPO/deploy/systemd"
 
 echo "=== EMS PI DRIFT CHECK ==="
@@ -37,6 +40,7 @@ echo "Homey out: $TARGET_HOMEY_EGRESS_SOURCE"
 echo "Status API:$TARGET_STATUS_SOURCE"
 echo "Web API:   $TARGET_WEB_DATA_SOURCE"
 echo "AI API:    $TARGET_ANALYSIS_SOURCE"
+echo "Health:    $TARGET_HEALTH_SOURCE"
 echo "Runtime:   $RUNTIME"
 echo
 
@@ -300,6 +304,32 @@ else
     )
 fi
 
+echo
+echo "=== TARGET-STRUCTURE HEALTH FILES ==="
+if [[ ! -d "$TARGET_HEALTH_RUNTIME" ]]; then
+    echo "MISSING: $TARGET_HEALTH_RUNTIME"
+    FAIL=1
+else
+    while IFS= read -r rel; do
+        src="$TARGET_HEALTH_SOURCE/$rel"
+        dst="$TARGET_HEALTH_RUNTIME/$rel"
+        if [[ ! -f "$dst" ]]; then
+            echo "MISSING: health/$rel"
+            FAIL=1
+            continue
+        fi
+        if ! cmp -s "$src" "$dst"; then
+            echo "DRIFT:   health/$rel"
+            FAIL=1
+        fi
+    done < <(
+        cd "$TARGET_HEALTH_SOURCE" && find . -type f \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort
+    )
+fi
+
 echo "=== EMS PERFORMANCE COMMAND ==="
 if [[ ! -L "$PERFORMANCE_COMMAND" ]]; then
     echo "MISSING: $PERFORMANCE_COMMAND symlink"
@@ -312,6 +342,21 @@ elif [[ ! -x "$TARGET_HISTORY_RUNTIME/ems_performance.py" ]]; then
     FAIL=1
 else
     echo "PASS: ems-performance command installed"
+fi
+
+echo
+echo "=== EMS HEALTH COMMAND ==="
+if [[ ! -L "$HEALTH_COMMAND" ]]; then
+    echo "MISSING: $HEALTH_COMMAND symlink"
+    FAIL=1
+elif [[ "$(readlink -f "$HEALTH_COMMAND")" != "$TARGET_HEALTH_RUNTIME/ems_health.py" ]]; then
+    echo "DRIFT:   $HEALTH_COMMAND -> $(readlink -f "$HEALTH_COMMAND")"
+    FAIL=1
+elif [[ ! -x "$TARGET_HEALTH_RUNTIME/ems_health.py" ]]; then
+    echo "NOT EXECUTABLE: $TARGET_HEALTH_RUNTIME/ems_health.py"
+    FAIL=1
+else
+    echo "PASS: ems-health command installed"
 fi
 
 echo
