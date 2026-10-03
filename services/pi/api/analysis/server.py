@@ -22,6 +22,8 @@ from zoneinfo import ZoneInfo
 HOST = os.environ.get("EMS_AI_HOST", "127.0.0.1")
 PORT = int(os.environ.get("EMS_AI_PORT", "3210"))
 MODEL = os.environ.get("EMS_AI_MODEL", "gpt-6-luna")
+REASONING_EFFORT = os.environ.get("EMS_AI_REASONING_EFFORT", "medium")
+MAX_OUTPUT_TOKENS = int(os.environ.get("EMS_AI_MAX_OUTPUT_TOKENS", "1200"))
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_RESPONSES_URL = os.environ.get("OPENAI_RESPONSES_URL", "https://api.openai.com/v1/responses")
 HISTORY_DB = os.environ.get("EMS_HISTORY_DB", "/home/jeroen/ems/data/ems-history.sqlite")
@@ -382,7 +384,11 @@ def ask_model(question, evidence):
         "model": MODEL,
         "instructions": SYSTEM_INSTRUCTIONS,
         "input": "Vraag:\n" + question + "\n\nEMS evidence JSON:\n" + json.dumps(evidence, ensure_ascii=False),
-        "max_output_tokens": 1200,
+        "reasoning": {
+            "effort": REASONING_EFFORT,
+            "mode": "standard",
+        },
+        "max_output_tokens": MAX_OUTPUT_TOKENS,
     }).encode("utf-8")
     req = urlrequest.Request(
         OPENAI_RESPONSES_URL,

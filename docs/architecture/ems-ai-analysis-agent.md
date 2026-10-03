@@ -172,3 +172,13 @@ exposing credentials.
 `POST /agent/ask` accepts a question and day. The response contains the
 answer plus bounded evidence counts/status. Raw model responses and credentials
 are not persisted.
+
+## Runtime model tuning
+
+The analysis model is configured through the systemd service environment.
+
+- `EMS_AI_MODEL` selects the OpenAI model.
+- `EMS_AI_REASONING_EFFORT` selects reasoning effort; the application default is `medium`.
+- `EMS_AI_MAX_OUTPUT_TOKENS` limits the combined reasoning and answer output budget; the application default is `1200`.
+
+The deployed analysis service may deliberately use a higher reasoning effort and output-token ceiling than the application defaults. These settings affect analysis only and do not grant control-write authority.
