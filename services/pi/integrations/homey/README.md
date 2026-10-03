@@ -41,6 +41,21 @@ are appended to `ems-history.sqlite -> ev_control_events`.
 This path is not a control input. It performs no device reads or writes and must
 never become an upstream dependency of Power Intent, Adapter, Gate or Actuator.
 
+
+The Quooker observability path follows the same control-neutral pattern without
+adding Quooker to the Core snapshot. Canonical Homey source
+`apps/homey/observability/quooker/quooker-pi-push-v0.1.homeyscript.js` reads
+only the existing Quooker Control, SHADOW Actuator Status and detector
+diagnostic Logic contracts and posts them to authenticated
+`POST /state/quooker`. Pi-side validation and semantic deduplication are owned
+by `services/pi/integrations/homey/ingress/quooker_evidence_ingest.py`; accepted
+evidence is archived in `ems-history.sqlite/quooker_control_events`.
+
+This Quooker evidence path is observability-only: the push performs no device
+reads, Logic writes, planning decisions or physical writes. The Quooker
+actuator evidence is SHADOW and `desiredOn`/`wouldWrite` must never be
+interpreted as proof that a physical command was issued.
+
 ## Pi → Homey (egress)
 
 The active production transport is Homey pulling `GET /control/current` through the enabled PI Dynamic Planner Bridge. `services/pi/integrations/homey/egress/publish_pi_control_intent.py` remains compatibility code and must not become a second production writer while the Homey bridge is authoritative.

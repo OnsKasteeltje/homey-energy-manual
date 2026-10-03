@@ -41,6 +41,10 @@ FUNCTION_UNITS = {
         "unit": "ems-history-daily.timer",
         "service": "ems-history-daily.service",
     },
+    "flexContextHistory": {
+        "unit": "ems-flex-context-history.timer",
+        "service": "ems-flex-context-history.service",
+    },
     "evDeadlineCommand": {
         "unit": "ems-ev-deadline-command.timer",
         "service": "ems-ev-deadline-command.service",

@@ -14,6 +14,12 @@ EV_CONTROL_INGEST="services/pi/integrations/homey/ingress/ev_control_ingest.py"
 EV_CONTROL_PUSH="apps/homey/observability/ev/ev-control-pi-push-v0.1.homeyscript.js"
 AI_EV_EVIDENCE_TEST="tests/integrations/test_ai_ev_evidence_contract.py"
 AI_CONTEXT_EVIDENCE_TEST="tests/integrations/test_ai_v0_3_context_contract.py"
+AI_V04_CONTEXT_TEST="tests/integrations/test_ai_v0_4_flex_context_contract.py"
+FLEX_CONTEXT_TEST="tests/integrations/test_flex_context_archive_contract.py"
+QUOOKER_EVIDENCE_TEST="tests/integrations/test_quooker_evidence_contract.py"
+FLEX_CONTEXT_ARCHIVE="services/pi/history/archive_flex_context_snapshot.py"
+QUOOKER_EVIDENCE_INGEST="services/pi/integrations/homey/ingress/quooker_evidence_ingest.py"
+QUOOKER_EVIDENCE_PUSH="apps/homey/observability/quooker/quooker-pi-push-v0.1.homeyscript.js"
 HEALTH_EVIDENCE="services/pi/health/ems_health.py"
 PLANNER_HISTORY="services/pi/history/archive_planner_snapshot.py"
 PERFORMANCE="services/pi/history/ems_performance.py"
@@ -44,6 +50,12 @@ cd "$REPO"
 [[ -f "$EV_CONTROL_PUSH" ]] || fail "$EV_CONTROL_PUSH missing"
 [[ -f "$AI_EV_EVIDENCE_TEST" ]] || fail "$AI_EV_EVIDENCE_TEST missing"
 [[ -f "$AI_CONTEXT_EVIDENCE_TEST" ]] || fail "$AI_CONTEXT_EVIDENCE_TEST missing"
+[[ -f "$AI_V04_CONTEXT_TEST" ]] || fail "$AI_V04_CONTEXT_TEST missing"
+[[ -f "$FLEX_CONTEXT_TEST" ]] || fail "$FLEX_CONTEXT_TEST missing"
+[[ -f "$QUOOKER_EVIDENCE_TEST" ]] || fail "$QUOOKER_EVIDENCE_TEST missing"
+[[ -f "$FLEX_CONTEXT_ARCHIVE" ]] || fail "$FLEX_CONTEXT_ARCHIVE missing"
+[[ -f "$QUOOKER_EVIDENCE_INGEST" ]] || fail "$QUOOKER_EVIDENCE_INGEST missing"
+[[ -f "$QUOOKER_EVIDENCE_PUSH" ]] || fail "$QUOOKER_EVIDENCE_PUSH missing"
 [[ -f "$HEALTH_EVIDENCE" ]] || fail "$HEALTH_EVIDENCE missing"
 [[ -f "$PLANNER_HISTORY" ]] || fail "$PLANNER_HISTORY missing"
 [[ -f "$PERFORMANCE" ]] || fail "$PERFORMANCE missing"
@@ -95,6 +107,21 @@ JS
 python3 "$AI_EV_EVIDENCE_TEST" || fail "AI V0.2 EV evidence contract failed"
 pass "EV decision/reason evidence is local, historical and control-neutral"
 
+grep -q 'EMS_HOMEY_QUOOKER_EVIDENCE_V0.1' "$QUOOKER_EVIDENCE_INGEST" || fail "Quooker evidence ingest schema missing"
+grep -q 'quooker_control_events' "$QUOOKER_EVIDENCE_INGEST" || fail "Quooker evidence archive table missing"
+grep -q '/state/quooker' services/pi/api/status/server.py || fail "Quooker evidence endpoint missing"
+grep -q '/state/quooker' "$QUOOKER_EVIDENCE_PUSH" || fail "Homey Quooker evidence push does not target local Pi endpoint"
+grep -q "controlImpact:'NONE'" "$QUOOKER_EVIDENCE_PUSH" || fail "Homey Quooker evidence push must remain control-neutral"
+if grep -q 'Homey.devices' "$QUOOKER_EVIDENCE_PUSH"; then fail "Quooker evidence push must not read devices"; fi
+node - "$QUOOKER_EVIDENCE_PUSH" <<'JS' || fail "Quooker evidence HomeyScript syntax invalid"
+const fs = require("fs");
+const path = process.argv[2];
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+new AsyncFunction(fs.readFileSync(path, "utf8"));
+JS
+python3 "$QUOOKER_EVIDENCE_TEST" || fail "Quooker evidence archive contract failed"
+pass "Quooker evidence path is local, historical and control-neutral"
+
 grep -q 'EMS_PI_HEALTH_V0.1' "$HEALTH_EVIDENCE" || fail "standard EMS health evidence schema missing"
 grep -q '"readOnly": True' "$HEALTH_EVIDENCE" || fail "EMS health evidence must declare read-only"
 grep -q '"controlWrites": False' "$HEALTH_EVIDENCE" || fail "EMS health evidence must declare no control writes"
@@ -112,6 +139,16 @@ grep -q '/home/jeroen/ems/runtime/history/archive_planner_snapshot.py' "$FORECAS
 grep -q 'services/pi/history' scripts/deploy_ems_pi.sh || fail "target-structure Pi history source is not deployed"
 grep -q 'TARGET-STRUCTURE HISTORY FILES' scripts/ems_pi_drift_check.sh || fail "target-structure Pi history source is not drift-checked"
 pass "planner decision history uses atomic planner-owned context"
+
+grep -q 'EMS_PI_FLEX_CONTEXT_SNAPSHOT_V0.1' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history schema missing"
+grep -q 'planner-history.sqlite' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history must use planner-history SQLite"
+if grep -Eq 'Homey\.|urllib|requests|urlopen|http://' "$FLEX_CONTEXT_ARCHIVE"; then fail "flex context archive must remain Pi-local with no Homey/network calls"; fi
+grep -q 'ems-flex-context-history.timer' "$HEALTH_EVIDENCE" || fail "EMS health must monitor flex context history timer"
+[[ -f deploy/systemd/ems-flex-context-history.service ]] || fail "flex context history service missing"
+[[ -f deploy/systemd/ems-flex-context-history.timer ]] || fail "flex context history timer missing"
+grep -q '/home/jeroen/ems/runtime/history/archive_flex_context_snapshot.py' deploy/systemd/ems-flex-context-history.service || fail "flex context service does not use canonical runtime history source"
+python3 "$FLEX_CONTEXT_TEST" || fail "flex context history contract failed"
+pass "Heating and WW flex context is archived read-only for retrospective analysis"
 
 grep -q 'services/pi/forecast' scripts/deploy_ems_pi.sh || fail "target-structure Pi forecast source is not deployed"
 grep -q -- "--exclude='forecast/'" scripts/deploy_ems_pi.sh || fail "generic runtime deploy must protect target-managed forecast directory"
@@ -146,6 +183,8 @@ pass "ConnectLife target-structure and read-only boundary documented"
 
 grep -q 'services/pi/integrations/homey/ingress/state_ingest.py' "$HOMEY_DOC" || fail "Homey ingress target repository boundary missing from integration document"
 grep -q 'services/pi/integrations/homey/egress/publish_pi_control_intent.py' "$HOMEY_DOC" || fail "Homey egress target repository boundary missing from integration document"
+grep -q 'quooker_evidence_ingest.py' "$HOMEY_DOC" || fail "Homey Quooker observability ingress missing from integration document"
+grep -q 'apps/homey/observability/quooker/quooker-pi-push-v0.1.homeyscript.js' "$HOMEY_DOC" || fail "Homey Quooker observability push missing from integration document"
 pass "Homey ingress/egress repository boundary documented"
 
 FRONTEND_NAV="frontend/shared/navigation.js"
@@ -174,6 +213,10 @@ grep -q 'plannerDecisionWindow' "$AI_ANALYSIS" || fail "AI analysis API does not
 grep -q 'forecastVsActual15m' "$AI_ANALYSIS" || fail "AI analysis API does not expose no-hindsight forecast comparison"
 grep -q 'boilerW' "$AI_ANALYSIS" || fail "AI analysis timeline does not expose broader flexible-load context"
 python3 "$AI_CONTEXT_EVIDENCE_TEST" || fail "AI V0.3 context evidence contract failed"
+grep -q 'EMS_AI_ANALYSIS_V0.4' "$AI_ANALYSIS" || fail "AI V0.4 schema missing"
+grep -q 'flexContextWindow' "$AI_ANALYSIS" || fail "AI analysis does not expose historical Heating/WW flex context"
+grep -q 'quookerEvents' "$AI_ANALYSIS" || fail "AI analysis does not expose historical Quooker evidence"
+python3 "$AI_V04_CONTEXT_TEST" || fail "AI V0.4 flex context contract failed"
 if grep -q '/control/current' "$AI_ANALYSIS"; then fail "AI analysis API must not call Pi control endpoint"; fi
 grep -q 'EMS_AI_HOST=127.0.0.1' "$AI_ANALYSIS_UNIT" || fail "AI analysis API must bind loopback"
 grep -q 'EnvironmentFile=-/etc/ems/ai-agent.env' "$AI_ANALYSIS_UNIT" || fail "AI analysis secret boundary missing"

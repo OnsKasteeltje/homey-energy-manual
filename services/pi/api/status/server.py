@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from state_ingest import handle_state_ingest
 from ev_control_ingest import handle_ev_control_ingest
+from quooker_evidence_ingest import handle_quooker_evidence_ingest
 
 HOST = "0.0.0.0"
 PORT = 3100
@@ -419,6 +420,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/state/ev-control":
             handle_ev_control_ingest(self, send_json)
+            return
+        if self.path == "/state/quooker":
+            handle_quooker_evidence_ingest(self, send_json)
             return
         send_json(self, 404, {"status": "REJECTED", "reason": "NOT_FOUND", "stateWritten": False})
 
