@@ -8,7 +8,8 @@ last_verified: 2026-10-03
 source:
   - Canonical source: src/homey/observability/quooker/quooker-detector-v0.4.live-homey.js
   - Pure classifier: src/homey/observability/quooker/quooker-detector-v0.4.mjs
-  - Homey Advanced Flow: EM v2 | 00 Core Tick | v0.10.13 (EV electrical context)
+  - Homey Advanced Flow: EM v2 | 01 Quooker Detector | v0.4 LIVE OBSERVE-ONLY (`e291cf14-0b92-4cef-ae8b-a699692b6c9a`)
+  - Homey Advanced Flow: EM v2 | 00 Core Tick | v0.11p PINNED SOURCE
 owner: EMS
 ---
 
@@ -46,23 +47,18 @@ v0.4 herstelt de detector als aparte observe-only flow. De flow draait elke 15 s
 
 De detector gebruikt geen `Homey.devices.getDevices()`.
 
-Per normale minuutrun leest hij gericht precies één device:
+Per run leest hij de Cooker gericht. P1 L3 wordt alleen aanvullend gericht gelezen wanneer dat nodig is:
 
 ```text
-Cooker switch
+Cooker ON                    = Cooker + P1 L3
+Cooker switchtransitie       = Cooker + P1 L3
+baseline ontbreekt           = Cooker + P1 L3
+Cooker OFF, baseline <55 s   = alleen Cooker
+Cooker OFF, baseline >=55 s  = Cooker + P1 L3
+full device snapshot         = nooit
 ```
 
-Alleen wanneer de P1-heartbeat aangeeft dat er sinds de vorige detectorrun een relevante P1-change is geweest, wordt aanvullend de P1-meter gericht gelezen.
-
-Daarmee ontstaat:
-
-```text
-normale run        = 1 targeted Cooker read
-run na P1-event    = 1 targeted Cooker read + 1 targeted P1 read
-full snapshot      = nooit
-```
-
-Dit is bewust gescheiden van de centrale Core Tick, die zijn eigen single-reader snapshot gebruikt.
+Dit houdt de detector responsief tijdens ON/heating en lichtgewicht tijdens OFF.
 
 ## 4. Autoritatieve ON/OFF-bron
 
@@ -85,7 +81,7 @@ Daarom kan een P1-piek nooit zelfstandig de status `HEATING` geven wanneer de Co
 
 ## 5. P1/L3 heating signature v0.4
 
-Wanneer de switch aan staat én een P1-event is gezien, leest de detector `measure_power.l3`.
+Wanneer de switch aan staat leest de detector iedere 15-secondenrun gericht `measure_power.l3`.
 
 De v0.4 signature gebruikt start- en hold-hysterese:
 
@@ -104,11 +100,19 @@ deltaW = L3_W - baseline_L3_W
 
 De baseline wordt nooit door een actieve heating-puls heen geleerd.
 
-Heating is geldig wanneer:
+Heating start wanneer:
 
 ```text
-1400 W <= deltaW <= 1750 W
+1300 W <= deltaW <= 1900 W
 ```
+
+Een eenmaal actieve heating-puls blijft geldig zolang:
+
+```text
+1100 W <= deltaW <= 2050 W
+```
+
+De bredere hold-band voorkomt klapperen door PV-rampen terwijl het element aantoonbaar actief is.
 
 Bij een geldige heating signature wordt:
 
@@ -260,18 +264,18 @@ Belangrijke invarianten:
 3. Geen volledige `getDevices()` snapshot.
 4. Geen fysieke Quooker-write.
 5. Stale detectorstate wordt door Core niet als actief beschouwd.
-6. Baseline-learning gebeurt alleen bij switch OFF.
+6. De baseline volgt alleen niet-heating achtergrond; tijdens HEATING is hij bevroren.
 
 ## 13. Validatie
 
 De detector is gebaseerd op eerder handmatig gevalideerde Quooker heating-events en runtime observaties waarbij de Quooker-switch en P1/L3 gezamenlijk zijn gecontroleerd.
 
-De operationele detectorcode zelf is op 2026-08-25 opnieuw gecontroleerd tegen de live Homey-flow.
+v0.4 is op 2026-10-03 gevalideerd tegen de gemeten ochtendpuls van circa +1636 W, daarna live gezet als observe-only Advanced Flow `e291cf14-0b92-4cef-ae8b-a699692b6c9a`. De eerste runtimecheck liet zien dat de oude stale baseline (`0,1 W`) direct werd vervangen door de actuele L3-achtergrond rond `-2383 W`, terwijl `EM_Quooker_Power_W=0` bleef zolang het element niet verwarmde.
 
 ## 14. Bekende beperkingen
 
 - De power estimate is gebaseerd op L3-delta ten opzichte van een learned baseline, niet op een dedicated Quooker energiemeter.
-- Gelijktijdige L3-belastingen kunnen de confidence verminderen, hoewel de autoritatieve switch en conservatieve baseline-learning false positives beperken.
+- Gelijktijdige L3-belastingen kunnen de confidence verminderen; de autoritatieve Cooker-switch en korte niet-heating baseline beperken dit risico.
 - De huidige transition history is beperkt tot acht entries.
 - Fingerprint thresholds zijn device-/installatiespecifiek en moeten opnieuw gevalideerd worden bij elektrische configuratiewijzigingen.
 
