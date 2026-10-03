@@ -434,7 +434,9 @@ Pi operational health becomes a separate reusable read-only capability under
 Schema `EMS_PI_HEALTH_V0.1` reports SYSTEM, EMS DATA, EMS FUNCTIONS and RECENT
 INCIDENT SIGNALS, with overall state `HEALTHY`,
 `HEALTHY_WITH_RECENT_INCIDENTS` or `DEGRADED`. Data freshness and expected
-active service/timer state are explicit. Recent incidents are a best-effort
+active service state are explicit. Timer-driven functions must report both an
+active timer and the last triggered `.service` execution/result; an active
+timer by itself is not functional-health proof. Recent incidents are a best-effort
 24-hour journal view, not yet durable incident history. Current health may
 provide context but is not proof of health at a historical decision timestamp.
 
