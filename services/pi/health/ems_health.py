@@ -114,7 +114,7 @@ def _data_status():
     return result, degraded
 
 
-def _systemctl_show(unit):
+def _systemctl_show(unit, expected_active=True):
     props = (
         "LoadState", "ActiveState", "SubState", "Result",
         "ExecMainStatus", "ExecMainExitTimestamp", "ActiveEnterTimestamp",
@@ -147,11 +147,18 @@ def _systemctl_show(unit):
     status = "OK"
     if values.get("LoadState") != "loaded":
         status = "MISSING"
-    elif active not in ("active", "inactive"):
+    elif expected_active and active != "active":
+        status = "DEGRADED"
+    elif not expected_active and active not in ("active", "inactive"):
         status = "DEGRADED"
     elif result not in (None, "", "success"):
         status = "DEGRADED"
-    return {"unit": unit, "status": status, **values}
+    return {
+        "unit": unit,
+        "status": status,
+        "expectedActive": expected_active,
+        **values,
+    }
 
 
 def _functions_status():
@@ -245,7 +252,7 @@ def _recent_incidents():
         proc = subprocess.run(
             [
                 "journalctl", "--since", "24 hours ago",
-                "--priority=warning..alert", "--no-pager", "--output=json",
+                "--priority=warning", "--no-pager", "--output=json",
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
