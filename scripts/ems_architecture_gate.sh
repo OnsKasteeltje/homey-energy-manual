@@ -84,6 +84,12 @@ grep -q '/state/ev-control' services/pi/api/status/server.py || fail "EV control
 grep -q '/state/ev-control' "$EV_CONTROL_PUSH" || fail "Homey EV evidence push does not target local Pi endpoint"
 grep -q "controlImpact:'NONE'" "$EV_CONTROL_PUSH" || fail "Homey EV evidence push must remain control-neutral"
 if grep -q 'Homey.devices' "$EV_CONTROL_PUSH"; then fail "EV control evidence push must not read devices"; fi
+node - "$EV_CONTROL_PUSH" <<'JS' || fail "EV control evidence HomeyScript syntax invalid"
+const fs = require("fs");
+const path = process.argv[2];
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+new AsyncFunction(fs.readFileSync(path, "utf8"));
+JS
 python3 "$AI_EV_EVIDENCE_TEST" || fail "AI V0.2 EV evidence contract failed"
 pass "EV decision/reason evidence is local, historical and control-neutral"
 
