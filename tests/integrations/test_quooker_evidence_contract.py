@@ -82,26 +82,38 @@ def main():
 
         second_payload = payload()
         second_payload["generatedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        second_payload["control"]["p1"]["avgGridW"] = -2600
+        second_payload["detector"]["powerW"] = 25
         second = module.archive_quooker_evidence(second_payload, db_path=db)
         assert second["inserted"] is False
         assert second["dedupe"] == "LATEST_NORMALIZED_EVIDENCE"
 
+        third_payload = payload()
+        third_payload["generatedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        third_payload["control"]["target_on"] = False
+        third_payload["control"]["reason"] = "OPPORTUNITY_STOP_IMPORT_LIMIT"
+        third = module.archive_quooker_evidence(third_payload, db_path=db)
+        assert third["inserted"] is True
+
         con = sqlite3.connect(db)
-        row = con.execute(
+        rows = con.execute(
             """
             SELECT control_mode,control_target_on,control_reason,avg_grid_w,p1_fresh,
                    actuator_desired_on,actuator_actual_on,actuator_would_write,
                    detector_active,detector_status,detector_power_w,
                    physical_write_performed
             FROM quooker_control_events
+            ORDER BY id
             """
-        ).fetchone()
+        ).fetchall()
         con.close()
 
-        assert row == (
+        assert len(rows) == 2
+        assert rows[0] == (
             "OPPORTUNITY", 1, "OPPORTUNITY_START_EXPORT", -2100.0, 1,
             1, 1, 0, 0, "ON_IDLE", 0.0, 0,
         )
+        assert rows[1][1:3] == (0, "OPPORTUNITY_STOP_IMPORT_LIMIT")
 
     print("PASS: Quooker evidence archive contract")
 
