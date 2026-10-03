@@ -429,6 +429,12 @@ health context and whether a physical write was reported. This evidence is
 analysis-only and must never become an upstream input to planner, Power Intent,
 Adapter, Gate or Actuator.
 
+Repeated transport triggers with unchanged runtime evidence are deduplicated
+semantically. The transport `generatedAt` timestamp is excluded from the event
+hash, so a repeated identical Gate/Actuator/Health snapshot does not create
+history noise; any actual change in those runtime contracts remains a distinct
+historical event.
+
 Pi operational health becomes a separate reusable read-only capability under
 `services/pi/health/ems_health.py`, installed as `/usr/local/bin/ems-health`.
 Schema `EMS_PI_HEALTH_V0.1` reports SYSTEM, EMS DATA, EMS FUNCTIONS and RECENT
