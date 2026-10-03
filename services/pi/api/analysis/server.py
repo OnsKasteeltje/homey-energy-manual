@@ -282,9 +282,9 @@ class Handler(BaseHTTPRequestHandler):
         except (OSError, sqlite3.Error, subprocess.SubprocessError, RuntimeError) as exc:
             reason = str(exc)
             status = 503 if reason in {
-                "MODEL_NOT_CONFIGURED", "MODEL_UNAVAILABLE", "EMS_PERFORMANCE_FAILED",
+                "MODEL_NOT_CONFIGURED", "MODEL_UNAVAILABLE",
                 "TIMELINE_SOURCE_INCOMPLETE", "MODEL_EMPTY_RESPONSE"
-            } or reason.startswith("MODEL_HTTP_") else 500
+            } or reason.startswith("MODEL_HTTP_") or reason.startswith("EMS_PERFORMANCE_FAILED") else 500
             send_json(self, status, {"schema": SCHEMA, "status": "UNAVAILABLE", "reason": reason})
 
     def log_message(self, fmt, *args):
