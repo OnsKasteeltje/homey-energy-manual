@@ -218,12 +218,12 @@ test('3P current regulator performs proportional fast down-regulation', () => {
   assert.equal(r.currentOnlyChange, true);
 });
 
-test('1P current regulator adds only 1 A after 45 s confirmed headroom', () => {
+test('1P current regulator adds only 1 A after 20 s confirmed headroom', () => {
   const r = evaluateEvPhaseCurrentCandidate(
     inputForAvailable(2400),
     previous('1P', 8, {
       availableW: 2400,
-      upscaleAgeMs: 50000,
+      upscaleAgeMs: 25000,
     }),
     NOW,
   );
@@ -233,12 +233,12 @@ test('1P current regulator adds only 1 A after 45 s confirmed headroom', () => {
   assert.equal(r.requiresPhysicalPhaseTransition, false);
 });
 
-test('3P current regulator adds only 1 A after 45 s confirmed headroom', () => {
+test('3P current regulator adds only 1 A after 30 s confirmed headroom', () => {
   const r = evaluateEvPhaseCurrentCandidate(
     inputForAvailable(5000),
     previous('3P', 6, {
       availableW: 5000,
-      upscaleAgeMs: 50000,
+      upscaleAgeMs: 35000,
     }),
     NOW,
   );
@@ -248,12 +248,12 @@ test('3P current regulator adds only 1 A after 45 s confirmed headroom', () => {
   assert.equal(r.requiresPhysicalPhaseTransition, false);
 });
 
-test('upscale confirmation does not change current before 45 s', () => {
+test('1P upscale confirmation does not change current before 20 s', () => {
   const r = evaluateEvPhaseCurrentCandidate(
     inputForAvailable(2400),
     previous('1P', 8, {
       availableW: 2400,
-      upscaleAgeMs: 20000,
+      upscaleAgeMs: 15000,
     }),
     NOW,
   );
@@ -293,6 +293,19 @@ test('3P upscale holds when next amp would exceed 200 W import target', () => {
   assert.equal(r.mode, '3P');
   assert.equal(r.requestedA, 7);
   assert.equal(r.currentReason, 'HOLD_A');
+});
+
+test('3P upscale confirmation does not change current before 30 s', () => {
+  const r = evaluateEvPhaseCurrentCandidate(
+    inputForAvailable(5380),
+    previous('3P', 7, {
+      availableW: 5380,
+      upscaleAgeMs: 25000,
+    }),
+    NOW,
+  );
+  assert.equal(r.requestedA, 7);
+  assert.equal(r.currentReason, 'UPSCALE_CONFIRMING');
 });
 
 test('same-phase A change never requests a physical phase transition', () => {
