@@ -414,5 +414,5 @@ inference and advice. Model text is never converted into an EMS control command.
 
 The AI evidence path must preserve read-only semantics end-to-end. The standardized
 `ems-performance` reader opens both `ems-history.sqlite` and `planner-history.sqlite`
-with SQLite `mode=ro&immutable=1`, so WAL/shm coordination never requires a writable evidence directory and it remains compatible with the hardened read-only systemd
+with SQLite `mode=ro`; live SQLite locking/change detection remains enabled so evidence reads stay coherent while the operational databases continue to change
 sandbox and cannot create journals or otherwise acquire write intent on evidence stores.
