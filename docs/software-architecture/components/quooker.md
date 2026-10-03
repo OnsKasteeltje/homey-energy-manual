@@ -1,13 +1,13 @@
 ---
 component: quooker
 title: Quooker Detector
-version: 0.3
+version: 0.4
 status: active
 architecture_status: implemented
-last_verified: 2026-08-25
+last_verified: 2026-10-03
 source:
-  - Homey Advanced Flow: EM v2 | 01 Quooker Detector | v0.3 SWITCH-AUTH + P1 HEATING
-  - Homey Standard Flow: EM v2 | 01a Quooker | P1 Event Heartbeat v0.2
+  - Canonical source: src/homey/observability/quooker/quooker-detector-v0.4.live-homey.js
+  - Pure classifier: src/homey/observability/quooker/quooker-detector-v0.4.mjs
   - Homey Advanced Flow: EM v2 | 00 Core Tick | v0.10.13 (EV electrical context)
 owner: EMS
 ---
@@ -25,16 +25,22 @@ De architectuur gebruikt twee verschillende bronnen met expliciete verantwoordel
 
 De detector stuurt de Quooker niet aan. Hij publiceert uitsluitend afgeleide toestand en diagnostiek naar Homey Logic, waarna Core deze informatie in dezelfde centrale EMS-state opneemt.
 
-## 2. Actuele runtime
+## 2. Runtime en 2026-10-03 herstel
 
-Actieve flows:
+Op 2026-10-03 bleek de detector uit de Homey-runtime verdwenen te zijn. Alleen de Quooker Adapter en LIVE Actuator waren nog aanwezig. Daardoor bleven de legacy detectorvariabelen, waaronder `EM_Quooker_Power_W`, stale/0 terwijl de fysieke Quooker aantoonbaar verwarmde.
 
-| Flow | Status | Functie |
-|---|---|---|
-| `EM v2 | 01 Quooker Detector | v0.3 SWITCH-AUTH + P1 HEATING` | actief | classificatie OFF / ON_IDLE / HEATING |
-| `EM v2 | 01a Quooker | P1 Event Heartbeat v0.2` | actief | zet alleen `EM_Quooker_P1_Event_Seen=true` bij P1 power change |
+De gemeten testcase van 2026-10-03:
 
-De detector draait elke minuut en heeft daarnaast een handmatige start-entry.
+```text
+10:11:00 lokaal  target ON / Cooker ON
+10:11:05         P1 L3 ≈ -1290 W
+10:11:10         P1 L3 ≈  +346 W
+delta            ≈ +1636 W
+```
+
+Dit bevestigt de bestaande ~1.58–1.65 kW heating signature.
+
+v0.4 herstelt de detector als aparte observe-only flow. De flow draait elke 15 seconden en wordt daarnaast direct getriggerd bij Cooker ON/OFF. Terwijl de Cooker ON is wordt P1 L3 elke run gericht gelezen; terwijl de Cooker OFF is wordt de L3-baseline maximaal eenmaal per ~55 seconden ververst.
 
 ## 3. Architectuurregel: geen volledige device-snapshot
 
@@ -77,22 +83,26 @@ P1/L3 mag de switchstatus niet overrulen.
 
 Daarom kan een P1-piek nooit zelfstandig de status `HEATING` geven wanneer de Cooker-switch uit staat.
 
-## 5. P1/L3 heating signature
+## 5. P1/L3 heating signature v0.4
 
 Wanneer de switch aan staat én een P1-event is gezien, leest de detector `measure_power.l3`.
 
-De huidige signature gebruikt:
+De v0.4 signature gebruikt start- en hold-hysterese:
 
 ```text
-MIN_DELTA_W = 1400 W
-MAX_DELTA_W = 1750 W
+START_MIN_W = 1300 W
+START_MAX_W = 1900 W
+HOLD_MIN_W  = 1100 W
+HOLD_MAX_W  = 2050 W
 ```
 
 Met:
 
 ```text
-deltaW = max(0, L3_W - baseline_L3_W)
+deltaW = L3_W - baseline_L3_W
 ```
+
+De baseline wordt nooit door een actieve heating-puls heen geleerd.
 
 Heating is geldig wanneer:
 
@@ -116,61 +126,27 @@ active  = false
 powerW  = 0
 ```
 
-## 6. Baseline-learning
+## 6. Baseline-learning v0.4
 
-De L3-baseline wordt alleen conservatief aangepast wanneer de Quooker-switch uit staat.
+De baseline is nu bewust kortlopend:
 
-Huidige parameters:
+- bij Cooker OFF wordt de meest recente L3-achtergrond als baseline vastgelegd;
+- bij OFF→ON blijft die laatste niet-heating baseline behouden zodat een direct inschakelend element niet zijn eigen baseline wordt;
+- bij Cooker ON + ON_IDLE volgt de baseline de actuele L3-achtergrond;
+- tijdens HEATING blijft de baseline bevroren;
+- zodra HEATING stopt wordt de actuele L3-waarde de nieuwe ON_IDLE-baseline.
 
-```text
-BASELINE_MAX_STEP_W = 400 W
-BASELINE_MAX_W      = 900 W
-ALPHA               = 0.30
-```
+Hierdoor volgt de detector PV-rampen en andere L3-belastingen beter dan de oude langzame EWMA-baseline.
 
-Een nieuwe OFF-sample mag dus alleen in de baseline worden opgenomen wanneer:
+## 7. Sampling v0.4
 
-```text
-L3 <= 900 W
-abs(L3 - vorigeBaseline) <= 400 W
-```
+De aparte P1-heartbeat is niet meer nodig. Eén Advanced Flow heeft drie entry-paden:
 
-De update is een eenvoudige exponentially weighted update:
+- elke 15 seconden;
+- Cooker ON;
+- Cooker OFF.
 
-```text
-baseline = 0.70 * oudeBaseline + 0.30 * L3
-```
-
-Dit voorkomt dat een grote gelijktijdige L3-verbruiker de Quooker-baseline snel vervormt.
-
-Wanneer bij de eerste geldige ON-sample nog geen baseline bestaat, wordt tijdelijk gestart met:
-
-```text
-baseline = L3 - 1575 W
-```
-
-## 7. P1 Event Heartbeat
-
-De Standard Flow `EM v2 | 01a Quooker | P1 Event Heartbeat v0.2` reageert op:
-
-```text
-P1 measure_power_changed
-```
-
-De enige actie is:
-
-```text
-EM_Quooker_P1_Event_Seen = true
-```
-
-Deze flow:
-
-- leest geen apparaten;
-- berekent geen fingerprint;
-- schrijft geen fysieke actuator;
-- triggert geen zware analyse.
-
-De detector consumeert en reset deze vlag bij de volgende minuutrun.
+De HomeyScript leest altijd de Cooker gericht. P1 L3 wordt gericht gelezen wanneer de Cooker ON is, bij een switchtransitie, bij ontbrekende baseline of wanneer de OFF-baseline ouder is dan ~55 seconden. Er wordt nooit `Homey.devices.getDevices()` gebruikt.
 
 ## 8. Gepubliceerde Logic-state
 
@@ -275,7 +251,7 @@ De detector is observe-only:
 physicalWritePerformed = false
 ```
 
-Er bestaat geen automatische Quooker-writer in deze detectorarchitectuur.
+De detector zelf schrijft nooit fysiek. De aparte `EM v2 | 60 Actuator | Quooker v0.2 LIVE` blijft de enige fysieke Quooker-writer.
 
 Belangrijke invarianten:
 
