@@ -5,6 +5,7 @@ const ITEMS = [
   { key: "planner", label: "Planner", href: "../planner/" },
   { key: "pv-flex", label: "PV & Flex", href: "../pv-flex/" },
   { key: "heating", label: "Verwarming", href: "../heating/" },
+  { key: "ai", label: "AI Analyse", href: "../ai/" },
   { key: "groups", label: "Groepen & fasen", disabled: true },
 ];
 
