@@ -168,7 +168,7 @@ if echo "$HONEYWELL_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; th
     exit 1
 fi
 
-for ingress_file in state_ingest.py ev_control_ingest.py; do
+for ingress_file in state_ingest.py ev_control_ingest.py quooker_evidence_ingest.py; do
     if [[ ! -f "$TARGET_HOMEY_INGRESS_SOURCE/$ingress_file" ]]; then
         echo "ERROR: Homey ingress source is missing: $ingress_file"
         echo "Deployment aborted to protect the Homey -> Pi state/observability path."
@@ -330,6 +330,9 @@ cp -a \
 cp -a \
     "$TARGET_HOMEY_INGRESS_SOURCE/ev_control_ingest.py" \
     "$TARGET_STATUS_RUNTIME/ev_control_ingest.py"
+cp -a \
+    "$TARGET_HOMEY_INGRESS_SOURCE/quooker_evidence_ingest.py" \
+    "$TARGET_STATUS_RUNTIME/quooker_evidence_ingest.py"
 
 mkdir -p "$TARGET_WEB_DATA_RUNTIME"
 rsync -a --delete \
