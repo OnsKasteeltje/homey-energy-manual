@@ -183,7 +183,7 @@ fi
 
 echo
 echo "=== TARGET-STRUCTURE HOMEY INGRESS FILES ==="
-for rel in state_ingest.py ev_control_ingest.py; do
+for rel in state_ingest.py ev_control_ingest.py quooker_evidence_ingest.py; do
     src="$TARGET_HOMEY_INGRESS_SOURCE/$rel"
     dst="$TARGET_STATUS_RUNTIME/$rel"
     if [[ ! -f "$src" ]]; then
