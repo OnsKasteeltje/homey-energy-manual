@@ -460,7 +460,7 @@ authority. The bounded 5-minute evidence timeline now includes boiler and Quatt
 power plus washer/dryer active state where canonical history exists. For
 question-relevant timestamps, the AI reader selects the latest frozen
 `planner-history.sqlite` decision snapshot generated at or before the anchor
-and projects only the relevant action/targets/reasons. It also compares archived
+and projects only the relevant canonical planner slot, allocation targets and reasons. It also compares archived
 PV forecast with canonical 15-minute actuals using the fixed 12-hour
 no-hindsight forecast selection already used by PV & Flex. Later forecasts may
 not be used to explain or judge earlier planner decisions.
