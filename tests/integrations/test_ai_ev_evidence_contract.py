@@ -168,16 +168,31 @@ def main():
         assert stored["archived"] is True
         assert stored["inserted"] is True
 
+        duplicate = dict(event)
+        duplicate["generatedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        duplicate_stored = ev_ingest.archive_ev_control(duplicate, db)
+        assert duplicate_stored["archived"] is True
+        assert duplicate_stored["inserted"] is False
+
+        changed = dict(event)
+        changed["generatedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        changed["actuator"] = dict(event["actuator"])
+        changed["actuator"]["reason"] = "SAME_PHASE_CURRENT_CONFIRMED"
+        changed_stored = ev_ingest.archive_ev_control(changed, db)
+        assert changed_stored["inserted"] is True
+
         con = sqlite3.connect(db)
-        row = con.execute("""
+        rows = con.execute("""
             SELECT phase_mode, gate_status, actuator_status, actuator_reason,
                    actuator_confirmed_mode, device_health_status
             FROM ev_control_events
-        """).fetchone()
+            ORDER BY id
+        """).fetchall()
         con.close()
-        assert row == (
-            "1P", "PASS", "STABLE", "SAME_PHASE_CURRENT_APPLIED", "1P", "OK"
-        )
+        assert rows == [
+            ("1P", "PASS", "STABLE", "SAME_PHASE_CURRENT_APPLIED", "1P", "OK"),
+            ("1P", "PASS", "STABLE", "SAME_PHASE_CURRENT_CONFIRMED", "1P", "OK"),
+        ]
 
     print("PASS: AI V0.2 EV evidence archive contract")
 
