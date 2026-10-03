@@ -87,9 +87,9 @@ important export windows and recent control events as anchors.
 For each anchor V0.3 selects the latest frozen planner snapshot generated at or
 before that timestamp. It never reads the current planner output and pretends it
 was historical state. Only a compact projection is sent to the model: relevant
-realtime correction context, deadline/guardrail context and the 15-minute action
-covering the anchor, including EV/WW/battery targets and recorded planner
-reasons. Snapshots older than the bounded historical tolerance remain missing
+realtime correction context, deadline/guardrail context and the canonical
+15-minute planner slot covering the anchor, including EV/WW/Quooker allocation,
+phase/current targets and recorded planner reasons. Snapshots older than the bounded historical tolerance remain missing
 rather than being fabricated.
 
 ### PV forecast versus actual
