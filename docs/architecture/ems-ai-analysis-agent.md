@@ -1,14 +1,14 @@
-# EMS AI Analysis Agent V0.3
+# EMS AI Analysis Agent V0.4
 
 ## Scope
 
 The EMS AI Analysis Agent is a **read-only diagnostic and explanation layer**.
 It is not part of the realtime control loop and has no device-write path.
 
-V0.3 keeps the proven V0.2 EV/control and health evidence and broadens the
-read-only context needed to explain whole-EMS decisions: tracked flexible loads,
-frozen planner decisions around the question timestamp, and a no-hindsight
-PV forecast-versus-actual comparison.
+V0.4 keeps the proven V0.3 performance, planner, forecast and EV evidence and
+adds the historical context needed to explain flexible-load opportunities
+across Quooker, warm water and Heating. It remains a read-only diagnostic layer;
+no new planner or physical-write authority is introduced.
 
 Runtime chain:
 
@@ -27,12 +27,24 @@ Homey EV observability
       |
       +--> targeted Logic reads only
       +--> POST /state/ev-control
-              +--> ems-history.sqlite / ev_control_events
-                    +--> Gate result/errors
-                    +--> actuator status/reason
-                    +--> requested/confirmed phase and current
-                    +--> transition stage/failure
-                    +--> device-health reason
+      |       +--> ems-history.sqlite / ev_control_events
+      |
+Homey Quooker observability
+      |
+      +--> targeted Logic reads only
+      +--> POST /state/quooker
+              +--> ems-history.sqlite / quooker_control_events
+                    +--> adapter/control target + reason
+                    +--> SHADOW actuator desired/actual/wouldWrite
+                    +--> detector status / measured pulse power
+
+Pi local flex state
+      |
+      +--> Heating V0.3 eligibility
+      +--> Flex Priority V0.1
+      +--> Heating V0.4 progression SHADOW
+      +--> WW input / seasonal advice / current source
+              +--> planner-history.sqlite / flex_context_snapshots
 
 Pi runtime
       |
@@ -58,9 +70,15 @@ a runtime evidence transport for the AI agent.
 - no Homey, Easee, Tesla, boiler, Honeywell or other physical-write client exists
   in the AI service;
 - the AI service does not call the Pi control endpoint;
-- the dedicated Homey EV evidence push performs targeted Logic reads only and
-  has no device reads, Logic writes, device writes or planning decisions;
-- `/state/ev-control` only validates and archives observability evidence;
+- the dedicated Homey EV and Quooker evidence pushes perform targeted Logic
+  reads only and have no device reads, Logic writes, device writes or planning
+  decisions;
+- `/state/ev-control` and `/state/quooker` only validate and archive
+  observability evidence;
+- the local flex-context archive reads already-derived Pi artifacts only and
+  performs no network/Homey/device call;
+- Heating progression and the Quooker actuator remain SHADOW; a grant,
+  `desiredOn` or `wouldWrite` is not proof of a physical write;
 - model output is explanatory text and is never converted into an EMS command.
 
 The model must distinguish **Feit**, **Afleiding** and **Advies** and must state
@@ -104,6 +122,44 @@ The evidence contains a daily comparable-slot summary (forecast energy, actual
 energy, bias and mean absolute error) plus a bounded detail set around analysis
 anchors and the largest forecast-error/export slots. A later forecast must
 never be used to judge an earlier planner decision.
+
+### Historical Heating and warm-water flex context
+
+V0.4 archives a compact semantic snapshot of the already-derived local flex
+state in `planner-history.sqlite/flex_context_snapshots`. The source is
+`services/pi/history/archive_flex_context_snapshot.py`, run once per minute
+after Heating progression.
+
+The snapshot contains bounded projections of:
+
+- Heating Preheat V0.3 eligibility, baseline-demand and CV guards;
+- Flex Priority V0.1 owner/grant/reason;
+- Heating Preheat V0.4 progression state, measured room temperature,
+  hypothetical active step and completion state;
+- current WW planner input, current hot-water source and boiler observation;
+- WW seasonal-source advice/economic context when available.
+
+Unchanged semantic state is deduplicated, with a bounded heartbeat so the
+archive still proves continuing coverage. The archive never reconstructs
+earlier state from the current JSON files. Historical coverage therefore starts
+only when the V0.4 archive is commissioned.
+
+### Quooker observability history
+
+V0.4 keeps Quooker out of the canonical Core snapshot and adds a separate,
+authenticated, control-neutral evidence path. Homey source
+`apps/homey/observability/quooker/quooker-pi-push-v0.1.homeyscript.js` reads
+only existing Logic contracts for Quooker Control, SHADOW Actuator Status and
+the Quooker detector diagnostic. It posts to `POST /state/quooker`; Pi-side
+validation and persistence live in
+`services/pi/integrations/homey/ingress/quooker_evidence_ingest.py`.
+
+Accepted snapshots are semantically deduplicated in
+`ems-history.sqlite/quooker_control_events`. The archive distinguishes the
+planner/adapter mode and target, SHADOW actuator desired/actual/would-write
+state, and detector-observed switch/heating state. The field
+`physicalWritePerformed` remains explicit and false for the current SHADOW
+actuator contract.
 
 ### Canonical EV telemetry history
 
@@ -168,7 +224,10 @@ that every component was healthy at an earlier EV decision timestamp.
 ## Historical boundary
 
 The richer EV telemetry and EV control-event history starts when V0.2 is
-commissioned. Earlier days must not be backfilled by inference.
+commissioned. Heating/WW flex-context history and Quooker control/detector
+history start when their V0.4 paths are commissioned. Earlier gaps in any of
+these evidence families remain missing and must not be backfilled by inference
+from current state.
 
 Recent incident signals are a bounded best-effort journal view, not yet a
 durable incident ledger. A later version may persist incident transitions if
