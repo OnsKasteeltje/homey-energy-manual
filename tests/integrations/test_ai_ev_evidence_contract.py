@@ -170,6 +170,16 @@ def main():
 
         duplicate = dict(event)
         duplicate["generatedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        duplicate["intent"] = dict(event["intent"])
+        duplicate["intent"]["generatedAt"] = duplicate["generatedAt"]
+        duplicate["adapter"] = dict(event["adapter"])
+        duplicate["adapter"]["generatedAt"] = duplicate["generatedAt"]
+        duplicate["gate"] = dict(event["gate"])
+        duplicate["gate"]["updatedAt"] = duplicate["generatedAt"]
+        duplicate["actuator"] = dict(event["actuator"])
+        duplicate["actuator"]["at"] = duplicate["generatedAt"]
+        duplicate["deviceHealth"] = dict(event["deviceHealth"])
+        duplicate["deviceHealth"]["sampledAt"] = duplicate["generatedAt"]
         duplicate_stored = ev_ingest.archive_ev_control(duplicate, db)
         assert duplicate_stored["archived"] is True
         assert duplicate_stored["inserted"] is False
