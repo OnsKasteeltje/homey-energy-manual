@@ -129,19 +129,27 @@ def create_planner(path):
         "plan":{
             "objective":"MAXIMIZE_PV_SELF_CONSUMPTION",
             "guardrails":{"wwSourceMode":"CV","wwElectricalFlexEligible":False,"teslaRole":"SECONDARY_FLEX_LOAD_WHEN_WW_COMFORT_REMAINS_FEASIBLE"},
-            "plan":{"actions":[{
-                "start":"2026-10-03T12:00:00Z",
-                "end":"2026-10-03T12:15:00Z",
+            "slots":[{
+                "slot_start_utc":"2026-10-03T12:00:00Z",
+                "localDate":"2026-10-03",
                 "baseLoadForecastW":500,
                 "pvForecastW":3600,
+                "quattForecastW":100,
+                "forecastExportBeforeFlexW":3000,
                 "correctedExportBeforeFlexW":1200,
                 "confidence":0.9,
-                "tesla":"CHARGE",
-                "warmWater":"HOLD",
-                "targets":{"evTargetW":2300,"wwTargetW":0},
-                "teslaPlan":{"mode":"CHARGE","reason":"PV_OPPORTUNITY"},
-                "warmWaterPlan":{"reason":"BLOCKED_SOURCE_CV"},
-            }]},
+                "wwPlanW":0,
+                "wwAllocationReason":"BLOCKED_SOURCE_CV",
+                "wwCandidateSourceEligible":False,
+                "evPlanW":2300,
+                "evPlanA":10,
+                "evPlanPhaseMode":"1P",
+                "evAllocationReason":"DYNAMIC_PV_1P",
+                "evOpportunityWindowClass":"1P",
+                "evOpportunityWindowSelectionReason":"PV_OPPORTUNITY",
+                "gridImportAfterFlexW":0,
+                "gridExportAfterFlexW":0
+            }],
         },
     }
     blob=zlib.compress(json.dumps(snap).encode("utf-8"))
@@ -176,8 +184,9 @@ def main():
         planner_window=ai._planner_decision_window(day, anchors)
         assert len(planner_window)==1
         assert planner_window[0]["snapshotAgeMinutes"]==5.0
-        assert planner_window[0]["action"]["teslaPlan"]["reason"]=="PV_OPPORTUNITY"
-        assert planner_window[0]["action"]["targets"]["evTargetW"]==2300
+        assert planner_window[0]["action"]["evAllocationReason"]=="DYNAMIC_PV_1P"
+        assert planner_window[0]["action"]["evPlanW"]==2300
+        assert planner_window[0]["action"]["wwAllocationReason"]=="BLOCKED_SOURCE_CV"
 
         forecast=ai._forecast_vs_actual_15m(day, anchors)
         assert forecast["available"] is True
