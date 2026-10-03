@@ -9,8 +9,10 @@ state or physical devices.
 
 import json
 import os
+import re
 import sqlite3
 import subprocess
+import zlib
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -27,12 +29,13 @@ MAX_OUTPUT_TOKENS = int(os.environ.get("EMS_AI_MAX_OUTPUT_TOKENS", "1200"))
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_RESPONSES_URL = os.environ.get("OPENAI_RESPONSES_URL", "https://api.openai.com/v1/responses")
 HISTORY_DB = os.environ.get("EMS_HISTORY_DB", "/home/jeroen/ems/data/ems-history.sqlite")
+PLANNER_DB = os.environ.get("EMS_PLANNER_DB", "/home/jeroen/ems/data/planner-history.sqlite")
 PERFORMANCE_COMMAND = os.environ.get("EMS_PERFORMANCE_COMMAND", "/usr/local/bin/ems-performance")
 HEALTH_COMMAND = os.environ.get("EMS_HEALTH_COMMAND", "/usr/local/bin/ems-health")
 LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
-SCHEMA = "EMS_AI_ANALYSIS_V0.2"
-EVIDENCE_SCHEMA = "EMS_AI_EVIDENCE_V0.2"
+SCHEMA = "EMS_AI_ANALYSIS_V0.3"
+EVIDENCE_SCHEMA = "EMS_AI_EVIDENCE_V0.3"
 MAX_BODY_BYTES = 16 * 1024
 MAX_QUESTION_CHARS = 1200
 
@@ -47,6 +50,8 @@ When evidence is insufficient, say exactly what is missing.
 Do not issue commands, suggest bypassing safety gates, or claim that any device was changed.
 Prefer exact local timestamps and quantitative values.
 An observed export window is not automatically an EMS fault; constraints may explain it.
+Use plannerDecisionWindow as historical intent evidence and never judge an earlier planner decision using a forecast generated later.
+Use forecastVsActual15m to distinguish forecast error from planner/control execution error when the evidence supports that distinction.
 Keep the answer concise but diagnostic."""
 
 def _iso_z(dt):
@@ -269,78 +274,499 @@ def _ev_control_events(day):
         })
     return out
 
+
+_TIME_RE = re.compile(r"(?<!\d)([01]?\d|2[0-3])[:.]([0-5]\d)(?!\d)")
+
+
+def _parse_ts(value):
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        return None
+    return dt
+
+
+def _question_anchors(question, day, performance, ev_control):
+    anchors = []
+    for match in _TIME_RE.finditer(question or ""):
+        anchors.append(datetime.combine(
+            day,
+            time(int(match.group(1)), int(match.group(2))),
+            LOCAL_TZ,
+        ))
+
+    if not anchors:
+        for window in (performance.get("surplusWindowsForReplay") or [])[:3]:
+            dt = _parse_ts(window.get("start"))
+            if dt is not None:
+                anchors.append(dt.astimezone(LOCAL_TZ))
+        for event in (ev_control or [])[-3:]:
+            dt = _parse_ts(event.get("atLocal"))
+            if dt is not None:
+                anchors.append(dt.astimezone(LOCAL_TZ))
+
+    result = []
+    seen = set()
+    for anchor in anchors:
+        local = anchor.astimezone(LOCAL_TZ).replace(second=0, microsecond=0)
+        key = local.isoformat()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(local)
+        if len(result) >= 6:
+            break
+    return result
+
+
 def _timeline(day):
     start, end = _bounds(day)
-    wanted = ("grid_p1", "pv_solaredge", "pv_goodwe4200", "pv_goodwe2000", "tesla")
+    mandatory_power = (
+        "grid_p1", "pv_solaredge", "pv_goodwe4200", "pv_goodwe2000", "tesla",
+    )
+    optional_power = ("boiler", "quatt_cic")
+    state_devices = ("washer", "dryer")
+    wanted = mandatory_power + optional_power + state_devices
+
     with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
         db.execute("PRAGMA query_only=ON")
-        device_ids = dict(db.execute(
-            "SELECT device_key,id FROM devices WHERE device_key IN (%s)" %
-            ",".join("?" for _ in wanted),
-            wanted,
-        ).fetchall())
-        metric = db.execute(
-            "SELECT id FROM metrics WHERE metric_key='electrical_power_w'"
-        ).fetchone()
-        if metric is None or any(k not in device_ids for k in wanted):
-            raise RuntimeError("TIMELINE_SOURCE_INCOMPLETE")
         rows = db.execute(
             f"""
-            SELECT m.ts_utc,d.device_key,m.value_real
+            SELECT m.ts_utc,d.device_key,x.metric_key,m.value_real
             FROM measurements m
             JOIN devices d ON d.id=m.device_id
-            WHERE m.metric_id=? AND m.ts_utc>=? AND m.ts_utc<?
-              AND m.device_id IN ({','.join('?' for _ in wanted)})
+            JOIN metrics x ON x.id=m.metric_id
+            WHERE m.ts_utc>=? AND m.ts_utc<?
+              AND d.device_key IN ({','.join('?' for _ in wanted)})
+              AND x.metric_key IN ('electrical_power_w','active')
             ORDER BY m.ts_utc
             """,
-            (
-                metric[0],
-                _iso_z(start),
-                _iso_z(end),
-                *[device_ids[k] for k in wanted],
-            ),
+            (_iso_z(start), _iso_z(end), *wanted),
         ).fetchall()
 
     buckets = defaultdict(lambda: defaultdict(list))
-    for ts_text, device_key, value in rows:
+    for ts_text, device_key, metric_key, value in rows:
         if value is None:
             continue
         ts = datetime.fromisoformat(ts_text.replace("Z", "+00:00"))
         local = ts.astimezone(LOCAL_TZ)
         minute = (local.minute // 5) * 5
         key = local.replace(minute=minute, second=0, microsecond=0)
-        buckets[key][device_key].append(float(value))
+        buckets[key][(device_key, metric_key)].append(float(value))
 
     out = []
     for stamp in sorted(buckets):
         b = buckets[stamp]
-        if any(k not in b for k in wanted):
+        if any((key, "electrical_power_w") not in b for key in mandatory_power):
             continue
-        avg = {k: sum(b[k]) / len(b[k]) for k in wanted}
-        pv = max(0.0, avg["pv_solaredge"] + avg["pv_goodwe4200"] + avg["pv_goodwe2000"])
-        grid = avg["grid_p1"]
-        tesla = max(0.0, avg["tesla"])
+
+        def avg_power(key):
+            values = b.get((key, "electrical_power_w"))
+            return None if not values else sum(values) / len(values)
+
+        def active_state(key):
+            values = b.get((key, "active"))
+            return None if not values else max(values) >= 0.5
+
+        grid = avg_power("grid_p1")
+        pv = max(
+            0.0,
+            sum(avg_power(key) or 0.0 for key in (
+                "pv_solaredge", "pv_goodwe4200", "pv_goodwe2000",
+            )),
+        )
+        tesla = max(0.0, avg_power("tesla") or 0.0)
+        boiler_raw = avg_power("boiler")
+        quatt_raw = avg_power("quatt_cic")
+        boiler = None if boiler_raw is None else max(0.0, boiler_raw)
+        quatt = None if quatt_raw is None else max(0.0, quatt_raw)
+        washer = active_state("washer")
+        dryer = active_state("dryer")
         export = max(0.0, -grid)
         house = max(0.0, pv + grid)
-        # Keep only intervals that materially help answer EV/PV/export questions.
-        if export < 150 and tesla < 200:
+        tracked = tesla + (boiler or 0.0) + (quatt or 0.0)
+        other_house = max(0.0, house - tracked)
+
+        if (
+            export < 150
+            and tesla < 200
+            and (boiler or 0.0) < 200
+            and (quatt or 0.0) < 200
+            and washer is not True
+            and dryer is not True
+        ):
             continue
+
         out.append({
             "atLocal": stamp.isoformat(),
             "gridW": round(grid),
             "pvW": round(pv),
             "houseW": round(house),
             "teslaW": round(tesla),
+            "boilerW": None if boiler is None else round(boiler),
+            "quattW": None if quatt is None else round(quatt),
+            "washerActive": washer,
+            "dryerActive": dryer,
+            "otherHouseWDerived": round(other_house),
             "exportW": round(export),
         })
-    # Bound model context. The newest intervals are generally most useful for "today".
     return out[-180:]
 
-def build_evidence(day):
+
+def _project_action(action):
+    if not isinstance(action, dict):
+        return None
+
+    # Canonical planner-history stores dynamic-shadow-plan.json, whose
+    # executable planning decisions live in plan["slots"]. Do not use the
+    # separate website publish projection (plan.plan.actions) as historical
+    # decision authority.
+    start = action.get("slot_start_utc") or action.get("start")
+    return {
+        "start": start,
+        "localDate": action.get("localDate"),
+        "pvForecastW": action.get("pvForecastW"),
+        "baseLoadForecastW": action.get("baseLoadForecastW"),
+        "quattForecastW": action.get("quattForecastW"),
+        "forecastExportBeforeFlexW": action.get("forecastExportBeforeFlexW"),
+        "correctedExportBeforeFlexW": action.get("correctedExportBeforeFlexW"),
+        "confidence": action.get("confidence"),
+        "wwPlanW": action.get("wwPlanW"),
+        "wwAllocationReason": action.get("wwAllocationReason"),
+        "wwCandidatePvCoverage": action.get("wwCandidatePvCoverage"),
+        "wwCandidateGridImportW": action.get("wwCandidateGridImportW"),
+        "wwCandidateSourceEligible": action.get("wwCandidateSourceEligible"),
+        "evPlanW": action.get("evPlanW"),
+        "evPlanA": action.get("evPlanA"),
+        "evPlanPhaseMode": action.get("evPlanPhaseMode"),
+        "evAllocationReason": action.get("evAllocationReason"),
+        "evOpportunityWindowId": action.get("evOpportunityWindowId"),
+        "evOpportunityWindowClass": action.get("evOpportunityWindowClass"),
+        "evOpportunityWindowSelectionReason": action.get(
+            "evOpportunityWindowSelectionReason"
+        ),
+        "evOpportunityWindowPvCoverage": action.get(
+            "evOpportunityWindowPvCoverage"
+        ),
+        "evDeadlineRequired": action.get("evDeadlineRequired"),
+        "quookerMode": action.get("quookerMode"),
+        "quookerPlanW": action.get("quookerPlanW"),
+        "quookerOpportunityAllowed": action.get("quookerOpportunityAllowed"),
+        "gridImportAfterFlexW": action.get("gridImportAfterFlexW"),
+        "gridExportAfterFlexW": action.get("gridExportAfterFlexW"),
+    }
+
+
+def _planner_decision_window(day, anchors):
+    if not os.path.exists(PLANNER_DB) or not anchors:
+        return []
+
+    start, end = _bounds(day)
+    query_start = start - timedelta(hours=2)
+    with sqlite3.connect(f"file:{PLANNER_DB}?mode=ro", uri=True) as db:
+        db.execute("PRAGMA query_only=ON")
+        rows = db.execute(
+            """
+            SELECT generated_at_utc,snapshot_zlib
+            FROM planner_snapshots
+            WHERE generated_at_utc>=? AND generated_at_utc<?
+            ORDER BY generated_at_utc
+            """,
+            (_iso_z(query_start), _iso_z(end)),
+        ).fetchall()
+
+    snapshots = []
+    for generated_text, blob in rows:
+        generated = _parse_ts(generated_text)
+        if generated is None:
+            continue
+        try:
+            payload = json.loads(zlib.decompress(blob).decode("utf-8"))
+        except (TypeError, ValueError, zlib.error, json.JSONDecodeError):
+            continue
+        snapshots.append((generated.astimezone(timezone.utc), payload))
+
+    out = []
+    seen = set()
+    for anchor in anchors:
+        anchor_utc = anchor.astimezone(timezone.utc)
+        eligible = [item for item in snapshots if item[0] <= anchor_utc]
+        if not eligible:
+            continue
+        generated, snapshot = eligible[-1]
+        age_min = (anchor_utc - generated).total_seconds() / 60.0
+        if age_min > 90:
+            continue
+
+        plan = snapshot.get("plan") or {}
+        context = snapshot.get("context") or {}
+        slots = plan.get("slots") or []
+        selected = None
+        for action in slots:
+            action_start = _parse_ts(
+                action.get("slot_start_utc") or action.get("start")
+            )
+            if action_start is None:
+                continue
+            action_start_utc = action_start.astimezone(timezone.utc)
+            action_end_utc = action_start_utc + timedelta(minutes=15)
+            if action_start_utc <= anchor_utc < action_end_utc:
+                selected = action
+                break
+
+        dedupe_key = (generated.isoformat(), (selected or {}).get("start"))
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+
+        realtime = context.get("realtime") or plan.get("realtime") or {}
+        tesla_context = context.get("tesla") or {}
+        deadline = tesla_context.get("deadline") or plan.get("deadlinePlan") or {}
+        guardrails = plan.get("guardrails") or {}
+        out.append({
+            "anchorLocal": anchor.isoformat(),
+            "snapshotGeneratedAtLocal": generated.astimezone(LOCAL_TZ).isoformat(),
+            "snapshotAgeMinutes": round(age_min, 1),
+            "contextSource": context.get("contextSource"),
+            "objective": snapshot.get("objective") or plan.get("objective"),
+            "realtime": {
+                "actualP1ExportW": realtime.get("actualP1ExportW"),
+                "recentLocalAccuracy": realtime.get("recentLocalAccuracy"),
+                "p1CorrectionPolicy": realtime.get("p1CorrectionPolicy"),
+            },
+            "deadline": {
+                key: deadline.get(key)
+                for key in (
+                    "active", "connected", "remainingKWh", "deadlineAt",
+                    "reserveNeedKWh", "reserveAddedKWh", "feasibleWithinVisibleHorizon",
+                )
+                if key in deadline
+            },
+            "guardrails": {
+                key: guardrails.get(key)
+                for key in (
+                    "wwSourceMode", "wwElectricalFlexEligible", "wwSourceBlockReason",
+                    "teslaRole", "evDeadlineHardConstraint",
+                    "contractPolicyEnforced", "inputFreshnessFailClosed",
+                )
+                if key in guardrails
+            },
+            "action": _project_action(selected),
+        })
+    return out[-12:]
+
+
+def _forecast_vs_actual_15m(day, anchors):
+    start, end = _bounds(day)
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
+        db.execute("PRAGMA query_only=ON")
+        tables = {
+            row[0]
+            for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        if "measurements_15m" not in tables or "pv_forecast_v2_archive" not in tables:
+            return {
+                "available": False,
+                "reason": "CANONICAL_15M_OR_FORECAST_ARCHIVE_MISSING",
+                "summary": {},
+                "slots": [],
+            }
+
+        actual_rows = db.execute(
+            """
+            SELECT m.slot_start_utc,d.device_key,m.value_avg,m.energy_wh,m.quality
+            FROM measurements_15m m
+            JOIN devices d ON d.id=m.device_id
+            JOIN metrics x ON x.id=m.metric_id
+            WHERE m.slot_start_utc>=? AND m.slot_start_utc<?
+              AND x.metric_key='electrical_power_w'
+              AND d.device_key IN (
+                'grid_p1','pv_solaredge','pv_goodwe4200','pv_goodwe2000',
+                'tesla','boiler'
+              )
+              AND m.quality IN ('complete','partial')
+            ORDER BY m.slot_start_utc
+            """,
+            (_iso_z(start), _iso_z(end)),
+        ).fetchall()
+
+        forecast_rows = db.execute(
+            """
+            SELECT f.slot_start_utc,f.forecast_w,f.confidence,f.model_basis,f.generated_at
+            FROM pv_forecast_v2_archive f
+            WHERE f.slot_start_utc>=? AND f.slot_start_utc<?
+              AND f.generated_at = (
+                SELECT MAX(f2.generated_at)
+                FROM pv_forecast_v2_archive f2
+                WHERE f2.slot_start_utc=f.slot_start_utc
+                  AND julianday(f2.generated_at) <=
+                      julianday(f.slot_start_utc) - (12.0/24.0)
+              )
+            ORDER BY f.slot_start_utc
+            """,
+            (_iso_z(start), _iso_z(end)),
+        ).fetchall()
+
+    slots = {}
+    for slot_text, device_key, value_avg, energy_wh, quality in actual_rows:
+        item = slots.setdefault(slot_text, {
+            "pvEnergyWh": 0.0,
+            "pvSeen": set(),
+            "exportKWh": None,
+            "evPowerW": None,
+            "boilerPowerW": None,
+            "qualities": set(),
+        })
+        item["qualities"].add(str(quality))
+        if device_key.startswith("pv_") and energy_wh is not None:
+            item["pvEnergyWh"] += max(0.0, float(energy_wh))
+            item["pvSeen"].add(device_key)
+        elif device_key == "grid_p1" and energy_wh is not None:
+            item["exportKWh"] = round(max(0.0, -float(energy_wh) / 1000.0), 6)
+        elif device_key == "tesla" and value_avg is not None:
+            item["evPowerW"] = round(float(value_avg), 1)
+        elif device_key == "boiler" and value_avg is not None:
+            item["boilerPowerW"] = round(float(value_avg), 1)
+
+    forecasts = {}
+    for slot_text, forecast_w, confidence, model_basis, generated_at in forecast_rows:
+        slot_dt = _parse_ts(slot_text)
+        generated_dt = _parse_ts(generated_at)
+        forecasts[slot_text] = {
+            "forecastW": float(forecast_w),
+            "confidence": confidence,
+            "modelBasis": model_basis,
+            "generatedAt": generated_at,
+            "leadMinutes": (
+                None if slot_dt is None or generated_dt is None
+                else round((slot_dt - generated_dt).total_seconds() / 60.0, 1)
+            ),
+        }
+
+    comparable = []
+    details_by_key = {}
+    required_pv = {"pv_solaredge", "pv_goodwe4200", "pv_goodwe2000"}
+    for slot_text in sorted(set(slots) | set(forecasts)):
+        actual = slots.get(slot_text) or {}
+        forecast = forecasts.get(slot_text)
+        pv_seen = actual.get("pvSeen") or set()
+        pv_actual_kwh = (
+            round(actual.get("pvEnergyWh", 0.0) / 1000.0, 6)
+            if required_pv.issubset(pv_seen)
+            else None
+        )
+        forecast_kwh = (
+            None if forecast is None
+            else round(forecast["forecastW"] * 0.25 / 1000.0, 6)
+        )
+        error_kwh = (
+            None if pv_actual_kwh is None or forecast_kwh is None
+            else round(pv_actual_kwh - forecast_kwh, 6)
+        )
+        actual_avg_w = (
+            None if pv_actual_kwh is None
+            else round(pv_actual_kwh * 4000.0, 1)
+        )
+        error_w = (
+            None if actual_avg_w is None or forecast is None
+            else round(actual_avg_w - forecast["forecastW"], 1)
+        )
+        detail = {
+            "startLocal": (
+                _parse_ts(slot_text).astimezone(LOCAL_TZ).isoformat()
+                if _parse_ts(slot_text) is not None else slot_text
+            ),
+            "pvForecastW": None if forecast is None else round(forecast["forecastW"], 1),
+            "pvActualAvgW": actual_avg_w,
+            "pvForecastKWh": forecast_kwh,
+            "pvActualKWh": pv_actual_kwh,
+            "pvErrorKWhActualMinusForecast": error_kwh,
+            "pvErrorWActualMinusForecast": error_w,
+            "exportKWh": actual.get("exportKWh"),
+            "evPowerW": actual.get("evPowerW"),
+            "boilerPowerW": actual.get("boilerPowerW"),
+            "forecastConfidence": None if forecast is None else forecast.get("confidence"),
+            "forecastModelBasis": None if forecast is None else forecast.get("modelBasis"),
+            "forecastGeneratedAt": None if forecast is None else forecast.get("generatedAt"),
+            "forecastLeadMinutes": None if forecast is None else forecast.get("leadMinutes"),
+            "actualQuality": sorted(actual.get("qualities") or []),
+        }
+        details_by_key[slot_text] = detail
+        if error_w is not None:
+            comparable.append((slot_text, detail))
+
+    summary = {
+        "selection": "FIXED_LEAD_12H_NO_HINDSIGHT",
+        "slotCount": len(comparable),
+        "forecastKWh": round(sum(x[1]["pvForecastKWh"] for x in comparable), 3)
+            if comparable else 0.0,
+        "actualKWh": round(sum(x[1]["pvActualKWh"] for x in comparable), 3)
+            if comparable else 0.0,
+        "biasKWhActualMinusForecast": round(
+            sum(x[1]["pvErrorKWhActualMinusForecast"] for x in comparable), 3
+        ) if comparable else 0.0,
+        "meanAbsoluteErrorW": round(
+            sum(abs(x[1]["pvErrorWActualMinusForecast"]) for x in comparable)
+            / len(comparable), 1
+        ) if comparable else None,
+    }
+
+    priority = []
+    for anchor in anchors:
+        anchor_utc = anchor.astimezone(timezone.utc)
+        for slot_text in details_by_key:
+            slot_dt = _parse_ts(slot_text)
+            if slot_dt is not None and abs(
+                (slot_dt.astimezone(timezone.utc) - anchor_utc).total_seconds()
+            ) <= 30 * 60:
+                priority.append(slot_text)
+
+    priority.extend(
+        key for key, detail in sorted(
+            comparable,
+            key=lambda item: abs(item[1]["pvErrorWActualMinusForecast"]),
+            reverse=True,
+        )[:8]
+    )
+    priority.extend(
+        key for key, detail in sorted(
+            details_by_key.items(),
+            key=lambda item: item[1].get("exportKWh") or 0.0,
+            reverse=True,
+        )[:8]
+    )
+
+    selected = []
+    seen = set()
+    for key in priority:
+        if key in seen:
+            continue
+        seen.add(key)
+        selected.append(key)
+        if len(selected) >= 24:
+            break
+
+    return {
+        "available": bool(forecasts),
+        "summary": summary,
+        "slots": [details_by_key[key] for key in sorted(selected)],
+    }
+
+
+def build_evidence(day, question=""):
     performance = _load_performance(day)
     ev_telemetry = _ev_telemetry(day)
     ev_control = _ev_control_events(day)
+    anchors = _question_anchors(question, day, performance, ev_control)
     health = _load_health()
+    planner_window = _planner_decision_window(day, anchors)
+    forecast_actual = _forecast_vs_actual_15m(day, anchors)
     return {
         "schema": EVIDENCE_SCHEMA,
         "generatedAt": _iso_z(datetime.now(timezone.utc)),
@@ -349,17 +775,23 @@ def build_evidence(day):
             "measurements": "ems-history.sqlite",
             "evTelemetry": "Homey canonical state push -> ems-history.sqlite",
             "evControlEvents": "Homey observability LAN push -> ems-history.sqlite",
-            "planner": "planner-history.sqlite via ems-performance",
+            "planner": "planner-history.sqlite frozen decision snapshots",
+            "forecastComparison": "pv_forecast_v2_archive fixed 12h lead + canonical measurements_15m",
             "performance": "EMS_PI_DAY_PERFORMANCE_V0.1",
             "currentHealth": "EMS_PI_HEALTH_V0.1 via ems-health",
         },
+        "analysisAnchorsLocal": [anchor.isoformat() for anchor in anchors],
         "performance": performance,
         "timeline5m": _timeline(day),
         "evTelemetry5m": ev_telemetry,
         "evControlEvents": ev_control,
+        "plannerDecisionWindow": planner_window,
+        "forecastVsActual15m": forecast_actual,
         "piHealthCurrent": health,
         "limitations": [
             "EV telemetry and control-event history only exist from their V0.2 commissioning onward; earlier gaps must not be backfilled by inference.",
+            "Planner decision windows use the latest frozen snapshot at or before each analysis anchor; missing snapshots remain missing.",
+            "PV forecast comparison uses a fixed 12-hour no-hindsight archive selection and must not substitute a later forecast.",
             "Observed phase mode is derived from measured phase currents; use explicit actuator/gate phase fields when control-event evidence exists.",
             "Current Pi health does not prove health at an earlier historical decision timestamp.",
             "Recent incident evidence is best-effort journal coverage until durable incident history is implemented.",
@@ -467,7 +899,7 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(question, str) or not question.strip() or len(question) > MAX_QUESTION_CHARS:
                 raise ValueError("QUESTION_INVALID")
             day = _resolve_day(request_payload.get("day"))
-            evidence = build_evidence(day)
+            evidence = build_evidence(day, question.strip())
             answer, response_id = ask_model(question.strip(), evidence)
             send_json(self, 200, {
                 "schema": SCHEMA,
@@ -483,6 +915,8 @@ class Handler(BaseHTTPRequestHandler):
                     "timelinePoints": len(evidence["timeline5m"]),
                     "evTelemetryPoints": len(evidence["evTelemetry5m"]),
                     "evControlEvents": len(evidence["evControlEvents"]),
+                    "plannerDecisionPoints": len(evidence["plannerDecisionWindow"]),
+                    "forecastComparisonSlots": len(evidence["forecastVsActual15m"].get("slots") or []),
                     "piHealthStatus": evidence["piHealthCurrent"].get("status"),
                     "limitations": evidence["limitations"],
                 },

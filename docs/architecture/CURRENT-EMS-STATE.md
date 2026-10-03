@@ -391,7 +391,7 @@ The 2026-09-27 opportunity-only EV cutover exposed a stale/invalid Easee access 
 EV writer v0.4.5 makes that boundary explicit. Cloud HTTP failures are operation-qualified (`EASEE_REFRESH_HTTP_*`, `EASEE_PHASE_COMMAND_HTTP_*`, `EASEE_PHASE_COMMAND_RETRY_HTTP_*`, and equivalent observation codes). A recoverable first phase-command HTTP 401 remains silent if the single refresh + retry succeeds. Terminal authentication failures such as refresh 400/401/403, missing/invalid token pair, primary phase 403, or a 401/403 on the post-refresh retry remain fail-closed and additionally emit one deduplicated operational alert for the active incident. Alert delivery is best-effort: push to the Homey Owner is preferred; if push cannot be delivered, a Homey Timeline notification is attempted. Alert delivery never changes Gate authority, never resumes charging, never bypasses `safeAbort`, and contains no token, user ID or other secret material. The remediation is re-running the private Pi commissioning bootstrap `services/pi/commissioning/bootstrap_easee_homey_tokens.py`.
 
 
-## Read-only AI analysis layer — V0.2
+## Read-only AI analysis layer — V0.3
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
 diagnosis through Frontend V2. Canonical source is
@@ -454,6 +454,20 @@ provide context but is not proof of health at a historical decision timestamp.
 Richer EV telemetry and event history exists only from V0.2 commissioning
 forward. Missing earlier evidence must remain missing; it must not be backfilled
 by inference.
+
+V0.3 broadens the same read-only analysis boundary without adding any control
+authority. The bounded 5-minute evidence timeline now includes boiler and Quatt
+power plus washer/dryer active state where canonical history exists. For
+question-relevant timestamps, the AI reader selects the latest frozen
+`planner-history.sqlite` decision snapshot generated at or before the anchor
+and projects only the relevant canonical planner slot, allocation targets and reasons. It also compares archived
+PV forecast with canonical 15-minute actuals using the fixed 12-hour
+no-hindsight forecast selection already used by PV & Flex. Later forecasts may
+not be used to explain or judge earlier planner decisions.
+
+The added planner and forecast readers remain SQLite `mode=ro` with
+`PRAGMA query_only=ON`, feed model context only, and are never consumed
+upstream by planner, Gate, actuator or any device writer.
 
 Frontend V2 exposes the human interface at `/ai/`. Private Caddy ingress
 proxies `/agent/*` only to the loopback analysis service. Model credentials
