@@ -112,7 +112,11 @@ def _load_health():
     return payload
 
 def _observed_phase_mode(values):
-    charging = values.get("ev_charging") == 1.0
+    charging_value = values.get("ev_charging")
+    if charging_value == 0.0:
+        return "OFF"
+    if charging_value != 1.0:
+        return "UNKNOWN"
     currents = [
         values.get("ev_l1_a"),
         values.get("ev_l2_a"),
@@ -122,8 +126,6 @@ def _observed_phase_mode(values):
         1 for value in currents
         if isinstance(value, (int, float)) and abs(value) >= 2.0
     )
-    if not charging and active == 0:
-        return "OFF"
     if active >= 2:
         return "3P"
     if active == 1:
