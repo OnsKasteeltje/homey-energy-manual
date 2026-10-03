@@ -97,6 +97,7 @@ grep -q 'EMS_PI_HEALTH_V0.1' "$HEALTH_EVIDENCE" || fail "standard EMS health evi
 grep -q '"readOnly": True' "$HEALTH_EVIDENCE" || fail "EMS health evidence must declare read-only"
 grep -q '"controlWrites": False' "$HEALTH_EVIDENCE" || fail "EMS health evidence must declare no control writes"
 grep -q 'recentIncidentSignals' "$HEALTH_EVIDENCE" || fail "EMS health evidence must expose recent incident signals"
+grep -q 'lastExecution' "$HEALTH_EVIDENCE" || fail "EMS health evidence must verify timer-triggered service execution"
 grep -q 'services/pi/health' scripts/deploy_ems_pi.sh || fail "target-structure Pi health source is not deployed"
 grep -q 'TARGET-STRUCTURE HEALTH FILES' scripts/ems_pi_drift_check.sh || fail "target-structure Pi health source is not drift-checked"
 grep -q '/usr/local/bin/ems-health' scripts/deploy_ems_pi.sh || fail "ems-health command is not installed by deployment"
