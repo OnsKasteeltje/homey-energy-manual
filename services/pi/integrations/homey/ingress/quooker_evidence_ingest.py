@@ -210,15 +210,43 @@ NORMALIZED_COLUMNS = (
     "physical_write_performed",
 )
 
+# P1 watts and detector pulse watts are evidence values, but not event identity.
+# A new row is needed when control reasoning, actuator state or detector state
+# changes. This prevents high-rate observability triggers from turning normal
+# P1 variation into an event stream.
+DEDUPE_COLUMNS = (
+    "control_mode",
+    "control_target_on",
+    "control_reason",
+    "p1_fresh",
+    "actuator_control_valid",
+    "actuator_control_fresh",
+    "actuator_desired_on",
+    "actuator_actual_on",
+    "actuator_would_write",
+    "actuator_reason",
+    "detector_valid",
+    "detector_switch_on",
+    "detector_active",
+    "detector_status",
+    "detector_reason",
+    "detector_last_heating_at",
+    "physical_write_performed",
+)
+
 
 def _normalized_tuple(data):
     return tuple(data[key] for key in NORMALIZED_COLUMNS)
 
 
-def _latest_normalized_tuple(con):
+def _dedupe_tuple(data):
+    return tuple(data[key] for key in DEDUPE_COLUMNS)
+
+
+def _latest_dedupe_tuple(con):
     row = con.execute(
         f"""
-        SELECT {",".join(NORMALIZED_COLUMNS)}
+        SELECT {",".join(DEDUPE_COLUMNS)}
         FROM quooker_control_events
         ORDER BY id DESC
         LIMIT 1
@@ -231,7 +259,8 @@ def archive_quooker_evidence(payload, db_path=HISTORY_DB):
     generated = _validate(payload)
     data = _extract(payload)
     hash_canonical = json.dumps(
-        data, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        {key: data[key] for key in DEDUPE_COLUMNS},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
     event_hash = hashlib.sha256(hash_canonical.encode("utf-8")).hexdigest()
     canonical = json.dumps(
@@ -242,7 +271,7 @@ def archive_quooker_evidence(payload, db_path=HISTORY_DB):
     con.execute("PRAGMA busy_timeout=2000")
     try:
         _ensure_schema(con)
-        if _latest_normalized_tuple(con) == _normalized_tuple(data):
+        if _latest_dedupe_tuple(con) == _dedupe_tuple(data):
             return {
                 "archived": True,
                 "inserted": False,
