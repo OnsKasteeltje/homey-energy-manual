@@ -414,5 +414,8 @@ inference and advice. Model text is never converted into an EMS control command.
 
 The AI evidence path must preserve read-only semantics end-to-end. The standardized
 `ems-performance` reader opens both `ems-history.sqlite` and `planner-history.sqlite`
-with SQLite `mode=ro`; live SQLite locking/change detection remains enabled so evidence reads stay coherent while the operational databases continue to change
-sandbox and cannot create journals or otherwise acquire write intent on evidence stores.
+with SQLite `mode=ro` and immediately enables `PRAGMA query_only=ON`. Because
+`ems-history.sqlite` runs in WAL mode, the hardened AI systemd sandbox grants only
+the bounded filesystem carve-out `ReadWritePaths=/home/jeroen/ems/data` so SQLite
+can perform WAL/SHM coordination. This filesystem permission does not make the SQL
+connection writable: `mode=ro` plus `query_only` remains the database access boundary.
