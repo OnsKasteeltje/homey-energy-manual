@@ -395,7 +395,16 @@ def ask_model(question, evidence):
         with urlrequest.urlopen(req, timeout=45) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urlerror.HTTPError as exc:
-        raise RuntimeError(f"MODEL_HTTP_{exc.code}") from exc
+        error_code = ""
+        try:
+            failure = json.loads(exc.read().decode("utf-8"))
+            error_code = str((failure.get("error") or {}).get("code") or "").strip()
+        except Exception:
+            error_code = ""
+        reason = f"MODEL_HTTP_{exc.code}"
+        if error_code:
+            reason += ":" + error_code
+        raise RuntimeError(reason) from exc
     except (urlerror.URLError, TimeoutError) as exc:
         raise RuntimeError("MODEL_UNAVAILABLE") from exc
 
@@ -470,10 +479,10 @@ class Handler(BaseHTTPRequestHandler):
                     "limitations": evidence["limitations"],
                 },
             })
-        except ValueError as exc:
-            send_json(self, 400, {"schema": SCHEMA, "status": "ERROR", "reason": str(exc)})
         except (json.JSONDecodeError, UnicodeDecodeError):
             send_json(self, 400, {"schema": SCHEMA, "status": "ERROR", "reason": "JSON_INVALID"})
+        except ValueError as exc:
+            send_json(self, 400, {"schema": SCHEMA, "status": "ERROR", "reason": str(exc)})
         except (OSError, sqlite3.Error, subprocess.SubprocessError, RuntimeError) as exc:
             reason = str(exc)
             status = 503 if reason in {
