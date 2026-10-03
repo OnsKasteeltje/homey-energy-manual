@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 ARCHIVE = ROOT / "services/pi/api/status/history_archive.py"
-EV_INGEST = ROOT / "services/pi/api/status/ev_control_ingest.py"
+EV_INGEST = ROOT / "services/pi/integrations/homey/ingress/ev_control_ingest.py"
 
 
 def load_module(name, path):
