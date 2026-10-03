@@ -65,6 +65,9 @@ jobs:
       - name: Run canonical Pi tests
         run: python -m pytest -q tests/state tests/planner
 
+      - name: Run Quooker detector regression tests
+        run: node --test tests/quooker-detector-v0.4.test.mjs
+
       - name: Run history integration regression tests
         run: |
           python -m pytest -q \
