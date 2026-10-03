@@ -13,7 +13,7 @@ TARGET_WW_SOURCE="$REPO/services/pi/planner/warm-water"
 TARGET_WW_RUNTIME="$RUNTIME/planner/warm-water"
 TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
 TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
-TARGET_HOMEY_INGRESS_FILE="$REPO/services/pi/integrations/homey/ingress/state_ingest.py"
+TARGET_HOMEY_INGRESS_SOURCE="$REPO/services/pi/integrations/homey/ingress"
 TARGET_HOMEY_EGRESS_SOURCE="$REPO/services/pi/integrations/homey/egress"
 TARGET_HOMEY_EGRESS_RUNTIME="$RUNTIME/homey-deploy"
 TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
@@ -168,11 +168,13 @@ if echo "$HONEYWELL_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; th
     exit 1
 fi
 
-if [[ ! -f "$TARGET_HOMEY_INGRESS_FILE" ]]; then
-    echo "ERROR: Homey ingress source is missing."
-    echo "Deployment aborted to protect the Homey -> Pi state path."
-    exit 1
-fi
+for ingress_file in state_ingest.py ev_control_ingest.py; do
+    if [[ ! -f "$TARGET_HOMEY_INGRESS_SOURCE/$ingress_file" ]]; then
+        echo "ERROR: Homey ingress source is missing: $ingress_file"
+        echo "Deployment aborted to protect the Homey -> Pi state/observability path."
+        exit 1
+    fi
+done
 
 mkdir -p "$TARGET_HOMEY_EGRESS_RUNTIME"
 if [[ ! -f "$TARGET_HOMEY_EGRESS_SOURCE/publish_pi_control_intent.py" ]]; then
@@ -185,10 +187,10 @@ mkdir -p "$TARGET_STATUS_RUNTIME"
 STATUS_UNMANAGED="$(
     diff -u \
         <(cd "$TARGET_STATUS_SOURCE" && find . -type f \
-            -not -path './state_ingest.py' \
             -printf '%P\n' | sort) \
         <(cd "$TARGET_STATUS_RUNTIME" && find . -type f \
             -not -path './state_ingest.py' \
+            -not -path './ev_control_ingest.py' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort) \
@@ -319,11 +321,15 @@ cp -a \
 
 mkdir -p "$TARGET_STATUS_RUNTIME"
 rsync -a --delete \
-    --exclude='state_ingest.py' \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     "$TARGET_STATUS_SOURCE/" "$TARGET_STATUS_RUNTIME/"
-cp -a "$TARGET_HOMEY_INGRESS_FILE" "$TARGET_STATUS_RUNTIME/state_ingest.py"
+cp -a \
+    "$TARGET_HOMEY_INGRESS_SOURCE/state_ingest.py" \
+    "$TARGET_STATUS_RUNTIME/state_ingest.py"
+cp -a \
+    "$TARGET_HOMEY_INGRESS_SOURCE/ev_control_ingest.py" \
+    "$TARGET_STATUS_RUNTIME/ev_control_ingest.py"
 
 mkdir -p "$TARGET_WEB_DATA_RUNTIME"
 rsync -a --delete \
