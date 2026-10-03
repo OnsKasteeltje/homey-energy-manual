@@ -79,6 +79,12 @@ jobs:
       - name: Run PV surplus replay validation tests
         run: python tests/replay/test_pv_surplus_absorption_backtest.py
 
+      - name: Run EV phase-current controller tests
+        run: |
+          node --test \
+            tests/ev-phase-current-controller-v0.1.test.mjs \
+            tests/ev-phase-current-bridge-v1.5.5.test.mjs
+
       - name: Run EV phase writer contract tests
         run: |
           node --test \
