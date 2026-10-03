@@ -2,7 +2,7 @@
 """Contract checks for the shared Frontend V2 main navigation."""
 from pathlib import Path
 
-PAGES = ("live", "settings", "history", "planner", "pv-flex", "heating")
+PAGES = ("live", "settings", "history", "planner", "pv-flex", "heating", "ai")
 NAV = Path("frontend/shared/navigation.js")
 nav = NAV.read_text()
 
@@ -13,6 +13,7 @@ expected = (
     ("planner", "Planner"),
     ("pv-flex", "PV & Flex"),
     ("heating", "Verwarming"),
+    ("ai", "AI Analyse"),
     ("groups", "Groepen & fasen"),
 )
 
