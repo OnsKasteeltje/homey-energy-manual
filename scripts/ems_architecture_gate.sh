@@ -126,6 +126,9 @@ pass "Frontend V2 local CSS/JS references resolve"
 [[ -f "$AI_ANALYSIS_DOC" ]] || fail "AI analysis architecture document missing"
 [[ -f "$AI_ANALYSIS_UNIT" ]] || fail "AI analysis systemd unit missing"
 grep -q 'controlWrites.*False' "$AI_ANALYSIS" || fail "AI analysis API does not declare read-only control boundary"
+grep -q 'mode=ro' "$AI_ANALYSIS" || fail "AI analysis timeline SQLite connection must be explicitly read-only"
+grep -q 'PRAGMA query_only=ON' "$AI_ANALYSIS" || fail "AI analysis timeline SQLite connection must enforce query_only"
+if grep -q 'immutable=1' "$AI_ANALYSIS"; then fail "AI analysis must not use immutable SQLite reads on live evidence"; fi
 grep -q 'ems-performance' "$AI_ANALYSIS" || fail "AI analysis API does not use standardized EMS performance evidence"
 if grep -q '/control/current' "$AI_ANALYSIS"; then fail "AI analysis API must not call Pi control endpoint"; fi
 grep -q 'EMS_AI_HOST=127.0.0.1' "$AI_ANALYSIS_UNIT" || fail "AI analysis API must bind loopback"
