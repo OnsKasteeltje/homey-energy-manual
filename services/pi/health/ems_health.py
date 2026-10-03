@@ -26,18 +26,45 @@ DATA_SOURCES = {
 }
 
 FUNCTION_UNITS = {
-    "statusApi": "ems-status-api.service",
-    "webDataApi": "ems-web-data-api.service",
-    "aiAnalysis": "ems-ai-analysis.service",
-    "forecastChain": "ems-forecast-chain.timer",
-    "history15m": "ems-history-15m.timer",
-    "historyDaily": "ems-history-daily.timer",
-    "evDeadlineCommand": "ems-ev-deadline-command.timer",
-    "evDeadlineState": "ems-ev-deadline-state.timer",
-    "weatherForecast": "ems-weather-forecast.timer",
-    "quattCurrent": "ems-quatt-current.timer",
-    "honeywellState": "ems-honeywell-state.timer",
-    "honeywellSchedule": "ems-honeywell-schedule.timer",
+    "statusApi": {"unit": "ems-status-api.service"},
+    "webDataApi": {"unit": "ems-web-data-api.service"},
+    "aiAnalysis": {"unit": "ems-ai-analysis.service"},
+    "forecastChain": {
+        "unit": "ems-forecast-chain.timer",
+        "service": "ems-forecast-chain.service",
+    },
+    "history15m": {
+        "unit": "ems-history-15m.timer",
+        "service": "ems-history-15m.service",
+    },
+    "historyDaily": {
+        "unit": "ems-history-daily.timer",
+        "service": "ems-history-daily.service",
+    },
+    "evDeadlineCommand": {
+        "unit": "ems-ev-deadline-command.timer",
+        "service": "ems-ev-deadline-command.service",
+    },
+    "evDeadlineState": {
+        "unit": "ems-ev-deadline-state.timer",
+        "service": "ems-ev-deadline-state.service",
+    },
+    "weatherForecast": {
+        "unit": "ems-weather-forecast.timer",
+        "service": "ems-weather-forecast.service",
+    },
+    "quattCurrent": {
+        "unit": "ems-quatt-current.timer",
+        "service": "ems-quatt-current.service",
+    },
+    "honeywellState": {
+        "unit": "ems-honeywell-state.timer",
+        "service": "ems-honeywell-state.service",
+    },
+    "honeywellSchedule": {
+        "unit": "ems-honeywell-schedule.timer",
+        "service": "ems-honeywell-schedule.service",
+    },
 }
 
 
@@ -162,9 +189,47 @@ def _systemctl_show(unit, expected_active=True):
     }
 
 
+def _execution_status(unit):
+    state = _systemctl_show(unit, expected_active=False)
+    if state.get("status") != "OK":
+        return state
+
+    active = state.get("ActiveState")
+    exit_at = state.get("ExecMainExitTimestamp") or ""
+    main_status = state.get("ExecMainStatus")
+
+    # A oneshot service can legitimately be inactive between timer runs, but
+    # health must prove that it has actually executed successfully. Merely
+    # seeing an active timer is not enough.
+    if active == "inactive" and not exit_at:
+        state["status"] = "NOT_PROVEN"
+    elif main_status not in (None, "", "0"):
+        state["status"] = "DEGRADED"
+    return state
+
+
 def _functions_status():
-    items = {name: _systemctl_show(unit) for name, unit in FUNCTION_UNITS.items()}
-    degraded = any(v.get("status") != "OK" for v in items.values())
+    items = {}
+    degraded = False
+
+    for name, spec in FUNCTION_UNITS.items():
+        schedule = _systemctl_show(spec["unit"], expected_active=True)
+        item = {
+            "status": schedule.get("status"),
+            "schedule": schedule,
+        }
+
+        service = spec.get("service")
+        if service:
+            execution = _execution_status(service)
+            item["lastExecution"] = execution
+            if execution.get("status") != "OK":
+                item["status"] = "DEGRADED"
+
+        if item["status"] != "OK":
+            degraded = True
+        items[name] = item
+
     return items, degraded
 
 
