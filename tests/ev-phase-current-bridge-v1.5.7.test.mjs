@@ -14,7 +14,7 @@ test('full HomeyScript candidate parses as async JavaScript',()=>{
 });
 
 test('v1.5.7 carries the deployed production identity',()=>{
-  assert.match(bridge,/PI_DYNAMIC_PLANNER_BRIDGE_V1\.5\.7_PHASE_CURRENT/);
+  assert.match(bridge,/PI_DYNAMIC_PLANNER_BRIDGE_V1\.5\.7_PREDICTIVE_CURRENT/);
   assert.match(bridge,/stable Bridge flow 8bf53fdb-76f4-47db-8ccb-773ac515f06e/);
 });
 
