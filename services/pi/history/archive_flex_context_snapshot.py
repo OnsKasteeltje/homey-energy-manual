@@ -232,6 +232,14 @@ def _semantic_payload(snapshot):
     if isinstance(energy, dict):
         energy.pop("sourceSampleAt", None)
         energy.pop("generatedAt", None)
+
+    progression = clone.get("progression")
+    if isinstance(progression, dict):
+        freshness = progression.get("sourceFreshness")
+        if isinstance(freshness, dict):
+            for source in freshness.values():
+                if isinstance(source, dict):
+                    source.pop("ageSeconds", None)
     return clone
 
 
