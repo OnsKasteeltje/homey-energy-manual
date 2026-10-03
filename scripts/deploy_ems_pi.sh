@@ -191,6 +191,7 @@ STATUS_UNMANAGED="$(
         <(cd "$TARGET_STATUS_RUNTIME" && find . -type f \
             -not -path './state_ingest.py' \
             -not -path './ev_control_ingest.py' \
+            -not -path './quooker_evidence_ingest.py' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort) \
