@@ -88,7 +88,8 @@ def _load_performance(day):
 def _timeline(day):
     start, end = _bounds(day)
     wanted = ("grid_p1", "pv_solaredge", "pv_goodwe4200", "pv_goodwe2000", "tesla")
-    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro&immutable=1", uri=True) as db:
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
+        db.execute("PRAGMA query_only=ON")
         device_ids = dict(db.execute(
             "SELECT device_key,id FROM devices WHERE device_key IN (%s)" %
             ",".join("?" for _ in wanted),
