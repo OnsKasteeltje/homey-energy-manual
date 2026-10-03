@@ -32,7 +32,8 @@ FUNCTION_UNITS = {
     "forecastChain": "ems-forecast-chain.timer",
     "history15m": "ems-history-15m.timer",
     "historyDaily": "ems-history-daily.timer",
-    "evDeadline": "ems-ev-deadline-command.timer",
+    "evDeadlineCommand": "ems-ev-deadline-command.timer",
+    "evDeadlineState": "ems-ev-deadline-state.timer",
     "weatherForecast": "ems-weather-forecast.timer",
     "quattCurrent": "ems-quatt-current.timer",
     "honeywellState": "ems-honeywell-state.timer",
@@ -295,10 +296,20 @@ def _recent_incidents():
             "priority": item.get("PRIORITY"),
             "message": str(item.get("MESSAGE") or "")[:300],
         })
+    partial = bool(proc.stderr.strip())
     return {
-        "coverage": "JOURNAL_24H_BEST_EFFORT",
+        "coverage": (
+            "JOURNAL_24H_PARTIAL"
+            if partial
+            else "JOURNAL_24H_BEST_EFFORT"
+        ),
         "events": events[-30:],
-        "note": "Not a durable incident archive; recovered incidents can fall outside this window.",
+        "note": (
+            "Journal visibility is partial for this service user; "
+            "this is not a durable incident archive."
+            if partial
+            else "Not a durable incident archive; recovered incidents can fall outside this window."
+        ),
     }
 
 
