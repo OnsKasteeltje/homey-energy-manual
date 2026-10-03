@@ -411,3 +411,8 @@ credentials fail explicitly rather than degrading to fabricated analysis.
 
 AI output is explanatory only and must distinguish observed fact, evidence-based
 inference and advice. Model text is never converted into an EMS control command.
+
+The AI evidence path must preserve read-only semantics end-to-end. The standardized
+`ems-performance` reader opens both `ems-history.sqlite` and `planner-history.sqlite`
+with SQLite `mode=ro`, so it remains compatible with the hardened read-only systemd
+sandbox and cannot create journals or otherwise acquire write intent on evidence stores.
