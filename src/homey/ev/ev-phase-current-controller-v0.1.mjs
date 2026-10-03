@@ -30,6 +30,10 @@ export const CONFIG = Object.freeze({
   upwardModeDwellMs: 300000,
 
   upscaleConfirmMs: 45000,
+  // Prefer using a little grid import over leaving several hundred watts of
+  // PV export unused. This threshold applies only to +1 A decisions; the
+  // existing importDeadbandW remains the fast-down safety boundary.
+  upscaleImportTargetW: 200,
   importDeadbandW: 250,
 
   maxRollingSamples: 240,
@@ -346,7 +350,7 @@ function regulateCurrent({
     };
   }
 
-  if (syntheticP1W <= -wpa && requestedA < maxA) {
+  if (syntheticP1W + wpa <= cfg.upscaleImportTargetW && requestedA < maxA) {
     const since = finite(previousUpscaleSinceMs)
       ? Number(previousUpscaleSinceMs)
       : nowMs;
