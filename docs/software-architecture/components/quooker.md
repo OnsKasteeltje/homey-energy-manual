@@ -1,14 +1,16 @@
 ---
 component: quooker
 title: Quooker Detector
-version: 0.4
+version: 0.5
 status: active
 architecture_status: implemented
 last_verified: 2026-10-03
 source:
-  - Canonical source: src/homey/observability/quooker/quooker-detector-v0.4.live-homey.js
-  - Pure classifier: src/homey/observability/quooker/quooker-detector-v0.4.mjs
-  - Homey Advanced Flow: EM v2 | 00 Core Tick | v0.10.13 (EV electrical context)
+  - Canonical runtime source: apps/homey/observability/quooker/quooker-detector-v0.5.live-homey.js
+  - Pure classifier: apps/homey/observability/quooker/quooker-detector-v0.5.mjs
+  - Replay tests: tests/replay/quooker-detector-v0.5.test.mjs
+  - Homey Advanced Flow: EM v2 | 01 Quooker Detector | v0.5 LIVE OBSERVE-ONLY
+  - Homey Flow ID: 939a347f-0b19-4c3d-98d3-77faa01fce0b
 owner: EMS
 ---
 
@@ -16,141 +18,67 @@ owner: EMS
 
 ## 1. Doel
 
-De Quooker-detector classificeert de operationele toestand van de Quooker zonder een extra volledige Homey device-snapshot te introduceren.
+De Quooker-detector classificeert de operationele toestand van de Quooker zonder fysieke aansturing. De Cooker-switch blijft autoritatief voor OFF/ON; P1-fasevermogen wordt uitsluitend gebruikt om een verwarmingspuls te herkennen en het momentane Quooker-vermogen te schatten.
 
-De architectuur gebruikt twee verschillende bronnen met expliciete verantwoordelijkheden:
+De detector publiceert alleen afgeleide toestand en diagnostiek naar Homey Logic. De aparte flow `EM v2 | 60 Actuator | Quooker v0.2 LIVE` blijft de enige fysieke Quooker-writer.
 
-- de Homey `onoff` capability van de Cooker-switch is autoritatief voor aan/uit;
-- P1 fase L3 wordt alleen gebruikt om te bepalen of de Quooker op dat moment daadwerkelijk verwarmt en om het geschatte Quooker-vermogen af te leiden.
+## 2. Actieve runtime
 
-De detector stuurt de Quooker niet aan. Hij publiceert uitsluitend afgeleide toestand en diagnostiek naar Homey Logic, waarna Core deze informatie in dezelfde centrale EMS-state opneemt.
+- Flow: `EM v2 | 01 Quooker Detector | v0.5 LIVE OBSERVE-ONLY`
+- Flow ID: `939a347f-0b19-4c3d-98d3-77faa01fce0b`
+- status: enabled, not broken
+- v0.4 Flow ID `e291cf14-0b92-4cef-ae8b-a699692b6c9a`: disabled rollback
+- cadence: elke 15 seconden plus Cooker ON/OFF triggers
+- physical writes: geen
 
-## 2. Runtime en 2026-10-03 herstel
+De cutover is uitgevoerd met v0.4 eerst uit en daarna v0.5 aan. Er is daardoor maximaal één actieve detectorversie.
 
-Op 2026-10-03 bleek de detector uit de Homey-runtime verdwenen te zijn. Alleen de Quooker Adapter en LIVE Actuator waren nog aanwezig. Daardoor bleven de legacy detectorvariabelen, waaronder `EM_Quooker_Power_W`, stale/0 terwijl de fysieke Quooker aantoonbaar verwarmde.
+## 3. Waarom v0.5 nodig was
 
-De gemeten testcase van 2026-10-03:
+Op 2026-10-03 bleek v0.4 onvoldoende onderscheidend omdat alleen L3 werd beoordeeld. Rond 13:17 lokaal veroorzaakte een EV-herstart een stap van ongeveer +1,6 kW op alle drie fasen; die mag geen Quooker worden. Rond 13:24 lokaal trad een korte stap van ongeveer +1,64 kW vrijwel uitsluitend op L3 op; die past wel bij de Quooker.
 
-```text
-10:11:00 lokaal  target ON / Cooker ON
-10:11:05         P1 L3 ≈ -1290 W
-10:11:10         P1 L3 ≈  +346 W
-delta            ≈ +1636 W
-```
+De replaytests modelleren deze vastgestelde signatures; de fixtures worden niet als exacte ruwe samples gepresenteerd.
 
-Dit bevestigt de bestaande ~1.58–1.65 kW heating signature.
+## 4. Heating signature v0.5
 
-v0.4 herstelt de detector als aparte observe-only flow. De flow draait elke 15 seconden en wordt daarnaast direct getriggerd bij Cooker ON/OFF. Terwijl de Cooker ON is wordt P1 L3 elke run gericht gelezen; terwijl de Cooker OFF is wordt de L3-baseline maximaal eenmaal per ~55 seconden ververst.
-
-## 3. Architectuurregel: geen volledige device-snapshot
-
-De detector gebruikt geen `Homey.devices.getDevices()`.
-
-Per normale minuutrun leest hij gericht precies één device:
+Startcriteria:
 
 ```text
-Cooker switch
+1300 W <= deltaL3W <= 1900 W
+abs(deltaL1W) <= 350 W
+abs(deltaL2W) <= 350 W
 ```
 
-Alleen wanneer de P1-heartbeat aangeeft dat er sinds de vorige detectorrun een relevante P1-change is geweest, wordt aanvullend de P1-meter gericht gelezen.
-
-Daarmee ontstaat:
+Holdcriteria:
 
 ```text
-normale run        = 1 targeted Cooker read
-run na P1-event    = 1 targeted Cooker read + 1 targeted P1 read
-full snapshot      = nooit
+1100 W <= deltaL3W <= 2050 W
+abs(deltaL1W) <= 500 W
+abs(deltaL2W) <= 500 W
 ```
 
-Dit is bewust gescheiden van de centrale Core Tick, die zijn eigen single-reader snapshot gebruikt.
+Een L3-signature die tegelijk een grote beweging op L1 of L2 heeft wordt afgewezen met `REJECT_SIDE_PHASE_MOVEMENT`.
 
-## 4. Autoritatieve ON/OFF-bron
+## 5. 90-seconden fail-safe
 
-De Cooker-switch is leidend:
+Een HEATING-classificatie mag maximaal 90 seconden actief blijven. Daarna volgt `HEATING -> ON_IDLE` met reden `HEATING_MAX_DURATION_FAILSAFE`; de actuele drie fasen worden dan de nieuwe baseline. Dit is alleen detector-safety en stuurt de fysieke Quooker niet uit.
 
-```text
-cookerOn = Homey Cooker onoff
-```
+## 6. Baselinegedrag
 
-Daaruit volgt direct:
+- OFF + verse P1-sample: L1/L2/L3 worden baseline;
+- OFF zonder nieuwe P1-sample: bestaande baseline blijft behouden;
+- ON_IDLE: baseline volgt de actuele drie-fasenachtergrond;
+- HEATING: baseline blijft bevroren;
+- einde HEATING of 90 s fail-safe: actuele drie fasen worden nieuwe baseline;
+- migratie v0.4 -> v0.5: ontbrekende L1/L2-baselines worden bij de eerste geldige ON-sample geïnitialiseerd zonder direct HEATING te classificeren.
 
-| Switch | Mogelijke detectorstatus |
-|---|---|
-| OFF | `OFF` |
-| ON | `ON_IDLE` of `HEATING` |
+De publieke `EM_Quooker_Baseline_L3_W` blijft voor Core-compatibiliteit bestaan. L1/L2-baselines leven in `EM_Quooker_Diagnostic`.
 
-P1/L3 mag de switchstatus niet overrulen.
+## 7. Homey API/load
 
-Daarom kan een P1-piek nooit zelfstandig de status `HEATING` geven wanneer de Cooker-switch uit staat.
+v0.5 gebruikt geen `Homey.logic.getVariables()` en geen `Homey.devices.getDevices()`. Per run gebruikt hij één targeted Cooker-read en één targeted Diagnostic Logic-read. P1 wordt gericht gelezen zolang Cooker ON is, bij switchtransitie, ontbrekende baseline of wanneer de OFF-baseline ouder is dan circa 55 seconden. Logic-writes zijn targeted.
 
-## 5. P1/L3 heating signature v0.4
-
-Wanneer de switch aan staat én een P1-event is gezien, leest de detector `measure_power.l3`.
-
-De v0.4 signature gebruikt start- en hold-hysterese:
-
-```text
-START_MIN_W = 1300 W
-START_MAX_W = 1900 W
-HOLD_MIN_W  = 1100 W
-HOLD_MAX_W  = 2050 W
-```
-
-Met:
-
-```text
-deltaW = L3_W - baseline_L3_W
-```
-
-De baseline wordt nooit door een actieve heating-puls heen geleerd.
-
-Heating is geldig wanneer:
-
-```text
-1400 W <= deltaW <= 1750 W
-```
-
-Bij een geldige heating signature wordt:
-
-```text
-status  = HEATING
-active  = true
-powerW  = round(deltaW)
-```
-
-Wanneer de switch aan staat maar de signature niet actief is:
-
-```text
-status  = ON_IDLE
-active  = false
-powerW  = 0
-```
-
-## 6. Baseline-learning v0.4
-
-De baseline is nu bewust kortlopend:
-
-- bij Cooker OFF wordt de meest recente L3-achtergrond als baseline vastgelegd;
-- bij OFF→ON blijft die laatste niet-heating baseline behouden zodat een direct inschakelend element niet zijn eigen baseline wordt;
-- bij Cooker ON + ON_IDLE volgt de baseline de actuele L3-achtergrond;
-- tijdens HEATING blijft de baseline bevroren;
-- zodra HEATING stopt wordt de actuele L3-waarde de nieuwe ON_IDLE-baseline.
-
-Hierdoor volgt de detector PV-rampen en andere L3-belastingen beter dan de oude langzame EWMA-baseline.
-
-## 7. Sampling v0.4
-
-De aparte P1-heartbeat is niet meer nodig. Eén Advanced Flow heeft drie entry-paden:
-
-- elke 15 seconden;
-- Cooker ON;
-- Cooker OFF.
-
-De HomeyScript leest altijd de Cooker gericht. P1 L3 wordt gericht gelezen wanneer de Cooker ON is, bij een switchtransitie, bij ontbrekende baseline of wanneer de OFF-baseline ouder is dan ~55 seconden. Er wordt nooit `Homey.devices.getDevices()` gebruikt.
-
-## 8. Gepubliceerde Logic-state
-
-De detector onderhoudt onder andere:
+## 8. Publiek Logic-contract
 
 ```text
 EM_Quooker_Switch_On
@@ -166,119 +94,23 @@ EM_Quooker_Last_Heating_Power_W
 EM_Quooker_Diagnostic
 ```
 
-De primaire statuswaarden zijn:
+Primaire statussen zijn `OFF`, `ON_IDLE` en `HEATING`.
 
-```text
-OFF
-ON_IDLE
-HEATING
-```
+## 9. Safety-invarianten
 
-## 9. Transitiehistorie
+1. Cooker switch is autoritatief voor OFF/ON.
+2. HEATING vereist een geïsoleerde L3-stap.
+3. Grote L1/L2-bewegingen worden afgewezen.
+4. HEATING heeft een harde maximale duur van 90 s.
+5. Geen brede Logic- of device-collection reads.
+6. Geen fysieke Quooker-write.
+7. De Quooker-actuator blijft sole physical writer.
+8. Maximaal één detectorversie is enabled.
 
-Bij iedere statuswijziging wordt een transition-record opgeslagen met onder andere:
+## 10. Validatie
 
-```text
-at
-from
-to
-switchOn
-l3W
-deltaW
-powerW
-```
+Voor promotie zijn op de Pi negen Node-regressietests uitgevoerd: 9/9 PASS. De Homey v0.5-source is vóór cutover exact tegen GitHub teruggelezen. v0.4 is daarna disabled en v0.5 enabled; beide flows waren bij read-back `broken=false`.
 
-De detector bewaart maximaal acht recente transitions in `EM_Quooker_Transition_History`.
+## 11. Rollback
 
-Dit is bedoeld voor runtime-diagnostiek en fingerprintvalidatie, niet als lange-termijn historieopslag.
-
-## 10. Integratie in Core
-
-Core v0.10.13 leest de detectoroutputs uit dezelfde Logic-snapshot als de overige EMS-variabelen.
-
-Core beschouwt Quooker-data als vers wanneer:
-
-```text
-age(EM_Quooker_Last_Sample) <= 150 s
-```
-
-Bij stale detectorstate publiceert Core de Quooker niet als actief.
-
-Core neemt onder andere over:
-
-```text
-active
-switchOn
-powerW
-status
-fresh
-lastSample
-baselineL3W
-lastTransition
-lastHeatingAt
-lastHeatingPowerW
-transitionHistory
-```
-
-De Core-publicatie markeert de bron expliciet als:
-
-```text
-source   = HOMEY_SWITCH_PLUS_P1_L3
-inferred = true
-```
-
-## 11. Energie-balans
-
-Wanneer de Quooker als `HEATING` is geclassificeerd, wordt het geschatte Quooker-vermogen toegevoegd aan de bekende gemeten loads in Core:
-
-```text
-knownMeasuredLoadW
-  = Tesla
-  + Boiler
-  + Quatt
-  + Quooker
-```
-
-Daarmee wordt het residual/`Overig`-vermogen niet ten onrechte opgeblazen met een herkende Quooker-load.
-
-De Quooker-detector zelf heeft geen directe control-impact op flexbudgetten zoals Tesla of boiler; de belasting wordt wel correct verklaard in de centrale huisbalans.
-
-## 12. Safety en control
-
-De detector is observe-only:
-
-```text
-physicalWritePerformed = false
-```
-
-De detector zelf schrijft nooit fysiek. De aparte `EM v2 | 60 Actuator | Quooker v0.2 LIVE` blijft de enige fysieke Quooker-writer.
-
-Belangrijke invarianten:
-
-1. Switch is autoritatief voor ON/OFF.
-2. P1 mag alleen heating binnen een ingeschakelde Quooker bevestigen.
-3. Geen volledige `getDevices()` snapshot.
-4. Geen fysieke Quooker-write.
-5. Stale detectorstate wordt door Core niet als actief beschouwd.
-6. Baseline-learning gebeurt alleen bij switch OFF.
-
-## 13. Validatie
-
-De detector is gebaseerd op eerder handmatig gevalideerde Quooker heating-events en runtime observaties waarbij de Quooker-switch en P1/L3 gezamenlijk zijn gecontroleerd.
-
-De operationele detectorcode zelf is op 2026-08-25 opnieuw gecontroleerd tegen de live Homey-flow.
-
-## 14. Bekende beperkingen
-
-- De power estimate is gebaseerd op L3-delta ten opzichte van een learned baseline, niet op een dedicated Quooker energiemeter.
-- Gelijktijdige L3-belastingen kunnen de confidence verminderen, hoewel de autoritatieve switch en conservatieve baseline-learning false positives beperken.
-- De huidige transition history is beperkt tot acht entries.
-- Fingerprint thresholds zijn device-/installatiespecifiek en moeten opnieuw gevalideerd worden bij elektrische configuratiewijzigingen.
-
-## 15. Gerelateerde documentatie
-
-Zie ook:
-
-- `../flows/quooker-flow.md`
-- `core.md`
-- `fingerprint-engine.md` zodra die centrale module is gemigreerd
+v0.4 blijft disabled rollback: `e291cf14-0b92-4cef-ae8b-a699692b6c9a`. Rollback vereist eerst v0.5 uit en daarna v0.4 aan.

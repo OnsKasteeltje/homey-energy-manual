@@ -221,6 +221,8 @@ Voor retrospectieve shadowvalidatie publiceert de adapter numerieke Insights-sig
 
 `EM v2 | 60 Actuator | Quooker v0.2 LIVE` (stabiele Flow ID `2d0ca017-0d35-4071-bd06-87742032c399`) is sinds 2 oktober 2026 de sole physical writer voor het Homey-device `Cooker` (device ID `42992d14-c4e4-43fc-aaf0-29a73a8e2eb9`). De actuator consumeert `EM2_Control_Quooker`, schrijft idempotent alleen bij een stateverschil en failt closed naar OFF bij ongeldig of stale control. De drie legacy tijdflows `Waterkoker weekend Aan`, `Waterkoker doordeweeks Aan` en `Waterkoker Uit` zijn in dezelfde cutover disabled en blijven uitsluitend rollback-evidence; zij mogen niet naast de LIVE-actuator actief zijn.
 
+Quooker-vermogensobservatie wordt sinds 3 oktober 2026 geleverd door `EM v2 | 01 Quooker Detector | v0.5 LIVE OBSERVE-ONLY` (Flow ID `939a347f-0b19-4c3d-98d3-77faa01fce0b`). Deze detector verandert geen Quooker-control of planner-ownership. Cooker `onoff` blijft autoritatief voor OFF/ON; HEATING vereist een korte geïsoleerde L3-stap (start 1300..1900 W) terwijl L1/L2 binnen de side-phase guard blijven. Een EV-achtige driefasenstap wordt daardoor afgewezen. HEATING heeft daarnaast een harde 90-seconden fail-safe. De flow gebruikt geen brede `getVariables()`/`getDevices()` collection reads en verricht geen fysieke device writes. De voormalige v0.4 detector (Flow ID `e291cf14-0b92-4cef-ae8b-a699692b6c9a`) is disabled rollback; maximaal één detectorversie mag enabled zijn.
+
 ## 9. Live cutover validation
 
 The controlled 2026-09-12 cutover validated Pi→Homey→Tesla and Pi→Homey→boiler end-to-end. The Homey→Pi state direction was validated in production on 2026-09-13 using genuinely fresh Homey Core state. Synthetic freshness must not be used as production evidence.

@@ -1,10 +1,10 @@
 ---
 component: operations
 title: Homey API/Load Map
-version: 1.3.2
+version: 1.3.3
 status: active
 architecture_status: implemented
-last_verified: 2026-08-29
+last_verified: 2026-10-03
 source:
   - Homey runtime inventory and targeted exact-ID flow reads, 2026-08-29
   - src/homey/MIGRATION_BATCH_2026-08-28.md
@@ -55,7 +55,7 @@ Consequences for Homey load governance:
 | `EM v2 | 10 Input | EV Deadline Goal Adapter v0.1` | `445cb82c-5e1f-43c3-b2cf-f2d78fec6e16` | **OFF** | every 1 min if enabled | one `getVariables()` plus multiple Logic writes | GitHub API/raw fetch every run | **high-risk if re-enabled: up to 60 broad Logic reads + 60 external fetches/hour** |
 | `EM v2 | 05 Config | EMS Settings Sync v0.3 low-load` | `9193b3ae-1e3d-4b52-aa95-60aff099e68a` | **OFF** | every 5 min if enabled | one `getVariables()`; strict no-op after matching request | GitHub API/raw fetch every run | no current load; targeted/event-driven redesign preferred |
 | `EM v2 | 06 Freshness | Day-Night Normalizer v0.1.1` | `a41079f7-2287-4ec0-9e9b-27619e93ba35` | **OFF** | every 5 min +30 s if enabled | one `getVariables()`; may rewrite `EM2_State` and `EM2_Public_State` | none | no current load; **fan-out amplifier if re-enabled** |
-| `EM v2 | 01 Quooker Detector | v0.3 SWITCH-AUTH + P1 HEATING` | `04a713a5-105e-439a-a93a-441fb2ca50b4` | **OFF** | every 1 min if enabled | one broad `getVariables()` + one targeted Cooker read; targeted P1 read only after heartbeat | no external I/O | no current load; remove 1-min broad scan before continuous use |
+| `EM v2 | 01 Quooker Detector | v0.5 LIVE OBSERVE-ONLY` | `939a347f-0b19-4c3d-98d3-77faa01fce0b` | **ON** | every 15 s + Cooker ON/OFF | one targeted Diagnostic Logic read; targeted Logic writes; no `getVariables()` | targeted Cooker every run; targeted P1 L1/L2/L3 while ON / transition / stale OFF baseline; no physical writes | active low-load detector; isolated-L3 guard + 90 s fail-safe |
 | `EM v2 | 20 Power Intent | P1 v0.1 SHADOW` | `596e9d60-ad2d-4249-8880-88293aa2cde4` | **OFF** | `EM2_Public_State` change if enabled | one broad `getVariables()` | none | rollback baseline; keep disabled |
 | `EM v2 | 60 Adapter | Actuator Commands v0.2 SHADOW` | `9acfe4d8-8542-483a-8201-595c32543e70` | **OFF** | `EM2_Power_Intent` change if enabled | one broad `getVariables()` | none | no current load; generic adapter superseded by specific adapters |
 | `EM v2 | 60 Adapter | WW Power v0.1 SHADOW` | `472d0355-3bb9-4a42-be43-114b57822136` | **OFF** | `EM2_Power_Intent` change if enabled | one broad `getVariables()` | none | no current load |
@@ -100,7 +100,7 @@ Before re-enabling these flows, refactor or explicitly accept their load model:
 
 1. `EV Deadline Goal Adapter v0.1`: remove 1-minute broad Logic scan and 1-minute GitHub polling.
 2. `Tesla Action Log v0.1`: remove the 1-minute broad Logic scan; use event-driven or targeted reads for bounded diagnostics.
-3. `Quooker Detector v0.3`: remove the 1-minute broad Logic scan; retain targeted Cooker/P1 reads only where necessary.
+3. `Quooker Detector v0.3`: remains retired. Active v0.5 uses targeted Logic/device access only and must not regress to broad collection reads.
 4. `PBTH API Price Adapter v0.1`: replace two full Logic scans per quarter-hour with targeted inputs if revived.
 5. `Price + PV v0.6 [FAILED-DIRECT-API]` and `Price + PV v0.5.1 [ROLLBACK ACTIVE]`: do not revive as-is; both combine multiple legacy context paths and broad reads.
 6. `Day-Night Normalizer v0.1.1`: do not independently rewrite canonical Core/Public State on a periodic clock.
