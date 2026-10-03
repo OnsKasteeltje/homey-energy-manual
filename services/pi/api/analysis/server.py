@@ -420,46 +420,45 @@ def _timeline(day):
 def _project_action(action):
     if not isinstance(action, dict):
         return None
-    targets = action.get("targets") or {}
-    tesla_plan = action.get("teslaPlan") or {}
-    ww_plan = action.get("warmWaterPlan") or {}
-    result = {
-        "start": action.get("start"),
-        "end": action.get("end"),
-        "priceClass": action.get("priceClass"),
-        "baseLoadForecastW": action.get("baseLoadForecastW"),
+
+    # Canonical planner-history stores dynamic-shadow-plan.json, whose
+    # executable planning decisions live in plan["slots"]. Do not use the
+    # separate website publish projection (plan.plan.actions) as historical
+    # decision authority.
+    start = action.get("slot_start_utc") or action.get("start")
+    return {
+        "start": start,
+        "localDate": action.get("localDate"),
         "pvForecastW": action.get("pvForecastW"),
-        "netBeforeFlexW": action.get("netBeforeFlexW"),
-        "importBeforeFlexW": action.get("importBeforeFlexW"),
-        "pvSurplusBeforeFlexW": action.get("pvSurplusBeforeFlexW"),
+        "baseLoadForecastW": action.get("baseLoadForecastW"),
+        "quattForecastW": action.get("quattForecastW"),
+        "forecastExportBeforeFlexW": action.get("forecastExportBeforeFlexW"),
         "correctedExportBeforeFlexW": action.get("correctedExportBeforeFlexW"),
         "confidence": action.get("confidence"),
-        "battery": action.get("battery"),
-        "tesla": action.get("tesla"),
-        "warmWater": action.get("warmWater"),
-        "targets": {
-            key: targets.get(key)
-            for key in ("evTargetW", "sourceEvTargetW", "wwTargetW", "batteryTargetW")
-            if key in targets
-        },
-        "teslaPlan": {
-            key: tesla_plan.get(key)
-            for key in (
-                "mode", "reason", "availableForecast", "availabilitySource",
-                "deadlineOverlay", "controlImpact",
-            )
-            if key in tesla_plan
-        },
-        "warmWaterPlan": {
-            key: ww_plan.get(key)
-            for key in ("reason", "mode", "controlImpact")
-            if key in ww_plan
-        },
+        "wwPlanW": action.get("wwPlanW"),
+        "wwAllocationReason": action.get("wwAllocationReason"),
+        "wwCandidatePvCoverage": action.get("wwCandidatePvCoverage"),
+        "wwCandidateGridImportW": action.get("wwCandidateGridImportW"),
+        "wwCandidateSourceEligible": action.get("wwCandidateSourceEligible"),
+        "evPlanW": action.get("evPlanW"),
+        "evPlanA": action.get("evPlanA"),
+        "evPlanPhaseMode": action.get("evPlanPhaseMode"),
+        "evAllocationReason": action.get("evAllocationReason"),
+        "evOpportunityWindowId": action.get("evOpportunityWindowId"),
+        "evOpportunityWindowClass": action.get("evOpportunityWindowClass"),
+        "evOpportunityWindowSelectionReason": action.get(
+            "evOpportunityWindowSelectionReason"
+        ),
+        "evOpportunityWindowPvCoverage": action.get(
+            "evOpportunityWindowPvCoverage"
+        ),
+        "evDeadlineRequired": action.get("evDeadlineRequired"),
+        "quookerMode": action.get("quookerMode"),
+        "quookerPlanW": action.get("quookerPlanW"),
+        "quookerOpportunityAllowed": action.get("quookerOpportunityAllowed"),
+        "gridImportAfterFlexW": action.get("gridImportAfterFlexW"),
+        "gridExportAfterFlexW": action.get("gridExportAfterFlexW"),
     }
-    for key in ("quooker", "quookerPlan", "heating", "heatingPlan", "flexPriority"):
-        if key in action:
-            result[key] = action.get(key)
-    return result
 
 
 def _planner_decision_window(day, anchors):
@@ -505,17 +504,17 @@ def _planner_decision_window(day, anchors):
 
         plan = snapshot.get("plan") or {}
         context = snapshot.get("context") or {}
-        actions = ((plan.get("plan") or {}).get("actions") or [])
+        slots = plan.get("slots") or []
         selected = None
-        for action in actions:
-            action_start = _parse_ts(action.get("start"))
-            action_end = _parse_ts(action.get("end"))
-            if (
-                action_start is not None
-                and action_end is not None
-                and action_start.astimezone(timezone.utc) <= anchor_utc
-                < action_end.astimezone(timezone.utc)
-            ):
+        for action in slots:
+            action_start = _parse_ts(
+                action.get("slot_start_utc") or action.get("start")
+            )
+            if action_start is None:
+                continue
+            action_start_utc = action_start.astimezone(timezone.utc)
+            action_end_utc = action_start_utc + timedelta(minutes=15)
+            if action_start_utc <= anchor_utc < action_end_utc:
                 selected = action
                 break
 
