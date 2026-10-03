@@ -419,3 +419,4 @@ with SQLite `mode=ro` and immediately enables `PRAGMA query_only=ON`. Because
 the bounded filesystem carve-out `ReadWritePaths=/home/jeroen/ems/data` so SQLite
 can perform WAL/SHM coordination. This filesystem permission does not make the SQL
 connection writable: `mode=ro` plus `query_only` remains the database access boundary.
+The AI service's own bounded 5-minute timeline reader follows the same rule and must not use SQLite `immutable=1` against the live operational history.
