@@ -13,7 +13,7 @@ TARGET_WW_SOURCE="$REPO/services/pi/planner/warm-water"
 TARGET_WW_RUNTIME="$RUNTIME/planner/warm-water"
 TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
 TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
-TARGET_HOMEY_INGRESS_FILE="$REPO/services/pi/integrations/homey/ingress/state_ingest.py"
+TARGET_HOMEY_INGRESS_SOURCE="$REPO/services/pi/integrations/homey/ingress"
 TARGET_HOMEY_EGRESS_SOURCE="$REPO/services/pi/integrations/homey/egress"
 TARGET_HOMEY_EGRESS_RUNTIME="$RUNTIME/homey-deploy"
 TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
@@ -22,7 +22,10 @@ TARGET_WEB_DATA_SOURCE="$REPO/services/pi/api/web-data"
 TARGET_WEB_DATA_RUNTIME="$RUNTIME/web-data-api"
 TARGET_ANALYSIS_SOURCE="$REPO/services/pi/api/analysis"
 TARGET_ANALYSIS_RUNTIME="$RUNTIME/analysis-api"
+TARGET_HEALTH_SOURCE="$REPO/services/pi/health"
+TARGET_HEALTH_RUNTIME="$RUNTIME/health"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
+HEALTH_COMMAND="/usr/local/bin/ems-health"
 SYSTEMD="$REPO/deploy/systemd"
 BACKUP_ROOT="/home/jeroen/ems/backup"
 DEPLOY_MARKER="/home/jeroen/ems/data/deployed-git-commit"
@@ -87,6 +90,7 @@ UNMANAGED="$(
             -not -path './status-api/*' \
             -not -path './web-data-api/*' \
             -not -path './analysis-api/*' \
+            -not -path './health/*' \
             -not -path './tools/honeywell/*' \
             -not -path './homey-deploy/publish_pi_control_intent.py' \
             -not -path '*/__pycache__/*' \
@@ -164,11 +168,13 @@ if echo "$HONEYWELL_UNMANAGED" | grep -E '^\\+' | grep -v '^+++ ' >/dev/null; th
     exit 1
 fi
 
-if [[ ! -f "$TARGET_HOMEY_INGRESS_FILE" ]]; then
-    echo "ERROR: Homey ingress source is missing."
-    echo "Deployment aborted to protect the Homey -> Pi state path."
-    exit 1
-fi
+for ingress_file in state_ingest.py ev_control_ingest.py; do
+    if [[ ! -f "$TARGET_HOMEY_INGRESS_SOURCE/$ingress_file" ]]; then
+        echo "ERROR: Homey ingress source is missing: $ingress_file"
+        echo "Deployment aborted to protect the Homey -> Pi state/observability path."
+        exit 1
+    fi
+done
 
 mkdir -p "$TARGET_HOMEY_EGRESS_RUNTIME"
 if [[ ! -f "$TARGET_HOMEY_EGRESS_SOURCE/publish_pi_control_intent.py" ]]; then
@@ -181,10 +187,10 @@ mkdir -p "$TARGET_STATUS_RUNTIME"
 STATUS_UNMANAGED="$(
     diff -u \
         <(cd "$TARGET_STATUS_SOURCE" && find . -type f \
-            -not -path './state_ingest.py' \
             -printf '%P\n' | sort) \
         <(cd "$TARGET_STATUS_RUNTIME" && find . -type f \
             -not -path './state_ingest.py' \
+            -not -path './ev_control_ingest.py' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort) \
@@ -236,6 +242,24 @@ if echo "$ANALYSIS_UNMANAGED" | grep -E '^\+' | grep -v '^+++ ' >/dev/null; then
     exit 1
 fi
 
+mkdir -p "$TARGET_HEALTH_RUNTIME"
+HEALTH_UNMANAGED="$(
+    diff -u \
+        <(cd "$TARGET_HEALTH_SOURCE" && find . -type f -printf '%P\n' | sort) \
+        <(cd "$TARGET_HEALTH_RUNTIME" && find . -type f \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort) \
+        || true
+)"
+if echo "$HEALTH_UNMANAGED" | grep -E '^\+' | grep -v '^+++ ' >/dev/null; then
+    echo "ERROR: unmanaged files exist in runtime/health."
+    echo "Deployment aborted to prevent accidental deletion."
+    echo
+    echo "$HEALTH_UNMANAGED"
+    exit 1
+fi
+
 echo "PASS: runtime contains no unmanaged source files"
 
 echo
@@ -252,6 +276,7 @@ rsync -a --delete \
     --exclude='status-api/' \
     --exclude='web-data-api/' \
     --exclude='analysis-api/' \
+    --exclude='health/' \
     --exclude='tools/' \
     --exclude='homey-deploy/' \
     --exclude='planner/warm-water/' \
@@ -296,11 +321,15 @@ cp -a \
 
 mkdir -p "$TARGET_STATUS_RUNTIME"
 rsync -a --delete \
-    --exclude='state_ingest.py' \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     "$TARGET_STATUS_SOURCE/" "$TARGET_STATUS_RUNTIME/"
-cp -a "$TARGET_HOMEY_INGRESS_FILE" "$TARGET_STATUS_RUNTIME/state_ingest.py"
+cp -a \
+    "$TARGET_HOMEY_INGRESS_SOURCE/state_ingest.py" \
+    "$TARGET_STATUS_RUNTIME/state_ingest.py"
+cp -a \
+    "$TARGET_HOMEY_INGRESS_SOURCE/ev_control_ingest.py" \
+    "$TARGET_STATUS_RUNTIME/ev_control_ingest.py"
 
 mkdir -p "$TARGET_WEB_DATA_RUNTIME"
 rsync -a --delete \
@@ -314,8 +343,16 @@ rsync -a --delete \
     --exclude='*.pyc' \
     "$TARGET_ANALYSIS_SOURCE/" "$TARGET_ANALYSIS_RUNTIME/"
 
+mkdir -p "$TARGET_HEALTH_RUNTIME"
+rsync -a --delete \
+    --exclude='__pycache__/' \
+    --exclude='*.pyc' \
+    "$TARGET_HEALTH_SOURCE/" "$TARGET_HEALTH_RUNTIME/"
+
 chmod 0755 "$TARGET_HISTORY_RUNTIME/ems_performance.py"
 ln -sfn "$TARGET_HISTORY_RUNTIME/ems_performance.py" "$PERFORMANCE_COMMAND"
+chmod 0755 "$TARGET_HEALTH_RUNTIME/ems_health.py"
+ln -sfn "$TARGET_HEALTH_RUNTIME/ems_health.py" "$HEALTH_COMMAND"
 
 # Remaining script unchanged below this point.
 # Deploy all declared production systemd units, validate drift, reload systemd,
@@ -344,4 +381,5 @@ echo "Release commit: ${COMMIT:0:10}"
 echo "Backup: $BACKUP"
 echo "Deployment marker: $COMMIT"
 echo "Performance command: $PERFORMANCE_COMMAND"
+echo "Health command: $HEALTH_COMMAND"
 echo "NOTE: Services were NOT restarted by this script."

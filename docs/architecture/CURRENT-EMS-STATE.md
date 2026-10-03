@@ -4,7 +4,7 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-10-02
+**Status date:** 2026-10-03
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover and post-cutover chain validation  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
@@ -391,32 +391,80 @@ The 2026-09-27 opportunity-only EV cutover exposed a stale/invalid Easee access 
 EV writer v0.4.5 makes that boundary explicit. Cloud HTTP failures are operation-qualified (`EASEE_REFRESH_HTTP_*`, `EASEE_PHASE_COMMAND_HTTP_*`, `EASEE_PHASE_COMMAND_RETRY_HTTP_*`, and equivalent observation codes). A recoverable first phase-command HTTP 401 remains silent if the single refresh + retry succeeds. Terminal authentication failures such as refresh 400/401/403, missing/invalid token pair, primary phase 403, or a 401/403 on the post-refresh retry remain fail-closed and additionally emit one deduplicated operational alert for the active incident. Alert delivery is best-effort: push to the Homey Owner is preferred; if push cannot be delivered, a Homey Timeline notification is attempted. Alert delivery never changes Gate authority, never resumes charging, never bypasses `safeAbort`, and contains no token, user ID or other secret material. The remediation is re-running the private Pi commissioning bootstrap `services/pi/commissioning/bootstrap_easee_homey_tokens.py`.
 
 
-## Read-only AI analysis layer — V0.1
+## Read-only AI analysis layer — V0.2
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
 diagnosis through Frontend V2. Canonical source is
-`services/pi/api/analysis/server.py`; the managed runtime path is
+`services/pi/api/analysis/server.py`; managed runtime is
 `/home/jeroen/ems/runtime/analysis-api/`.
 
 This service is **outside the realtime control direction**. It has no Homey,
 Easee, Tesla, boiler, Honeywell or other physical-write client and does not call
-the Pi control endpoint. It consumes canonical historical evidence from
-`ems-history.sqlite` and `planner-history.sqlite` through the standardized
-`ems-performance` analysis plus a bounded read-only grid/PV/Tesla timeline.
+the Pi control endpoint. Model output is explanatory only and is never converted
+into an EMS command.
 
-Frontend V2 exposes the human interface at `/ai/`. Private Caddy ingress proxies
-`/agent/*` only to the loopback analysis service. Model credentials remain
-host-local under `/etc/ems/ai-agent.env` and must never be committed. Missing
-credentials fail explicitly rather than degrading to fabricated analysis.
+V0.2 retains the V0.1 performance and 5-minute P1/PV/Tesla-power evidence and
+adds two historical EV evidence paths:
 
-AI output is explanatory only and must distinguish observed fact, evidence-based
-inference and advice. Model text is never converted into an EMS control command.
+1. the existing canonical Homey -> Pi state push now archives EV connected /
+   charging state, requested/offered current, measured phase currents, charge
+   state, deadline context and EMS manager decision/reason/priority into
+   `ems-history.sqlite`;
+2. a dedicated control-neutral Homey observability push, sourced from existing
+   Power Intent / Adapter / Gate / Actuator Status / Device Health Logic
+   contracts, posts to `POST /state/ev-control` and archives
+   `ev_control_events` locally.
 
-The AI evidence path must preserve read-only semantics end-to-end. The standardized
-`ems-performance` reader opens both `ems-history.sqlite` and `planner-history.sqlite`
-with SQLite `mode=ro` and immediately enables `PRAGMA query_only=ON`. Because
-`ems-history.sqlite` runs in WAL mode, the hardened AI systemd sandbox grants only
-the bounded filesystem carve-out `ReadWritePaths=/home/jeroen/ems/data` so SQLite
-can perform WAL/SHM coordination. This filesystem permission does not make the SQL
-connection writable: `mode=ro` plus `query_only` remains the database access boundary.
-The AI service's own bounded 5-minute timeline reader follows the same rule and must not use SQLite `immutable=1` against the live operational history.
+The Homey EV evidence push is canonical new Homey source under
+`apps/homey/observability/ev/`. It uses targeted Logic reads only: no device
+reads, Logic writes, device writes or planning decisions. The Pi HTTP route
+remains in `services/pi/api/status/server.py`; Homey-specific validation and
+archive semantics live under
+`services/pi/integrations/homey/ingress/ev_control_ingest.py`. GitHub is not
+a runtime evidence transport.
+
+The event archive records Gate result/errors, actuator status/reason, target
+current/phase, confirmed phase, transition stage/failure, charge-state/device
+health context and whether a physical write was reported. This evidence is
+analysis-only and must never become an upstream input to planner, Power Intent,
+Adapter, Gate or Actuator.
+
+Repeated transport triggers with unchanged runtime evidence are deduplicated
+semantically. The event hash is built from the normalized evidence fields that
+are persisted, rather than from the raw transport payload. This excludes both
+top-level and nested volatile timestamps such as `generatedAt`, `updatedAt`
+and `sampledAt` from dedupe identity, while any actual change in Gate,
+Actuator, transition, charge-state or device-health evidence remains a distinct
+historical event.
+ The ingest also compares each incoming normalized snapshot with the
+latest persisted normalized event before relying on hash uniqueness. This keeps
+dedupe correct across hash-algorithm upgrades without rewriting historical rows.
+
+Pi operational health becomes a separate reusable read-only capability under
+`services/pi/health/ems_health.py`, installed as `/usr/local/bin/ems-health`.
+Schema `EMS_PI_HEALTH_V0.1` reports SYSTEM, EMS DATA, EMS FUNCTIONS and RECENT
+INCIDENT SIGNALS, with overall state `HEALTHY`,
+`HEALTHY_WITH_RECENT_INCIDENTS` or `DEGRADED`. Data freshness and expected
+active service state are explicit. Timer-driven functions must report both an
+active timer and the last triggered `.service` execution/result; an active
+timer by itself is not functional-health proof. Recent incidents are a best-effort
+24-hour journal view, not yet durable incident history. Current health may
+provide context but is not proof of health at a historical decision timestamp.
+
+Richer EV telemetry and event history exists only from V0.2 commissioning
+forward. Missing earlier evidence must remain missing; it must not be backfilled
+by inference.
+
+Frontend V2 exposes the human interface at `/ai/`. Private Caddy ingress
+proxies `/agent/*` only to the loopback analysis service. Model credentials
+remain host-local under `/etc/ems/ai-agent.env` and must never be committed.
+Missing credentials fail explicitly rather than degrading to fabricated
+analysis.
+
+The AI evidence path preserves read-only query semantics. `ems-performance`
+and the AI timeline/event readers open live SQLite with `mode=ro` and
+`PRAGMA query_only=ON`. Because `ems-history.sqlite` runs in WAL mode, the
+hardened AI systemd sandbox grants the bounded filesystem carve-out
+`ReadWritePaths=/home/jeroen/ems/data` for WAL/SHM coordination. This does not
+make the SQL connections writable. `immutable=1` is forbidden for AI reads of
+the live operational history.

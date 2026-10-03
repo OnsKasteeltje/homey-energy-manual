@@ -101,6 +101,34 @@ STATE_DEVICES = {
     },
 }
 
+
+EV_EVIDENCE_METRICS = {
+    "ev_connected": ("boolean", None, ("tesla", "connected")),
+    "ev_charging": ("boolean", None, ("tesla", "charging")),
+    "ev_requested_a": ("number", "A", ("tesla", "requested_a")),
+    "ev_offered_a": ("number", "A", ("tesla", "offered_a")),
+    "ev_l1_a": ("number", "A", ("tesla", "l1_a")),
+    "ev_l2_a": ("number", "A", ("tesla", "l2_a")),
+    "ev_l3_a": ("number", "A", ("tesla", "l3_a")),
+    "ev_deadline_active": ("boolean", None, ("tesla", "deadline_active")),
+    "ev_deadline_max_a": ("number", "A", ("tesla", "deadline_max_a")),
+    "ev_remaining_kwh": ("number", "kWh", ("tesla", "remaining_kwh")),
+    "ev_charge_state": ("text", None, ("tesla", "charge_state")),
+    "ev_need": ("text", None, ("tesla", "need")),
+}
+
+MANAGER_EVIDENCE_METRICS = {
+    "manager_decision": ("text", None, ("manager", "decision")),
+    "manager_reason": ("text", None, ("manager", "reason")),
+    "manager_priority": ("text", None, ("manager", "priority")),
+}
+
+MANAGER_DEVICE = {
+    "source_device_id": "em2:manager",
+    "name": "EMS Manager",
+    "device_type": "ems_manager",
+}
+
 PV_FRESHNESS_KEYS = {
     "pv_solaredge": "solarEdge",
     "pv_goodwe4200": "goodWe4200",
@@ -138,6 +166,21 @@ def _source_resolution(payload):
     if value <= 0 or value > 3600:
         return DEFAULT_SOURCE_RESOLUTION_SECONDS
     return value
+
+
+def _ensure_metric(con, metric_key, value_type, unit=None):
+    con.execute(
+        """
+        INSERT OR IGNORE INTO metrics
+        (metric_key, unit, value_type, description)
+        VALUES (?, ?, ?, ?)
+        """,
+        (metric_key, unit, value_type, "EMS analysis evidence"),
+    )
+    return con.execute(
+        "SELECT id FROM metrics WHERE metric_key=?",
+        (metric_key,),
+    ).fetchone()[0]
 
 
 def _ensure_device(con, device_key, spec):
@@ -304,6 +347,64 @@ def archive_state_history(payload, db_path=HISTORY_DB):
                 VALUES (?, ?, ?, ?, 'observed', ?)
                 """,
                 (ts, device_id, active_metric_id, 1.0 if value else 0.0, resolution),
+            )
+            inserted += cur.rowcount
+
+        # Archive EV/manager observability already present in the canonical
+        # Homey -> Pi state push. These rows are analysis evidence only; they
+        # are never consumed by realtime control.
+        tesla_spec = POWER_DEVICES["tesla"]
+        tesla_device_id = _ensure_device(con, "tesla", tesla_spec)
+        manager_device_id = _ensure_device(con, "ems_manager", MANAGER_DEVICE)
+
+        for metric_key, (value_type, unit, path) in EV_EVIDENCE_METRICS.items():
+            value = _value_at(payload, path)
+            if value is None:
+                continue
+            metric_id = _ensure_metric(con, metric_key, value_type, unit)
+            value_real = None
+            value_text = None
+            if value_type == "boolean":
+                if not isinstance(value, bool):
+                    continue
+                value_real = 1.0 if value else 0.0
+            elif value_type == "number":
+                value_real = _number(value)
+                if value_real is None:
+                    continue
+            else:
+                value_text = str(value)
+            cur = con.execute(
+                """
+                INSERT OR IGNORE INTO measurements
+                (
+                    ts_utc, device_id, metric_id, value_real, value_text,
+                    quality, source_resolution_seconds
+                )
+                VALUES (?, ?, ?, ?, ?, 'observed', ?)
+                """,
+                (
+                    ts, tesla_device_id, metric_id, value_real, value_text,
+                    resolution,
+                ),
+            )
+            inserted += cur.rowcount
+
+        for metric_key, (value_type, unit, path) in MANAGER_EVIDENCE_METRICS.items():
+            value = _value_at(payload, path)
+            if value is None:
+                continue
+            metric_id = _ensure_metric(con, metric_key, value_type, unit)
+            cur = con.execute(
+                """
+                INSERT OR IGNORE INTO measurements
+                (
+                    ts_utc, device_id, metric_id, value_real, value_text,
+                    quality, source_resolution_seconds
+                )
+                VALUES (?, ?, ?, NULL, ?, 'observed', ?)
+                """,
+                (ts, manager_device_id, metric_id, str(value), resolution),
             )
             inserted += cur.rowcount
 
