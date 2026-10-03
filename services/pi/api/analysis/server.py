@@ -71,7 +71,15 @@ def _load_performance(day):
         timeout=20,
     )
     if proc.returncode != 0:
-        raise RuntimeError("EMS_PERFORMANCE_FAILED")
+        detail = ""
+        try:
+            failed = json.loads(proc.stdout)
+            detail = str(failed.get("error") or "").strip()
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            detail = proc.stderr.strip()
+        raise RuntimeError(
+            "EMS_PERFORMANCE_FAILED" + (": " + detail if detail else "")
+        )
     payload = json.loads(proc.stdout)
     if payload.get("schema") != "EMS_PI_DAY_PERFORMANCE_V0.1":
         raise RuntimeError("EMS_PERFORMANCE_SCHEMA_INVALID")
