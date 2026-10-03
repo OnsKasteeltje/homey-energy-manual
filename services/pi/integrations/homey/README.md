@@ -26,6 +26,21 @@ Homey Core state
 
 The API owns HTTP transport; the Homey integration owns Homey-specific state semantics and validation.
 
+### EV control observability ingress
+
+The AI V0.2 evidence path adds a second, strictly observability-only Homey -> Pi
+ingress. A targeted Homey observability script reads the existing EV Power
+Intent, Adapter, Gate, Actuator Status and Device Health Logic contracts and
+posts them to `POST /state/ev-control`.
+
+The HTTP route remains in `services/pi/api/status/server.py`; Homey-specific
+validation and local archival semantics live in
+`services/pi/integrations/homey/ingress/ev_control_ingest.py`. Accepted events
+are appended to `ems-history.sqlite -> ev_control_events`.
+
+This path is not a control input. It performs no device reads or writes and must
+never become an upstream dependency of Power Intent, Adapter, Gate or Actuator.
+
 ## Pi → Homey (egress)
 
 The active production transport is Homey pulling `GET /control/current` through the enabled PI Dynamic Planner Bridge. `services/pi/integrations/homey/egress/publish_pi_control_intent.py` remains compatibility code and must not become a second production writer while the Homey bridge is authoritative.
@@ -47,8 +62,10 @@ The Pi planner never writes devices directly. Homey remains responsible for boun
 
 Repository placement is independent from the installed Pi runtime layout. During the incremental repository migration the existing runtime contracts stay unchanged:
 
-- ingress source: `services/pi/integrations/homey/ingress/state_ingest.py`
+- state ingress source: `services/pi/integrations/homey/ingress/state_ingest.py`
   → runtime: `/home/jeroen/ems/runtime/status-api/state_ingest.py`
+- EV observability ingress source: `services/pi/integrations/homey/ingress/ev_control_ingest.py`
+  → runtime: `/home/jeroen/ems/runtime/status-api/ev_control_ingest.py`
 - compatibility egress source: `services/pi/integrations/homey/egress/publish_pi_control_intent.py`
   → runtime: `/home/jeroen/ems/runtime/homey-deploy/publish_pi_control_intent.py`
 
