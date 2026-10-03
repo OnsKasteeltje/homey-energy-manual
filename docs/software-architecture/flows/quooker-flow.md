@@ -1,201 +1,140 @@
 ---
 component: quooker-flow
 title: Quooker Detector Flow
-version: 0.3
+version: 0.4
 status: active
 architecture_status: implemented
-last_verified: 2026-08-25
+last_verified: 2026-10-03
 source:
-  - Homey Advanced Flow: EM v2 | 01 Quooker Detector | v0.3 SWITCH-AUTH + P1 HEATING
-  - Homey Standard Flow: EM v2 | 01a Quooker | P1 Event Heartbeat v0.2
+  - Homey Advanced Flow: EM v2 | 01 Quooker Detector | v0.4 LIVE OBSERVE-ONLY
+  - Flow ID: e291cf14-0b92-4cef-ae8b-a699692b6c9a
+  - Canonical source: src/homey/observability/quooker/quooker-detector-v0.4.live-homey.js
 owner: EMS
 ---
 
 # Quooker Detector Flow
 
-Deze procesflows zijn afgeleid van de live Homey-implementatie en tonen de huidige runtime-logica.
+## 1. Runtime
 
-## 1. Event-assisted architectuur
+De live detector heeft vier entry-paden naar één HomeyScript:
 
-```process-model
-{
-  "id": "quooker-flow-1",
-  "kind": "mermaid-source",
-  "declaration": "flowchart TD",
-  "lines": [
-    "    A[P1 measure_power changed] --> B[Set EM_Quooker_P1_Event_Seen = true]",
-    "    C[Elke minuut] --> D[Lees Cooker-switch gericht]",
-    "    E[Handmatige start] --> D",
-    "    D --> F{Cooker ON?}",
-    "    F -->|Nee| G{P1 event gezien?}",
-    "    F -->|Ja| H{P1 event gezien?}",
-    "    G -->|Nee| I[Status OFF]",
-    "    G -->|Ja| J[Reset event flag]",
-    "    J --> K[Lees P1 L3 gericht]",
-    "    K --> L[Update baseline indien sample veilig]",
-    "    L --> I",
-    "    H -->|Nee| M[Status ON_IDLE]",
-    "    H -->|Ja| N[Reset event flag]",
-    "    N --> O[Lees P1 L3 gericht]",
-    "    O --> P[Bereken delta t.o.v. baseline]",
-    "    P --> Q{1400 <= delta <= 1750 W?}",
-    "    Q -->|Ja| R[Status HEATING\\nactive=true\\npowerW=delta]",
-    "    Q -->|Nee| M",
-    "    I --> S[Publiceer Logic-state]",
-    "    M --> S",
-    "    R --> S",
-    "    S --> T[Core leest detectorstate uit Logic snapshot]"
-  ]
-}
-```
+- handmatige start;
+- elke 15 seconden;
+- Cooker ON;
+- Cooker OFF.
 
-<!-- GENERATED_MERMAID:quooker-flow-1 START -->
+De flow is observe-only en schrijft nooit een device-capability.
+
 ```mermaid
 flowchart TD
-    A[P1 measure_power changed] --> B[Set EM_Quooker_P1_Event_Seen = true]
-    C[Elke minuut] --> D[Lees Cooker-switch gericht]
-    E[Handmatige start] --> D
-    D --> F{Cooker ON?}
-    F -->|Nee| G{P1 event gezien?}
-    F -->|Ja| H{P1 event gezien?}
-    G -->|Nee| I[Status OFF]
-    G -->|Ja| J[Reset event flag]
-    J --> K[Lees P1 L3 gericht]
-    K --> L[Update baseline indien sample veilig]
-    L --> I
-    H -->|Nee| M[Status ON_IDLE]
-    H -->|Ja| N[Reset event flag]
-    N --> O[Lees P1 L3 gericht]
-    O --> P[Bereken delta t.o.v. baseline]
-    P --> Q{1400 <= delta <= 1750 W?}
-    Q -->|Ja| R[Status HEATING
-active=true
-powerW=delta]
-    Q -->|Nee| M
-    I --> S[Publiceer Logic-state]
-    M --> S
-    R --> S
-    S --> T[Core leest detectorstate uit Logic snapshot]
-```
-<!-- GENERATED_MERMAID:quooker-flow-1 END -->
-
-## 2. Baseline-update
-
-```process-model
-{
-  "id": "quooker-flow-2",
-  "kind": "mermaid-source",
-  "declaration": "flowchart TD",
-  "lines": [
-    "    A[Cooker OFF + P1 event] --> B[Lees L3]",
-    "    B --> C{Baseline bestaat?}",
-    "    C -->|Nee| D[baseline = L3]",
-    "    C -->|Ja| E{L3 <= 900 W\\nen stap <= 400 W?}",
-    "    E -->|Nee| F[Baseline behouden]",
-    "    E -->|Ja| G[baseline = 0.70 oud + 0.30 L3]",
-    "    D --> H[Opslaan EM_Quooker_Baseline_L3_W]",
-    "    G --> H",
-    "    F --> I[Geen baseline-write]"
-  ]
-}
+    A[Elke 15 s] --> E[v0.4 detector]
+    B[Cooker ON] --> E
+    C[Cooker OFF] --> E
+    D[Handmatige start] --> E
+    E --> F[Lees Cooker gericht]
+    F --> G{P1 L3 nodig?}
+    G -->|Nee| H[Gebruik recente OFF-baseline]
+    G -->|Ja| I[Lees P1 L3 gericht]
+    H --> J[Classificeer OFF]
+    I --> K{Cooker ON?}
+    K -->|Nee| L[OFF + baseline track]
+    K -->|Ja| M[Bereken L3 delta]
+    M --> N{Heating signature?}
+    N -->|Ja| O[HEATING + powerW]
+    N -->|Nee| P[ON_IDLE + baseline track]
+    J --> Q[Publiceer EM_Quooker_*]
+    L --> Q
+    O --> Q
+    P --> Q
 ```
 
-<!-- GENERATED_MERMAID:quooker-flow-2 START -->
-```mermaid
-flowchart TD
-    A[Cooker OFF + P1 event] --> B[Lees L3]
-    B --> C{Baseline bestaat?}
-    C -->|Nee| D[baseline = L3]
-    C -->|Ja| E{L3 <= 900 W
-en stap <= 400 W?}
-    E -->|Nee| F[Baseline behouden]
-    E -->|Ja| G[baseline = 0.70 oud + 0.30 L3]
-    D --> H[Opslaan EM_Quooker_Baseline_L3_W]
-    G --> H
-    F --> I[Geen baseline-write]
+## 2. Sampling
+
+P1 wordt niet meer via een aparte heartbeat-flow aangestuurd.
+
+```text
+Cooker ON                    -> P1 iedere detectorrun
+Cooker switchtransitie       -> P1 direct
+baseline ontbreekt           -> P1 direct
+Cooker OFF baseline <55 s    -> geen P1-read
+Cooker OFF baseline >=55 s   -> P1 baseline refresh
 ```
-<!-- GENERATED_MERMAID:quooker-flow-2 END -->
+
+Hierdoor is de normale ON-detectielatency maximaal ongeveer 15 seconden.
 
 ## 3. Statusmodel
 
-```process-model
-{
-  "id": "quooker-flow-3",
-  "kind": "mermaid-source",
-  "declaration": "stateDiagram-v2",
-  "lines": [
-    "    [*] --> OFF",
-    "    OFF --> ON_IDLE: switch ON zonder heating signature",
-    "    ON_IDLE --> HEATING: switch ON + geldige L3 delta",
-    "    HEATING --> ON_IDLE: heating signature verdwijnt, switch blijft ON",
-    "    HEATING --> OFF: switch OFF",
-    "    ON_IDLE --> OFF: switch OFF"
-  ]
-}
-```
-
-<!-- GENERATED_MERMAID:quooker-flow-3 START -->
 ```mermaid
 stateDiagram-v2
     [*] --> OFF
-    OFF --> ON_IDLE: switch ON zonder heating signature
-    ON_IDLE --> HEATING: switch ON + geldige L3 delta
-    HEATING --> ON_IDLE: heating signature verdwijnt, switch blijft ON
-    HEATING --> OFF: switch OFF
-    ON_IDLE --> OFF: switch OFF
-```
-<!-- GENERATED_MERMAID:quooker-flow-3 END -->
-
-## 4. Core freshness
-
-```process-model
-{
-  "id": "quooker-flow-4",
-  "kind": "mermaid-source",
-  "declaration": "flowchart TD",
-  "lines": [
-    "    A[Core Tick] --> B[Lees EM_Quooker_Last_Sample]",
-    "    B --> C{Age <= 150 s?}",
-    "    C -->|Nee| D[Quooker fresh=false\\nactive=false\\npowerW=0]",
-    "    C -->|Ja| E[Neem detectorstatus over]",
-    "    E --> F{active=HEATING?}",
-    "    F -->|Ja| G[Voeg Quooker power toe aan knownMeasuredLoad]",
-    "    F -->|Nee| H[Geen Quooker-load aftrekken]",
-    "    G --> I[Publiceer energy-state-v2]",
-    "    H --> I",
-    "    D --> I"
-  ]
-}
+    OFF --> ON_IDLE: Cooker ON, geen heating delta
+    OFF --> HEATING: Cooker ON + geldige heating delta
+    ON_IDLE --> HEATING: 1300..1900 W delta
+    HEATING --> HEATING: 1100..2050 W delta
+    HEATING --> ON_IDLE: delta buiten hold-band
+    ON_IDLE --> OFF: Cooker OFF
+    HEATING --> OFF: Cooker OFF
 ```
 
-<!-- GENERATED_MERMAID:quooker-flow-4 START -->
-```mermaid
-flowchart TD
-    A[Core Tick] --> B[Lees EM_Quooker_Last_Sample]
-    B --> C{Age <= 150 s?}
-    C -->|Nee| D[Quooker fresh=false
-active=false
-powerW=0]
-    C -->|Ja| E[Neem detectorstatus over]
-    E --> F{active=HEATING?}
-    F -->|Ja| G[Voeg Quooker power toe aan knownMeasuredLoad]
-    F -->|Nee| H[Geen Quooker-load aftrekken]
-    G --> I[Publiceer energy-state-v2]
-    H --> I
-    D --> I
-```
-<!-- GENERATED_MERMAID:quooker-flow-4 END -->
+De switch blijft autoritatief: bij Cooker OFF kan de detector nooit HEATING publiceren.
 
-## 5. Architectuurinvarianten
+## 4. Baseline
 
-De live implementatie moet aan alle onderstaande voorwaarden blijven voldoen:
+De baseline is de actuele niet-Quooker L3-achtergrond.
+
+- OFF: periodiek actualiseren;
+- OFF→ON: laatste OFF-baseline behouden;
+- ON_IDLE: actuele L3 wordt de nieuwe baseline;
+- HEATING: baseline bevriezen;
+- HEATING→ON_IDLE: baseline resetten naar actuele L3.
+
+Daarmee kan de detector PV-rampen volgen zonder de circa 1,6 kW Quooker-puls in zijn eigen baseline op te nemen.
+
+## 5. Publicatie naar Core
+
+De detector onderhoudt het bestaande contract:
 
 ```text
-Cooker switch authoritative for ON/OFF
-P1/L3 only heating assist
-no full getDevices snapshot
-P1 targeted read only after heartbeat
-no physical Quooker writes
-Core rejects stale detector activity
-baseline learning only while switch OFF
+EM_Quooker_Switch_On
+EM_Quooker_Active
+EM_Quooker_Power_W
+EM_Quooker_Status
+EM_Quooker_Last_Sample
+EM_Quooker_Baseline_L3_W
+EM_Quooker_Last_Transition
+EM_Quooker_Transition_History
+EM_Quooker_Last_Heating_At
+EM_Quooker_Last_Heating_Power_W
+EM_Quooker_Diagnostic
+```
+
+Core v0.11p accepteert deze detectorstate alleen wanneer `EM_Quooker_Last_Sample` maximaal 150 seconden oud is.
+
+## 6. 2026-10-03 recovery evidence
+
+Voor herstel was de detectorflow niet meer aanwezig in Homey. Adapter en LIVE Actuator werkten wel, waardoor de Cooker fysiek aan kon gaan maar detectorvariabelen stale bleven.
+
+De gemeten P1 L3 testcase:
+
+```text
+10:11:05 lokaal   -1290 W
+10:11:10 lokaal    +346 W
+delta             +1636 W
+```
+
+De pure v0.4 classifier reproduceert dit als `HEATING / 1636 W`.
+
+Na livegang van flow `e291cf14-0b92-4cef-ae8b-a699692b6c9a` werd de stale baseline van circa `0,1 W` meteen vervangen door de actuele L3-achtergrond rond `-2383 W`. De Cooker stond toen ON maar verwarmde niet, zodat `EM_Quooker_Power_W=0` correct bleef.
+
+## 7. Invarianten
+
+```text
+Cooker switch authoritative for OFF/ON
+P1 L3 only classifies heating
+no Homey.devices.getDevices()
+no physical writes
+15 s ON sampling
+sparse OFF P1 sampling
+baseline frozen during HEATING
+Core rejects stale detector state
 ```
