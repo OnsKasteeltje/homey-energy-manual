@@ -389,3 +389,25 @@ A failed architecture gate is a hard deployment stop and must not be bypassed in
 The 2026-09-27 opportunity-only EV cutover exposed a stale/invalid Easee access token during a 1P→3P phase command. The v0.4.4 writer added exactly one forced Easee token refresh and one retry on HTTP 401 for the phase-command/phase-observation REST boundary. Live validation on 2026-10-02 then proved that this recovery itself can fail when the separately provisioned Easee refresh session is no longer valid: Pi realtime opportunity, Homey Bridge, EV Adapter and EV Gate were all healthy (`PASS`, 1P request), while the actuator failed closed on `EASEE_HTTP_401` and the Tesla remained paused.
 
 EV writer v0.4.5 makes that boundary explicit. Cloud HTTP failures are operation-qualified (`EASEE_REFRESH_HTTP_*`, `EASEE_PHASE_COMMAND_HTTP_*`, `EASEE_PHASE_COMMAND_RETRY_HTTP_*`, and equivalent observation codes). A recoverable first phase-command HTTP 401 remains silent if the single refresh + retry succeeds. Terminal authentication failures such as refresh 400/401/403, missing/invalid token pair, primary phase 403, or a 401/403 on the post-refresh retry remain fail-closed and additionally emit one deduplicated operational alert for the active incident. Alert delivery is best-effort: push to the Homey Owner is preferred; if push cannot be delivered, a Homey Timeline notification is attempted. Alert delivery never changes Gate authority, never resumes charging, never bypasses `safeAbort`, and contains no token, user ID or other secret material. The remediation is re-running the private Pi commissioning bootstrap `services/pi/commissioning/bootstrap_easee_homey_tokens.py`.
+
+
+## Read-only AI analysis layer — V0.1
+
+The Pi exposes an optional read-only EMS AI analysis service for human-facing
+diagnosis through Frontend V2. Canonical source is
+`services/pi/api/analysis/server.py`; the managed runtime path is
+`/home/jeroen/ems/runtime/analysis-api/`.
+
+This service is **outside the realtime control direction**. It has no Homey,
+Easee, Tesla, boiler, Honeywell or other physical-write client and does not call
+the Pi control endpoint. It consumes canonical historical evidence from
+`ems-history.sqlite` and `planner-history.sqlite` through the standardized
+`ems-performance` analysis plus a bounded read-only grid/PV/Tesla timeline.
+
+Frontend V2 exposes the human interface at `/ai/`. Private Caddy ingress proxies
+`/agent/*` only to the loopback analysis service. Model credentials remain
+host-local under `/etc/ems/ai-agent.env` and must never be committed. Missing
+credentials fail explicitly rather than degrading to fabricated analysis.
+
+AI output is explanatory only and must distinguish observed fact, evidence-based
+inference and advice. Model text is never converted into an EMS control command.
