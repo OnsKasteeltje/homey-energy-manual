@@ -108,6 +108,9 @@ The event hash is derived from the normalized persisted evidence fields rather
 than the raw transport payload, so top-level and nested volatile timestamps do
 not create history noise. A real Gate, actuator, transition, charge-state or
 health change still produces a distinct event.
+The ingest additionally compares incoming normalized evidence with the latest
+persisted normalized event before hash-based insertion. This preserves semantic
+dedupe across hash-algorithm upgrades without rewriting existing history.
 
 This event history is **observability only**. It is never consumed by the
 planner, Gate or actuator.
