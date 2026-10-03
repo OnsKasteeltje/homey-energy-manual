@@ -1,6 +1,6 @@
 # Canonieke projectbaseline — Home Energy Management System
 
-_Status: 22 augustus 2026_
+_Status: 3 oktober 2026_
 
 ## Doel en bronhiërarchie
 
@@ -151,3 +151,9 @@ Voor detailengineering geldt `docs/victron-hardware-baseline.md` als gespecialis
 ## 9. Change-control
 
 Bij iedere relevante wijziging worden requirement, architectuurimpact, Shadow/test waar nodig, runtimevalidatie, requirements-traceability, projectbaseline en gespecialiseerde documentatie synchroon bijgewerkt. Oude aanpakken worden expliciet `SUPERSEDED` gemarkeerd.
+
+## 10. Baselineverbruikers
+
+- `VERIFIED` — P1-nachtmetingen laten een rustige structurele belasting van circa **300–340 W** zien, met een gemeten minimum van circa **247 W** in het onderzochte nachtvenster.
+- `IMPLEMENTED` — `docs/components/baseload-consumers.md` is de gespecialiseerde inventaris voor bekende vaste/cyclische basisverbruikers, waaronder koelapparatuur en netwerk-infrastructuur.
+- `DECIDED` — koelapparatuur en netwerk-infrastructuur worden voorlopig als **niet-flexibele baseline** behandeld; onbekend restvermogen blijft expliciet residual en wordt niet zonder meting aan apparaten toegeschreven.
