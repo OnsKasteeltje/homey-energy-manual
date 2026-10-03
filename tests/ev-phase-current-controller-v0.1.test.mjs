@@ -261,6 +261,40 @@ test('upscale confirmation does not change current before 45 s', () => {
   assert.equal(r.currentReason, 'UPSCALE_CONFIRMING');
 });
 
+test('3P upscale accepts about 200 W predicted import instead of leaving 500-600 W export', () => {
+  // 7 A * 690 W + 550 W export = 5380 W counterfactual EV-available power.
+  // Moving to 8 A then predicts 5520 - 5380 = 140 W grid import.
+  const r = evaluateEvPhaseCurrentCandidate(
+    inputForAvailable(5380),
+    previous('3P', 7, {
+      availableW: 5380,
+      upscaleAgeMs: 50000,
+    }),
+    NOW,
+  );
+  assert.equal(r.mode, '3P');
+  assert.equal(r.requestedA, 8);
+  assert.equal(r.currentReason, 'SLOW_PLUS_1A');
+  assert.equal(r.syntheticP1W, 140);
+  assert.equal(r.requiresPhysicalPhaseTransition, false);
+});
+
+test('3P upscale holds when next amp would exceed 200 W import target', () => {
+  // 7 A * 690 W + 450 W export = 5280 W available.
+  // 8 A would predict 240 W import, so remain at 7 A.
+  const r = evaluateEvPhaseCurrentCandidate(
+    inputForAvailable(5280),
+    previous('3P', 7, {
+      availableW: 5280,
+      upscaleAgeMs: 50000,
+    }),
+    NOW,
+  );
+  assert.equal(r.mode, '3P');
+  assert.equal(r.requestedA, 7);
+  assert.equal(r.currentReason, 'HOLD_A');
+});
+
 test('same-phase A change never requests a physical phase transition', () => {
   const r = evaluateEvPhaseCurrentCandidate(
     inputForAvailable(2000),
