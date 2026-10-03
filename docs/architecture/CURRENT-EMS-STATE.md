@@ -436,6 +436,9 @@ top-level and nested volatile timestamps such as `generatedAt`, `updatedAt`
 and `sampledAt` from dedupe identity, while any actual change in Gate,
 Actuator, transition, charge-state or device-health evidence remains a distinct
 historical event.
+ The ingest also compares each incoming normalized snapshot with the
+latest persisted normalized event before relying on hash uniqueness. This keeps
+dedupe correct across hash-algorithm upgrades without rewriting historical rows.
 
 Pi operational health becomes a separate reusable read-only capability under
 `services/pi/health/ems_health.py`, installed as `/usr/local/bin/ems-health`.
