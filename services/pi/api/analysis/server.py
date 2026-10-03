@@ -34,8 +34,8 @@ PERFORMANCE_COMMAND = os.environ.get("EMS_PERFORMANCE_COMMAND", "/usr/local/bin/
 HEALTH_COMMAND = os.environ.get("EMS_HEALTH_COMMAND", "/usr/local/bin/ems-health")
 LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
-SCHEMA = "EMS_AI_ANALYSIS_V0.3"
-EVIDENCE_SCHEMA = "EMS_AI_EVIDENCE_V0.3"
+SCHEMA = "EMS_AI_ANALYSIS_V0.4"
+EVIDENCE_SCHEMA = "EMS_AI_EVIDENCE_V0.4"
 MAX_BODY_BYTES = 16 * 1024
 MAX_QUESTION_CHARS = 1200
 
@@ -52,6 +52,9 @@ Prefer exact local timestamps and quantitative values.
 An observed export window is not automatically an EMS fault; constraints may explain it.
 Use plannerDecisionWindow as historical intent evidence and never judge an earlier planner decision using a forecast generated later.
 Use forecastVsActual15m to distinguish forecast error from planner/control execution error when the evidence supports that distinction.
+Use flexContextWindow for historical Heating/WW eligibility and priority, and quookerEvents for Quooker adapter/actuator/detector evidence.
+Heating progression and the Quooker actuator are SHADOW unless evidence explicitly proves otherwise: a shadow grant, desired target or wouldWrite is not a physical command.
+Never backfill missing pre-commissioning flex or Quooker history by inference.
 Keep the answer concise but diagnostic."""
 
 def _iso_z(dt):
@@ -527,6 +530,7 @@ def _planner_decision_window(day, anchors):
         tesla_context = context.get("tesla") or {}
         deadline = tesla_context.get("deadline") or plan.get("deadlinePlan") or {}
         guardrails = plan.get("guardrails") or {}
+        warm_water = context.get("warmWater") or {}
         out.append({
             "anchorLocal": anchor.isoformat(),
             "snapshotGeneratedAtLocal": generated.astimezone(LOCAL_TZ).isoformat(),
@@ -550,13 +554,170 @@ def _planner_decision_window(day, anchors):
                 key: guardrails.get(key)
                 for key in (
                     "wwSourceMode", "wwElectricalFlexEligible", "wwSourceBlockReason",
+                    "wwDeadlineLocal", "wwMinRunMinutes",
+                    "quookerPolicy", "quookerModeledPowerW",
+                    "quookerEnergyBudgetKWh", "quookerExpectedHeatMinutes",
+                    "quookerOpportunityStartExportW",
+                    "quookerOpportunityStopImportW",
+                    "quookerWeekdayForcedLocal", "quookerWeekendForcedLocal",
                     "teslaRole", "evDeadlineHardConstraint",
                     "contractPolicyEnforced", "inputFreshnessFailClosed",
                 )
                 if key in guardrails
             },
+            "warmWaterContext": {
+                key: warm_water.get(key)
+                for key in (
+                    "date", "goalReached", "remainingFallbackMin",
+                    "expectedDailyEnergyKWh", "plannedDemandMin",
+                    "remainingPlannedDemandMin", "electricalRemainingDemandMin",
+                    "heatingMinToday", "sourceMode", "electricalFlexEligible",
+                    "sourceBlockReason", "requiredSlots", "allocatedSlots",
+                    "comfortFeasible", "deadlineLocal", "allocationPolicy",
+                )
+                if key in warm_water
+            },
             "action": _project_action(selected),
         })
+    return out[-12:]
+
+
+
+def _quooker_events(day):
+    start, end = _bounds(day)
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
+        db.execute("PRAGMA query_only=ON")
+        exists = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' "
+            "AND name='quooker_control_events'"
+        ).fetchone()
+        if not exists:
+            return []
+        rows = db.execute(
+            """
+            SELECT
+                ts_utc,control_mode,control_target_on,control_reason,
+                modeled_power_w,avg_grid_w,p1_fresh,start_export_w,stop_import_w,
+                actuator_control_valid,actuator_control_fresh,
+                actuator_desired_on,actuator_actual_on,actuator_would_write,
+                actuator_reason,detector_valid,detector_switch_on,
+                detector_active,detector_status,detector_power_w,
+                detector_reason,detector_last_heating_at,
+                detector_last_heating_power_w,physical_write_performed
+            FROM quooker_control_events
+            WHERE ts_utc>=? AND ts_utc<?
+            ORDER BY ts_utc
+            """,
+            (_iso_z(start), _iso_z(end)),
+        ).fetchall()
+
+    out = []
+    for row in rows[-240:]:
+        (
+            ts_text, mode, target_on, control_reason,
+            modeled_w, avg_grid_w, p1_fresh, start_export_w, stop_import_w,
+            actuator_valid, actuator_fresh, desired_on, actual_on, would_write,
+            actuator_reason, detector_valid, switch_on, active, detector_status,
+            detector_power_w, detector_reason, last_heating_at,
+            last_heating_power_w, physical_write,
+        ) = row
+        local = datetime.fromisoformat(
+            ts_text.replace("Z", "+00:00")
+        ).astimezone(LOCAL_TZ)
+        out.append({
+            "atLocal": local.isoformat(),
+            "control": {
+                "mode": mode,
+                "targetOn": None if target_on is None else target_on == 1,
+                "reason": control_reason,
+                "modeledPowerW": modeled_w,
+                "avgGridW": avg_grid_w,
+                "p1Fresh": None if p1_fresh is None else p1_fresh == 1,
+                "startExportW": start_export_w,
+                "stopImportW": stop_import_w,
+            },
+            "actuatorShadow": {
+                "controlValid": None if actuator_valid is None else actuator_valid == 1,
+                "controlFresh": None if actuator_fresh is None else actuator_fresh == 1,
+                "desiredOn": None if desired_on is None else desired_on == 1,
+                "actualOn": None if actual_on is None else actual_on == 1,
+                "wouldWrite": None if would_write is None else would_write == 1,
+                "reason": actuator_reason,
+            },
+            "detector": {
+                "valid": None if detector_valid is None else detector_valid == 1,
+                "switchOn": None if switch_on is None else switch_on == 1,
+                "active": None if active is None else active == 1,
+                "status": detector_status,
+                "powerW": detector_power_w,
+                "reason": detector_reason,
+                "lastHeatingAt": last_heating_at,
+                "lastHeatingPowerW": last_heating_power_w,
+            },
+            "physicalWritePerformed": physical_write == 1,
+        })
+    return out
+
+
+def _flex_context_window(day, anchors):
+    if not os.path.exists(PLANNER_DB) or not anchors:
+        return []
+
+    start, end = _bounds(day)
+    query_start = start - timedelta(hours=2)
+    with sqlite3.connect(f"file:{PLANNER_DB}?mode=ro", uri=True) as db:
+        db.execute("PRAGMA query_only=ON")
+        exists = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' "
+            "AND name='flex_context_snapshots'"
+        ).fetchone()
+        if not exists:
+            return []
+        rows = db.execute(
+            """
+            SELECT captured_at_utc,snapshot_zlib
+            FROM flex_context_snapshots
+            WHERE captured_at_utc>=? AND captured_at_utc<?
+            ORDER BY captured_at_utc
+            """,
+            (_iso_z(query_start), _iso_z(end)),
+        ).fetchall()
+
+    snapshots = []
+    for captured_text, blob in rows:
+        captured = _parse_ts(captured_text)
+        if captured is None:
+            continue
+        try:
+            payload = json.loads(zlib.decompress(blob).decode("utf-8"))
+        except (TypeError, ValueError, zlib.error, json.JSONDecodeError):
+            continue
+        if payload.get("schema") != "EMS_PI_FLEX_CONTEXT_SNAPSHOT_V0.1":
+            continue
+        snapshots.append((captured.astimezone(timezone.utc), payload))
+
+    out = []
+    seen = set()
+    for anchor in anchors:
+        anchor_utc = anchor.astimezone(timezone.utc)
+        eligible = [item for item in snapshots if item[0] <= anchor_utc]
+        if not eligible:
+            continue
+        captured, payload = eligible[-1]
+        age_min = (anchor_utc - captured).total_seconds() / 60.0
+        if age_min > 30:
+            continue
+
+        dedupe = captured.isoformat()
+        if dedupe in seen:
+            continue
+        seen.add(dedupe)
+        item = dict(payload)
+        item["anchorLocal"] = anchor.isoformat()
+        item["snapshotCapturedAtLocal"] = captured.astimezone(LOCAL_TZ).isoformat()
+        item["snapshotAgeMinutes"] = round(age_min, 1)
+        out.append(item)
+
     return out[-12:]
 
 
@@ -766,6 +927,8 @@ def build_evidence(day, question=""):
     anchors = _question_anchors(question, day, performance, ev_control)
     health = _load_health()
     planner_window = _planner_decision_window(day, anchors)
+    flex_context = _flex_context_window(day, anchors)
+    quooker_events = _quooker_events(day)
     forecast_actual = _forecast_vs_actual_15m(day, anchors)
     return {
         "schema": EVIDENCE_SCHEMA,
@@ -775,7 +938,9 @@ def build_evidence(day, question=""):
             "measurements": "ems-history.sqlite",
             "evTelemetry": "Homey canonical state push -> ems-history.sqlite",
             "evControlEvents": "Homey observability LAN push -> ems-history.sqlite",
+            "quookerEvents": "Homey Quooker observability LAN push -> ems-history.sqlite",
             "planner": "planner-history.sqlite frozen decision snapshots",
+            "flexContext": "Pi-local Heating/WW shadow archive -> planner-history.sqlite",
             "forecastComparison": "pv_forecast_v2_archive fixed 12h lead + canonical measurements_15m",
             "performance": "EMS_PI_DAY_PERFORMANCE_V0.1",
             "currentHealth": "EMS_PI_HEALTH_V0.1 via ems-health",
@@ -785,11 +950,16 @@ def build_evidence(day, question=""):
         "timeline5m": _timeline(day),
         "evTelemetry5m": ev_telemetry,
         "evControlEvents": ev_control,
+        "quookerEvents": quooker_events,
         "plannerDecisionWindow": planner_window,
+        "flexContextWindow": flex_context,
         "forecastVsActual15m": forecast_actual,
         "piHealthCurrent": health,
         "limitations": [
             "EV telemetry and control-event history only exist from their V0.2 commissioning onward; earlier gaps must not be backfilled by inference.",
+            "Heating/WW flex-context history only exists from V0.4 flex-context archive commissioning onward; earlier gaps must not be backfilled from current JSON.",
+            "Quooker adapter/actuator/detector history only exists from V0.4 Quooker evidence-push commissioning onward; earlier gaps must not be backfilled from current Homey Logic.",
+            "Heating progression and Quooker actuator evidence are SHADOW: grant, desiredOn and wouldWrite do not prove a physical command or device change.",
             "Planner decision windows use the latest frozen snapshot at or before each analysis anchor; missing snapshots remain missing.",
             "PV forecast comparison uses a fixed 12-hour no-hindsight archive selection and must not substitute a later forecast.",
             "Observed phase mode is derived from measured phase currents; use explicit actuator/gate phase fields when control-event evidence exists.",
@@ -915,7 +1085,9 @@ class Handler(BaseHTTPRequestHandler):
                     "timelinePoints": len(evidence["timeline5m"]),
                     "evTelemetryPoints": len(evidence["evTelemetry5m"]),
                     "evControlEvents": len(evidence["evControlEvents"]),
+                    "quookerEvents": len(evidence["quookerEvents"]),
                     "plannerDecisionPoints": len(evidence["plannerDecisionWindow"]),
+                    "flexContextPoints": len(evidence["flexContextWindow"]),
                     "forecastComparisonSlots": len(evidence["forecastVsActual15m"].get("slots") or []),
                     "piHealthStatus": evidence["piHealthCurrent"].get("status"),
                     "limitations": evidence["limitations"],
