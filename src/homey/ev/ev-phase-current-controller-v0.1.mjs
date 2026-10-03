@@ -29,7 +29,8 @@ export const CONFIG = Object.freeze({
   // and intentionally import for several minutes.
   upwardModeDwellMs: 300000,
 
-  upscaleConfirmMs: 45000,
+  upscaleConfirm1pMs: 20000,
+  upscaleConfirm3pMs: 30000,
   // Prefer using a little grid import over leaving several hundred watts of
   // PV export unused. This threshold applies only to +1 A decisions; the
   // existing importDeadbandW remains the fast-down safety boundary.
@@ -355,7 +356,9 @@ function regulateCurrent({
       ? Number(previousUpscaleSinceMs)
       : nowMs;
 
-    if (nowMs - since >= cfg.upscaleConfirmMs) {
+    const confirmMs = mode === '1P' ? cfg.upscaleConfirm1pMs : cfg.upscaleConfirm3pMs;
+
+    if (nowMs - since >= confirmMs) {
       return {
         requestedA: requestedA + 1,
         upscaleSinceMs: nowMs,
