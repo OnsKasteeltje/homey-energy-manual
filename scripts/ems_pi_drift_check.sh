@@ -13,7 +13,7 @@ TARGET_WW_SOURCE="$REPO/services/pi/planner/warm-water"
 TARGET_WW_RUNTIME="$RUNTIME/planner/warm-water"
 TARGET_HONEYWELL_SOURCE="$REPO/services/pi/integrations/honeywell"
 TARGET_HONEYWELL_RUNTIME="$RUNTIME/tools/honeywell"
-TARGET_HOMEY_INGRESS_FILE="$REPO/services/pi/integrations/homey/ingress/state_ingest.py"
+TARGET_HOMEY_INGRESS_SOURCE="$REPO/services/pi/integrations/homey/ingress"
 TARGET_HOMEY_EGRESS_SOURCE="$REPO/services/pi/integrations/homey/egress"
 TARGET_HOMEY_EGRESS_RUNTIME="$RUNTIME/homey-deploy"
 TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
@@ -35,7 +35,7 @@ echo "History:   $TARGET_HISTORY_SOURCE"
 echo "Forecast:  $TARGET_FORECAST_SOURCE"
 echo "WW planner:$TARGET_WW_SOURCE"
 echo "Honeywell: $TARGET_HONEYWELL_SOURCE"
-echo "Homey in:  $TARGET_HOMEY_INGRESS_FILE"
+echo "Homey in:  $TARGET_HOMEY_INGRESS_SOURCE"
 echo "Homey out: $TARGET_HOMEY_EGRESS_SOURCE"
 echo "Status API:$TARGET_STATUS_SOURCE"
 echo "Web API:   $TARGET_WEB_DATA_SOURCE"
@@ -182,17 +182,25 @@ else
 fi
 
 echo
-echo "=== TARGET-STRUCTURE HOMEY INGRESS FILE ==="
-if [[ ! -f "$TARGET_HOMEY_INGRESS_FILE" ]]; then
-    echo "MISSING: $TARGET_HOMEY_INGRESS_FILE"
-    FAIL=1
-elif [[ ! -f "$TARGET_STATUS_RUNTIME/state_ingest.py" ]]; then
-    echo "MISSING: status-api/state_ingest.py"
-    FAIL=1
-elif ! cmp -s "$TARGET_HOMEY_INGRESS_FILE" "$TARGET_STATUS_RUNTIME/state_ingest.py"; then
-    echo "DRIFT:   status-api/state_ingest.py"
-    FAIL=1
-fi
+echo "=== TARGET-STRUCTURE HOMEY INGRESS FILES ==="
+for rel in state_ingest.py ev_control_ingest.py; do
+    src="$TARGET_HOMEY_INGRESS_SOURCE/$rel"
+    dst="$TARGET_STATUS_RUNTIME/$rel"
+    if [[ ! -f "$src" ]]; then
+        echo "MISSING: Homey ingress source $src"
+        FAIL=1
+        continue
+    fi
+    if [[ ! -f "$dst" ]]; then
+        echo "MISSING: status-api/$rel"
+        FAIL=1
+        continue
+    fi
+    if ! cmp -s "$src" "$dst"; then
+        echo "DRIFT:   status-api/$rel"
+        FAIL=1
+    fi
+done
 
 echo
 echo "=== TARGET-STRUCTURE HOMEY EGRESS FILES ==="
@@ -244,7 +252,6 @@ else
         fi
     done < <(
         cd "$TARGET_STATUS_SOURCE" && find . -type f \
-            -not -path './state_ingest.py' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort
