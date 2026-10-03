@@ -1,13 +1,14 @@
-# EMS AI Analysis Agent V0.2
+# EMS AI Analysis Agent V0.3
 
 ## Scope
 
 The EMS AI Analysis Agent is a **read-only diagnostic and explanation layer**.
 It is not part of the realtime control loop and has no device-write path.
 
-V0.2 keeps the proven V0.1 power/performance evidence and adds the evidence
-needed to explain *why* EV control did or did not execute, plus a bounded
-read-only Pi/EMS health snapshot.
+V0.3 keeps the proven V0.2 EV/control and health evidence and broadens the
+read-only context needed to explain whole-EMS decisions: tracked flexible loads,
+frozen planner decisions around the question timestamp, and a no-hindsight
+PV forecast-versus-actual comparison.
 
 Runtime chain:
 
@@ -37,6 +38,8 @@ Pi runtime
       |
       +--> /usr/local/bin/ems-performance
       +--> /usr/local/bin/ems-health
+      +--> planner-history.sqlite (frozen decision snapshots)
+      +--> ems-history.sqlite measurements_15m + pv_forecast_v2_archive
       |
       v
 ems-ai-analysis.service (127.0.0.1:3210)
@@ -68,11 +71,39 @@ of an EMS fault.
 
 ### Performance and electrical timeline
 
-V0.2 retains:
+V0.3 retains `EMS_PI_DAY_PERFORMANCE_V0.1` and expands the bounded 5-minute
+electrical timeline to P1, aggregate PV, Tesla, boiler and Quatt power plus
+washer/dryer active state when available. A derived residual household value is
+included only as a labelled derivation from measured house power minus the
+tracked large loads; it is not a new measurement authority.
 
-1. `EMS_PI_DAY_PERFORMANCE_V0.1`;
-2. planner-history coverage exposed through that report;
-3. bounded 5-minute P1, aggregate PV and Tesla electrical-power evidence.
+### Planner decision window
+
+For question-specific timestamps the agent extracts a bounded historical
+`plannerDecisionWindow` from `planner-history.sqlite`. The question may provide
+an explicit local clock time (for example `14:00`); otherwise the analysis uses
+important export windows and recent control events as anchors.
+
+For each anchor V0.3 selects the latest frozen planner snapshot generated at or
+before that timestamp. It never reads the current planner output and pretends it
+was historical state. Only a compact projection is sent to the model: relevant
+realtime correction context, deadline/guardrail context and the 15-minute action
+covering the anchor, including EV/WW/battery targets and recorded planner
+reasons. Snapshots older than the bounded historical tolerance remain missing
+rather than being fabricated.
+
+### PV forecast versus actual
+
+V0.3 adds `forecastVsActual15m` from canonical local history. Forecast values
+come from `pv_forecast_v2_archive` using the same fixed 12-hour no-hindsight
+selection rule as PV & Flex: for each target slot use the newest forecast that
+already existed no later than slot start minus 12 hours. Actual PV/export and
+EV/boiler context come from canonical `measurements_15m`.
+
+The evidence contains a daily comparable-slot summary (forecast energy, actual
+energy, bias and mean absolute error) plus a bounded detail set around analysis
+anchors and the largest forecast-error/export slots. A later forecast must
+never be used to judge an earlier planner decision.
 
 ### Canonical EV telemetry history
 
@@ -178,9 +209,10 @@ Secrets must never be committed.
 `GET /agent/health` reports readiness and the configured model without
 exposing credentials.
 
-`POST /agent/ask` accepts a question and day. The response contains the
-answer plus bounded evidence counts/status. Raw model responses and credentials
-are not persisted.
+`POST /agent/ask` accepts a question and day. The question is also used only to
+select bounded historical analysis anchors; it never changes EMS state. The
+response contains the answer plus bounded evidence counts/status. Raw model
+responses and credentials are not persisted.
 
 ## Runtime model tuning
 
