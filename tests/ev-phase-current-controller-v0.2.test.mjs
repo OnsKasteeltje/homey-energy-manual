@@ -94,7 +94,7 @@ test('OFF -> 1P requires sustained rolling surplus and sizes current in 1P', () 
   assert.equal(r.requiresPhysicalPhaseTransition, true);
 });
 
-test('OFF -> 3P requires sustained high surplus and uses 690 W per amp', () => {
+test('OFF -> 3P entry respects the +200 W import target', () => {
   const r = evaluateEvPhaseCurrentCandidate(
     inputForAvailable(4600),
     previous('OFF', 0, {availableW: 4600}),
@@ -102,8 +102,9 @@ test('OFF -> 3P requires sustained high surplus and uses 690 W per amp', () => {
   );
   assert.equal(r.mode, '3P');
   assert.equal(r.phaseReason, 'OFF_TO_3P_ROLLING_HIGH');
-  assert.equal(r.requestedA, 7);
-  assert.equal(r.requestedW, 7 * 690);
+  assert.equal(r.requestedA, 6);
+  assert.equal(r.requestedW, 6 * 690);
+  assert.equal(r.syntheticP1W, -460);
   assert.equal(r.mappingWPerA, 690);
 });
 
