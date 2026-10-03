@@ -430,9 +430,11 @@ analysis-only and must never become an upstream input to planner, Power Intent,
 Adapter, Gate or Actuator.
 
 Repeated transport triggers with unchanged runtime evidence are deduplicated
-semantically. The transport `generatedAt` timestamp is excluded from the event
-hash, so a repeated identical Gate/Actuator/Health snapshot does not create
-history noise; any actual change in those runtime contracts remains a distinct
+semantically. The event hash is built from the normalized evidence fields that
+are persisted, rather than from the raw transport payload. This excludes both
+top-level and nested volatile timestamps such as `generatedAt`, `updatedAt`
+and `sampledAt` from dedupe identity, while any actual change in Gate,
+Actuator, transition, charge-state or device-health evidence remains a distinct
 historical event.
 
 Pi operational health becomes a separate reusable read-only capability under
