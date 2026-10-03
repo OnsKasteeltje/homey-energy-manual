@@ -20,6 +20,8 @@ TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
 TARGET_STATUS_RUNTIME="$RUNTIME/status-api"
 TARGET_WEB_DATA_SOURCE="$REPO/services/pi/api/web-data"
 TARGET_WEB_DATA_RUNTIME="$RUNTIME/web-data-api"
+TARGET_ANALYSIS_SOURCE="$REPO/services/pi/api/analysis"
+TARGET_ANALYSIS_RUNTIME="$RUNTIME/analysis-api"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 SYSTEMD="$REPO/deploy/systemd"
 BACKUP_ROOT="/home/jeroen/ems/backup"
@@ -84,6 +86,7 @@ UNMANAGED="$(
             -not -path './planner/warm-water/*' \
             -not -path './status-api/*' \
             -not -path './web-data-api/*' \
+            -not -path './analysis-api/*' \
             -not -path './tools/honeywell/*' \
             -not -path './homey-deploy/publish_pi_control_intent.py' \
             -not -path '*/__pycache__/*' \
@@ -215,6 +218,24 @@ if echo "$WEB_DATA_UNMANAGED" | grep -E '^\+' | grep -v '^+++ ' >/dev/null; then
     exit 1
 fi
 
+mkdir -p "$TARGET_ANALYSIS_RUNTIME"
+ANALYSIS_UNMANAGED="$(
+    diff -u \
+        <(cd "$TARGET_ANALYSIS_SOURCE" && find . -type f -printf '%P\n' | sort) \
+        <(cd "$TARGET_ANALYSIS_RUNTIME" && find . -type f \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort) \
+        || true
+)"
+if echo "$ANALYSIS_UNMANAGED" | grep -E '^\+' | grep -v '^+++ ' >/dev/null; then
+    echo "ERROR: unmanaged files exist in runtime/analysis-api."
+    echo "Deployment aborted to prevent accidental deletion."
+    echo
+    echo "$ANALYSIS_UNMANAGED"
+    exit 1
+fi
+
 echo "PASS: runtime contains no unmanaged source files"
 
 echo
@@ -230,6 +251,7 @@ rsync -a --delete \
     --exclude='forecast/' \
     --exclude='status-api/' \
     --exclude='web-data-api/' \
+    --exclude='analysis-api/' \
     --exclude='tools/' \
     --exclude='homey-deploy/' \
     --exclude='planner/warm-water/' \
@@ -285,6 +307,12 @@ rsync -a --delete \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     "$TARGET_WEB_DATA_SOURCE/" "$TARGET_WEB_DATA_RUNTIME/"
+
+mkdir -p "$TARGET_ANALYSIS_RUNTIME"
+rsync -a --delete \
+    --exclude='__pycache__/' \
+    --exclude='*.pyc' \
+    "$TARGET_ANALYSIS_SOURCE/" "$TARGET_ANALYSIS_RUNTIME/"
 
 chmod 0755 "$TARGET_HISTORY_RUNTIME/ems_performance.py"
 ln -sfn "$TARGET_HISTORY_RUNTIME/ems_performance.py" "$PERFORMANCE_COMMAND"
