@@ -20,6 +20,8 @@ TARGET_STATUS_SOURCE="$REPO/services/pi/api/status"
 TARGET_STATUS_RUNTIME="$RUNTIME/status-api"
 TARGET_WEB_DATA_SOURCE="$REPO/services/pi/api/web-data"
 TARGET_WEB_DATA_RUNTIME="$RUNTIME/web-data-api"
+TARGET_ANALYSIS_SOURCE="$REPO/services/pi/api/analysis"
+TARGET_ANALYSIS_RUNTIME="$RUNTIME/analysis-api"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 SYSTEMD="$REPO/deploy/systemd"
 
@@ -34,6 +36,7 @@ echo "Homey in:  $TARGET_HOMEY_INGRESS_FILE"
 echo "Homey out: $TARGET_HOMEY_EGRESS_SOURCE"
 echo "Status API:$TARGET_STATUS_SOURCE"
 echo "Web API:   $TARGET_WEB_DATA_SOURCE"
+echo "AI API:    $TARGET_ANALYSIS_SOURCE"
 echo "Runtime:   $RUNTIME"
 echo
 
@@ -265,6 +268,32 @@ else
         fi
     done < <(
         cd "$TARGET_WEB_DATA_SOURCE" && find . -type f \
+            -not -path '*/__pycache__/*' \
+            -not -name '*.pyc' \
+            -printf '%P\n' | sort
+    )
+fi
+
+echo
+echo "=== TARGET-STRUCTURE AI ANALYSIS API FILES ==="
+if [[ ! -d "$TARGET_ANALYSIS_RUNTIME" ]]; then
+    echo "MISSING: $TARGET_ANALYSIS_RUNTIME"
+    FAIL=1
+else
+    while IFS= read -r rel; do
+        src="$TARGET_ANALYSIS_SOURCE/$rel"
+        dst="$TARGET_ANALYSIS_RUNTIME/$rel"
+        if [[ ! -f "$dst" ]]; then
+            echo "MISSING: analysis-api/$rel"
+            FAIL=1
+            continue
+        fi
+        if ! cmp -s "$src" "$dst"; then
+            echo "DRIFT:   analysis-api/$rel"
+            FAIL=1
+        fi
+    done < <(
+        cd "$TARGET_ANALYSIS_SOURCE" && find . -type f \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort

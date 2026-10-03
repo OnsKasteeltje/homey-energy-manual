@@ -69,7 +69,8 @@ def load_measurements(day, db_path=MEASUREMENTS_DB):
     start, end = bounds(day)
     if not db_path.exists():
         raise RuntimeError(f"measurement DB missing: {db_path}")
-    con = sqlite3.connect(db_path)
+    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    con.execute("PRAGMA query_only=ON")
     try:
         ids = dict(con.execute(
             "SELECT device_key,id FROM devices WHERE device_key IN (%s)" % ",".join("?" * len(DEVICES)),
@@ -215,7 +216,8 @@ def load_planner_history(day, db_path=PLANNER_DB):
             "contractIds": [],
             "plannerOwners": [],
         }
-    con = sqlite3.connect(db_path)
+    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    con.execute("PRAGMA query_only=ON")
     try:
         rows = con.execute(
             "SELECT generated_at_utc,snapshot_zlib FROM planner_snapshots "

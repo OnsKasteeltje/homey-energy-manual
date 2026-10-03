@@ -17,6 +17,10 @@ http://192.168.1.42, http://100.127.130.0 {
         reverse_proxy 127.0.0.1:3200
     }
 
+    handle /agent/* {
+        reverse_proxy 127.0.0.1:3210
+    }
+
     handle {
         header Cache-Control "no-store"
         file_server

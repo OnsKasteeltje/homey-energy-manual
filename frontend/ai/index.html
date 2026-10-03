@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>EMS · AI Analyse</title>
+  <link rel="stylesheet" href="../shared/styles/v2-shell.css">
+  <link rel="stylesheet" href="./styles/ai.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../live/">EMS <span>Productie</span></a>
+  <nav data-ems-main-nav aria-label="Hoofdnavigatie"></nav>
+  <div id="agent-status" class="freshness">Controleren…</div>
+</header>
+<main>
+  <section class="intro">
+    <div>
+      <small>AI ANALYSE V0.1 · READ-ONLY</small>
+      <h1>Vraag het EMS</h1>
+      <p>Analyseert canonieke Pi-historie en planner-evidence. De agent kan geen apparaten aansturen.</p>
+    </div>
+  </section>
+
+  <section class="quick-actions" aria-label="Snelle vragen">
+    <button data-question="Waarom hebben we vandaag PV geëxporteerd terwijl de Tesla aangesloten was?">Waarom export met Tesla?</button>
+    <button data-question="Heeft het EMS vandaag opvallende gemiste PV-kansen gehad?">Gemiste PV-kansen</button>
+    <button data-question="Hoe heeft het EMS vandaag gepresteerd en wat zijn de belangrijkste verklaringen?">Analyseer vandaag</button>
+  </section>
+
+  <section class="panel chat-panel">
+    <div id="messages" class="messages" aria-live="polite">
+      <article class="message agent">
+        <small>EMS AI</small>
+        <p>Stel een vraag over vandaag. V0.1 gebruikt de dagelijkse EMS-performanceanalyse plus 5-minuten evidence voor net, PV en Tesla.</p>
+      </article>
+    </div>
+    <form id="ask-form" class="ask-form">
+      <label for="question">Vraag</label>
+      <textarea id="question" rows="3" maxlength="1200" placeholder="Bijv. waarom exporteerden we rond 14:00 terwijl de Tesla aangesloten was?"></textarea>
+      <div class="form-actions">
+        <span id="hint">Feit → afleiding → advies</span>
+        <button id="send" type="submit">Analyseer</button>
+      </div>
+    </form>
+  </section>
+
+  <p class="preview-note">EMS productie · AI read-only · geen control writes</p>
+</main>
+<script type="module" src="./render/ai.js"></script>
+<script type="module" src="../shared/navigation.js"></script>
+</body>
+</html>
