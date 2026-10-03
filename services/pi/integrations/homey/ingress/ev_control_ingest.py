@@ -188,20 +188,19 @@ def _extract(payload):
 def archive_ev_control(payload, db_path=HISTORY_DB):
     generated = _validate(payload)
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    data = _extract(payload)
 
-    # Deduplicate semantic evidence, not transport timestamps. Gate and actuator
-    # changes remain distinct because their payload content changes; a repeated
-    # trigger with identical runtime contracts does not create event noise.
-    hash_payload = dict(payload)
-    hash_payload.pop("generatedAt", None)
+    # Deduplicate on the normalized evidence we actually persist, not on the
+    # transport payload. Nested runtime contracts contain volatile timestamps
+    # such as generatedAt/updatedAt/sampledAt that may change while the control
+    # state remains identical. Those timestamps must not create event noise.
     hash_canonical = json.dumps(
-        hash_payload,
+        data,
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
     )
     event_hash = hashlib.sha256(hash_canonical.encode("utf-8")).hexdigest()
-    data = _extract(payload)
 
     con = sqlite3.connect(str(db_path), timeout=2.0)
     con.execute("PRAGMA busy_timeout=2000")
