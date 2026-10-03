@@ -163,7 +163,7 @@ def _extract(payload):
         "target_w": _number(ev.get("target_W") if ev else actuator.get("targetW")),
         "requested_a": _number(cmd.get("requested_A") if cmd else gate.get("requested_A")),
         "phase_mode": str(
-            cmd.get("mode") if cmd else gate.get("phaseMode") or ""
+            (cmd.get("mode") if cmd else gate.get("phaseMode")) or ""
         ) or None,
         "gate_status": str(gate.get("finalStatus") or gate.get("status") or "") or None,
         "gate_errors_json": json.dumps(errors, separators=(",", ":"), ensure_ascii=False),
