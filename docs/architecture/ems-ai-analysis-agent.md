@@ -103,6 +103,10 @@ requested current and phase, confirmed phase, transition stage/failure,
 charge-state/device-health context and whether the actuator reports a physical
 write.
 
+Identical runtime evidence triggered repeatedly is deduplicated semantically:
+the transport `generatedAt` timestamp is excluded from the event hash. A real
+Gate, actuator, transition or health change still produces a distinct event.
+
 This event history is **observability only**. It is never consumed by the
 planner, Gate or actuator.
 
