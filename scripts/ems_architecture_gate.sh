@@ -86,6 +86,8 @@ grep -q 'EMS_PI_DAY_PERFORMANCE_V0.1' "$PERFORMANCE" || fail "standard EMS perfo
 grep -q 'ems-history.sqlite' "$PERFORMANCE" || fail "EMS performance command does not use canonical measurement history"
 grep -q 'planner-history.sqlite' "$PERFORMANCE" || fail "EMS performance command does not use planner replay history"
 grep -q 'mode=ro' "$PERFORMANCE" || fail "EMS performance SQLite connections must be explicitly read-only"
+grep -q 'PRAGMA query_only=ON' "$PERFORMANCE" || fail "EMS performance SQLite connections must enforce query_only"
+grep -q 'ReadWritePaths=/home/jeroen/ems/data' "$AI_ANALYSIS_UNIT" || fail "AI analysis service must allow bounded SQLite WAL coordination in data directory"
 grep -q 'constrainedOptimumAvailable' "$PERFORMANCE" || fail "EMS performance report must distinguish constrained optimum from upper bound"
 grep -q '/usr/local/bin/ems-performance' scripts/deploy_ems_pi.sh || fail "ems-performance command is not installed by deployment"
 grep -q 'EMS PERFORMANCE COMMAND' scripts/ems_pi_drift_check.sh || fail "ems-performance installation is not drift-checked"
