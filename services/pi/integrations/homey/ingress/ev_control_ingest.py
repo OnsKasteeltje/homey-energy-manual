@@ -185,6 +185,44 @@ def _extract(payload):
     }
 
 
+NORMALIZED_COLUMNS = (
+    "source_revision",
+    "control_revision",
+    "target_w",
+    "requested_a",
+    "phase_mode",
+    "gate_status",
+    "gate_errors_json",
+    "actuator_status",
+    "actuator_reason",
+    "actuator_target_a",
+    "actuator_phase_mode",
+    "actuator_confirmed_mode",
+    "transition_stage",
+    "transition_failure",
+    "charge_state",
+    "device_health_status",
+    "device_health_reason",
+    "physical_write_performed",
+)
+
+
+def _normalized_tuple(data):
+    return tuple(data[key] for key in NORMALIZED_COLUMNS)
+
+
+def _latest_normalized_tuple(con):
+    row = con.execute(
+        f"""
+        SELECT {",".join(NORMALIZED_COLUMNS)}
+        FROM ev_control_events
+        ORDER BY id DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    return tuple(row) if row is not None else None
+
+
 def archive_ev_control(payload, db_path=HISTORY_DB):
     generated = _validate(payload)
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
@@ -206,6 +244,20 @@ def archive_ev_control(payload, db_path=HISTORY_DB):
     con.execute("PRAGMA busy_timeout=2000")
     try:
         _ensure_schema(con)
+
+        # Transition-safe semantic dedupe: compare against the latest persisted
+        # normalized evidence before relying on event_hash uniqueness. This also
+        # suppresses duplicates created after a hash-algorithm upgrade, because
+        # older rows may carry hashes produced by a previous scheme.
+        if _latest_normalized_tuple(con) == _normalized_tuple(data):
+            return {
+                "archived": True,
+                "inserted": False,
+                "eventHash": event_hash,
+                "generatedAt": payload.get("generatedAt"),
+                "dedupe": "LATEST_NORMALIZED_EVIDENCE",
+            }
+
         cur = con.execute(
             """
             INSERT OR IGNORE INTO ev_control_events (
