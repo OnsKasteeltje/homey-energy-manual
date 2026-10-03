@@ -168,6 +168,17 @@ def main():
         assert stored["archived"] is True
         assert stored["inserted"] is True
 
+        # Simulate an already-commissioned row whose hash came from an older
+        # algorithm. Transition-safe dedupe must still compare normalized fields
+        # and suppress an identical new snapshot.
+        con = sqlite3.connect(db)
+        con.execute(
+            "UPDATE ev_control_events SET event_hash=? WHERE id=(SELECT MIN(id) FROM ev_control_events)",
+            ("legacy-hash-v1",),
+        )
+        con.commit()
+        con.close()
+
         duplicate = dict(event)
         duplicate["generatedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         duplicate["intent"] = dict(event["intent"])
