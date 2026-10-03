@@ -113,8 +113,9 @@ operator-health structure:
 
 - **SYSTEM** — uptime, load, memory, disk, Pi temperature and throttling flag;
 - **EMS DATA** — freshness/existence of canonical runtime data and history;
-- **EMS FUNCTIONS** — expected active services/timers and their last systemd
-  result/status;
+- **EMS FUNCTIONS** — expected active long-running services, plus for timer-driven
+  functions both the active timer schedule and the last triggered `.service`
+  execution/result; an active timer alone is not proof that the function works;
 - **RECENT INCIDENT SIGNALS** — best-effort warning/error journal evidence for
   EMS systemd units over the previous 24 hours.
 
