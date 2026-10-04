@@ -896,6 +896,21 @@ def _budget_compact_evidence(evidence, limits):
 
     if _budget_compact_field(
         evidence,
+        "semanticEvents",
+        limits["semanticEvents"],
+        change_paths=(
+            ("eventType",),
+            ("domain",),
+            ("subject",),
+        ),
+        important=lambda point: (
+            point.get("provenanceClass") == "USER_INTENT_COMMAND"
+        ),
+    ):
+        changed.append("semanticEvents")
+
+    if _budget_compact_field(
+        evidence,
         "flexContextWindow",
         limits["flexContextWindow"],
         change_paths=(
@@ -944,6 +959,7 @@ def _refresh_budget_selected_counts(evidence):
         "evTelemetry5m",
         "evControlEvents",
         "quookerEvents",
+        "semanticEvents",
         "flexContextWindow",
     ):
         value = evidence.get(field)
@@ -1879,6 +1895,7 @@ def build_evidence(day, question="", conversation_context=None):
 
     ev_telemetry_all = _ev_telemetry(day)
     quooker_events_all = _quooker_events(day)
+    semantic_events_all, semantic_event_coverage = _semantic_events(day)
     timeline_all = _timeline(day)
 
     original_counts = {
@@ -1886,12 +1903,14 @@ def build_evidence(day, question="", conversation_context=None):
         "evTelemetry5m": len(ev_telemetry_all),
         "evControlEvents": len(ev_control_all),
         "quookerEvents": len(quooker_events_all),
+        "semanticEvents": len(semantic_events_all),
     }
 
     timeline = list(timeline_all)
     ev_telemetry = list(ev_telemetry_all)
     ev_control = list(ev_control_all)
     quooker_events = list(quooker_events_all)
+    semantic_events = list(semantic_events_all)
     compacted_fields = []
     omitted_fields = []
 
@@ -1907,6 +1926,9 @@ def build_evidence(day, question="", conversation_context=None):
         )
         quooker_events = _select_points_near_anchors(
             quooker_events_all, selected_time_anchors
+        )
+        semantic_events = _select_points_near_anchors(
+            semantic_events_all, selected_time_anchors
         )
         mode = (
             "EXPLICIT_TIME_WINDOW"
@@ -1980,11 +2002,25 @@ def build_evidence(day, question="", conversation_context=None):
             ),
         )
 
+        semantic_events = _bounded_points(
+            semantic_events_all,
+            DAY_SCOPE_LIMITS["semanticEvents"],
+            change_paths=(
+                ("eventType",),
+                ("domain",),
+                ("subject",),
+            ),
+            important=lambda point: (
+                point.get("provenanceClass") == "USER_INTENT_COMMAND"
+            ),
+        )
+
         for field, before, after in (
             ("timeline5m", timeline_all, timeline),
             ("evTelemetry5m", ev_telemetry_all, ev_telemetry),
             ("evControlEvents", ev_control_all, ev_control),
             ("quookerEvents", quooker_events_all, quooker_events),
+            ("semanticEvents", semantic_events_all, semantic_events),
         ):
             if len(after) < len(before):
                 compacted_fields.append(field)
@@ -2007,6 +2043,22 @@ def build_evidence(day, question="", conversation_context=None):
             if quooker_events:
                 omitted_fields.append("quookerEvents")
             quooker_events = []
+
+        if "PV_FLEX" not in topics:
+            allowed_semantic_domains = set()
+            if "EV" in topics:
+                allowed_semantic_domains.update(("EV", "FLEX"))
+            if "HEATING_WW" in topics:
+                allowed_semantic_domains.update(
+                    ("HEATING", "WARM_WATER", "FLEX")
+                )
+            filtered_semantic = [
+                event for event in semantic_events
+                if event.get("domain") in allowed_semantic_domains
+            ]
+            if len(filtered_semantic) < len(semantic_events):
+                omitted_fields.append("semanticEvents")
+            semantic_events = filtered_semantic
 
     health = _load_health()
     planner_window = _planner_decision_window(day, anchors)
@@ -2032,6 +2084,7 @@ def build_evidence(day, question="", conversation_context=None):
         "evTelemetry5m": len(ev_telemetry),
         "evControlEvents": len(ev_control),
         "quookerEvents": len(quooker_events),
+        "semanticEvents": len(semantic_events),
         "flexContextWindow": len(flex_context),
     }
     original_counts["flexContextWindow"] = len(flex_context_all)
@@ -2062,6 +2115,7 @@ def build_evidence(day, question="", conversation_context=None):
                 "evTelemetry5m",
                 "evControlEvents",
                 "quookerEvents",
+                "semanticEvents",
             ]
             if selected_time_anchors
             else []
@@ -2081,6 +2135,7 @@ def build_evidence(day, question="", conversation_context=None):
             "evTelemetry": "Homey canonical state push -> ems-history.sqlite",
             "evControlEvents": "Homey observability LAN push -> ems-history.sqlite",
             "quookerEvents": "Homey Quooker observability LAN push -> ems-history.sqlite",
+            "semanticEvents": "Pi-local semantic observer -> ems-history.sqlite semantic_events",
             "planner": "planner-history.sqlite frozen decision snapshots",
             "flexContext": "Pi-local Heating/WW shadow archive -> planner-history.sqlite",
             "forecastComparison": "pv_forecast_v2_archive fixed 12h lead + canonical measurements_15m",
@@ -2094,6 +2149,8 @@ def build_evidence(day, question="", conversation_context=None):
         "evTelemetry5m": ev_telemetry,
         "evControlEvents": ev_control,
         "quookerEvents": quooker_events,
+        "semanticEvents": semantic_events,
+        "semanticEventCoverage": semantic_event_coverage,
         "plannerDecisionWindow": planner_window,
         "flexContextWindow": flex_context,
         "forecastVsActual15m": forecast_actual,
@@ -2108,6 +2165,8 @@ def build_evidence(day, question="", conversation_context=None):
             "EV telemetry and control-event history only exist from their V0.2 commissioning onward; earlier gaps must not be backfilled by inference.",
             "Heating/WW flex-context history only exists from V0.4 flex-context archive commissioning onward; earlier gaps must not be backfilled from current JSON.",
             "Quooker adapter/actuator/detector history only exists from V0.4 Quooker evidence-push commissioning onward; earlier gaps must not be backfilled from current Homey Logic.",
+            "Semantic event history begins at semanticEventCoverage.commissionedAt. Initial state is baseline-only and creates no synthetic event; absence before commissioning or at baseline is not proof that no change occurred.",
+            "Semantic event provenance is explicit: USER_INTENT_COMMAND records intent but not physical execution; OBSERVED_STATE does not identify the actor; DERIVED_STATE is Pi-derived; SHADOW_DECISION is not a physical write.",
             "Heating progression remains SHADOW. Quooker actuator mode is evidence-driven: SHADOW desiredOn/wouldWrite does not prove a physical command; LIVE physicalWritePerformed=true does.",
             "For Quooker LIVE evidence, physicalWritePerformed=false can be an idempotent no-op when the requested state already matched; use actualOnBefore/actualOnAfter plus detector evidence for context.",
             "If a historical Quooker event has actuator.mode=UNKNOWN, do not infer a physical write from detector HEATING alone.",
