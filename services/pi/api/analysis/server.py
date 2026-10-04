@@ -2413,6 +2413,8 @@ def _evidence_summary(evidence):
         "evTelemetryPoints": len(evidence["evTelemetry5m"]),
         "evControlEvents": len(evidence["evControlEvents"]),
         "quookerEvents": len(evidence["quookerEvents"]),
+        "semanticEvents": len(evidence["semanticEvents"]),
+        "semanticEventCoverage": evidence.get("semanticEventCoverage"),
         "plannerDecisionPoints": len(evidence["plannerDecisionWindow"]),
         "flexContextPoints": len(evidence["flexContextWindow"]),
         "forecastComparisonSlots": len(
