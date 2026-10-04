@@ -123,6 +123,42 @@ The model must distinguish **Feit**, **Afleiding** and **Advies** and must state
 when evidence is insufficient. An observed export window is not by itself proof
 of an EMS fault.
 
+## Deterministic constrained-replay evidence
+
+V0.4 now has a candidate bounded evidence bridge to Constrained Replay V0.1.1.
+The AI service invokes the read-only `ems-constrained-replay` command and
+accepts only schema `EMS_PI_CONSTRAINED_REPLAY_V0.1.1`.
+
+The field is exposed as `constrainedReplay` only for EV/PV-Flex relevant
+questions (or generic day-scope analysis). It contains:
+
+- replay scope and read-only/control-write declarations;
+- day-level coverage and totals;
+- deterministic reason-energy attribution;
+- at most 12 bounded replay windows;
+- per-window classification, reason, export, bounded additional feasible
+  capture, phase/control reason, confidence and nearby semantic events.
+
+For explicit/context clock-time questions the selected replay windows are
+limited to the same ±30-minute analysis scope. For day-scope questions the
+projection prioritizes `REAL_MISSED_OPPORTUNITY` windows by bounded additional
+capture and then the largest remaining export windows.
+
+The model is not allowed to reclassify replay output. In particular:
+
+- `UNAVOIDABLE_EXPORT`, `CONSTRAINT_DRIVEN_EXPORT`,
+  `REAL_MISSED_OPPORTUNITY` and `INSUFFICIENT_EVIDENCE` remain replay
+  classifications, not LLM judgments;
+- the model may explain a replay reason but may not increase
+  `additionalFeasibleCaptureKWh`;
+- `UNAVOIDABLE_EXPORT` is explicitly scoped to the modeled EV path and must
+  never be generalized to WW/Heating/appliance/battery flexibility;
+- omitted replay windows are bounded-selection omissions, not proof that no
+  other windows occurred.
+
+This keeps the LLM in the explanation layer while counterfactual feasibility
+remains deterministic and local.
+
 ## Evidence model
 
 ### Current EV deadline command authority
