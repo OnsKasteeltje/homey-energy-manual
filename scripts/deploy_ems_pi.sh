@@ -86,6 +86,7 @@ UNMANAGED="$(
             -not -path './logs/*' \
             -not -path './history/*' \
             -not -path './forecast/*' \
+            -not -path './thermal/*' \
             -not -path './planner/warm-water/*' \
             -not -path './status-api/*' \
             -not -path './web-data-api/*' \
@@ -266,14 +267,16 @@ echo "PASS: runtime contains no unmanaged source files"
 echo
 echo "=== DEPLOY RUNTIME SOURCE ==="
 # tools/, homey-deploy/ and status-api/ are managed separately below.
-# Exclude the complete directories here so rsync --delete never attempts to
-# remove their protected target-managed contents or emits misleading
-# "cannot delete non-empty directory" messages.
+# thermal/ contains derived operational artifacts (including quatt-current.json)
+# produced by target-structure integrations and is not repository-managed source.
+# Exclude these complete directories so rsync --delete never removes protected
+# runtime state or emits misleading "cannot delete non-empty directory" messages.
 rsync -a --delete \
     --exclude='data/' \
     --exclude='logs/' \
     --exclude='history/' \
     --exclude='forecast/' \
+    --exclude='thermal/' \
     --exclude='status-api/' \
     --exclude='web-data-api/' \
     --exclude='analysis-api/' \
