@@ -42,16 +42,26 @@ EVIDENCE_SCHEMA = "EMS_AI_EVIDENCE_V0.4"
 MAX_BODY_BYTES = 16 * 1024
 MAX_QUESTION_CHARS = 1200
 MAX_REQUEST_ID_CHARS = 80
+MAX_CONTEXT_MESSAGES = 4
+MAX_CONTEXT_MESSAGE_CHARS = 1200
 JOB_RETENTION_HOURS = 24
 JOB_PENDING_STALE_SECONDS = 180
 EXPLICIT_TIME_WINDOW_MINUTES = 30
+DAY_SCOPE_LIMITS = {
+    "timeline5m": 72,
+    "evTelemetry5m": 48,
+    "evControlEvents": 48,
+    "quookerEvents": 36,
+    "flexContextWindow": 3,
+}
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 _ACTIVE_JOB_IDS = set()
 _ACTIVE_JOB_LOCK = threading.Lock()
 
 SYSTEM_INSTRUCTIONS = """You are the read-only analysis layer for a household Energy Management System.
 Answer in Dutch unless the user's question is clearly in another language.
-Use ONLY the supplied EMS evidence. Never claim facts that are not present.
+Use ONLY the supplied EMS evidence for factual claims. Never claim facts that are not present.
+Recent conversation context, when supplied, is referential context only: use it to resolve phrases such as "dit tijdslot", "die deadline" or "waarom dan", but do not treat prior user or assistant statements as EMS evidence and do not repeat factual claims unless the current EMS evidence supports them.
 Clearly distinguish:
 1. Feit: directly observed or recorded evidence.
 2. Afleiding: a conclusion supported by the evidence.
@@ -65,7 +75,8 @@ Use plannerDecisionWindow as historical intent evidence and never judge an earli
 Use forecastVsActual15m to distinguish forecast error from planner/control execution error when the evidence supports that distinction.
 For EV control questions, evControlEvents[].intentReason, realtimePhaseReason and realtimeCurrentReason are recorded Homey control reasons, not model inference. If a zero target/IDLE event has one of these reasons, use it before saying the underlying cause is unknown. Rolling available-power fields in the same event may support that reason but must not be invented when absent.
 Use flexContextWindow for historical Heating/WW eligibility and priority, and quookerEvents for Quooker adapter/actuator/detector evidence.
-When evidenceSelection.mode is EXPLICIT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally limited to the documented local window around clock times explicitly present in the user's question. Do not interpret absence outside that selected window as evidence that no activity occurred elsewhere in the day.
+When evidenceSelection.mode is EXPLICIT_TIME_WINDOW or CONTEXT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally limited to the documented local window around the selected clock time. Do not interpret absence outside that selected window as evidence that no activity occurred elsewhere in the day.
+When evidenceSelection.mode is TOPIC_DAY_SCOPE or DAY_SCOPE_COMPACT, listed compactedFields are bounded samples across the day and listed omittedFields were intentionally excluded as unrelated to the current question. Do not interpret omitted or unsampled records as proof that no activity occurred.
 Heating progression remains SHADOW. Quooker actuator evidence is versioned: use quookerEvents[].actuator.mode as the authority. For SHADOW evidence, desiredOn/wouldWrite is not a physical command. For LIVE evidence, physicalWritePerformed=true is direct proof that the Homey actuator executed a device write, while actualOnBefore/actualOnAfter describe the observed state transition. physicalWritePerformed=false may be an idempotent no-op when desired and actual state already matched. Detector HEATING is independent electrical evidence and must not by itself be described as a physical control write.
 Never backfill missing pre-commissioning flex or Quooker history by inference.
 For an in-progress day, PARTIAL_TODAY means the calendar day is not finished; never call data incomplete from full-day coverage alone. Use quality.coveragePctElapsed, quality.elapsedCoverageStatus and quality.dayProgressPct.
@@ -492,6 +503,76 @@ def _explicit_question_anchors(question, day):
     return _normalize_anchors(anchors)
 
 
+_CONTEXT_REF_RE = re.compile(
+    r"\b(dit|deze|die|daar|dan|hier|zelfde|vorige|tijdslot|slot)\b"
+    r"|\bde\s+deadline\b",
+    re.IGNORECASE,
+)
+
+
+def _validate_conversation_context(value):
+    if value in (None, []):
+        return []
+    if not isinstance(value, list):
+        raise ValueError("CONTEXT_INVALID")
+
+    out = []
+    for item in value[-MAX_CONTEXT_MESSAGES:]:
+        if not isinstance(item, dict):
+            raise ValueError("CONTEXT_INVALID")
+        role = item.get("role")
+        content = item.get("content")
+        if role not in {"user", "assistant"} or not isinstance(content, str):
+            raise ValueError("CONTEXT_INVALID")
+        text = content.strip()
+        if not text:
+            continue
+        if len(text) > MAX_CONTEXT_MESSAGE_CHARS:
+            raise ValueError("CONTEXT_INVALID")
+        out.append({"role": role, "content": text})
+    return out
+
+
+def _is_contextual_followup(question):
+    return _CONTEXT_REF_RE.search(question or "") is not None
+
+
+def _detect_topics(text):
+    value = (text or "").lower()
+    topics = set()
+
+    if re.search(r"\b(tesla|ev|easee|laden|laadt|laad[a-z-]*)\b", value):
+        topics.add("EV")
+    if re.search(r"\b(warm\s*water|warmwater|boiler|ww|quatt|heating|verwarm[a-z-]*|preheat[a-z-]*|serre)\b", value):
+        topics.add("HEATING_WW")
+    if "deadline" in value and "HEATING_WW" not in topics:
+        topics.add("EV")
+    if re.search(r"\b(quooker)\b", value):
+        topics.add("QUOOKER")
+    if re.search(r"\b(pv|flex|planner|forecast|export|teruglever[a-z-]*|overschot|zelfgebruik|tijdslot)\b", value):
+        topics.add("PV_FLEX")
+
+    return topics
+
+
+def _question_topics(question, conversation_context=None):
+    topics = _detect_topics(question)
+    if _is_contextual_followup(question):
+        for item in (conversation_context or [])[-2:]:
+            topics.update(_detect_topics(item.get("content")))
+    return sorted(topics)
+
+
+def _context_followup_anchors(question, day, conversation_context=None):
+    if not _is_contextual_followup(question):
+        return []
+    for item in reversed(conversation_context or []):
+        anchors = _explicit_question_anchors(item.get("content"), day)
+        if anchors:
+            return anchors[:3]
+    return []
+
+
 def _question_anchors(question, day, performance, ev_control):
     anchors = _explicit_question_anchors(question, day)
 
@@ -506,6 +587,69 @@ def _question_anchors(question, day, performance, ev_control):
                 anchors.append(dt.astimezone(LOCAL_TZ))
 
     return _normalize_anchors(anchors)
+
+
+def _point_path(point, path):
+    value = point
+    for part in path:
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+    return value
+
+
+def _evenly_pick_indices(indices, count):
+    ordered = sorted(set(indices))
+    if count <= 0:
+        return []
+    if len(ordered) <= count:
+        return ordered
+    if count == 1:
+        return [ordered[-1]]
+
+    positions = {
+        round(i * (len(ordered) - 1) / (count - 1))
+        for i in range(count)
+    }
+    return [ordered[pos] for pos in sorted(positions)]
+
+
+def _bounded_points(points, max_points, change_paths=(), important=None):
+    values = list(points)
+    if len(values) <= max_points:
+        return values
+
+    important_indices = {0, len(values) - 1}
+    for index, point in enumerate(values):
+        if important is not None and important(point):
+            important_indices.add(index)
+        if index == 0:
+            continue
+        previous = values[index - 1]
+        if any(
+            _point_path(previous, path) != _point_path(point, path)
+            for path in change_paths
+        ):
+            important_indices.add(index - 1)
+            important_indices.add(index)
+
+    if len(important_indices) >= max_points:
+        chosen = _evenly_pick_indices(important_indices, max_points)
+        return [values[index] for index in chosen]
+
+    chosen = set(important_indices)
+    for index in _evenly_pick_indices(range(len(values)), max_points):
+        chosen.add(index)
+        if len(chosen) >= max_points:
+            break
+
+    if len(chosen) < max_points:
+        for index in range(len(values)):
+            chosen.add(index)
+            if len(chosen) >= max_points:
+                break
+
+    return [values[index] for index in sorted(chosen)]
 
 
 def _select_points_near_anchors(
@@ -1230,51 +1374,197 @@ def _forecast_vs_actual_15m(day, anchors):
     }
 
 
-def build_evidence(day, question=""):
+def build_evidence(day, question="", conversation_context=None):
+    conversation_context = conversation_context or []
     performance = _load_performance(day)
     ev_control_all = _ev_control_events(day)
+
     explicit_anchors = _explicit_question_anchors(question, day)
-    anchors = _question_anchors(question, day, performance, ev_control_all)
+    context_anchors = (
+        []
+        if explicit_anchors
+        else _context_followup_anchors(
+            question, day, conversation_context
+        )
+    )
+    selected_time_anchors = explicit_anchors or context_anchors
+    topics = _question_topics(question, conversation_context)
 
-    ev_telemetry = _ev_telemetry(day)
-    quooker_events = _quooker_events(day)
-    timeline = _timeline(day)
-    ev_control = ev_control_all
+    if selected_time_anchors:
+        anchors = selected_time_anchors
+    else:
+        anchors = _question_anchors(
+            question, day, performance, ev_control_all
+        )
 
-    if explicit_anchors:
+    ev_telemetry_all = _ev_telemetry(day)
+    quooker_events_all = _quooker_events(day)
+    timeline_all = _timeline(day)
+
+    original_counts = {
+        "timeline5m": len(timeline_all),
+        "evTelemetry5m": len(ev_telemetry_all),
+        "evControlEvents": len(ev_control_all),
+        "quookerEvents": len(quooker_events_all),
+    }
+
+    timeline = list(timeline_all)
+    ev_telemetry = list(ev_telemetry_all)
+    ev_control = list(ev_control_all)
+    quooker_events = list(quooker_events_all)
+    compacted_fields = []
+    omitted_fields = []
+
+    if selected_time_anchors:
+        timeline = _select_points_near_anchors(
+            timeline_all, selected_time_anchors
+        )
         ev_telemetry = _select_points_near_anchors(
-            ev_telemetry, explicit_anchors
+            ev_telemetry_all, selected_time_anchors
         )
         ev_control = _select_points_near_anchors(
-            ev_control_all, explicit_anchors
+            ev_control_all, selected_time_anchors
         )
         quooker_events = _select_points_near_anchors(
-            quooker_events, explicit_anchors
+            quooker_events_all, selected_time_anchors
         )
-        timeline = _select_points_near_anchors(
-            timeline, explicit_anchors
+        mode = (
+            "EXPLICIT_TIME_WINDOW"
+            if explicit_anchors
+            else "CONTEXT_TIME_WINDOW"
         )
+    else:
+        timeline = _bounded_points(
+            timeline_all,
+            DAY_SCOPE_LIMITS["timeline5m"],
+            change_paths=(
+                ("washerActive",),
+                ("dryerActive",),
+            ),
+        )
+        ev_telemetry = _bounded_points(
+            ev_telemetry_all,
+            DAY_SCOPE_LIMITS["evTelemetry5m"],
+            change_paths=(
+                ("connected",),
+                ("charging",),
+                ("observedPhaseMode",),
+                ("chargeState",),
+                ("deadlineActive",),
+                ("managerDecision",),
+                ("managerReason",),
+            ),
+        )
+        ev_control = _bounded_points(
+            ev_control_all,
+            DAY_SCOPE_LIMITS["evControlEvents"],
+            change_paths=(
+                ("gateStatus",),
+                ("actuatorStatus",),
+                ("actuatorReason",),
+                ("transitionStage",),
+                ("transitionFailure",),
+                ("chargeState",),
+                ("deviceHealthStatus",),
+                ("phaseMode",),
+                ("intentReason",),
+                ("realtimePhaseReason",),
+                ("realtimeCurrentReason",),
+            ),
+            important=lambda point: bool(
+                point.get("physicalWritePerformed")
+                or point.get("transitionFailure")
+                or point.get("gateErrors")
+            ),
+        )
+        quooker_events = _bounded_points(
+            quooker_events_all,
+            DAY_SCOPE_LIMITS["quookerEvents"],
+            change_paths=(
+                ("control", "targetOn"),
+                ("actuator", "mode"),
+                ("actuator", "actualOn"),
+                ("detector", "active"),
+                ("detector", "status"),
+                ("physicalWritePerformed",),
+            ),
+            important=lambda point: bool(
+                point.get("physicalWritePerformed")
+                or (point.get("actuator") or {}).get("writeError")
+            ),
+        )
+
+        for field, before, after in (
+            ("timeline5m", timeline_all, timeline),
+            ("evTelemetry5m", ev_telemetry_all, ev_telemetry),
+            ("evControlEvents", ev_control_all, ev_control),
+            ("quookerEvents", quooker_events_all, quooker_events),
+        ):
+            if len(after) < len(before):
+                compacted_fields.append(field)
+
+        if topics:
+            if "EV" not in topics:
+                if ev_telemetry:
+                    omitted_fields.append("evTelemetry5m")
+                if ev_control:
+                    omitted_fields.append("evControlEvents")
+                ev_telemetry = []
+                ev_control = []
+            if "QUOOKER" not in topics:
+                if quooker_events:
+                    omitted_fields.append("quookerEvents")
+                quooker_events = []
+
+        mode = "TOPIC_DAY_SCOPE" if topics else "DAY_SCOPE_COMPACT"
 
     health = _load_health()
     planner_window = _planner_decision_window(day, anchors)
-    flex_context = _flex_context_window(day, anchors)
-    _annotate_deadline_semantics(ev_telemetry, planner_window, flex_context)
+    flex_context_all = _flex_context_window(day, anchors)
+
+    if selected_time_anchors:
+        flex_context = flex_context_all
+    else:
+        flex_context = _bounded_points(
+            flex_context_all,
+            DAY_SCOPE_LIMITS["flexContextWindow"],
+        )
+        if len(flex_context) < len(flex_context_all):
+            compacted_fields.append("flexContextWindow")
+
+    _annotate_deadline_semantics(
+        ev_telemetry, planner_window, flex_context
+    )
     forecast_actual = _forecast_vs_actual_15m(day, anchors)
 
+    selected_counts = {
+        "timeline5m": len(timeline),
+        "evTelemetry5m": len(ev_telemetry),
+        "evControlEvents": len(ev_control),
+        "quookerEvents": len(quooker_events),
+        "flexContextWindow": len(flex_context),
+    }
+    original_counts["flexContextWindow"] = len(flex_context_all)
+
     selection = {
-        "mode": (
-            "EXPLICIT_TIME_WINDOW"
-            if explicit_anchors
-            else "DAY_SCOPE"
-        ),
+        "mode": mode,
+        "topics": topics,
+        "conversationContextMessages": len(conversation_context),
         "explicitTimeAnchorsLocal": [
             anchor.isoformat() for anchor in explicit_anchors
         ],
+        "contextTimeAnchorsLocal": [
+            anchor.isoformat() for anchor in context_anchors
+        ],
         "windowMinutesBefore": (
-            EXPLICIT_TIME_WINDOW_MINUTES if explicit_anchors else None
+            EXPLICIT_TIME_WINDOW_MINUTES
+            if selected_time_anchors
+            else None
         ),
         "windowMinutesAfter": (
-            EXPLICIT_TIME_WINDOW_MINUTES if explicit_anchors else None
+            EXPLICIT_TIME_WINDOW_MINUTES
+            if selected_time_anchors
+            else None
         ),
         "scopedFields": (
             [
@@ -1283,9 +1573,13 @@ def build_evidence(day, question=""):
                 "evControlEvents",
                 "quookerEvents",
             ]
-            if explicit_anchors
+            if selected_time_anchors
             else []
         ),
+        "compactedFields": sorted(set(compacted_fields)),
+        "omittedFields": sorted(set(omitted_fields)),
+        "originalCounts": original_counts,
+        "selectedCounts": selected_counts,
     }
 
     return {
@@ -1316,7 +1610,9 @@ def build_evidence(day, question=""):
         "piHealthCurrent": health,
         "limitations": [
             "For today, full-calendar-day coverage is not evidence completeness. Use coveragePctElapsed and elapsedCoverageStatus to judge elapsed-time measurement coverage.",
-            "When evidenceSelection.mode is EXPLICIT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally scoped to the documented local window around explicit user-provided clock times; absence outside that window is not evidence of no activity.",
+            "Recent conversation context is referential context only and is not EMS evidence. Factual claims still require support from the current evidence package.",
+            "When evidenceSelection.mode is EXPLICIT_TIME_WINDOW or CONTEXT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally scoped to the documented local window; absence outside that window is not evidence of no activity.",
+            "When evidenceSelection.mode is TOPIC_DAY_SCOPE or DAY_SCOPE_COMPACT, compactedFields are bounded samples across the day and omittedFields were intentionally excluded as unrelated to the question; absence or omission is not evidence of no activity.",
             "EV deadline values may retain historical deadlineAt/remainingKWh metadata after the constraint becomes inactive; deadlineSemantics.effective is the authority for whether those values constrain the referenced decision time.",
             "EV telemetry and control-event history only exist from their V0.2 commissioning onward; earlier gaps must not be backfilled by inference.",
             "Heating/WW flex-context history only exists from V0.4 flex-context archive commissioning onward; earlier gaps must not be backfilled from current JSON.",
@@ -1332,7 +1628,6 @@ def build_evidence(day, question=""):
             "Export windows are observations and require constraint context before classifying them as missed opportunities.",
         ],
     }
-
 
 def _job_now():
     return datetime.now(timezone.utc)
@@ -1572,6 +1867,12 @@ def _evidence_summary(evidence):
         "evidenceSelectionMode": (
             evidence.get("evidenceSelection") or {}
         ).get("mode"),
+        "evidenceSelectionTopics": (
+            evidence.get("evidenceSelection") or {}
+        ).get("topics") or [],
+        "conversationContextMessages": (
+            evidence.get("evidenceSelection") or {}
+        ).get("conversationContextMessages") or 0,
         "limitations": evidence["limitations"],
     }
 
@@ -1697,13 +1998,33 @@ def _raise_model_response_failure(payload, duration_ms=None):
     raise RuntimeError(reason)
 
 
-def ask_model(question, evidence):
+def ask_model(question, evidence, conversation_context=None):
     if not OPENAI_API_KEY:
         raise RuntimeError("MODEL_NOT_CONFIGURED")
+
+    context_lines = [
+        f"{item['role']}: {item['content']}"
+        for item in (conversation_context or [])
+    ]
+    context_block = ""
+    if context_lines:
+        context_block = (
+            "Recente conversatiecontext (alleen voor referenties; "
+            "geen EMS-bewijs):\n"
+            + "\n".join(context_lines)
+            + "\n\n"
+        )
+
     body = json.dumps({
         "model": MODEL,
         "instructions": SYSTEM_INSTRUCTIONS,
-        "input": "Vraag:\n" + question + "\n\nEMS evidence JSON:\n" + json.dumps(evidence, ensure_ascii=False),
+        "input": (
+            context_block
+            + "Vraag:\n"
+            + question
+            + "\n\nEMS evidence JSON:\n"
+            + json.dumps(evidence, ensure_ascii=False)
+        ),
         "reasoning": {
             "effort": REASONING_EFFORT,
             "mode": "standard",
@@ -1890,6 +2211,9 @@ class Handler(BaseHTTPRequestHandler):
             question = question.strip()
             day = _resolve_day(request_payload.get("day"))
             request_id = _validate_request_id(request_payload.get("requestId"))
+            conversation_context = _validate_conversation_context(
+                request_payload.get("conversationContext")
+            )
 
             if request_id is not None:
                 job = _job_claim(request_id, question, day)
@@ -1913,8 +2237,12 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 claimed_job = True
 
-            evidence = build_evidence(day, question)
-            answer, response_id = ask_model(question, evidence)
+            evidence = build_evidence(
+                day, question, conversation_context
+            )
+            answer, response_id = ask_model(
+                question, evidence, conversation_context
+            )
             result = _analysis_response(
                 day, answer, response_id, evidence, request_id=request_id
             )
