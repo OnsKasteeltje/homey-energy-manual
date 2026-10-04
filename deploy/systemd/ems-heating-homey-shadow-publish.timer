@@ -3,9 +3,10 @@ Description=Publish Heating V0.5 to Homey SHADOW every minute
 
 [Timer]
 # V0.5 control gate runs at :30. Publish the validated SHADOW contract at :35.
+# Accuracy is tight so this timer cannot coalesce back onto the V0.5 phase.
 OnCalendar=*-*-* *:*:35
 Persistent=true
-AccuracySec=5s
+AccuracySec=1s
 Unit=ems-heating-homey-shadow-publish.service
 
 [Install]
