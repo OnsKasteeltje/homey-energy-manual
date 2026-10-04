@@ -252,7 +252,7 @@ thermostat reads are the only Homey effects.
 When host-local Heating commissioning has already reached `state=READY` but
 the final post-publish validation was interrupted (for example by Homey 429),
 operators must use `--resume-ready` rather than rerun `--apply`.
-The resume path performs no Logic/Advanced Flow create or update. It validates
+The resume path performs no structural Logic/Advanced Flow create or update. It validates
 the pinned three Logic IDs and two Advanced Flow IDs by targeted readback with
 at least five seconds between Homey API reads, performs one SHADOW publish,
 then validates Intent, Adapter and Gate on one shared `controlRevision`.
