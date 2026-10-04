@@ -99,6 +99,8 @@ def main():
     assert "referential context only" in instructions
     assert "TOPIC_DAY_SCOPE" in instructions
     assert "omittedFields" in instructions
+    assert "evidenceSelection.inputBudget.status" in instructions
+    assert "budgetCompactedFields" in instructions
 
     day = date(2026, 10, 4)
     explicit = ai._explicit_question_anchors(
@@ -308,6 +310,85 @@ def main():
     assert pv_explicit_evidence["evControlEvents"] == []
     assert pv_explicit_evidence["evTelemetry5m"] == []
     assert pv_explicit_evidence["quookerEvents"] == []
+
+    normal_budget = pv_explicit_evidence["evidenceSelection"]["inputBudget"]
+    assert normal_budget["targetTokens"] == 80000
+    assert normal_budget["hardLimitTokens"] == 100000
+    assert normal_budget["exactTokenizer"] is False
+    assert normal_budget["status"] in {
+        "WITHIN_BUDGET",
+        "COMPACTED_TO_BUDGET",
+        "WITHIN_HARD_LIMIT",
+    }
+    assert normal_budget["estimatedTokens"] <= normal_budget["hardLimitTokens"]
+
+    budget_evidence = {
+        "evidenceSelection": {
+            "compactedFields": [],
+            "selectedCounts": {
+                "timeline5m": 100,
+                "evTelemetry5m": 0,
+                "evControlEvents": 0,
+                "quookerEvents": 0,
+                "flexContextWindow": 0,
+            },
+        },
+        "timeline5m": [
+            {
+                "atLocal": f"2026-10-04T00:{index % 60:02d}:00+02:00",
+                "blob": "x" * 4000,
+            }
+            for index in range(100)
+        ],
+        "evTelemetry5m": [],
+        "evControlEvents": [],
+        "quookerEvents": [],
+        "plannerDecisionWindow": [],
+        "flexContextWindow": [],
+        "forecastVsActual15m": {"available": True, "summary": {}, "slots": []},
+    }
+    budgeted = ai._apply_model_input_budget(
+        budget_evidence,
+        "analyseer vandaag",
+        [],
+    )
+    compact_budget = budgeted["evidenceSelection"]["inputBudget"]
+    assert compact_budget["status"] == "COMPACTED_TO_BUDGET"
+    assert compact_budget["compactionStepsApplied"] >= 1
+    assert "timeline5m" in compact_budget["budgetCompactedFields"]
+    assert len(budgeted["timeline5m"]) < 100
+    assert compact_budget["estimatedTokens"] <= ai.MODEL_INPUT_TARGET_TOKENS
+    assert budgeted["evidenceSelection"]["selectedCounts"]["timeline5m"] == len(
+        budgeted["timeline5m"]
+    )
+
+    hard_evidence = {
+        "evidenceSelection": {
+            "compactedFields": [],
+            "selectedCounts": {},
+        },
+        "timeline5m": [],
+        "evTelemetry5m": [],
+        "evControlEvents": [],
+        "quookerEvents": [],
+        "plannerDecisionWindow": [],
+        "flexContextWindow": [],
+        "forecastVsActual15m": {"available": True, "summary": {}, "slots": []},
+        "nonCompactable": "x" * 400000,
+    }
+    try:
+        ai._apply_model_input_budget(
+            hard_evidence,
+            "analyseer vandaag",
+            [],
+        )
+        raise AssertionError("hard input budget must fail closed")
+    except RuntimeError as exc:
+        assert str(exc) == "MODEL_INPUT_BUDGET_EXCEEDED"
+        assert (
+            hard_evidence["evidenceSelection"]["inputBudget"]["status"]
+            == "HARD_LIMIT_EXCEEDED"
+        )
 
     maxed = {
         "id": "resp_test_max",

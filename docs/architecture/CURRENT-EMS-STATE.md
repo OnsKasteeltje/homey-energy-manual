@@ -584,9 +584,20 @@ are compacted deterministically; unrelated EV or Quooker streams are omitted
 for topic-specific questions. `evidenceSelection` records the mode, topics,
 context-anchor use, compacted/omitted fields and original/selected counts. The
 browser supplies at most four recent non-error messages (1200 characters each)
-as referential context only; prior chat text is not EMS evidence. This is
-analysis-transport optimization only: canonical history, source authority,
-polling, planner, Homey and physical-control paths are unchanged.
+as referential context only; prior chat text is not EMS evidence.
+
+A final pre-flight input budget now protects the model boundary. The service
+targets 80,000 estimated input tokens and fails closed above 100,000 estimated
+tokens after deterministic budget compaction. The estimate is intentionally
+conservative and uses UTF-8 bytes / 2.5 rather than introducing a tokenizer
+runtime dependency; `exactTokenizer=false` is exposed with the budget
+metadata. If the target is exceeded, already-selected event/window collections
+are reduced in documented steps and `budgetCompactedFields` records what was
+reduced. If the hard limit still cannot be met,
+`MODEL_INPUT_BUDGET_EXCEEDED` is returned before any OpenAI request. This
+limits oversized single requests but does not replace provider rolling
+rate-limit handling. Canonical history, source authority, polling, planner,
+Homey and physical-control paths are unchanged.
 
 Frontend V2 exposes the human interface at `/ai/`. Private Caddy ingress
 proxies `/agent/*` only to the loopback analysis service. Model credentials
