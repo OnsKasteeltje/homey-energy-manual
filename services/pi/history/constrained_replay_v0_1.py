@@ -30,13 +30,13 @@ TZ = ZoneInfo("Europe/Amsterdam")
 DATA = Path("/home/jeroen/ems/data")
 HISTORY_DB = DATA / "ems-history.sqlite"
 
-SCHEMA = "EMS_PI_CONSTRAINED_REPLAY_V0.1"
+SCHEMA = "EMS_PI_CONSTRAINED_REPLAY_V0.1.1"
 SCOPE = "EV_EXPORT_ONLY"
 
 MIN_EXPORT_W = 250.0
 MAX_MEASUREMENT_INTERVAL_S = 600.0
 PREFERRED_ATTRIBUTION_INTERVAL_S = 120.0
-MAX_CONTROL_EVENT_AGE_S = 90.0
+HIGH_CONFIDENCE_CONTROL_EVENT_AGE_S = 90.0
 
 MIN_A = 6
 MAX_A = 16
@@ -223,7 +223,20 @@ def load_control_events(
     try:
         if not _table_exists(con, "ev_control_events"):
             return []
-        rows = con.execute(
+        baseline = con.execute(
+            """
+            SELECT
+                ts_utc,requested_a,phase_mode,gate_status,
+                actuator_status,actuator_reason,actuator_target_a,
+                transition_stage,transition_failure,charge_state,raw_json
+            FROM ev_control_events
+            WHERE ts_utc<?
+            ORDER BY ts_utc DESC
+            LIMIT 1
+            """,
+            (_iso_z(start),),
+        ).fetchall()
+        in_day = con.execute(
             """
             SELECT
                 ts_utc,requested_a,phase_mode,gate_status,
@@ -235,6 +248,7 @@ def load_control_events(
             """,
             (_iso_z(start), _iso_z(end)),
         ).fetchall()
+        rows = baseline + in_day
     finally:
         con.close()
 
@@ -432,8 +446,12 @@ def classify_export_interval(
         return _result(CLASS_INSUFFICIENT, "NO_EV_CONTROL_EVIDENCE", confidence="LOW")
 
     event_age_s = (at - event.at).total_seconds()
-    if event_age_s < -5 or event_age_s > MAX_CONTROL_EVENT_AGE_S:
-        return _result(CLASS_INSUFFICIENT, "EV_CONTROL_EVIDENCE_NOT_TIME_ALIGNED", confidence="LOW")
+    if event_age_s < -5:
+        return _result(
+            CLASS_INSUFFICIENT,
+            "EV_CONTROL_EVIDENCE_NOT_TIME_ALIGNED",
+            confidence="LOW",
+        )
 
     ctx = _control_context(event)
     charge_state = str(event.charge_state or "").lower()
@@ -454,10 +472,16 @@ def classify_export_interval(
         requested_a = _num(ctx["requestedA"]) or 0.0
         requested_w = requested_a * wpa
         potential = min(export_w, max(0.0, requested_w - ev_w))
+        if potential > 0:
+            return _result(
+                CLASS_MISSED,
+                "ACTUATOR_OR_PHASE_TRANSITION_FAILED",
+                potential,
+                confidence="MEDIUM",
+            )
         return _result(
-            CLASS_MISSED,
-            "ACTUATOR_OR_PHASE_TRANSITION_FAILED",
-            potential,
+            CLASS_CONSTRAINT,
+            "ACTUATOR_FAILURE_NO_PROVEN_CAPTURE",
             confidence="MEDIUM",
         )
 
@@ -714,6 +738,7 @@ def build_replay(
     *,
     db_path: Path = HISTORY_DB,
 ) -> dict:
+    start, end = _bounds(day)
     measurements = load_measurements(day, db_path)
     controls = load_control_events(day, db_path)
     semantic_events = load_semantic_events(day, db_path)
@@ -727,6 +752,7 @@ def build_replay(
     measurement_intervals_s = []
     intervals_over_preferred = 0
     control_segmented_intervals = 0
+    carried_forward_segments = 0
 
     for i in range(len(measurements) - 1):
         row = measurements[i]
@@ -763,19 +789,9 @@ def build_replay(
                 if segment_start < candidate_at < next_row.at:
                     next_control_at = candidate_at
 
-            evidence_expiry_at = None
-            if segment_control is not None:
-                expiry = segment_control.at + timedelta(
-                    seconds=MAX_CONTROL_EVENT_AGE_S
-                )
-                if segment_start < expiry < next_row.at:
-                    evidence_expiry_at = expiry
-
             boundaries = [next_row.at]
             if next_control_at is not None:
                 boundaries.append(next_control_at)
-            if evidence_expiry_at is not None:
-                boundaries.append(evidence_expiry_at)
             segment_end = min(boundaries)
             segment_dt_s = (segment_end - segment_start).total_seconds()
 
@@ -791,7 +807,20 @@ def build_replay(
                 additional_w = min(export_w, result["additionalFeasibleW"])
                 confidence = result["confidence"]
                 resolution_limited = dt_s > PREFERRED_ATTRIBUTION_INTERVAL_S
-                if resolution_limited and confidence == "HIGH":
+                control_evidence_age_s = (
+                    max(0.0, (segment_start - segment_control.at).total_seconds())
+                    if segment_control is not None
+                    else None
+                )
+                state_carried_forward = (
+                    control_evidence_age_s is not None
+                    and control_evidence_age_s
+                    > HIGH_CONFIDENCE_CONTROL_EVENT_AGE_S
+                )
+                if (
+                    (resolution_limited or state_carried_forward)
+                    and confidence == "HIGH"
+                ):
                     confidence = "MEDIUM"
 
                 samples.append({
@@ -806,6 +835,12 @@ def build_replay(
                     "confidence": confidence,
                     "measurementIntervalSec": dt_s,
                     "resolutionLimited": resolution_limited,
+                    "controlEvidenceAgeSec": (
+                        round(control_evidence_age_s, 3)
+                        if control_evidence_age_s is not None
+                        else None
+                    ),
+                    "controlStateCarriedForward": state_carried_forward,
                     "additionalFeasibleCaptureKWh": additional_w * segment_dt_s / 3_600_000.0,
                     "phaseMode": ctx.get("mode"),
                     "currentReason": ctx.get("currentReason"),
@@ -818,6 +853,8 @@ def build_replay(
                     "rollingReady": ctx.get("rollingReady"),
                     "controlEvidenceAt": _iso_z(segment_control.at) if segment_control else None,
                 })
+                if state_carried_forward:
+                    carried_forward_segments += 1
 
             if segment_end >= next_row.at:
                 break
@@ -831,11 +868,6 @@ def build_replay(
                     latest_control = controls[control_i]
                     control_i += 1
                 segment_control = latest_control
-            elif (
-                evidence_expiry_at is not None
-                and segment_end == evidence_expiry_at
-            ):
-                segment_control = None
 
             segment_start = segment_end
 
@@ -874,7 +906,8 @@ def build_replay(
             "maxMeasurementIntervalSec": MAX_MEASUREMENT_INTERVAL_S,
             "preferredAttributionIntervalSec": PREFERRED_ATTRIBUTION_INTERVAL_S,
             "controlEventSegmentation": True,
-            "maxControlEvidenceAgeSec": MAX_CONTROL_EVENT_AGE_S,
+            "controlStateSemantics": "SEMANTIC_CHANGE_LEDGER",
+            "highConfidenceControlEvidenceAgeSec": HIGH_CONFIDENCE_CONTROL_EVENT_AGE_S,
             "evCurrentRangeA": [MIN_A, MAX_A],
             "wattsPerAmp": {"1P": W_PER_A_1P, "3P": W_PER_A_3P},
             "predictiveImportTargetW": IMPORT_TARGET_W,
@@ -885,6 +918,8 @@ def build_replay(
         "coverage": {
             "measurementPoints": len(measurements),
             "controlEvents": len(controls),
+            "controlEventsInDay": sum(1 for event in controls if start <= event.at < end),
+            "controlBaselineBeforeDay": any(event.at < start for event in controls),
             "semanticEvents": len(semantic_events),
             "integratedHours": round(integrated_s / 3600.0, 3),
             "measurementIntervalSecP50": (
@@ -894,6 +929,7 @@ def build_replay(
             ),
             "measurementIntervalsOverPreferredAttributionSec": intervals_over_preferred,
             "controlSegmentedMeasurementIntervals": control_segmented_intervals,
+            "controlStateCarriedForwardSegments": carried_forward_segments,
             "classifiedExportKWh": round(classified_export, 4),
             "sufficientEvidenceExportKWh": round(max(0.0, sufficient_export), 4),
             "insufficientEvidenceExportKWh": round(
@@ -938,8 +974,8 @@ def build_replay(
             "UNAVOIDABLE_EXPORT means unavoidable by the modeled EV path, not globally unavoidable by every possible household flexibility option.",
             "REAL_MISSED_OPPORTUNITY is emitted only when time-aligned durable control evidence supports EV connection/eligibility and no recorded controller constraint explains unused current or phase headroom.",
             "CONSTRAINT_DRIVEN_EXPORT includes rolling-power readiness, dwell, envelope/current caps, physical target settling, downstream offered-current limits and safe phase-transition execution.",
-            "Intervals without control evidence within the bounded age are INSUFFICIENT_EVIDENCE and are never silently reclassified.",
-            "Canonical measurements may be coarser than 120 seconds. V0.1 integrates valid intervals up to 600 seconds, segments them at durable EV-control event boundaries and control-evidence expiry boundaries, and downgrades otherwise HIGH attribution confidence to MEDIUM when the underlying measurement interval exceeds 120 seconds.",
+            "ev_control_events is a semantically deduplicated state-change ledger, not a heartbeat log. The latest known normalized control state remains valid until the next durable control change; age above 90 seconds reduces confidence rather than erasing the state. Missing baseline/control state is still INSUFFICIENT_EVIDENCE.",
+            "Canonical measurements may be coarser than 120 seconds. V0.1.1 integrates valid intervals up to 600 seconds, segments them at durable EV-control state-change boundaries, and downgrades otherwise HIGH attribution confidence to MEDIUM when the measurement interval exceeds 120 seconds or the last semantic control change is older than 90 seconds.",
             "The replay does not invent pre-commissioning semantic events or backfill unavailable control history.",
         ],
     }

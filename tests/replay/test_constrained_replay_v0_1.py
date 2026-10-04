@@ -197,6 +197,44 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(result["classification"], replay.CLASS_CONSTRAINT)
         self.assertEqual(result["reason"], "OFF_REENTRY_DWELL_ACTIVE")
 
+    def test_actuator_failure_without_proven_capture_is_constraint(self):
+        event = control_event(
+            at=self.at,
+            mode="OFF",
+            requested_a=0,
+            offered_a=0,
+            actuator_status="FAILED",
+            transition_failure="PHASE_CONFIRM_TIMEOUT",
+        )
+        result = replay.classify_export_interval(
+            at=self.at,
+            export_w=2200,
+            ev_w=0,
+            event=event,
+        )
+        self.assertEqual(result["classification"], replay.CLASS_CONSTRAINT)
+        self.assertEqual(result["reason"], "ACTUATOR_FAILURE_NO_PROVEN_CAPTURE")
+        self.assertEqual(result["additionalFeasibleW"], 0)
+
+    def test_actuator_failure_with_proven_undelivered_request_can_be_real_miss(self):
+        event = control_event(
+            at=self.at,
+            mode="3P",
+            requested_a=8,
+            offered_a=0,
+            actuator_status="FAILED",
+            transition_failure="RESUME_FAILED",
+        )
+        result = replay.classify_export_interval(
+            at=self.at,
+            export_w=3000,
+            ev_w=0,
+            event=event,
+        )
+        self.assertEqual(result["classification"], replay.CLASS_MISSED)
+        self.assertEqual(result["reason"], "ACTUATOR_OR_PHASE_TRANSITION_FAILED")
+        self.assertGreater(result["additionalFeasibleW"], 0)
+
     def test_missing_control_event_is_never_guessed(self):
         result = replay.classify_export_interval(
             at=self.at,
@@ -293,7 +331,7 @@ class ReplayIntegrationTests(unittest.TestCase):
                 )
 
             event = control_event(
-                at=start,
+                at=datetime(2026, 10, 3, 21, 59, tzinfo=timezone.utc),
                 requested_a=6,
                 offered_a=6,
                 available_w=6500,
@@ -371,11 +409,13 @@ class ReplayIntegrationTests(unittest.TestCase):
 
             report = replay.build_replay(date(2026, 10, 4), db_path=db)
 
-        self.assertEqual(report["schema"], "EMS_PI_CONSTRAINED_REPLAY_V0.1")
+        self.assertEqual(report["schema"], "EMS_PI_CONSTRAINED_REPLAY_V0.1.1")
         self.assertTrue(report["readOnly"])
         self.assertFalse(report["controlWrites"])
         self.assertEqual(report["scope"], "EV_EXPORT_ONLY")
         self.assertEqual(report["coverage"]["controlEvents"], 2)
+        self.assertEqual(report["coverage"]["controlEventsInDay"], 1)
+        self.assertTrue(report["coverage"]["controlBaselineBeforeDay"])
         self.assertGreater(report["coverage"]["integratedHours"], 0)
         self.assertEqual(report["coverage"]["measurementIntervalSecP50"], 300.0)
         self.assertEqual(
@@ -398,6 +438,10 @@ class ReplayIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(report["windows"][0]["confidence"], "MEDIUM")
         self.assertGreater(
+            report["coverage"]["controlStateCarriedForwardSegments"],
+            0,
+        )
+        self.assertEqual(
             report["totals"]["byClassificationKWh"][replay.CLASS_INSUFFICIENT],
             0,
         )
