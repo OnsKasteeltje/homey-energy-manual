@@ -20,7 +20,7 @@ function addMessage(kind,text,meta){
     article.append(note);
   }
   messages.append(article);
-  article.scrollIntoView({behavior:"smooth",block:"end"});
+  messages.scrollTo({top:messages.scrollHeight,behavior:"smooth"});
 }
 
 async function health(){
