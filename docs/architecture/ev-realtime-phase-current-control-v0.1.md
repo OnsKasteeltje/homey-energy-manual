@@ -1,8 +1,8 @@
 # EV realtime phase/current control v0.1 — production control contract
 
 Status: **DEPLOYED / LIVE**  
-Date: 2026-10-02  
-Scope: Tesla opportunity charging. Bridge v1.5.4 is live; Adapter/Gate/Writer contracts remain unchanged.
+Date: 2026-10-04  
+Scope: Tesla opportunity charging. Bridge v1.5.8 is live; Adapter/Gate/Writer contracts remain unchanged.
 
 ## 1. Problem statement
 
@@ -77,13 +77,14 @@ An upward phase entry also requires the **current instantaneous** reconstructed 
 
 ### Dwell
 
-The live v1.5.4 controller uses a 300-second dwell for **upward/re-entry** transitions (`OFF -> 1P/3P` after a recent stop and `1P -> 3P`).
+Production v1.5.8 splits the former unified upward/re-entry dwell:
 
-Sustained downward transitions (`3P -> 1P`, `3P -> OFF`, `1P -> OFF`) are allowed as soon as the 120-second rolling condition is confirmed. They are deliberately not held behind the 300-second dwell: otherwise a cloud dip directly after an upshift could leave 3P stuck at its 6 A minimum and intentionally import for several minutes.
+- `OFF -> 1P/3P`: **120 seconds** since the last mode change;
+- `1P -> 3P`: **180 seconds** since entry into 1P.
 
-The dwell never blocks ordinary current corrections inside 1P or 3P.
+The 120-second time-weighted signal with at least 90 seconds coverage remains mandatory before either upward transition. Instantaneous minimum-current viability is still checked separately. The shorter timers therefore do not replace the rolling anti-flap filter; they remove the additional five-minute hold that live 2026-10-04 telemetry showed could leave several kilowatts of recovered PV exporting.
 
-The 300-second value is the current v1.5.4 production setting.
+Sustained downward transitions (`3P -> 1P`, `3P -> OFF`, `1P -> OFF`) remain allowed as soon as the rolling condition is confirmed and are not held behind either upward dwell. Ordinary current corrections inside 1P or 3P are not phase-dwell limited.
 
 ## 5. Current regulator — fast control inside both phases
 
@@ -101,49 +102,34 @@ The regulator never changes phase and never decides OFF. OFF is phase-selector o
 
 ### Down-regulation
 
-Down-regulation reacts quickly to real import.
-
-Estimate the candidate grid effect using the currently requested EV target:
+The regulator reconstructs the expected grid effect from the selected current:
 
 ```text
 synthetic_p1_w = requested_ev_w - available_total_w
 ```
 
-If:
+The 250 W `EVPC_IMPORT_DEADBAND_W` remains the phase-entry/minimum-viability margin. For same-phase current control, v1.5.8 aligns down-regulation with the configured import preference:
 
 ```text
-synthetic_p1_w > 250 W
+current_import_limit_w = max(250 W, 300 W) = 300 W
 ```
 
-reduce current immediately by enough whole amps to remove the excess import above the 250 W deadband:
-
-```text
-reduction_a = ceil((synthetic_p1_w - 250) / watts_per_amp)
-```
-
-The current regulator may reduce only to the physical 6 A minimum while the selected mode remains active. If power is not sustainable at 6 A, the phase selector performs the relevant 3P->1P or 1P->OFF transition on its slower rolling signal.
+If predicted import exceeds 300 W, current is reduced immediately by enough whole amps to return within that limit. This avoids a control fight in which the upscale regulator intentionally chooses a target up to +300 W import but the down-regulator would immediately undo it above +250 W.
 
 ### Up-regulation
 
-Up-regulation is deliberately slower.
-
-A +1 A step is allowed only when at least one additional amp of export headroom has been continuously available for 45 seconds:
+Same-phase current uses the physical Easee offered current plus confirmed phase to reconstruct EV load and computes:
 
 ```text
-synthetic_p1_w <= -watts_per_amp
+desired_a = floor((available_total_w + 300 W) / watts_per_amp)
 ```
 
-Then:
+The target is bounded by the Pi envelope/maxA and 6..16 A device range. A further upscale is permitted only after the physical Easee target has settled to the controller's previous request. Each settled control step remains bounded to:
 
-```text
-requestedA := requestedA + 1
-```
+- maximum +3 A in 1P;
+- maximum +2 A in 3P.
 
-and the confirmation timer starts over.
-
-Any loss of that headroom resets the upscale confirmation timer.
-
-The 45-second value is the current v1.5.4 production setting.
+This preserves the v1.5.7 physical-feedback protection while allowing the controller to prefer modest import over avoidable PV export. At 3P, for example, 8→9 A becomes eligible at approximately 5910 W available power, corresponding to at most about +300 W predicted import at the discrete 690 W/A step.
 
 ### Same-phase changes
 
@@ -215,28 +201,28 @@ The tests cover 1P and 3P current regulation separately from physical phase tran
 
 Bridge integration source:
 
-`src/homey/power-intent/pi-dynamic-planner-bridge-v1.5.4.phase-current.js`
+`apps/homey/control/ev/pi-dynamic-planner-bridge-v1.5.8.production-tuned.js`
 
-The HomeyScript bridge cannot import the ESM reference module directly, so v1.5.4 carries the same controller logic inline. The bridge keeps the existing `EM2_EV_PHASE_CONTROL_V0.1` Adapter/Gate contract unchanged. The former parallel `candidateA` calculation is removed; compatibility fields `realtime.candidateA/candidateW` are now aliases of the single combined controller result only.
+The HomeyScript bridge cannot import the ESM reference module directly, so the production bridge carries the controller logic inline. The bridge keeps the existing `EM2_EV_PHASE_CONTROL_V0.1` Adapter/Gate contract unchanged. The former parallel `candidateA` calculation is removed; compatibility fields `realtime.candidateA/candidateW` are now aliases of the single combined controller result only.
 
 Structural integration tests live at:
 
-`tests/ev-phase-current-bridge-v1.5.4.test.mjs`
+`tests/control/ev/ev-phase-current-bridge-v1.5.8.test.mjs`
 
-## 9. Promotion result and remaining acceptance
+## 9. v1.5.8 production promotion
 
-Bridge v1.5.4 was deployed on 2026-10-02 to Advanced Flow `8bf53fdb-76f4-47db-8ccb-773ac515f06e` after the following gates passed:
+The 2026-10-04 tuning is a direct production change on the existing stable Bridge flow ID; it does not introduce a shadow controller or second writer. The reason is evidence from live minute telemetry: once a phase/current target was settled, v1.5.7 regulated close to zero grid power, while the former 300-second upward dwell left material export during fast PV recovery. The change therefore targets the identified bottleneck rather than broadening the control architecture.
 
-- 59/59 combined Node controller/bridge/regression tests PASS;
-- repository Architecture Gate PASS;
-- repository Security Scan PASS;
-- OFF/1P/3P thresholds remain aligned with the Pi policy contract;
-- current-only changes keep `requiresPhysicalPhaseTransition=false`;
-- proportional import down-regulation is proven in both 1P and 3P;
-- +1 A upscale confirmation is proven in both 1P and 3P;
-- sustained downward phase transitions cannot be trapped behind the 300 s upward dwell;
-- deadline requests remain outside this opportunity controller;
-- stale/invalid inputs fail closed;
-- Adapter/Gate/Writer semantics are unchanged.
+Production acceptance requires:
 
-Post-cutover chain validation passed with `policyRevision=PI_DYNAMIC_PLANNER_BRIDGE_V1.5.4_PHASE_CURRENT`, Adapter `valid=true`, Gate `PASS`, aligned control revisions through the actuator, and actuator `STABLE / OFF_ZERO_A_HOLD` without a physical write. The remaining acceptance gate is natural PV operation: observe OFF→1P, same-phase A regulation, 1P→3P, 3P→1P and 1P→OFF under real irradiance changes. The existing 2026-10-02 five-minute Pi history remains too coarse to validate a 120-second controller retrospectively; no new observability/history subsystem is introduced by this change.
+- repository structure and architecture gates PASS;
+- v1.5.8 HomeyScript compile/regression PASS;
+- existing v1.5.7/controller and writer regressions remain PASS;
+- exact existing Advanced Flow cards/ID preserved;
+- one targeted pre-read, one write and one targeted read-back;
+- `policyRevision=PI_DYNAMIC_PLANNER_BRIDGE_V1.5.8_PRODUCTION_TUNED`;
+- Adapter/Gate remain valid/PASS and no second physical writer appears;
+- natural post-deploy operation remains bounded by the existing Pi envelope and deadline force.
+
+Rollback is the exact pre-deploy writable Bridge body captured before the single Homey update.
+
