@@ -155,6 +155,8 @@ For analysis, V0.4 retains two bounded 48-hour histories in the same local progr
 
 The V0.4 minute cadence is Pi-local only and performs no Homey call. It accepts V0.3 only within its bounded freshness horizon and accepts Flex Priority only when the priority artifact is fresh and was generated at or after the V0.3 state it is granting. Otherwise progression fails closed to a waiting/hold state.
 
+The timer phase is part of that ordering contract: V0.3 refreshes at second `:00` on its five-minute cadence, Flex Priority is calendar-locked to `:10`, and V0.4 runs at `:20`. V0.5 and Homey SHADOW publication follow at `:30` and `:35`. These timers use one-second accuracy. A relative Flex cadence is not permitted because phase drift can make a newly generated V0.3 snapshot temporarily newer than the Flex snapshot and force an avoidable fail-closed V0.4 iteration.
+
 ## V0.5 control-boundary gate SHADOW
 
 V0.5 lives under `services/pi/control/heating/`, not under the planner. It is
