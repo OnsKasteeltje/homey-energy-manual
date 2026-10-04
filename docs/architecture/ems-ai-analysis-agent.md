@@ -318,14 +318,34 @@ them in `ev_control_events`.
 The event archive includes Gate PASS/FAIL and errors, actuator status/reason,
 requested current and phase, confirmed phase, transition stage/failure,
 charge-state/device-health context and whether the actuator reports a physical
-write. The archive also retains the original normalized evidence payload in
+write. Device Health v0.4 additionally reads the Easee charger and the paired
+Homey Equalizer as **observability only**. The archived downstream snapshot
+contains Easee requested current, offered current, target circuit current,
+measured charger power/phase currents and Equalizer measured power/phase
+currents. The Pi ingest persists a normalized `downstream_json` projection so
+changes in those values are not lost to semantic deduplication.
+
+The archive also retains the original normalized evidence payload in
 `raw_json`. The AI reader projects a bounded subset of Power Intent realtime
-reasoning from that already-stored payload into each `evControlEvents` item:
-`intentReason`, `intentSource`, `realtimeApplied`,
-`realtimePhaseReason`, `realtimeCurrentReason`,
+reasoning and downstream execution evidence from that already-stored payload
+into each `evControlEvents` item: `intentReason`, `intentSource`,
+`realtimeApplied`, `realtimePhaseReason`, `realtimeCurrentReason`,
 `realtimeAvailableTotalW`, `realtimeAvailableTotalAvg2mW`,
-`realtimeRollingReady` and `realtimeRollingCoverageMs`. These fields are
-historical recorded Homey control evidence, not reconstructed model reasoning.
+`realtimeRollingReady`, `realtimeRollingCoverageMs`,
+`easeeRequestedA`, `easeeOfferedA`, `easeeTargetCircuitA`,
+`easeeMeasureW`, `easeePhaseCurrentsA`, `equalizerAvailable`,
+`equalizerMeasureW`, `equalizerPhaseCurrentsA`,
+`equalizerTelemetryAgeSec`, `p1PhaseCurrentsA` and the derived
+`offeredBelowRequestedA` comparison. These fields are historical recorded
+Homey control/observability evidence, not reconstructed model reasoning.
+
+For a deadline/current question the AI must distinguish the layers:
+EMS/Homey requested target → Easee requested target → Easee offered current →
+measured charger phase currents. If Easee requested current matches the EMS
+request while offered current is lower, the reduction is downstream of the EMS
+target. Fresh Equalizer phase-current evidence may make that pattern consistent
+with Equalizer/load-balancing constraint, but the AI must not claim the
+Equalizer is the unique cause unless explicit evidence proves that attribution.
 If a zero-target/IDLE event contains a phase/current reason such as
 `1P_TO_OFF_ROLLING_LOW`, the model must use that reason before declaring the
 underlying control cause unknown.

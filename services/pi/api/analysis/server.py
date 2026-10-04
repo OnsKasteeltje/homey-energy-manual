@@ -124,6 +124,7 @@ An observed export window is not automatically an EMS fault; constraints may exp
 Use plannerDecisionWindow as historical intent evidence and never judge an earlier planner decision using a forecast generated later.
 Use forecastVsActual15m to distinguish forecast error from planner/control execution error when the evidence supports that distinction.
 For EV control questions, evControlEvents[].intentReason, realtimePhaseReason and realtimeCurrentReason are recorded Homey control reasons, not model inference. If a zero target/IDLE event has one of these reasons, use it before saying the underlying cause is unknown. Rolling available-power fields in the same event may support that reason but must not be invented when absent.
+When an EV is charging below a deadline/current request, compare the control requestedA/actuatorTargetA with Easee requestedA, Easee offeredA, measured Easee phase currents and Equalizer/P1 phase currents from evControlEvents before diagnosing a control failure. Easee requestedA matching the EMS request while offeredA is lower proves that the reduction occurred downstream of the EMS/Homey target. If fresh Equalizer evidence is present, describe the pattern as consistent with Equalizer/load-balancing constraint; do not claim the Equalizer as the unique cause unless the evidence explicitly proves that attribution.
 Use flexContextWindow for historical Heating/WW eligibility and priority, and quookerEvents for Quooker adapter/actuator/detector evidence.
 When evidenceSelection.mode is EXPLICIT_TIME_WINDOW or CONTEXT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally limited to the documented local window around the selected clock time. Do not interpret absence outside that selected window as evidence that no activity occurred elsewhere in the day.
 When evidenceSelection.mode is TOPIC_DAY_SCOPE or DAY_SCOPE_COMPACT, listed compactedFields are bounded samples across the day and listed omittedFields were intentionally excluded as unrelated to the current question. Do not interpret omitted or unsampled records as proof that no activity occurred.
@@ -299,6 +300,17 @@ def _ev_intent_reason_context(raw_json):
         "realtimeAvailableTotalAvg2mW": None,
         "realtimeRollingReady": None,
         "realtimeRollingCoverageMs": None,
+        "easeeRequestedA": None,
+        "easeeOfferedA": None,
+        "easeeTargetCircuitA": None,
+        "easeeMeasureW": None,
+        "easeePhaseCurrentsA": None,
+        "equalizerAvailable": None,
+        "equalizerMeasureW": None,
+        "equalizerPhaseCurrentsA": None,
+        "equalizerTelemetryAgeSec": None,
+        "p1PhaseCurrentsA": None,
+        "offeredBelowRequestedA": None,
     }
     if not raw_json:
         return context
@@ -335,6 +347,42 @@ def _ev_intent_reason_context(raw_json):
     context["realtimeAvailableTotalAvg2mW"] = phase.get("availableTotalAvg2mW")
     context["realtimeRollingReady"] = phase.get("rollingReady")
     context["realtimeRollingCoverageMs"] = phase.get("rollingCoverageMs")
+
+    health = payload.get("deviceHealth")
+    if not isinstance(health, dict):
+        health = {}
+    easee = health.get("easee")
+    if not isinstance(easee, dict):
+        easee = {}
+    equalizer = health.get("equalizer")
+    if not isinstance(equalizer, dict):
+        equalizer = {}
+    p1 = health.get("p1")
+    if not isinstance(p1, dict):
+        p1 = {}
+
+    context["easeeRequestedA"] = easee.get("requestedA")
+    context["easeeOfferedA"] = easee.get("offeredA")
+    context["easeeTargetCircuitA"] = easee.get("targetCircuitA")
+    context["easeeMeasureW"] = easee.get("measureW")
+    context["easeePhaseCurrentsA"] = easee.get("phaseCurrentsA")
+    context["equalizerAvailable"] = equalizer.get("deviceAvailable")
+    context["equalizerMeasureW"] = equalizer.get("measureW")
+    context["equalizerPhaseCurrentsA"] = equalizer.get("phaseCurrentsA")
+    context["equalizerTelemetryAgeSec"] = equalizer.get("telemetryAgeSec")
+    context["p1PhaseCurrentsA"] = {
+        "l1": p1.get("l1A"),
+        "l2": p1.get("l2A"),
+        "l3": p1.get("l3A"),
+    } if any(p1.get(key) is not None for key in ("l1A", "l2A", "l3A")) else None
+
+    try:
+        requested = float(context["easeeRequestedA"])
+        offered = float(context["easeeOfferedA"])
+        context["offeredBelowRequestedA"] = offered + 0.25 < requested
+    except (TypeError, ValueError):
+        context["offeredBelowRequestedA"] = None
+
     return context
 
 
@@ -805,6 +853,12 @@ def _budget_compact_evidence(evidence, limits):
             ("intentReason",),
             ("realtimePhaseReason",),
             ("realtimeCurrentReason",),
+            ("easeeRequestedA",),
+            ("easeeOfferedA",),
+            ("easeeMeasureW",),
+            ("equalizerPhaseCurrentsA", "l1"),
+            ("equalizerPhaseCurrentsA", "l2"),
+            ("equalizerPhaseCurrentsA", "l3"),
         ),
         important=lambda point: bool(
             point.get("physicalWritePerformed")
@@ -1791,6 +1845,12 @@ def build_evidence(day, question="", conversation_context=None):
                 ("intentReason",),
                 ("realtimePhaseReason",),
                 ("realtimeCurrentReason",),
+            ("easeeRequestedA",),
+            ("easeeOfferedA",),
+            ("easeeMeasureW",),
+            ("equalizerPhaseCurrentsA", "l1"),
+            ("equalizerPhaseCurrentsA", "l2"),
+            ("equalizerPhaseCurrentsA", "l3"),
             ),
             important=lambda point: bool(
                 point.get("physicalWritePerformed")

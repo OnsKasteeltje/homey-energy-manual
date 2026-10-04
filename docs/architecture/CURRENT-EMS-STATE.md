@@ -29,6 +29,18 @@ Canonical diagnostic source-of-truth and mandatory root-cause documentation rule
 
 Operational energy history follows the canonical Homey → Pi state direction. Accepted Core state pushes are archived locally on the Pi; automatic Pi polling of Homey Insights is not a production history transport.
 
+EV downstream execution observability now extends beyond the EMS control target.
+Homey EV Device Health v0.4 performs targeted read-only reads of the Easee
+charger and Equalizer and publishes requested/offered current, actual Easee
+phase currents/power, target circuit current and Equalizer phase currents/power.
+The existing EV Control Pi Push transports that Logic snapshot without device
+writes. Pi EV control ingest stores a normalized `downstream_json` projection
+inside `ev_control_events`, ensuring offered-current/Equalizer changes create
+durable historical evidence even when Gate/Actuator state itself is unchanged.
+The AI may therefore distinguish an EMS target mismatch from downstream
+charger/load-balancing curtailment; Equalizer attribution remains qualified
+unless explicit evidence proves causation.
+
 Household-energy history is derived from cumulative P1/PV counters in `house_energy_intervals`. Cumulative counter rows with quality `held` remain valid monotonic state for derivation and must not truncate the timeline when a PV inverter sleeps or becomes stale after production has stopped. Intervals touching a held counter endpoint are retained with derived quality `held`; counter decreases remain discontinuities and true timing gaps remain `gap`. The Web History API treats `held` intervals as covered energy while preserving the stronger `gap` and `discontinuity` classifications.
 
 ### 1.1 Ruimteverwarming — Honeywell baseline, PV-voorverwarming and Thermal Learning
