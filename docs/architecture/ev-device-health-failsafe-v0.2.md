@@ -19,6 +19,34 @@ Live validation showed that the health observer can report `STALE / EASEE_TELEME
 
 Therefore the health observer was conflating **unchanged capability timestamps** with **loss of control availability**. Using that signal as a hard gate produced false-positive control vetoes.
 
+## 2026-10-04 v0.4 downstream observability extension
+
+The production observer is promoted to `EM2_EV_DEVICE_HEALTH_V0.4` without
+changing its safety role. It remains observability-only and does not participate
+in Gate PASS/FAIL.
+
+Compared with v0.3, one additional targeted read is made for the Homey
+`Equalizer` device. The observer now records:
+
+- Easee `target_charger_current` as requested current;
+- Easee `measure_current.offered` as offered current;
+- Easee `target_circuit_current`;
+- Easee measured charging power and L1/L2/L3 currents;
+- Equalizer measured power and L1/L2/L3 currents, availability and telemetry age;
+- existing P1/grid current context.
+
+This evidence exists specifically to distinguish **requested** current from
+**offered** and **physically measured** current. A lower offered current than the
+requested current proves the reduction happened downstream of the EMS/Homey
+target. Presence of fresh Equalizer evidence makes Equalizer/load balancing a
+supported explanation, but not unique causal proof by itself.
+
+The EV Control Pi Push remains unchanged: it still performs Logic reads only.
+Because the Device Health Logic value now contains the downstream snapshot, the
+existing health-variable trigger transports it to the Pi. Pi ingest persists a
+normalized `downstream_json` projection so changes in downstream current/load
+are not removed by semantic deduplication.
+
 ## Current Homey runtime components
 
 ### `EM v2 | 82 Safety | EV Device Health v0.2 LIVE-GATE`

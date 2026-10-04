@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 ARCHIVE = ROOT / "services/pi/api/status/history_archive.py"
 EV_INGEST = ROOT / "services/pi/integrations/homey/ingress/ev_control_ingest.py"
+HEALTH_SCRIPT = ROOT / "src/homey/observability/ev/ev-device-health-v0.4.observability-only.js"
 
 
 def load_module(name, path):
@@ -59,6 +60,13 @@ def create_db(path):
 def main():
     archive = load_module("history_archive_ev_contract", ARCHIVE)
     ev_ingest = load_module("ev_control_ingest_contract", EV_INGEST)
+
+    health_text = HEALTH_SCRIPT.read_text(encoding="utf-8")
+    assert "EM2_EV_DEVICE_HEALTH_V0.4" in health_text
+    assert "EQUALIZER_ID='7dd35f8f-1dca-42f5-9b41-9b69bd14c611'" in health_text
+    assert "target_circuit_current" in health_text
+    assert "phaseCurrentsA:{l1:easeeL1A,l2:easeeL2A,l3:easeeL3A}" in health_text
+    assert "equalizer:{deviceAvailable:equalizerAvailable" in health_text
 
     with tempfile.TemporaryDirectory() as temp:
         db = Path(temp) / "history.sqlite"
@@ -160,8 +168,30 @@ def main():
                 "observed": {"chargeState": "plugged_in_charging"},
             },
             "deviceHealth": {
+                "schema": "EM2_EV_DEVICE_HEALTH_V0.4",
                 "status": "OK",
                 "reason": "FRESH_TELEMETRY",
+                "easee": {
+                    "chargeState": "plugged_in_charging",
+                    "requestedA": 10,
+                    "offeredA": 8,
+                    "targetCircuitA": 20,
+                    "measureW": 5647,
+                    "phaseCurrentsA": {"l1": 8.06, "l2": 8.11, "l3": 8.09},
+                    "telemetryAgeSec": 1,
+                },
+                "equalizer": {
+                    "deviceAvailable": True,
+                    "measureW": 7868,
+                    "phaseCurrentsA": {"l1": 16, "l2": 9, "l3": 8},
+                    "telemetryAgeSec": 1,
+                },
+                "p1": {
+                    "gridW": 7867,
+                    "l1A": 15.89,
+                    "l2A": 9.41,
+                    "l3A": 8.39,
+                },
             },
         }
         stored = ev_ingest.archive_ev_control(event, db)
@@ -195,7 +225,21 @@ def main():
         assert duplicate_stored["archived"] is True
         assert duplicate_stored["inserted"] is False
 
-        changed = dict(event)
+        downstream_changed = dict(event)
+        downstream_changed["generatedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        downstream_changed["deviceHealth"] = dict(event["deviceHealth"])
+        downstream_changed["deviceHealth"]["easee"] = dict(event["deviceHealth"]["easee"])
+        downstream_changed["deviceHealth"]["easee"]["offeredA"] = 10
+        downstream_changed["deviceHealth"]["equalizer"] = dict(event["deviceHealth"]["equalizer"])
+        downstream_changed["deviceHealth"]["equalizer"]["phaseCurrentsA"] = {
+            "l1": 18,
+            "l2": 11,
+            "l3": 10,
+        }
+        downstream_stored = ev_ingest.archive_ev_control(downstream_changed, db)
+        assert downstream_stored["inserted"] is True
+
+        changed = dict(downstream_changed)
         changed["generatedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         changed["actuator"] = dict(event["actuator"])
         changed["actuator"]["reason"] = "SAME_PHASE_CURRENT_CONFIRMED"
@@ -205,15 +249,27 @@ def main():
         con = sqlite3.connect(db)
         rows = con.execute("""
             SELECT phase_mode, gate_status, actuator_status, actuator_reason,
-                   actuator_confirmed_mode, device_health_status
+                   actuator_confirmed_mode, device_health_status, downstream_json
             FROM ev_control_events
             ORDER BY id
         """).fetchall()
         con.close()
-        assert rows == [
-            ("1P", "PASS", "STABLE", "SAME_PHASE_CURRENT_APPLIED", "1P", "OK"),
-            ("1P", "PASS", "STABLE", "SAME_PHASE_CURRENT_CONFIRMED", "1P", "OK"),
-        ]
+        assert len(rows) == 3
+        assert rows[0][:6] == (
+            "1P", "PASS", "STABLE", "SAME_PHASE_CURRENT_APPLIED", "1P", "OK"
+        )
+        first_downstream = __import__("json").loads(rows[0][6])
+        assert first_downstream["easee"]["requestedA"] == 10.0
+        assert first_downstream["easee"]["offeredA"] == 8.0
+        assert first_downstream["equalizer"]["phaseCurrentsA"]["l1"] == 16
+
+        second_downstream = __import__("json").loads(rows[1][6])
+        assert second_downstream["easee"]["offeredA"] == 10.0
+        assert second_downstream["equalizer"]["phaseCurrentsA"]["l1"] == 18
+
+        assert rows[2][:6] == (
+            "1P", "PASS", "STABLE", "SAME_PHASE_CURRENT_CONFIRMED", "1P", "OK"
+        )
 
     print("PASS: AI V0.2 EV evidence archive contract")
 
