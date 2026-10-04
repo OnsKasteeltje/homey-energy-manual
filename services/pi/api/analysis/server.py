@@ -252,18 +252,25 @@ def _current_deadline_command(day):
 
 
 def _load_constrained_replay(day):
-    proc = subprocess.run(
-        [
-            CONSTRAINED_REPLAY_COMMAND,
-            day.isoformat(),
-            "--no-write-output",
-        ],
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        timeout=20,
-    )
+    try:
+        proc = subprocess.run(
+            [
+                CONSTRAINED_REPLAY_COMMAND,
+                day.isoformat(),
+                "--no-write-output",
+            ],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {
+            "available": False,
+            "reason": "CONSTRAINED_REPLAY_COMMAND_UNAVAILABLE",
+            "error": str(exc)[:400],
+        }
     if proc.returncode != 0:
         return {
             "available": False,
