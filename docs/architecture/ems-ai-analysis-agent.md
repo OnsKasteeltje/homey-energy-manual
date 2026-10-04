@@ -184,8 +184,8 @@ ratio was calibrated against successful 2026-10-04 EMS model calls and is
 recorded as an estimate, never as an exact token count.
 
 If the target is exceeded, deterministic budget-compaction steps further bound
-the already-selected timeline, EV telemetry/control, Quooker, flex-context,
-planner-window and forecast-slot collections while continuing to preserve
+the already-selected timeline, EV telemetry/control, Quooker, semantic-event,
+flex-context, planner-window and forecast-slot collections while continuing to preserve
 state-transition/important-event points where those contracts define them.
 `evidenceSelection.inputBudget` records the target, hard limit, estimator,
 pre/post estimate, number of compaction steps and `budgetCompactedFields`.
@@ -307,6 +307,47 @@ explain urgency or allocation as if it were live. This annotation is applied to
 canonical EV telemetry, frozen planner deadline context and archived flex
 priority evidence. It changes analysis semantics only and does not alter EV
 deadline control behaviour.
+
+### Durable semantic event history
+
+The Pi now maintains a sparse semantic event archive for high-value state
+changes that would otherwise require reconstructing intent from raw snapshots.
+Canonical source is
+`services/pi/history/archive_semantic_events.py`; the one-minute timer runs at
+`:50`, after the local Heating/Flex chain and flex-context archive.
+
+The observer reads existing local artifacts only and writes
+`ems-history.sqlite/semantic_events` plus a small
+`semantic_event_state` cursor table. The first observation of each state key
+establishes a baseline and **does not create a synthetic historical event**.
+There is no pre-commissioning backfill. Coverage begins at
+`semanticEventCoverage.commissionedAt`.
+
+V0.1 records only state transitions whose provenance can be stated without
+guessing:
+
+- Tesla connected/disconnected and charging start/stop from canonical
+  `energy-state-v2.json`;
+- EV deadline command set/update/cancel from
+  `tesla-deadline-command.json`;
+- EV deadline status transitions from
+  `ev-deadline-shadow-state.json`;
+- observed warm-water source-mode changes from canonical energy state;
+- Flex Priority owner/grant changes from the READ_ONLY/SHADOW priority
+  artifact;
+- per-room Heating progression/eligibility/grant changes from the V0.4
+  READ_ONLY/SHADOW artifact.
+
+Each event carries an explicit `provenanceClass`:
+`USER_INTENT_COMMAND`, `OBSERVED_STATE`, `DERIVED_STATE` or
+`SHADOW_DECISION`. These classes are deliberately narrow.
+`USER_INTENT_COMMAND` proves that intent was recorded, not that a device
+executed it. `OBSERVED_STATE` proves a state transition but does not identify
+the actor. `SHADOW_DECISION` never proves a physical write.
+
+The archive is observability-only. It performs no Homey/network calls, no
+planner decisions and no control/device writes. It is never consumed by the
+realtime planner, Gate or actuator.
 
 ### EV control event history
 

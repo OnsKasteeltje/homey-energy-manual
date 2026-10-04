@@ -52,6 +52,7 @@ DAY_SCOPE_LIMITS = {
     "evTelemetry5m": 48,
     "evControlEvents": 48,
     "quookerEvents": 36,
+    "semanticEvents": 48,
     "flexContextWindow": 3,
 }
 MODEL_INPUT_TARGET_TOKENS = 80000
@@ -63,6 +64,7 @@ MODEL_INPUT_BUDGET_STEPS = (
         "evTelemetry5m": 40,
         "evControlEvents": 40,
         "quookerEvents": 30,
+        "semanticEvents": 36,
         "flexContextWindow": 3,
         "plannerDecisionWindow": 12,
         "forecastSlots": 24,
@@ -72,6 +74,7 @@ MODEL_INPUT_BUDGET_STEPS = (
         "evTelemetry5m": 32,
         "evControlEvents": 32,
         "quookerEvents": 24,
+        "semanticEvents": 30,
         "flexContextWindow": 3,
         "plannerDecisionWindow": 10,
         "forecastSlots": 20,
@@ -81,6 +84,7 @@ MODEL_INPUT_BUDGET_STEPS = (
         "evTelemetry5m": 24,
         "evControlEvents": 24,
         "quookerEvents": 18,
+        "semanticEvents": 24,
         "flexContextWindow": 2,
         "plannerDecisionWindow": 8,
         "forecastSlots": 16,
@@ -90,6 +94,7 @@ MODEL_INPUT_BUDGET_STEPS = (
         "evTelemetry5m": 16,
         "evControlEvents": 16,
         "quookerEvents": 12,
+        "semanticEvents": 18,
         "flexContextWindow": 2,
         "plannerDecisionWindow": 6,
         "forecastSlots": 12,
@@ -99,6 +104,7 @@ MODEL_INPUT_BUDGET_STEPS = (
         "evTelemetry5m": 12,
         "evControlEvents": 12,
         "quookerEvents": 8,
+        "semanticEvents": 12,
         "flexContextWindow": 1,
         "plannerDecisionWindow": 4,
         "forecastSlots": 8,
@@ -126,7 +132,8 @@ Use forecastVsActual15m to distinguish forecast error from planner/control execu
 For EV control questions, evControlEvents[].intentReason, realtimePhaseReason and realtimeCurrentReason are recorded Homey control reasons, not model inference. If a zero target/IDLE event has one of these reasons, use it before saying the underlying cause is unknown. Rolling available-power fields in the same event may support that reason but must not be invented when absent.
 When an EV is charging below a deadline/current request, compare the control requestedA/actuatorTargetA with Easee requestedA, Easee offeredA, measured Easee phase currents and Equalizer/P1 phase currents from evControlEvents before diagnosing a control failure. Easee requestedA matching the EMS request while offeredA is lower proves that the reduction occurred downstream of the EMS/Homey target. If fresh Equalizer evidence is present, describe the pattern as consistent with Equalizer/load-balancing constraint; do not claim the Equalizer as the unique cause unless the evidence explicitly proves that attribution.
 Use flexContextWindow for historical Heating/WW eligibility and priority, and quookerEvents for Quooker adapter/actuator/detector evidence.
-When evidenceSelection.mode is EXPLICIT_TIME_WINDOW or CONTEXT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally limited to the documented local window around the selected clock time. Do not interpret absence outside that selected window as evidence that no activity occurred elsewhere in the day.
+Use semanticEvents as durable historical state-change evidence. provenanceClass=USER_INTENT_COMMAND proves that a user-intent command was recorded, but not that a physical device action occurred. provenanceClass=OBSERVED_STATE proves an observed state transition but does not identify who or what caused it. provenanceClass=DERIVED_STATE is Pi-derived state, and provenanceClass=SHADOW_DECISION is never proof of a physical write. The semantic-event archive starts at semanticEventCoverage.commissionedAt; its initial baseline creates no synthetic event, so absence before commissioning or absence of an event at baseline is not proof that no earlier change occurred.
+When evidenceSelection.mode is EXPLICIT_TIME_WINDOW or CONTEXT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents, quookerEvents and semanticEvents are intentionally limited to the documented local window around the selected clock time. Do not interpret absence outside that selected window as evidence that no activity occurred elsewhere in the day.
 When evidenceSelection.mode is TOPIC_DAY_SCOPE or DAY_SCOPE_COMPACT, listed compactedFields are bounded samples across the day and listed omittedFields were intentionally excluded as unrelated to the current question. Do not interpret omitted or unsampled records as proof that no activity occurred.
 When evidenceSelection.inputBudget.status is COMPACTED_TO_BUDGET or WITHIN_HARD_LIMIT, budgetCompactedFields were additionally reduced before the model call to stay within the documented estimated input budget. This is deliberate selection, not evidence that omitted records did not occur.
 Heating progression remains SHADOW. Quooker actuator evidence is versioned: use quookerEvents[].actuator.mode as the authority. For SHADOW evidence, desiredOn/wouldWrite is not a physical command. For LIVE evidence, physicalWritePerformed=true is direct proof that the Homey actuator executed a device write, while actualOnBefore/actualOnAfter describe the observed state transition. physicalWritePerformed=false may be an idempotent no-op when desired and actual state already matched. Detector HEATING is independent electrical evidence and must not by itself be described as a physical control write.
@@ -889,6 +896,21 @@ def _budget_compact_evidence(evidence, limits):
 
     if _budget_compact_field(
         evidence,
+        "semanticEvents",
+        limits["semanticEvents"],
+        change_paths=(
+            ("eventType",),
+            ("domain",),
+            ("subject",),
+        ),
+        important=lambda point: (
+            point.get("provenanceClass") == "USER_INTENT_COMMAND"
+        ),
+    ):
+        changed.append("semanticEvents")
+
+    if _budget_compact_field(
+        evidence,
         "flexContextWindow",
         limits["flexContextWindow"],
         change_paths=(
@@ -937,6 +959,7 @@ def _refresh_budget_selected_counts(evidence):
         "evTelemetry5m",
         "evControlEvents",
         "quookerEvents",
+        "semanticEvents",
         "flexContextWindow",
     ):
         value = evidence.get(field)
@@ -1488,6 +1511,104 @@ def _quooker_events(day):
 
 
 
+
+def _semantic_events(day):
+    start, end = _bounds(day)
+    coverage = {
+        "available": False,
+        "schema": None,
+        "commissionedAt": None,
+        "historicalBackfill": False,
+        "eventCount": 0,
+        "oldestEventAt": None,
+        "newestEventAt": None,
+    }
+
+    if not os.path.exists(HISTORY_DB):
+        return [], coverage
+
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
+        db.execute("PRAGMA query_only=ON")
+        tables = {
+            row[0]
+            for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        if "semantic_events" not in tables:
+            return [], coverage
+
+        coverage["available"] = True
+        if "semantic_event_meta" in tables:
+            meta = dict(db.execute(
+                "SELECT key,value_text FROM semantic_event_meta"
+            ).fetchall())
+            coverage["schema"] = meta.get("schema")
+            commissioned = _parse_ts(meta.get("commissioned_at_utc"))
+            coverage["commissionedAt"] = (
+                commissioned.astimezone(LOCAL_TZ).isoformat()
+                if commissioned is not None
+                else meta.get("commissioned_at_utc")
+            )
+
+        stats = db.execute(
+            """
+            SELECT COUNT(*),MIN(ts_utc),MAX(ts_utc)
+            FROM semantic_events
+            """
+        ).fetchone()
+        coverage["eventCount"] = int(stats[0] or 0)
+        coverage["oldestEventAt"] = stats[1]
+        coverage["newestEventAt"] = stats[2]
+
+        rows = db.execute(
+            """
+            SELECT
+                ts_utc,event_type,domain,subject,state_key,
+                provenance_class,source_name,source_at_utc,
+                before_json,after_json,details_json
+            FROM semantic_events
+            WHERE ts_utc>=? AND ts_utc<?
+            ORDER BY ts_utc,id
+            """,
+            (_iso_z(start), _iso_z(end)),
+        ).fetchall()
+
+    out = []
+    for (
+        ts_text,event_type,domain,subject,state_key,
+        provenance,source_name,source_at,
+        before_json,after_json,details_json,
+    ) in rows:
+        ts = _parse_ts(ts_text)
+        if ts is None:
+            continue
+
+        def decode(value, fallback):
+            if value is None:
+                return fallback
+            try:
+                return json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                return fallback
+
+        out.append({
+            "atLocal": ts.astimezone(LOCAL_TZ).isoformat(),
+            "eventType": event_type,
+            "domain": domain,
+            "subject": subject,
+            "stateKey": state_key,
+            "provenanceClass": provenance,
+            "sourceName": source_name,
+            "sourceAt": source_at,
+            "before": decode(before_json, None),
+            "after": decode(after_json, None),
+            "details": decode(details_json, {}),
+        })
+
+    return out, coverage
+
+
 def _flex_context_window(day, anchors):
     if not os.path.exists(PLANNER_DB) or not anchors:
         return []
@@ -1774,6 +1895,7 @@ def build_evidence(day, question="", conversation_context=None):
 
     ev_telemetry_all = _ev_telemetry(day)
     quooker_events_all = _quooker_events(day)
+    semantic_events_all, semantic_event_coverage = _semantic_events(day)
     timeline_all = _timeline(day)
 
     original_counts = {
@@ -1781,12 +1903,14 @@ def build_evidence(day, question="", conversation_context=None):
         "evTelemetry5m": len(ev_telemetry_all),
         "evControlEvents": len(ev_control_all),
         "quookerEvents": len(quooker_events_all),
+        "semanticEvents": len(semantic_events_all),
     }
 
     timeline = list(timeline_all)
     ev_telemetry = list(ev_telemetry_all)
     ev_control = list(ev_control_all)
     quooker_events = list(quooker_events_all)
+    semantic_events = list(semantic_events_all)
     compacted_fields = []
     omitted_fields = []
 
@@ -1802,6 +1926,9 @@ def build_evidence(day, question="", conversation_context=None):
         )
         quooker_events = _select_points_near_anchors(
             quooker_events_all, selected_time_anchors
+        )
+        semantic_events = _select_points_near_anchors(
+            semantic_events_all, selected_time_anchors
         )
         mode = (
             "EXPLICIT_TIME_WINDOW"
@@ -1875,11 +2002,25 @@ def build_evidence(day, question="", conversation_context=None):
             ),
         )
 
+        semantic_events = _bounded_points(
+            semantic_events_all,
+            DAY_SCOPE_LIMITS["semanticEvents"],
+            change_paths=(
+                ("eventType",),
+                ("domain",),
+                ("subject",),
+            ),
+            important=lambda point: (
+                point.get("provenanceClass") == "USER_INTENT_COMMAND"
+            ),
+        )
+
         for field, before, after in (
             ("timeline5m", timeline_all, timeline),
             ("evTelemetry5m", ev_telemetry_all, ev_telemetry),
             ("evControlEvents", ev_control_all, ev_control),
             ("quookerEvents", quooker_events_all, quooker_events),
+            ("semanticEvents", semantic_events_all, semantic_events),
         ):
             if len(after) < len(before):
                 compacted_fields.append(field)
@@ -1902,6 +2043,22 @@ def build_evidence(day, question="", conversation_context=None):
             if quooker_events:
                 omitted_fields.append("quookerEvents")
             quooker_events = []
+
+        if "PV_FLEX" not in topics:
+            allowed_semantic_domains = set()
+            if "EV" in topics:
+                allowed_semantic_domains.update(("EV", "FLEX"))
+            if "HEATING_WW" in topics:
+                allowed_semantic_domains.update(
+                    ("HEATING", "WARM_WATER", "FLEX")
+                )
+            filtered_semantic = [
+                event for event in semantic_events
+                if event.get("domain") in allowed_semantic_domains
+            ]
+            if len(filtered_semantic) < len(semantic_events):
+                omitted_fields.append("semanticEvents")
+            semantic_events = filtered_semantic
 
     health = _load_health()
     planner_window = _planner_decision_window(day, anchors)
@@ -1927,6 +2084,7 @@ def build_evidence(day, question="", conversation_context=None):
         "evTelemetry5m": len(ev_telemetry),
         "evControlEvents": len(ev_control),
         "quookerEvents": len(quooker_events),
+        "semanticEvents": len(semantic_events),
         "flexContextWindow": len(flex_context),
     }
     original_counts["flexContextWindow"] = len(flex_context_all)
@@ -1957,6 +2115,7 @@ def build_evidence(day, question="", conversation_context=None):
                 "evTelemetry5m",
                 "evControlEvents",
                 "quookerEvents",
+                "semanticEvents",
             ]
             if selected_time_anchors
             else []
@@ -1976,6 +2135,7 @@ def build_evidence(day, question="", conversation_context=None):
             "evTelemetry": "Homey canonical state push -> ems-history.sqlite",
             "evControlEvents": "Homey observability LAN push -> ems-history.sqlite",
             "quookerEvents": "Homey Quooker observability LAN push -> ems-history.sqlite",
+            "semanticEvents": "Pi-local semantic observer -> ems-history.sqlite semantic_events",
             "planner": "planner-history.sqlite frozen decision snapshots",
             "flexContext": "Pi-local Heating/WW shadow archive -> planner-history.sqlite",
             "forecastComparison": "pv_forecast_v2_archive fixed 12h lead + canonical measurements_15m",
@@ -1989,6 +2149,8 @@ def build_evidence(day, question="", conversation_context=None):
         "evTelemetry5m": ev_telemetry,
         "evControlEvents": ev_control,
         "quookerEvents": quooker_events,
+        "semanticEvents": semantic_events,
+        "semanticEventCoverage": semantic_event_coverage,
         "plannerDecisionWindow": planner_window,
         "flexContextWindow": flex_context,
         "forecastVsActual15m": forecast_actual,
@@ -1996,13 +2158,15 @@ def build_evidence(day, question="", conversation_context=None):
         "limitations": [
             "For today, full-calendar-day coverage is not evidence completeness. Use coveragePctElapsed and elapsedCoverageStatus to judge elapsed-time measurement coverage.",
             "Recent conversation context is referential context only and is not EMS evidence. Factual claims still require support from the current evidence package.",
-            "When evidenceSelection.mode is EXPLICIT_TIME_WINDOW or CONTEXT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally scoped to the documented local window; absence outside that window is not evidence of no activity.",
+            "When evidenceSelection.mode is EXPLICIT_TIME_WINDOW or CONTEXT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents, quookerEvents and semanticEvents are intentionally scoped to the documented local window; absence outside that window is not evidence of no activity.",
             "When evidenceSelection.mode is TOPIC_DAY_SCOPE or DAY_SCOPE_COMPACT, compactedFields are bounded samples across the day and omittedFields were intentionally excluded as unrelated to the question; absence or omission is not evidence of no activity.",
             "evidenceSelection.inputBudget uses a conservative UTF-8 byte-based token estimate rather than the model tokenizer. If budget compaction is applied, budgetCompactedFields records the additional deterministic reductions; HARD_LIMIT_EXCEEDED prevents the model call.",
             "EV deadline values may retain historical deadlineAt/remainingKWh metadata after the constraint becomes inactive; deadlineSemantics.effective is the authority for whether those values constrain the referenced decision time.",
             "EV telemetry and control-event history only exist from their V0.2 commissioning onward; earlier gaps must not be backfilled by inference.",
             "Heating/WW flex-context history only exists from V0.4 flex-context archive commissioning onward; earlier gaps must not be backfilled from current JSON.",
             "Quooker adapter/actuator/detector history only exists from V0.4 Quooker evidence-push commissioning onward; earlier gaps must not be backfilled from current Homey Logic.",
+            "Semantic event history begins at semanticEventCoverage.commissionedAt. Initial state is baseline-only and creates no synthetic event; absence before commissioning or at baseline is not proof that no change occurred.",
+            "Semantic event provenance is explicit: USER_INTENT_COMMAND records intent but not physical execution; OBSERVED_STATE does not identify the actor; DERIVED_STATE is Pi-derived; SHADOW_DECISION is not a physical write.",
             "Heating progression remains SHADOW. Quooker actuator mode is evidence-driven: SHADOW desiredOn/wouldWrite does not prove a physical command; LIVE physicalWritePerformed=true does.",
             "For Quooker LIVE evidence, physicalWritePerformed=false can be an idempotent no-op when the requested state already matched; use actualOnBefore/actualOnAfter plus detector evidence for context.",
             "If a historical Quooker event has actuator.mode=UNKNOWN, do not infer a physical write from detector HEATING alone.",
@@ -2249,6 +2413,8 @@ def _evidence_summary(evidence):
         "evTelemetryPoints": len(evidence["evTelemetry5m"]),
         "evControlEvents": len(evidence["evControlEvents"]),
         "quookerEvents": len(evidence["quookerEvents"]),
+        "semanticEvents": len(evidence["semanticEvents"]),
+        "semanticEventCoverage": evidence.get("semanticEventCoverage"),
         "plannerDecisionPoints": len(evidence["plannerDecisionWindow"]),
         "flexContextPoints": len(evidence["flexContextWindow"]),
         "forecastComparisonSlots": len(
