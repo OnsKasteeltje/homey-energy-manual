@@ -1,0 +1,18 @@
+[Unit]
+Description=Publish Heating V0.5 control intent to Homey SHADOW bus
+After=ems-heating-control-gate-shadow.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+WorkingDirectory=/home/jeroen/ems/runtime/homey-deploy
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/homey-deploy/publish_heating_control_intent_shadow.py
+TimeoutStartSec=30
+Nice=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jeroen/ems/data
