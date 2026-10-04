@@ -51,7 +51,43 @@ def payloads():
     return intent, adapter, gate
 
 
+def _test_ready_logic_readback_is_paced():
+    ids = {
+        "intent": {"id": "intent-id", "name": m.LOGIC_NAMES["intent"]},
+        "adapter": {"id": "adapter-id", "name": m.LOGIC_NAMES["adapter"]},
+        "gate": {"id": "gate-id", "name": m.LOGIC_NAMES["gate"]},
+    }
+    by_id = {
+        meta["id"]: {"id": meta["id"], "name": meta["name"], "type": "string"}
+        for meta in ids.values()
+    }
+    sleeps = []
+    original_get = m.get_variable
+    original_sleep = m.time.sleep
+    try:
+        m.get_variable = lambda var_id: by_id[var_id]
+        m.time.sleep = lambda seconds: sleeps.append(seconds)
+        result = m.ensure_logic_variables(
+            {
+                "state": "READY",
+                "logic": ids,
+                "flows": {},
+                "pendingOperation": None,
+            },
+            apply=False,
+        )
+    finally:
+        m.get_variable = original_get
+        m.time.sleep = original_sleep
+
+    assert result == ids
+    assert sleeps == [m.READBACK_SPACING_SECONDS, m.READBACK_SPACING_SECONDS]
+    assert m.READBACK_SPACING_SECONDS == 6
+    assert m.WRITE_SPACING_SECONDS == 6
+
+
 def main():
+    _test_ready_logic_readback_is_paced()
     intent, adapter, gate = payloads()
     assert m._validate_shadow_chain_payloads(intent, adapter, gate) == "hcs1-test"
 

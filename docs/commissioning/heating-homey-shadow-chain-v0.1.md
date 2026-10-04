@@ -112,6 +112,15 @@ resume with the timer disabled. Successful resume records `validatedAt`,
 `lastValidatedRevision` and `publisherTimerEnabled=true` in the host-local
 config.
 
+When the source-controlled Adapter/Gate changes after first commissioning, rerun
+`--apply` as a READY resync before `--resume`. Existing Logic variables and
+Advanced Flows are addressed only by their pinned IDs; their readbacks are
+paced, any changed flow source is updated in place, and no new object is created
+while the READY metadata is complete. The resync forces the publisher timer off,
+sets `publisherTimerEnabled=false`, and clears `validatedAt` plus
+`lastValidatedRevision`; this invalidates the previous activation proof until a
+new successful `--resume`.
+
 The Pi publisher runs at `:35`, after V0.5 at `:30`. It writes only the
 dedicated intent Logic variable. Homey Adapter/Gate execution is event-driven by
 Logic changes.
