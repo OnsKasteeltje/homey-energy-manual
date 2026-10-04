@@ -760,10 +760,23 @@ def build_replay(
             next_control_at = None
             if control_i < len(controls):
                 candidate_at = controls[control_i].at
-                if row.at < candidate_at < next_row.at:
+                if segment_start < candidate_at < next_row.at:
                     next_control_at = candidate_at
 
-            segment_end = next_control_at or next_row.at
+            evidence_expiry_at = None
+            if segment_control is not None:
+                expiry = segment_control.at + timedelta(
+                    seconds=MAX_CONTROL_EVENT_AGE_S
+                )
+                if segment_start < expiry < next_row.at:
+                    evidence_expiry_at = expiry
+
+            boundaries = [next_row.at]
+            if next_control_at is not None:
+                boundaries.append(next_control_at)
+            if evidence_expiry_at is not None:
+                boundaries.append(evidence_expiry_at)
+            segment_end = min(boundaries)
             segment_dt_s = (segment_end - segment_start).total_seconds()
 
             if segment_dt_s > 0:
@@ -806,18 +819,25 @@ def build_replay(
                     "controlEvidenceAt": _iso_z(segment_control.at) if segment_control else None,
                 })
 
-            if next_control_at is None:
+            if segment_end >= next_row.at:
                 break
 
             segmented = True
-            while (
-                control_i < len(controls)
-                and controls[control_i].at == next_control_at
+            if next_control_at is not None and segment_end == next_control_at:
+                while (
+                    control_i < len(controls)
+                    and controls[control_i].at == next_control_at
+                ):
+                    latest_control = controls[control_i]
+                    control_i += 1
+                segment_control = latest_control
+            elif (
+                evidence_expiry_at is not None
+                and segment_end == evidence_expiry_at
             ):
-                latest_control = controls[control_i]
-                control_i += 1
-            segment_control = latest_control
-            segment_start = next_control_at
+                segment_control = None
+
+            segment_start = segment_end
 
         if segmented:
             control_segmented_intervals += 1
@@ -919,7 +939,7 @@ def build_replay(
             "REAL_MISSED_OPPORTUNITY is emitted only when time-aligned durable control evidence supports EV connection/eligibility and no recorded controller constraint explains unused current or phase headroom.",
             "CONSTRAINT_DRIVEN_EXPORT includes rolling-power readiness, dwell, envelope/current caps, physical target settling, downstream offered-current limits and safe phase-transition execution.",
             "Intervals without control evidence within the bounded age are INSUFFICIENT_EVIDENCE and are never silently reclassified.",
-            "Canonical measurements may be coarser than 120 seconds. V0.1 integrates valid intervals up to 600 seconds, segments them at durable EV-control event boundaries, and downgrades otherwise HIGH attribution confidence to MEDIUM when the underlying measurement interval exceeds 120 seconds.",
+            "Canonical measurements may be coarser than 120 seconds. V0.1 integrates valid intervals up to 600 seconds, segments them at durable EV-control event boundaries and control-evidence expiry boundaries, and downgrades otherwise HIGH attribution confidence to MEDIUM when the underlying measurement interval exceeds 120 seconds.",
             "The replay does not invent pre-commissioning semantic events or backfill unavailable control history.",
         ],
     }
