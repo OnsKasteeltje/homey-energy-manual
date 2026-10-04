@@ -36,7 +36,7 @@ def fixtures(root, *, changed=False):
             "charging": changed,
         },
         "hot_water": {
-            "mode": "BOILER" if changed else "CV",
+            "mode": True if changed else False,
         },
     }
     command = {
@@ -132,6 +132,14 @@ def main():
         assert baseline["historicalBackfill"] is False
         assert baseline["baselineCount"] == 7, baseline
         assert baseline["insertedEventCount"] == 0, baseline
+        with sqlite3.connect(db) as con:
+            ww_baseline = con.execute(
+                """
+                SELECT value_json FROM semantic_event_state
+                WHERE state_key='warm_water.source_mode'
+                """
+            ).fetchone()[0]
+        assert json.loads(ww_baseline) == "CV", ww_baseline
 
         fixtures(root, changed=True)
         changed = module.archive(
@@ -183,6 +191,49 @@ def main():
         deadline_after = json.loads(by_type["EV_DEADLINE_SET"][4])
         assert deadline_after["requestId"] == "req-2"
         assert deadline_after["active"] is True
+
+        ww_before = json.loads(by_type["WW_SOURCE_CHANGED"][3])
+        ww_after = json.loads(by_type["WW_SOURCE_CHANGED"][4])
+        assert ww_before == "CV"
+        assert ww_after == "BOILER"
+
+        # Upgrade compatibility: a pre-normalization boolean baseline must be
+        # silently normalized in-place when the physical source did not change.
+        compat_db = root / "compat.sqlite"
+        fixtures(root, changed=False)
+        module.archive(
+            db_path=compat_db,
+            now=datetime(2026, 10, 4, 9, 59, 50, tzinfo=timezone.utc),
+        )
+        with sqlite3.connect(compat_db) as con:
+            con.execute(
+                """
+                UPDATE semantic_event_state
+                SET value_json='false'
+                WHERE state_key='warm_water.source_mode'
+                """
+            )
+            con.commit()
+        compatible = module.archive(
+            db_path=compat_db,
+            now=datetime(2026, 10, 4, 10, 0, 50, tzinfo=timezone.utc),
+        )
+        assert compatible["insertedEventCount"] == 0, compatible
+        with sqlite3.connect(compat_db) as con:
+            value = con.execute(
+                """
+                SELECT value_json FROM semantic_event_state
+                WHERE state_key='warm_water.source_mode'
+                """
+            ).fetchone()[0]
+            event_count = con.execute(
+                """
+                SELECT COUNT(*) FROM semantic_events
+                WHERE event_type='WW_SOURCE_CHANGED'
+                """
+            ).fetchone()[0]
+        assert json.loads(value) == "CV"
+        assert event_count == 0
 
     print("PASS: semantic event history contract")
 
