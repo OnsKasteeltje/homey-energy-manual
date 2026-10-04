@@ -134,6 +134,18 @@ does not by itself prove power attribution: without separate measured
 device-power evidence the model may describe the active device as a supported
 possible explanation, but must not claim that it caused the measured P1 change.
 
+When the user's question contains one or more explicit local clock times, the
+large day-wide historical arrays `timeline5m`, `evTelemetry5m`,
+`evControlEvents` and `quookerEvents` are scoped to ±30 minutes around
+those user-provided times. Multiple explicit times use the union of their local
+windows. The evidence includes `evidenceSelection.mode=EXPLICIT_TIME_WINDOW`,
+the explicit anchors and the configured window size, so the model can
+distinguish deliberate selection from missing history. Absence outside such a
+window must never be interpreted as evidence that no activity occurred there.
+When the question contains no explicit clock time, these four arrays retain the
+existing bounded day-scope behavior; fallback planner/export anchors must not
+silently trigger evidence trimming.
+
 For an in-progress local day, performance quality separates three different
 concepts: `dayProgressPct` (how much of the calendar day has elapsed),
 `coveragePctFullDay` (integrated evidence as a fraction of the complete day)
@@ -336,10 +348,11 @@ Secrets must never be committed.
 `GET /agent/health` reports readiness and the configured model without
 exposing credentials.
 
-`POST /agent/ask` accepts a question and day. The question is also used only to
-select bounded historical analysis anchors; it never changes EMS state. The
-response contains the answer plus bounded evidence counts/status. Raw model
-responses and credentials are not persisted.
+`POST /agent/ask` accepts a question and day. The question is used only to
+select bounded historical analysis anchors and, when it contains explicit
+clock times, to scope the large historical evidence arrays around those times;
+it never changes EMS state. The response contains the answer plus bounded
+evidence counts/status. Raw model responses and credentials are not persisted.
 
 ## Runtime model tuning
 
