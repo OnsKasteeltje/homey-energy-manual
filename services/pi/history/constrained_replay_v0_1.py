@@ -738,6 +738,7 @@ def build_replay(
     *,
     db_path: Path = HISTORY_DB,
 ) -> dict:
+    start, end = _bounds(day)
     measurements = load_measurements(day, db_path)
     controls = load_control_events(day, db_path)
     semantic_events = load_semantic_events(day, db_path)
