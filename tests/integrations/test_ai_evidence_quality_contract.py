@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import importlib.util
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -89,6 +90,62 @@ def main():
     assert "dryerActive" in instructions
     assert "mention that state as a Feit" in instructions
     assert "Never equate an active device state with measured power attribution" in instructions
+    assert "evidenceSelection.mode is EXPLICIT_TIME_WINDOW" in instructions
+
+    day = date(2026, 10, 4)
+    explicit = ai._explicit_question_anchors(
+        "Waarom was het verbruik rond 05:20 zo hoog?",
+        day,
+    )
+    assert len(explicit) == 1
+    assert explicit[0].hour == 5
+    assert explicit[0].minute == 20
+    assert ai._explicit_question_anchors(
+        "Hoe heeft het EMS het vandaag gedaan?",
+        day,
+    ) == []
+
+    points = [
+        {"atLocal": "2026-10-04T04:49:00+02:00", "id": "too-early"},
+        {"atLocal": "2026-10-04T04:50:00+02:00", "id": "window-start"},
+        {"atLocal": "2026-10-04T05:20:00+02:00", "id": "anchor"},
+        {"atLocal": "2026-10-04T05:50:00+02:00", "id": "window-end"},
+        {"atLocal": "2026-10-04T05:51:00+02:00", "id": "too-late"},
+        {"atLocal": "2026-10-04T14:00:00+02:00", "id": "other-time"},
+    ]
+    selected = ai._select_points_near_anchors(points, explicit)
+    assert [point["id"] for point in selected] == [
+        "window-start",
+        "anchor",
+        "window-end",
+    ]
+    assert ai._select_points_near_anchors(points, []) == points
+
+    two_anchors = ai._explicit_question_anchors(
+        "Vergelijk 05:20 met 14:00.",
+        day,
+    )
+    selected_two = ai._select_points_near_anchors(points, two_anchors)
+    assert [point["id"] for point in selected_two] == [
+        "window-start",
+        "anchor",
+        "window-end",
+        "other-time",
+    ]
+
+    fallback = ai._question_anchors(
+        "Hoe heeft het EMS het vandaag gedaan?",
+        day,
+        {
+            "surplusWindowsForReplay": [
+                {"start": "2026-10-04T10:00:00+02:00"}
+            ]
+        },
+        [],
+    )
+    assert len(fallback) == 1
+    assert fallback[0].hour == 10
+    assert fallback[0].minute == 0
 
     maxed = {
         "id": "resp_test_max",
