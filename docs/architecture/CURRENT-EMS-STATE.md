@@ -518,7 +518,11 @@ paths are unchanged.
 The current V0.4 evidence-quality semantics also require directly observed
 appliance state in `timeline5m` to be used when relevant to a power-event
 question. For example, `washerActive=true` is a recorded **Feit** that must
-not be omitted from the explanation. It remains distinct from power
+not be omitted when it is relevant to explaining a household power event.
+Relevance is now explicit: unrelated device-state observations must not be
+included merely because they are present in the evidence. In a Tesla-specific
+status question, washer/dryer state is omitted unless it materially explains or
+constrains the Tesla event. Device-active state remains distinct from power
 attribution: without separate measured washer power, the AI may identify the
 active washer as a supported possible explanation but must not claim that it
 caused the measured P1 change.
