@@ -281,19 +281,71 @@ def verdict(score, gap_kwh, quality):
     return "REVIEW_REQUIRED"
 
 
-def build_report(day, measurement_db=MEASUREMENTS_DB, planner_db=PLANNER_DB):
+def build_report(
+    day,
+    measurement_db=MEASUREMENTS_DB,
+    planner_db=PLANNER_DB,
+    now_utc=None,
+):
     rows, quality_counts = load_measurements(day, measurement_db)
     if len(rows) < 2:
         raise RuntimeError(f"insufficient complete measurement samples for {day}")
 
     totals, integrated_s, windows = integrate(rows)
     minutes = integrated_s / 60
-    today = datetime.now(TZ).date()
-    coverage_pct = min(100.0, minutes / FULL_DAY_MINUTES * 100)
+
+    start_utc, end_utc = bounds(day)
+    now_utc = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    now_local = now_utc.astimezone(TZ)
+    today = now_local.date()
+
+    day_duration_minutes = (end_utc - start_utc).total_seconds() / 60.0
+    full_day_coverage_pct = min(
+        100.0,
+        minutes / day_duration_minutes * 100
+        if day_duration_minutes > 0 else 0.0,
+    )
+
     if day == today:
+        elapsed_minutes = min(
+            day_duration_minutes,
+            max(0.0, (now_utc - start_utc).total_seconds() / 60.0),
+        )
+    elif day < today:
+        elapsed_minutes = day_duration_minutes
+    else:
+        elapsed_minutes = 0.0
+
+    day_progress_pct = min(
+        100.0,
+        elapsed_minutes / day_duration_minutes * 100
+        if day_duration_minutes > 0 else 0.0,
+    )
+    elapsed_coverage_pct = min(
+        100.0,
+        minutes / elapsed_minutes * 100
+        if elapsed_minutes > 0 else 0.0,
+    )
+
+    if elapsed_minutes < 30 or minutes < 30:
+        elapsed_coverage_status = "INSUFFICIENT_SO_FAR"
+    elif elapsed_coverage_pct >= 90:
+        elapsed_coverage_status = "GOOD_SO_FAR"
+    elif elapsed_coverage_pct >= 50:
+        elapsed_coverage_status = "PARTIAL_SO_FAR"
+    else:
+        elapsed_coverage_status = "INSUFFICIENT_SO_FAR"
+
+    if day == today:
+        # PARTIAL_TODAY means the calendar day is still in progress. It does
+        # not mean measurement coverage of elapsed time is poor.
         quality = "PARTIAL_TODAY" if minutes >= 30 else "INSUFFICIENT"
     else:
-        quality = "GOOD" if coverage_pct >= 90 else ("PARTIAL" if coverage_pct >= 50 else "INSUFFICIENT")
+        quality = (
+            "GOOD"
+            if full_day_coverage_pct >= 90
+            else ("PARTIAL" if full_day_coverage_pct >= 50 else "INSUFFICIENT")
+        )
 
     pv = totals["pv_kwh"]
     direct = totals["direct_pv_self_use_kwh"]
@@ -349,9 +401,25 @@ def build_report(day, measurement_db=MEASUREMENTS_DB, planner_db=PLANNER_DB):
         "quality": {
             "status": quality,
             "integratedMinutes": round(minutes, 1),
-            "coveragePct": round(coverage_pct, 1),
+            # Backwards-compatible field: coverage against the complete local
+            # calendar day, not evidence completeness of elapsed time.
+            "coveragePct": round(full_day_coverage_pct, 1),
+            "coveragePctFullDay": round(full_day_coverage_pct, 1),
+            "elapsedMinutes": round(elapsed_minutes, 1),
+            "coveragePctElapsed": round(elapsed_coverage_pct, 1),
+            "dayProgressPct": round(day_progress_pct, 1),
+            "elapsedCoverageStatus": elapsed_coverage_status,
+            "dayInProgress": day == today,
             "completeSampleCount": len(rows),
             "measurementQualityCounts": dict(quality_counts),
+            "interpretation": (
+                "For today, coveragePct/coveragePctFullDay is coverage against "
+                "the full calendar day and must not be interpreted as missing "
+                "measurement data. Use coveragePctElapsed and "
+                "elapsedCoverageStatus to judge data completeness so far."
+                if day == today
+                else "For a completed day, full-day and elapsed-time coverage are equivalent."
+            ),
         },
         "metrics": metrics,
         "benchmark": benchmark,
