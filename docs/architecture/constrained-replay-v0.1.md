@@ -1,6 +1,6 @@
-# Constrained Replay V0.1 — deterministic EV export attribution
+# Constrained Replay V0.1.1 — deterministic EV export attribution
 
-Status: **CANDIDATE / READ_ONLY — runtime validation required before production baseline**
+Status: **CANDIDATE / READ_ONLY — V0.1 runtime validated; V0.1.1 semantic correction requires runtime replay validation**
 
 ## Purpose
 
@@ -23,7 +23,7 @@ CLI after normal Pi deployment:
 
 Schema:
 
-`EMS_PI_CONSTRAINED_REPLAY_V0.1`
+`EMS_PI_CONSTRAINED_REPLAY_V0.1.1`
 
 ## V0.1 scope
 
@@ -73,8 +73,14 @@ Semantic Event History is attached as bounded historical context around replay
 windows. It is provenance evidence and is not used to invent a missing control
 decision.
 
-Control evidence older than the bounded alignment horizon is not silently
-carried forward. Such export becomes `INSUFFICIENT_EVIDENCE`.
+`ev_control_events` is a semantically deduplicated state-change ledger, not a
+heartbeat stream. An unchanged normalized control state therefore creates no
+new row. V0.1.1 loads the latest durable control state before the local day as
+its baseline and carries that state forward until the next recorded control
+change. A state-change age above 90 seconds lowers otherwise-HIGH attribution
+confidence to MEDIUM; it does not erase the state. `INSUFFICIENT_EVIDENCE`
+is reserved for a genuinely missing baseline/control state or other required
+fields that are absent/ambiguous.
 
 ## Classifications
 
@@ -126,6 +132,9 @@ AI analyst may explain; the LLM is not allowed to manufacture this category.
 Actuator/phase-transition failures with a valid positive request may also be
 classified as a real missed opportunity, but only with medium confidence and
 only up to the smaller of observed export and requested-but-undelivered power.
+If the replay cannot prove any positive requested-but-undelivered capture, the
+failure is `CONSTRAINT_DRIVEN_EXPORT / ACTUATOR_FAILURE_NO_PROVEN_CAPTURE`;
+a zero-kWh counterfactual is never labelled `REAL_MISSED_OPPORTUNITY`.
 
 ### INSUFFICIENT_EVIDENCE
 
@@ -137,18 +146,21 @@ evidence is never converted into a performance conclusion.
 V0.1 uses canonical sub-quarter-hour operational measurements, not the 15-minute
 capacity-planning backtest. The current operational cadence can be about five
 minutes, so V0.1 integrates valid measurement intervals up to ten minutes but
-uses durable EV-control events inside each measurement interval as additional
-classification boundaries. A control event is never carried beyond its bounded
-90-second evidence age.
+uses durable EV-control state-change events inside each measurement interval as
+additional classification boundaries. The latest known semantic control state
+remains effective until another recorded state change. Ninety seconds is the
+HIGH-confidence horizon for that carried-forward state, not an expiry.
 
 Defaults:
 
 - minimum export for classification: 250 W;
 - maximum measurement interval accepted for energy integration: 600 s;
 - preferred attribution resolution: 120 s;
-- measurement intervals coarser than 120 s are segmented at EV-control-event and control-evidence-expiry boundaries;
+- measurement intervals coarser than 120 s are segmented at durable EV-control state-change boundaries;
 - otherwise-HIGH classifications sourced from a >120 s measurement interval are downgraded to MEDIUM confidence;
-- maximum EV-control evidence age: 90 s;
+- otherwise-HIGH classifications based on a semantic control state older than 90 s are also downgraded to MEDIUM;
+- latest pre-day control state is loaded as the day baseline when available;
+- 90 s is a high-confidence age horizon, not a control-state expiry;
 - 1P mapping: 230 W/A;
 - 3P mapping: 690 W/A;
 - EV current range: 6–16 A;
@@ -160,9 +172,11 @@ Defaults:
 Where recorded controller values exist, the replay uses the event-specific
 values rather than inventing replacements. The measurement value is held only
 across its accepted source interval for energy integration; control semantics
-may change within that interval at durable control-event boundaries. This keeps
-five-minute canonical history usable without pretending that it directly
-measures 120/180-second dwell behaviour.
+may change within that interval at durable state-change boundaries. Because the
+ingress explicitly deduplicates unchanged normalized EV control evidence,
+absence of a newer event means “no recorded semantic change”, not automatically
+“unknown state”. This keeps five-minute canonical history usable without
+pretending that it directly measures 120/180-second dwell behaviour.
 
 ## Output
 
@@ -214,7 +228,19 @@ Future AI integration may expose replay results as evidence, but the AI may
 only interpret the deterministic result. It may not rewrite the replay
 classification.
 
-## V0.1 acceptance
+## Runtime finding that led to V0.1.1
+
+The first production replay of 2026-10-04 after the cadence fix integrated
+22.5 hours and reproduced 6.8958 kWh observed grid export. It classified
+3.7046 kWh as constraint-driven, 1.1502 kWh as EV-unavoidable,
+0.3074 kWh as real missed opportunity and 1.5766 kWh as insufficient evidence,
+with only 0.1526 kWh bounded additional feasible EV capture. Review of the
+windows showed two semantic defects: some actuator failures with zero proven
+extra capture were still called real misses, and the 90-second expiry created
+artificial evidence gaps despite semantic deduplication in `ev_control_events`.
+V0.1.1 corrects exactly those two issues.
+
+## V0.1.1 acceptance
 
 Repository:
 
@@ -231,7 +257,7 @@ Runtime, after normal Pi deployment:
 4. no Homey/API/device call is made;
 5. report contains all four classifications in its schema contract even when
    one has zero energy;
-6. results for 2026-10-04 are reviewed against the already manually analysed
+6. results for 2026-10-04 are replayed again and reviewed against the already manually analysed
    EV/PV export behaviour before AI integration is enabled.
 
 ## Next step after runtime validation
