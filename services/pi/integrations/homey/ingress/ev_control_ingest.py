@@ -110,12 +110,22 @@ def _ensure_schema(con):
             charge_state TEXT,
             device_health_status TEXT,
             device_health_reason TEXT,
+            downstream_json TEXT,
             physical_write_performed INTEGER,
             raw_json TEXT NOT NULL,
             collected_at_utc TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    columns = {
+        row[1]
+        for row in con.execute("PRAGMA table_info(ev_control_events)").fetchall()
+    }
+    if "downstream_json" not in columns:
+        con.execute(
+            "ALTER TABLE ev_control_events ADD COLUMN downstream_json TEXT"
+        )
+
     con.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_ev_control_events_time
@@ -136,6 +146,38 @@ def _extract(payload):
     transition = actuator.get("transition") or {}
     observed = actuator.get("observed") or {}
     easee = health.get("easee") or {}
+    equalizer = health.get("equalizer") or {}
+
+    downstream = {
+        "easee": {
+            "requestedA": _number(easee.get("requestedA")),
+            "offeredA": _number(easee.get("offeredA")),
+            "targetCircuitA": _number(easee.get("targetCircuitA")),
+            "measureW": _number(easee.get("measureW")),
+            "phaseCurrentsA": easee.get("phaseCurrentsA")
+            if isinstance(easee.get("phaseCurrentsA"), dict)
+            else None,
+            "telemetryAgeSec": _number(easee.get("telemetryAgeSec")),
+        },
+        "equalizer": {
+            "deviceAvailable": (
+                equalizer.get("deviceAvailable")
+                if isinstance(equalizer.get("deviceAvailable"), bool)
+                else None
+            ),
+            "measureW": _number(equalizer.get("measureW")),
+            "phaseCurrentsA": equalizer.get("phaseCurrentsA")
+            if isinstance(equalizer.get("phaseCurrentsA"), dict)
+            else None,
+            "telemetryAgeSec": _number(equalizer.get("telemetryAgeSec")),
+        },
+    }
+    downstream_json = json.dumps(
+        downstream,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
 
     source_revision = (
         adapter.get("sourceRevision")
@@ -181,6 +223,7 @@ def _extract(payload):
         ) or None,
         "device_health_status": str(health.get("status") or "") or None,
         "device_health_reason": str(health.get("reason") or "") or None,
+        "downstream_json": downstream_json,
         "physical_write_performed": 1 if actuator.get("physicalWritePerformed") is True else 0,
     }
 
@@ -203,6 +246,7 @@ NORMALIZED_COLUMNS = (
     "charge_state",
     "device_health_status",
     "device_health_reason",
+    "downstream_json",
     "physical_write_performed",
 )
 
@@ -268,9 +312,9 @@ def archive_ev_control(payload, db_path=HISTORY_DB):
                 actuator_phase_mode, actuator_confirmed_mode,
                 transition_stage, transition_failure,
                 charge_state, device_health_status, device_health_reason,
-                physical_write_performed, raw_json
+                downstream_json, physical_write_performed, raw_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event_hash,
@@ -292,6 +336,7 @@ def archive_ev_control(payload, db_path=HISTORY_DB):
                 data["charge_state"],
                 data["device_health_status"],
                 data["device_health_reason"],
+                data["downstream_json"],
                 data["physical_write_performed"],
                 canonical,
             ),
