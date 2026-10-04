@@ -272,7 +272,17 @@ them in `ev_control_events`.
 The event archive includes Gate PASS/FAIL and errors, actuator status/reason,
 requested current and phase, confirmed phase, transition stage/failure,
 charge-state/device-health context and whether the actuator reports a physical
-write.
+write. The archive also retains the original normalized evidence payload in
+`raw_json`. The AI reader projects a bounded subset of Power Intent realtime
+reasoning from that already-stored payload into each `evControlEvents` item:
+`intentReason`, `intentSource`, `realtimeApplied`,
+`realtimePhaseReason`, `realtimeCurrentReason`,
+`realtimeAvailableTotalW`, `realtimeAvailableTotalAvg2mW`,
+`realtimeRollingReady` and `realtimeRollingCoverageMs`. These fields are
+historical recorded Homey control evidence, not reconstructed model reasoning.
+If a zero-target/IDLE event contains a phase/current reason such as
+`1P_TO_OFF_ROLLING_LOW`, the model must use that reason before declaring the
+underlying control cause unknown.
 
 Identical runtime evidence triggered repeatedly is deduplicated semantically.
 The event hash is derived from the normalized persisted evidence fields rather
