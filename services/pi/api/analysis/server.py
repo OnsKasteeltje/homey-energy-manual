@@ -33,6 +33,10 @@ OPENAI_RESPONSES_URL = os.environ.get("OPENAI_RESPONSES_URL", "https://api.opena
 HISTORY_DB = os.environ.get("EMS_HISTORY_DB", "/home/jeroen/ems/data/ems-history.sqlite")
 PLANNER_DB = os.environ.get("EMS_PLANNER_DB", "/home/jeroen/ems/data/planner-history.sqlite")
 JOBS_DB = os.environ.get("EMS_AI_JOBS_DB", "/home/jeroen/ems/data/ai-analysis-jobs.sqlite")
+EV_DEADLINE_COMMAND_FILE = os.environ.get(
+    "EMS_EV_DEADLINE_COMMAND_FILE",
+    "/home/jeroen/ems/data/tesla-deadline-command.json",
+)
 PERFORMANCE_COMMAND = os.environ.get("EMS_PERFORMANCE_COMMAND", "/usr/local/bin/ems-performance")
 HEALTH_COMMAND = os.environ.get("EMS_HEALTH_COMMAND", "/usr/local/bin/ems-health")
 LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
@@ -133,6 +137,7 @@ For EV control questions, evControlEvents[].intentReason, realtimePhaseReason an
 When an EV is charging below a deadline/current request, compare the control requestedA/actuatorTargetA with Easee requestedA, Easee offeredA, measured Easee phase currents and Equalizer/P1 phase currents from evControlEvents before diagnosing a control failure. Easee requestedA matching the EMS request while offeredA is lower proves that the reduction occurred downstream of the EMS/Homey target. If fresh Equalizer evidence is present, describe the pattern as consistent with Equalizer/load-balancing constraint; do not claim the Equalizer as the unique cause unless the evidence explicitly proves that attribution.
 Use flexContextWindow for historical Heating/WW eligibility and priority, and quookerEvents for Quooker adapter/actuator/detector evidence.
 Use semanticEvents as durable historical state-change evidence. provenanceClass=USER_INTENT_COMMAND proves that a user-intent command was recorded, but not that a physical device action occurred. provenanceClass=OBSERVED_STATE proves an observed state transition but does not identify who or what caused it. provenanceClass=DERIVED_STATE is Pi-derived state, and provenanceClass=SHADOW_DECISION is never proof of a physical write. The semantic-event archive starts at semanticEventCoverage.commissionedAt; its initial baseline creates no synthetic event, so absence before commissioning or absence of an event at baseline is not proof that no earlier change occurred.
+For questions about the latest/current EV deadline command, currentDeadlineCommand is the authority for the last valid user-intent command currently accepted by the Pi. evControlEvents are executor/realtime control outputs and must never be relabelled as a user deadline command. semanticEvents provide historical before/after command changes and provenance, but currentDeadlineCommand is not delayed by the semantic-event archive cadence. For historical times or non-current days, do not project currentDeadlineCommand backwards.
 When evidenceSelection.mode is EXPLICIT_TIME_WINDOW or CONTEXT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents, quookerEvents and semanticEvents are intentionally limited to the documented local window around the selected clock time. Do not interpret absence outside that selected window as evidence that no activity occurred elsewhere in the day.
 When evidenceSelection.mode is TOPIC_DAY_SCOPE or DAY_SCOPE_COMPACT, listed compactedFields are bounded samples across the day and listed omittedFields were intentionally excluded as unrelated to the current question. Do not interpret omitted or unsampled records as proof that no activity occurred.
 When evidenceSelection.inputBudget.status is COMPACTED_TO_BUDGET or WITHIN_HARD_LIMIT, budgetCompactedFields were additionally reduced before the model call to stay within the documented estimated input budget. This is deliberate selection, not evidence that omitted records did not occur.
@@ -180,6 +185,66 @@ def _load_performance(day):
     if payload.get("schema") != "EMS_PI_DAY_PERFORMANCE_V0.1":
         raise RuntimeError("EMS_PERFORMANCE_SCHEMA_INVALID")
     return payload
+
+def _current_deadline_command(day):
+    """Return the current canonical Pi EV user-intent command for today only."""
+    today = datetime.now(LOCAL_TZ).date()
+    if day != today:
+        return {
+            "available": False,
+            "reason": "NOT_CURRENT_DAY",
+            "provenanceClass": "USER_INTENT_COMMAND",
+        }
+
+    try:
+        with open(EV_DEADLINE_COMMAND_FILE, "r", encoding="utf-8") as handle:
+            command = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {
+            "available": False,
+            "reason": "CURRENT_COMMAND_UNAVAILABLE",
+            "provenanceClass": "USER_INTENT_COMMAND",
+        }
+
+    if not isinstance(command, dict):
+        return {
+            "available": False,
+            "reason": "CURRENT_COMMAND_INVALID",
+            "provenanceClass": "USER_INTENT_COMMAND",
+        }
+
+    request_id = command.get("requestId")
+    active = command.get("active")
+    requested_at = _parse_ts(command.get("requestedAt"))
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or not isinstance(active, bool)
+        or requested_at is None
+    ):
+        return {
+            "available": False,
+            "reason": "CURRENT_COMMAND_INVALID",
+            "provenanceClass": "USER_INTENT_COMMAND",
+        }
+
+    return {
+        "available": True,
+        "authority": "CURRENT_USER_INTENT_COMMAND",
+        "provenanceClass": "USER_INTENT_COMMAND",
+        "sourceName": "tesla-deadline-command.json",
+        "requestId": request_id,
+        "requestedAt": command.get("requestedAt"),
+        "requestedAtLocal": requested_at.astimezone(LOCAL_TZ).isoformat(),
+        "source": command.get("source"),
+        "active": active,
+        "deadline": command.get("deadline"),
+        "currentSoc": command.get("currentSoc"),
+        "targetSoc": command.get("targetSoc"),
+        "goalKWh": command.get("goalKWh"),
+        "maxA": command.get("maxA"),
+    }
+
 
 def _load_health():
     proc = subprocess.run(
@@ -1896,6 +1961,7 @@ def build_evidence(day, question="", conversation_context=None):
     ev_telemetry_all = _ev_telemetry(day)
     quooker_events_all = _quooker_events(day)
     semantic_events_all, semantic_event_coverage = _semantic_events(day)
+    current_deadline_command = _current_deadline_command(day)
     timeline_all = _timeline(day)
 
     original_counts = {
@@ -2136,6 +2202,7 @@ def build_evidence(day, question="", conversation_context=None):
             "evControlEvents": "Homey observability LAN push -> ems-history.sqlite",
             "quookerEvents": "Homey Quooker observability LAN push -> ems-history.sqlite",
             "semanticEvents": "Pi-local semantic observer -> ems-history.sqlite semantic_events",
+            "currentDeadlineCommand": "Pi canonical runtime /home/jeroen/ems/data/tesla-deadline-command.json",
             "planner": "planner-history.sqlite frozen decision snapshots",
             "flexContext": "Pi-local Heating/WW shadow archive -> planner-history.sqlite",
             "forecastComparison": "pv_forecast_v2_archive fixed 12h lead + canonical measurements_15m",
@@ -2151,6 +2218,7 @@ def build_evidence(day, question="", conversation_context=None):
         "quookerEvents": quooker_events,
         "semanticEvents": semantic_events,
         "semanticEventCoverage": semantic_event_coverage,
+        "currentDeadlineCommand": current_deadline_command,
         "plannerDecisionWindow": planner_window,
         "flexContextWindow": flex_context,
         "forecastVsActual15m": forecast_actual,
@@ -2415,6 +2483,7 @@ def _evidence_summary(evidence):
         "quookerEvents": len(evidence["quookerEvents"]),
         "semanticEvents": len(evidence["semanticEvents"]),
         "semanticEventCoverage": evidence.get("semanticEventCoverage"),
+        "currentDeadlineCommand": evidence.get("currentDeadlineCommand"),
         "plannerDecisionPoints": len(evidence["plannerDecisionWindow"]),
         "flexContextPoints": len(evidence["flexContextWindow"]),
         "forecastComparisonSlots": len(
