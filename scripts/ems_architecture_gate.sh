@@ -263,7 +263,7 @@ grep -Fqx 'AccuracySec=1s' "$HEATING_HOMEY_PUBLISH_TIMER" || fail "Heating Homey
 if grep -Eq 'Homey\.|requests|urllib|urlopen|http://' "$HEATING_CADENCE_INSTALL"; then
   fail "Heating cadence installer must not contain Homey/network control"
 fi
-pass "Heating SHADOW timers are phase-locked V0.3 :00 -> Flex :10 -> V0.4 :20 -> V0.5 :30 -> publish :35"
+pass "Heating local SHADOW cadence is phase-locked through V0.5; Homey publish slot remains parked"
 
 [[ -f "$HEATING_V05_BUILD" ]] || fail "Heating V0.5 builder missing"
 [[ -f "$HEATING_V05_RUNNER" ]] || fail "Heating V0.5 runner missing"
@@ -327,7 +327,10 @@ grep -q 'config\["publisherTimerEnabled"\] = False' "$HEATING_HOMEY_COMMISSION" 
 grep -q 'config.pop("lastValidatedRevision", None)' "$HEATING_HOMEY_COMMISSION" || fail "Heating READY resync must clear prior revision proof"
 grep -q 'RESUME_REQUIRES_READY_STATE' "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey resume must require READY state"
 grep -q 'RESUME_REVISION_MISMATCH' "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey resume revision gate missing"
-grep -q 'enable", "--now"' "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey timer promotion action missing"
+if grep -q 'enable", "--now"' "$HEATING_HOMEY_COMMISSION"; then
+  fail "Heating Homey SHADOW commissioning must not auto-enable publisher timer"
+fi
+grep -q 'disable", "--now"' "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey SHADOW timer-off boundary missing"
 grep -q 'HOMEY_SKIP_STARTUP_NOTIFIERS' "$HEATING_HOMEY_PUBLISHER" || fail "Heating publisher must suppress Homey CLI startup notifiers"
 grep -q 'NO_UPDATE_NOTIFIER' "$HEATING_HOMEY_PUBLISHER" || fail "Heating publisher must suppress update-notifier writes"
 grep -q 'HOMEY_SKIP_STARTUP_NOTIFIERS' "$HEATING_HOMEY_COMMISSION" || fail "Heating commissioning must suppress Homey CLI startup notifiers"
@@ -344,7 +347,7 @@ grep -q 'COOLDOWN_RATE_LIMIT' "$HEATING_HOMEY_PUBLISHER" || fail "Heating Homey 
 grep -q 'heating-homey-shadow-publish-cache.json' "$HEATING_HOMEY_PUBLISHER" || fail "Heating Homey host-local publish cache missing"
 grep -q -- '--runtime-only' "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey runtime-only deployment mode missing"
 grep -q 'RUNTIME_ONLY_REQUIRES_READY_STATE' "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey runtime-only mode must require READY state"
-pass "Heating V0.5 -> Homey Adapter/Gate SHADOW transport is explicit, change-driven, rate-limit-aware and physical-write-free"
+pass "Heating V0.5 -> Homey Adapter/Gate SHADOW proof remains parked, explicit and physical-write-free"
 
 grep -q 'services/pi/integrations/connectlife/' "$CONNECTLIFE_DOC" || fail "ConnectLife target repository boundary missing from architecture document"
 grep -q 'read-only telemetry' "$CONNECTLIFE_DOC" || fail "ConnectLife read-only safety boundary missing from architecture document"
