@@ -186,6 +186,6 @@ def test_fail_closed_output_never_claims_physical_ownership():
 def test_deploy_contract_is_shadow_only():
     installer = INSTALLER.read_text()
     assert 'physicalWriteAllowed") is False' in installer
-    assert 'command.get("physicalWrite") is False' in installer
+    assert 'cmd.get("physicalWrite") is False' in installer
     assert "ReadWritePaths=/home/jeroen/ems/data" in SERVICE.read_text()
     assert "OnCalendar=*-*-* *:*:30" in TIMER.read_text()
