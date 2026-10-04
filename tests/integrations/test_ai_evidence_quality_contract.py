@@ -101,6 +101,42 @@ def main():
     assert "omittedFields" in instructions
     assert "evidenceSelection.inputBudget.status" in instructions
     assert "budgetCompactedFields" in instructions
+    assert "Easee requestedA matching the EMS request while offeredA is lower" in instructions
+    assert "consistent with Equalizer/load-balancing constraint" in instructions
+
+    downstream = ai._ev_intent_reason_context({
+        "intent": {
+            "policyProjection": {
+                "reason": "HOMEY_EXECUTOR_DEADLINE_GUARD",
+                "realtime": {"phaseShadow": {}},
+            },
+            "targets": {"ev": {"source": "REMAINING_KWH_OVER_TIME_TO_DEADLINE"}},
+        },
+        "deviceHealth": {
+            "easee": {
+                "requestedA": 10,
+                "offeredA": 8,
+                "targetCircuitA": 20,
+                "measureW": 5647,
+                "phaseCurrentsA": {"l1": 8.06, "l2": 8.11, "l3": 8.09},
+            },
+            "equalizer": {
+                "deviceAvailable": True,
+                "measureW": 7868,
+                "phaseCurrentsA": {"l1": 16, "l2": 9, "l3": 8},
+                "telemetryAgeSec": 1,
+            },
+            "p1": {"l1A": 15.89, "l2A": 9.41, "l3A": 8.39},
+        },
+    })
+    assert downstream["easeeRequestedA"] == 10
+    assert downstream["easeeOfferedA"] == 8
+    assert downstream["easeeTargetCircuitA"] == 20
+    assert downstream["offeredBelowRequestedA"] is True
+    assert downstream["easeePhaseCurrentsA"]["l1"] == 8.06
+    assert downstream["equalizerAvailable"] is True
+    assert downstream["equalizerPhaseCurrentsA"]["l1"] == 16
+    assert downstream["p1PhaseCurrentsA"]["l1"] == 15.89
 
     day = date(2026, 10, 4)
     explicit = ai._explicit_question_anchors(
