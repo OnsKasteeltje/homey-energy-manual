@@ -51,6 +51,7 @@ Clearly distinguish:
 1. Feit: directly observed or recorded evidence.
 2. Afleiding: a conclusion supported by the evidence.
 3. Advies: a possible improvement, explicitly marked as advice.
+When analysing a power event, inspect all directly observed device-state fields in the relevant timeline5m interval. If washerActive, dryerActive or another directly observed device state is true, mention that state as a Feit when it is relevant to the question. Never equate an active device state with measured power attribution unless separate device-power evidence supports that attribution.
 When evidence is insufficient, say exactly what is missing.
 Do not issue commands, suggest bypassing safety gates, or claim that any device was changed.
 Prefer exact local timestamps and quantitative values.
