@@ -28,3 +28,17 @@ adapter and gate, exactly one Honeywell writer, acknowledgement/readback,
 idempotent set/reset behaviour, health/alerting and rollback validation.
 At LIVE cutover this commissioning shadow must be promoted or retired/archived;
 it must not remain as a parallel controller.
+
+
+## Observability gate before LIVE
+
+V0.5 commissioning evidence is persisted by the existing Pi-local
+`ems-flex-context-history` path. The additive `controlGate` projection is
+stored in `planner-history.sqlite/flex_context_snapshots` together with V0.3,
+Flex Priority and V0.4. Semantic command transitions are retained immediately;
+unchanged state remains deduplicated with the normal heartbeat.
+
+`ems-health` must expose the complete V0.3 -> Flex Priority -> V0.4 -> V0.5
+chain as artifact freshness plus timer/service health. This observability is a
+commissioning prerequisite for any later Pi->Homey Heating adapter/gate work.
+It remains read-only and must never become a control input.

@@ -19,6 +19,7 @@ AI_EVIDENCE_QUALITY_TEST="tests/integrations/test_ai_evidence_quality_contract.p
 AI_RESUME_TEST="tests/integrations/test_ai_request_resume_contract.py"
 AI_NAV_RESUME_TEST="tests/frontend/test_ai_navigation_resume_contract.py"
 FLEX_CONTEXT_TEST="tests/integrations/test_flex_context_archive_contract.py"
+HEATING_OBSERVABILITY_TEST="tests/integrations/test_heating_observability_contract.py"
 QUOOKER_EVIDENCE_TEST="tests/integrations/test_quooker_evidence_contract.py"
 FLEX_CONTEXT_ARCHIVE="services/pi/history/archive_flex_context_snapshot.py"
 QUOOKER_EVIDENCE_INGEST="services/pi/integrations/homey/ingress/quooker_evidence_ingest.py"
@@ -43,6 +44,7 @@ HEATING_V05_RUNNER="services/pi/control/heating/run_heating_control_gate_shadow_
 HEATING_V05_SERVICE="deploy/systemd/ems-heating-control-gate-shadow.service"
 HEATING_V05_TIMER="deploy/systemd/ems-heating-control-gate-shadow.timer"
 HEATING_V05_INSTALL="deploy/install/install_heating_control_gate_shadow_v0_5.sh"
+HEATING_V05_OBSERVABILITY_INSTALL="deploy/install/install_heating_v05_observability.sh"
 BASE_REF="${1:-}"
 
 fail() { echo "ARCHITECTURE GATE: FAIL: $*" >&2; exit 1; }
@@ -163,6 +165,23 @@ grep -q 'ems-flex-context-history.timer' "$HEALTH_EVIDENCE" || fail "EMS health 
 grep -q '/home/jeroen/ems/runtime/history/archive_flex_context_snapshot.py' deploy/systemd/ems-flex-context-history.service || fail "flex context service does not use canonical runtime history source"
 python3 "$FLEX_CONTEXT_TEST" || fail "flex context history contract failed"
 pass "Heating and WW flex context is archived read-only for retrospective analysis"
+
+grep -q 'heating-control-gate-shadow-v0.5.json' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context archive must include Heating V0.5 control-gate evidence"
+grep -q '"controlGate"' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context snapshot must project Heating V0.5 control-gate evidence"
+grep -q 'ems-heating-control-gate-shadow.service' deploy/systemd/ems-flex-context-history.service || fail "flex context archive must run after Heating V0.5 control-gate"
+grep -q 'heatingControlGateV05' "$HEALTH_EVIDENCE" || fail "EMS health must expose Heating V0.5 artifact freshness"
+grep -q 'ems-heating-preheat-shadow.timer' "$HEALTH_EVIDENCE" || fail "EMS health must monitor Heating V0.3 timer"
+grep -q 'ems-flex-priority-shadow.timer' "$HEALTH_EVIDENCE" || fail "EMS health must monitor Flex Priority timer"
+grep -q 'ems-heating-preheat-progression-shadow.timer' "$HEALTH_EVIDENCE" || fail "EMS health must monitor Heating V0.4 timer"
+grep -q 'ems-heating-control-gate-shadow.timer' "$HEALTH_EVIDENCE" || fail "EMS health must monitor Heating V0.5 timer"
+[[ -f "$HEATING_OBSERVABILITY_TEST" ]] || fail "Heating observability contract test missing"
+python3 "$HEATING_OBSERVABILITY_TEST" || fail "Heating V0.5 observability contract failed"
+pass "Heating V0.3 -> Flex -> V0.4 -> V0.5 observability is durable and health-monitored"
+[[ -f "$HEATING_V05_OBSERVABILITY_INSTALL" ]] || fail "Heating V0.5 observability installer missing"
+if grep -Eq 'Homey\.|requests|urllib|urlopen|http://' "$HEATING_V05_OBSERVABILITY_INSTALL"; then
+  fail "Heating V0.5 observability installer must not contain Homey/network control"
+fi
+pass "Heating V0.5 observability deploy remains local and control-neutral"
 
 grep -q 'services/pi/forecast' scripts/deploy_ems_pi.sh || fail "target-structure Pi forecast source is not deployed"
 grep -q -- "--exclude='forecast/'" scripts/deploy_ems_pi.sh || fail "generic runtime deploy must protect target-managed forecast directory"
