@@ -563,7 +563,14 @@ def resume_ready(config):
         raise RuntimeError("RESUME_REQUIRES_PUBLISHER_TIMER_INACTIVE")
 
     logic = config.get("logic") or {}
-    ids = {key: value["id"] for key, value in logic.items()}
+    if set(logic) != set(LOGIC_NAMES):
+        raise RuntimeError("READY_LOGIC_IDS_INCOMPLETE")
+    for key in LOGIC_NAMES:
+        meta = logic.get(key)
+        if not isinstance(meta, dict) or not isinstance(meta.get("id"), str):
+            raise RuntimeError(f"READY_LOGIC_METADATA_INVALID:{key}")
+
+    ids = {key: logic[key]["id"] for key in LOGIC_NAMES}
     adapter_src = render(ADAPTER_SOURCE, ids)
     gate_src = render(GATE_SOURCE, ids)
 
@@ -612,7 +619,8 @@ def resume_ready(config):
     print("publisher timer: enabled")
     print("physicalWriteAllowed: false")
     print("liveExecutionAllowed: false")
-    print("NOTE: no Homey object create/update and no Honeywell/device capability write")
+    print("NOTE: no structural Homey Logic/Flow create/update; one SHADOW Intent value publish only")
+    print("NOTE: no Honeywell/device capability write")
     return 0
 
 
