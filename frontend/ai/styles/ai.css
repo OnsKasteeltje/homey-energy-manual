@@ -1,17 +1,116 @@
-.quick-actions{display:flex;gap:.75rem;flex-wrap:wrap;margin:1rem 0}
-.quick-actions button,.ask-form button{border:0;border-radius:999px;padding:.7rem 1rem;font:inherit;cursor:pointer}
-.quick-actions button{background:#eef2f5}
-.chat-panel{display:grid;gap:1rem}
-.messages{display:grid;gap:.8rem;min-height:260px;max-height:60vh;overflow:auto;padding:.25rem}
-.message{max-width:850px;padding:1rem 1.1rem;border-radius:18px;background:#f2f4f6}
-.message.user{justify-self:end;background:#e7eef7}
-.message small{display:block;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;opacity:.6;margin-bottom:.35rem}
+main{width:min(1180px,92vw);margin:34px auto 60px}
+.intro{display:flex;justify-content:space-between;align-items:end;margin-bottom:22px}
+.intro small,.panel small{font-size:11px;font-weight:800;letter-spacing:.11em;color:var(--blue)}
+h1{margin:4px 0 6px;font-size:34px}
+.intro p{margin:0;color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px}
+.panel-header{display:flex;justify-content:space-between;align-items:center}
+.panel h2{margin:4px 0 0}
+.badge{background:var(--blue-soft);color:var(--blue);padding:7px 10px;border-radius:999px;font-size:11px;font-weight:800}
+
+.chat-panel{
+  height:560px;
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr) auto;
+  gap:16px;
+  overflow:hidden
+}
+
+.quick-actions{display:flex;gap:10px;flex-wrap:wrap}
+.quick-actions button,.ask-form button{
+  border:0;
+  border-radius:999px;
+  padding:9px 14px;
+  font:inherit;
+  font-size:13px;
+  cursor:pointer
+}
+.quick-actions button{background:var(--blue-soft);color:var(--text-secondary)}
+.quick-actions button:hover{color:var(--blue)}
+
+.messages{
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:var(--panel2)
+}
+.message{
+  width:min(820px,88%);
+  padding:14px 16px;
+  border-radius:16px;
+  background:#eef3f7;
+  flex:0 0 auto
+}
+.message.user{align-self:flex-end;background:var(--blue-soft)}
+.message.agent{align-self:flex-start}
+.message small{
+  display:block;
+  margin-bottom:6px;
+  font-size:10px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  opacity:.7
+}
 .message p{white-space:pre-wrap;margin:0;line-height:1.55}
-.message-meta{display:block;margin-top:.7rem;font-size:.78rem;opacity:.55}
-.ask-form{display:grid;gap:.55rem;border-top:1px solid #e5e7eb;padding-top:1rem}
-.ask-form label{font-weight:650}
-.ask-form textarea{width:100%;box-sizing:border-box;resize:vertical;border:1px solid #d6dbe0;border-radius:14px;padding:.85rem 1rem;font:inherit;background:white}
-.form-actions{display:flex;align-items:center;justify-content:space-between;gap:1rem}
-.form-actions span{font-size:.82rem;opacity:.6}
-.ask-form button{background:#111827;color:white}
+.message-meta{display:block;margin-top:9px;font-size:11px;color:var(--muted)}
+
+.ask-form{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  grid-template-areas:
+    "label question send"
+    ". hint send";
+  column-gap:14px;
+  row-gap:6px;
+  align-items:center;
+  padding-top:16px;
+  border-top:1px solid var(--line)
+}
+.ask-form label{grid-area:label;font-size:13px;font-weight:700}
+.ask-form textarea{
+  grid-area:question;
+  width:100%;
+  min-height:76px;
+  max-height:76px;
+  box-sizing:border-box;
+  resize:none;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:12px 14px;
+  font:inherit;
+  background:white;
+  color:var(--text)
+}
+.ask-form textarea:focus{outline:2px solid var(--blue-soft);border-color:var(--blue)}
+.form-actions{display:contents}
+.form-actions span{grid-area:hint;font-size:11px;color:var(--muted)}
+.ask-form button{
+  grid-area:send;
+  align-self:center;
+  background:var(--text);
+  color:white;
+  min-width:104px
+}
 .ask-form button:disabled{opacity:.5;cursor:wait}
+
+@media(max-width:700px){
+  main{width:94vw;margin-top:20px}
+  .panel{padding:14px}
+  h1{font-size:28px}
+  .chat-panel{height:620px;gap:12px}
+  .message{width:96%}
+  .ask-form{
+    grid-template-columns:1fr auto;
+    grid-template-areas:
+      "label label"
+      "question question"
+      "hint send"
+  }
+}
