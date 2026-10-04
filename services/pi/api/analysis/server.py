@@ -39,6 +39,10 @@ EV_DEADLINE_COMMAND_FILE = os.environ.get(
 )
 PERFORMANCE_COMMAND = os.environ.get("EMS_PERFORMANCE_COMMAND", "/usr/local/bin/ems-performance")
 HEALTH_COMMAND = os.environ.get("EMS_HEALTH_COMMAND", "/usr/local/bin/ems-health")
+CONSTRAINED_REPLAY_COMMAND = os.environ.get(
+    "EMS_CONSTRAINED_REPLAY_COMMAND",
+    "/usr/local/bin/ems-constrained-replay",
+)
 LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
 SCHEMA = "EMS_AI_ANALYSIS_V0.4"
@@ -145,6 +149,7 @@ Heating progression remains SHADOW. Quooker actuator evidence is versioned: use 
 Never backfill missing pre-commissioning flex or Quooker history by inference.
 For an in-progress day, PARTIAL_TODAY means the calendar day is not finished; never call data incomplete from full-day coverage alone. Use quality.coveragePctElapsed, quality.elapsedCoverageStatus and quality.dayProgressPct.
 Treat EV deadline metadata as an active constraint only when deadlineSemantics.effective is true. Old deadlineAt/remainingKWh values may remain visible for audit but are not active constraints when semantics say INACTIVE, EXPIRED_OR_STALE or INVALID_OR_STALE.
+Use constrainedReplay only as deterministic read-only performance evidence. Its classification fields are authoritative outputs of the replay engine for the modeled EV-only scope; never relabel UNAVOIDABLE_EXPORT, CONSTRAINT_DRIVEN_EXPORT, REAL_MISSED_OPPORTUNITY or INSUFFICIENT_EVIDENCE based on your own speculation. "UNAVOIDABLE_EXPORT" is explicitly EV-relative in V0.1.1, not proof that WW/Heating/appliances/battery could not have used the energy. When selectedWindows are present, explain the replay reason and bounded additionalFeasibleCaptureKWh; do not claim more counterfactual capture than the replay reports.
 Keep the answer concise but diagnostic."""
 
 def _iso_z(dt):
@@ -243,6 +248,151 @@ def _current_deadline_command(day):
         "targetSoc": command.get("targetSoc"),
         "goalKWh": command.get("goalKWh"),
         "maxA": command.get("maxA"),
+    }
+
+
+def _load_constrained_replay(day):
+    try:
+        proc = subprocess.run(
+            [
+                CONSTRAINED_REPLAY_COMMAND,
+                day.isoformat(),
+                "--no-write-output",
+            ],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {
+            "available": False,
+            "reason": "CONSTRAINED_REPLAY_COMMAND_UNAVAILABLE",
+            "error": str(exc)[:400],
+        }
+    if proc.returncode != 0:
+        return {
+            "available": False,
+            "reason": "CONSTRAINED_REPLAY_COMMAND_FAILED",
+            "error": (proc.stderr or proc.stdout).strip()[:400],
+        }
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return {
+            "available": False,
+            "reason": "CONSTRAINED_REPLAY_JSON_INVALID",
+        }
+    if payload.get("schema") != "EMS_PI_CONSTRAINED_REPLAY_V0.1.1":
+        return {
+            "available": False,
+            "reason": "CONSTRAINED_REPLAY_SCHEMA_INVALID",
+            "schema": payload.get("schema"),
+        }
+    return payload
+
+
+def _project_constrained_replay(payload, anchors=None, limit=12):
+    if not isinstance(payload, dict):
+        return {
+            "available": False,
+            "reason": "CONSTRAINED_REPLAY_UNAVAILABLE",
+        }
+    if payload.get("schema") != "EMS_PI_CONSTRAINED_REPLAY_V0.1.1":
+        return payload if payload.get("available") is False else {
+            "available": False,
+            "reason": "CONSTRAINED_REPLAY_SCHEMA_INVALID",
+        }
+
+    windows = [
+        window for window in (payload.get("windows") or [])
+        if isinstance(window, dict)
+    ]
+    anchors = anchors or []
+
+    selected = []
+    if anchors:
+        for window in windows:
+            start = _parse_ts(window.get("start"))
+            end = _parse_ts(window.get("end"))
+            if start is None or end is None:
+                continue
+            if any(
+                start <= anchor.astimezone(timezone.utc) + timedelta(minutes=30)
+                and end >= anchor.astimezone(timezone.utc) - timedelta(minutes=30)
+                for anchor in anchors
+            ):
+                selected.append(window)
+    else:
+        missed = [
+            window for window in windows
+            if window.get("classification") == "REAL_MISSED_OPPORTUNITY"
+        ]
+        selected.extend(sorted(
+            missed,
+            key=lambda window: (
+                window.get("additionalFeasibleCaptureKWh") or 0.0,
+                window.get("exportKWh") or 0.0,
+            ),
+            reverse=True,
+        ))
+        selected.extend(sorted(
+            [
+                window for window in windows
+                if window.get("classification") != "REAL_MISSED_OPPORTUNITY"
+            ],
+            key=lambda window: window.get("exportKWh") or 0.0,
+            reverse=True,
+        ))
+
+    bounded = []
+    seen = set()
+    for window in selected:
+        key = (
+            window.get("start"),
+            window.get("end"),
+            window.get("classification"),
+            window.get("primaryReason"),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        bounded.append({
+            "start": window.get("start"),
+            "end": window.get("end"),
+            "classification": window.get("classification"),
+            "primaryReason": window.get("primaryReason"),
+            "reasons": window.get("reasons") or [],
+            "phaseModes": window.get("phaseModes") or [],
+            "controlReasons": window.get("controlReasons") or [],
+            "exportKWh": window.get("exportKWh"),
+            "additionalFeasibleCaptureKWh": (
+                window.get("additionalFeasibleCaptureKWh")
+            ),
+            "peakExportW": window.get("peakExportW"),
+            "confidence": window.get("confidence"),
+            "semanticEvents": window.get("semanticEvents") or [],
+        })
+        if len(bounded) >= limit:
+            break
+
+    return {
+        "available": True,
+        "schema": payload.get("schema"),
+        "scope": payload.get("scope"),
+        "readOnly": payload.get("readOnly"),
+        "controlWrites": payload.get("controlWrites"),
+        "coverage": payload.get("coverage") or {},
+        "totals": payload.get("totals") or {},
+        "reasonEnergyKWh": payload.get("reasonEnergyKWh") or {},
+        "selectedWindows": bounded,
+        "windowSelection": (
+            "AROUND_ANALYSIS_ANCHORS"
+            if anchors
+            else "REAL_MISSES_THEN_LARGEST_EXPORT"
+        ),
+        "limitations": payload.get("limitations") or [],
     }
 
 
@@ -1964,12 +2114,29 @@ def build_evidence(day, question="", conversation_context=None):
     current_deadline_command = _current_deadline_command(day)
     timeline_all = _timeline(day)
 
+    constrained_replay = None
+    constrained_replay_relevant = (
+        not topics
+        or "EV" in topics
+        or "PV_FLEX" in topics
+    )
+    if constrained_replay_relevant:
+        constrained_replay = _project_constrained_replay(
+            _load_constrained_replay(day),
+            selected_time_anchors,
+        )
+
     original_counts = {
         "timeline5m": len(timeline_all),
         "evTelemetry5m": len(ev_telemetry_all),
         "evControlEvents": len(ev_control_all),
         "quookerEvents": len(quooker_events_all),
         "semanticEvents": len(semantic_events_all),
+        "constrainedReplayWindows": (
+            len((constrained_replay or {}).get("selectedWindows") or [])
+            if constrained_replay_relevant
+            else 0
+        ),
     }
 
     timeline = list(timeline_all)
@@ -2109,6 +2276,10 @@ def build_evidence(day, question="", conversation_context=None):
             if quooker_events:
                 omitted_fields.append("quookerEvents")
             quooker_events = []
+        if "EV" not in topics and "PV_FLEX" not in topics:
+            if constrained_replay is not None:
+                omitted_fields.append("constrainedReplay")
+            constrained_replay = None
 
         if "PV_FLEX" not in topics:
             allowed_semantic_domains = set()
@@ -2152,6 +2323,9 @@ def build_evidence(day, question="", conversation_context=None):
         "quookerEvents": len(quooker_events),
         "semanticEvents": len(semantic_events),
         "flexContextWindow": len(flex_context),
+        "constrainedReplayWindows": len(
+            (constrained_replay or {}).get("selectedWindows") or []
+        ),
     }
     original_counts["flexContextWindow"] = len(flex_context_all)
 
@@ -2207,6 +2381,7 @@ def build_evidence(day, question="", conversation_context=None):
             "flexContext": "Pi-local Heating/WW shadow archive -> planner-history.sqlite",
             "forecastComparison": "pv_forecast_v2_archive fixed 12h lead + canonical measurements_15m",
             "performance": "EMS_PI_DAY_PERFORMANCE_V0.1",
+            "constrainedReplay": "EMS_PI_CONSTRAINED_REPLAY_V0.1.1 via ems-constrained-replay",
             "currentHealth": "EMS_PI_HEALTH_V0.1 via ems-health",
         },
         "analysisAnchorsLocal": [anchor.isoformat() for anchor in anchors],
@@ -2222,6 +2397,7 @@ def build_evidence(day, question="", conversation_context=None):
         "plannerDecisionWindow": planner_window,
         "flexContextWindow": flex_context,
         "forecastVsActual15m": forecast_actual,
+        "constrainedReplay": constrained_replay,
         "piHealthCurrent": health,
         "limitations": [
             "For today, full-calendar-day coverage is not evidence completeness. Use coveragePctElapsed and elapsedCoverageStatus to judge elapsed-time measurement coverage.",
@@ -2241,6 +2417,8 @@ def build_evidence(day, question="", conversation_context=None):
             "Planner decision windows use the latest frozen snapshot at or before each analysis anchor; missing snapshots remain missing.",
             "PV forecast comparison uses a fixed 12-hour no-hindsight archive selection and must not substitute a later forecast.",
             "Observed phase mode is derived from measured phase currents; use explicit actuator/gate phase fields when control-event evidence exists.",
+            "constrainedReplay classifications are deterministic replay outputs and must not be relabelled by the model. V0.1.1 scope is EV_EXPORT_ONLY: UNAVOIDABLE_EXPORT means unavoidable by the modeled EV path, not globally unavoidable by WW/Heating/appliance/battery flexibility.",
+            "constrainedReplay selectedWindows is bounded evidence. Do not infer that omitted replay windows did not occur; use replay totals for day-level quantities.",
             "Current Pi health does not prove health at an earlier historical decision timestamp.",
             "Recent incident evidence is best-effort journal coverage until durable incident history is implemented.",
             "Export windows are observations and require constraint context before classifying them as missed opportunities.",
@@ -2482,6 +2660,14 @@ def _evidence_summary(evidence):
         "evControlEvents": len(evidence["evControlEvents"]),
         "quookerEvents": len(evidence["quookerEvents"]),
         "semanticEvents": len(evidence["semanticEvents"]),
+        "constrainedReplayWindows": len(
+            (evidence.get("constrainedReplay") or {}).get("selectedWindows") or []
+        ),
+        "constrainedReplayAvailable": (
+            (evidence.get("constrainedReplay") or {}).get("available")
+            if evidence.get("constrainedReplay") is not None
+            else None
+        ),
         "semanticEventCoverage": evidence.get("semanticEventCoverage"),
         "currentDeadlineCommand": evidence.get("currentDeadlineCommand"),
         "plannerDecisionPoints": len(evidence["plannerDecisionWindow"]),

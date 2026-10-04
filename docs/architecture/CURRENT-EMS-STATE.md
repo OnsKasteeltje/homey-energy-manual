@@ -244,7 +244,7 @@ may be labelled `REAL_MISSED_OPPORTUNITY`; otherwise it is constraint-driven.
 This preserves useful five-minute energy evidence without claiming direct
 120/180-second measurement precision.
 
-Constrained Replay V0.1.1 is now the repository candidate for the first deterministic
+Constrained Replay V0.1.1 is now runtime validated as the first deterministic
 short-timescale constrained replay. Canonical source is
 `services/pi/history/constrained_replay_v0_1.py`, schema
 `EMS_PI_CONSTRAINED_REPLAY_V0.1.1`, with explicit scope `EV_EXPORT_ONLY`.
@@ -448,7 +448,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - WW ownership remains more distributed than EV ownership because Homey still carries substantial realtime WW state/safety policy.
 - PV forecast quality remains a follow-up item.
 - Planner schema V0.3 does not yet embed Homey `state_revision` / `source_sample_at` in the final decision output.
-- Constrained Replay V0.1.1 exists as a read-only EV-only candidate. V0.1 cadence/runtime integration is proven; V0.1.1 still needs one Pi replay validation before bounded AI-evidence integration.
+- Constrained Replay V0.1.1 is runtime validated read-only EV-only analysis. The 2026-10-04 replay produced 6.8958 kWh observed export with 5.1359 kWh constraint-driven, 1.3829 kWh EV-unavoidable, 0.2200 kWh real-missed and 0.0000 kWh insufficient evidence; bounded additional feasible capture was 0.1887 kWh. Bounded AI-evidence integration is the current candidate next step.
 - Legacy backfill collectors remain source-only diagnostic/recovery tooling, not production live collectors.
 - Honeywell deployment must continue preserving host-local venv, credentials and OAuth cache.
 - Heating Thermal Learning still needs fine-grained empirical room-response data. The provisional 180-minute preheat horizon and <=0.5 °C steps must be evaluated in shadow against actual room temperature, Quatt activity, PV-export capture and rebound/reduced heating around the original Honeywell comfort time before any LIVE heating control is considered.
@@ -480,6 +480,17 @@ The 2026-09-27 opportunity-only EV cutover exposed a stale/invalid Easee access 
 
 EV writer v0.4.5 makes that boundary explicit. Cloud HTTP failures are operation-qualified (`EASEE_REFRESH_HTTP_*`, `EASEE_PHASE_COMMAND_HTTP_*`, `EASEE_PHASE_COMMAND_RETRY_HTTP_*`, and equivalent observation codes). A recoverable first phase-command HTTP 401 remains silent if the single refresh + retry succeeds. Terminal authentication failures such as refresh 400/401/403, missing/invalid token pair, primary phase 403, or a 401/403 on the post-refresh retry remain fail-closed and additionally emit one deduplicated operational alert for the active incident. Alert delivery is best-effort: push to the Homey Owner is preferred; if push cannot be delivered, a Homey Timeline notification is attempted. Alert delivery never changes Gate authority, never resumes charging, never bypasses `safeAbort`, and contains no token, user ID or other secret material. The remediation is re-running the private Pi commissioning bootstrap `services/pi/commissioning/bootstrap_easee_homey_tokens.py`.
 
+
+## Constrained Replay -> AI bounded evidence candidate
+
+The current candidate adds `constrainedReplay` to AI V0.4 evidence for EV,
+PV/Flex or generic performance questions. The AI service invokes only the
+read-only `ems-constrained-replay` command, validates schema
+`EMS_PI_CONSTRAINED_REPLAY_V0.1.1`, keeps day totals, and projects at most
+12 bounded windows. Explicit/context clock-time questions receive only replay
+windows around the selected time. The system prompt forbids model-side
+reclassification or inflation of bounded feasible capture. Replay remains
+outside planner/Gate/actuator authority.
 
 ## Read-only AI analysis layer — V0.4
 
