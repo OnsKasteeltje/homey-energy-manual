@@ -7,6 +7,8 @@ const status = $("agent-status");
 
 const STORAGE_KEY = "ems.ai.v0.4.session";
 const MAX_STORED_MESSAGES = 40;
+const MAX_CONTEXT_MESSAGES = 4;
+const MAX_CONTEXT_MESSAGE_CHARS = 1200;
 const POLL_MS = 1500;
 
 let pageLeaving = false;
@@ -85,6 +87,25 @@ function hasAgentReply(requestId){
   );
 }
 
+function recentConversationContext(excludeRequestId){
+  return state.messages
+    .filter(item=>
+      item&&
+      ["user","agent"].includes(item.kind)&&
+      typeof item.text==="string"&&
+      item.requestId!==excludeRequestId&&
+      !(
+        item.kind==="agent"&&
+        item.text.startsWith("Analyse niet beschikbaar:")
+      )
+    )
+    .slice(-MAX_CONTEXT_MESSAGES)
+    .map(item=>({
+      role:item.kind==="user"?"user":"assistant",
+      content:item.text.slice(0,MAX_CONTEXT_MESSAGE_CHARS)
+    }));
+}
+
 function finishSuccess(d,requestId){
   if(!hasAgentReply(requestId)){
     addMessage("agent",d.answer,responseMeta(d),requestId);
@@ -114,11 +135,23 @@ function schedulePoll(){
   },POLL_MS);
 }
 
-async function submitRequest(text,requestId,{addUser=true}={}){
+async function submitRequest(
+  text,
+  requestId,
+  {addUser=true,conversationContext=null}={}
+){
   if(addUser){
     addMessage("user",text,null,requestId);
   }
-  state.pending={requestId,question:text,day:"today"};
+  const context=Array.isArray(conversationContext)
+    ?conversationContext
+    :recentConversationContext(requestId);
+  state.pending={
+    requestId,
+    question:text,
+    day:"today",
+    conversationContext:context
+  };
   saveState();
   setBusy(true);
 
@@ -129,7 +162,8 @@ async function submitRequest(text,requestId,{addUser=true}={}){
       body:JSON.stringify({
         question:text,
         day:"today",
-        requestId
+        requestId,
+        conversationContext:context
       })
     });
     const d=await r.json();
@@ -173,7 +207,12 @@ async function resumePending(){
       await submitRequest(
         pending.question,
         pending.requestId,
-        {addUser:false}
+        {
+          addUser:false,
+          conversationContext:Array.isArray(pending.conversationContext)
+            ?pending.conversationContext
+            :recentConversationContext(pending.requestId)
+        }
       );
       return;
     }
