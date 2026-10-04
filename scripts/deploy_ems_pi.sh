@@ -25,6 +25,7 @@ TARGET_ANALYSIS_RUNTIME="$RUNTIME/analysis-api"
 TARGET_HEALTH_SOURCE="$REPO/services/pi/health"
 TARGET_HEALTH_RUNTIME="$RUNTIME/health"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
+CONSTRAINED_REPLAY_COMMAND="/usr/local/bin/ems-constrained-replay"
 HEALTH_COMMAND="/usr/local/bin/ems-health"
 SYSTEMD="$REPO/deploy/systemd"
 BACKUP_ROOT="/home/jeroen/ems/backup"
@@ -363,6 +364,8 @@ rsync -a --delete \
 
 chmod 0755 "$TARGET_HISTORY_RUNTIME/ems_performance.py"
 ln -sfn "$TARGET_HISTORY_RUNTIME/ems_performance.py" "$PERFORMANCE_COMMAND"
+chmod 0755 "$TARGET_HISTORY_RUNTIME/constrained_replay_v0_1.py"
+ln -sfn "$TARGET_HISTORY_RUNTIME/constrained_replay_v0_1.py" "$CONSTRAINED_REPLAY_COMMAND"
 chmod 0755 "$TARGET_HEALTH_RUNTIME/ems_health.py"
 ln -sfn "$TARGET_HEALTH_RUNTIME/ems_health.py" "$HEALTH_COMMAND"
 

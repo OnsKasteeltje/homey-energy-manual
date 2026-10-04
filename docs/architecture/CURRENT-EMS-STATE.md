@@ -226,6 +226,23 @@ Heating Preheat V0.2 does not alter the active Dynamic Pi Planner. It exposes on
 
 Planner decisions are archived best-effort in `/home/jeroen/ems/data/planner-history.sqlite`; measured actuals remain in `/home/jeroen/ems/data/ems-history.sqlite`. Retrospective performance analysis must distinguish measured actuals, archived decision context and any unconstrained upper-bound benchmark from a future constrained replay optimum.
 
+Constrained Replay V0.1 is now a repository candidate for the first deterministic
+short-timescale constrained replay. Canonical source is
+`services/pi/history/constrained_replay_v0_1.py`, schema
+`EMS_PI_CONSTRAINED_REPLAY_V0.1`, with explicit scope `EV_EXPORT_ONLY`.
+It reads only `ems-history.sqlite/measurements`, durable
+`ev_control_events` and `semantic_events`; it performs no Homey/network,
+planner or device/control write. It classifies time-aligned observed export as
+`UNAVOIDABLE_EXPORT`, `CONSTRAINT_DRIVEN_EXPORT`,
+`REAL_MISSED_OPPORTUNITY` or `INSUFFICIENT_EVIDENCE`. The classification
+is deterministic and conservative: missing/stale control evidence is never
+promoted into a performance conclusion. In V0.1, “unavoidable” is explicitly
+EV-relative and must not be generalized to WW/Heating/appliance/battery
+flexibility. The existing PV-surplus absorption backtest remains the separate
+longer-horizon technical allocation/capacity backtest and is not replaced by
+this incident/performance replay. Runtime validation on the Pi is required
+before the replay is exposed as AI evidence.
+
 ## 5. Current control endpoint
 
 The Pi exposes `GET /control/current`. A valid production response uses schema `EMS_PI_CONTROL_COMMAND_V0.1`, is bounded to the current quarter-hour slot and planner validity, and fails closed on stale or invalid planner input. The endpoint is a readiness/command endpoint, not a second authority selector.
@@ -413,7 +430,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - WW ownership remains more distributed than EV ownership because Homey still carries substantial realtime WW state/safety policy.
 - PV forecast quality remains a follow-up item.
 - Planner schema V0.3 does not yet embed Homey `state_revision` / `source_sample_at` in the final decision output.
-- A dedicated constrained replay optimizer remains future work.
+- Constrained Replay V0.1 exists as a read-only EV-only candidate; runtime validation and later bounded AI-evidence integration remain open before it can replace the former 'future constrained replay' gap.
 - Legacy backfill collectors remain source-only diagnostic/recovery tooling, not production live collectors.
 - Honeywell deployment must continue preserving host-local venv, credentials and OAuth cache.
 - Heating Thermal Learning still needs fine-grained empirical room-response data. The provisional 180-minute preheat horizon and <=0.5 °C steps must be evaluated in shadow against actual room temperature, Quatt activity, PV-export capture and rebound/reduced heating around the original Honeywell comfort time before any LIVE heating control is considered.
