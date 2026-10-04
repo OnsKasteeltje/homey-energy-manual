@@ -1326,6 +1326,81 @@ def _extract_output_text(payload):
                 texts.append(part["text"])
     return "\n".join(texts).strip()
 
+
+def _model_refusal_present(payload):
+    for item in payload.get("output") or []:
+        if item.get("type") != "message":
+            continue
+        for part in item.get("content") or []:
+            if part.get("type") == "refusal":
+                return True
+    return False
+
+
+def _model_failure_reason(payload):
+    status = str(payload.get("status") or "").strip().lower()
+    incomplete = payload.get("incomplete_details") or {}
+    incomplete_reason = str(incomplete.get("reason") or "").strip().lower()
+
+    if status == "incomplete":
+        if incomplete_reason == "max_output_tokens":
+            return "MODEL_INCOMPLETE_MAX_OUTPUT_TOKENS"
+        if incomplete_reason == "content_filter":
+            return "MODEL_INCOMPLETE_CONTENT_FILTER"
+        return "MODEL_INCOMPLETE"
+
+    if _model_refusal_present(payload):
+        return "MODEL_REFUSED"
+
+    error = payload.get("error") or {}
+    if isinstance(error, dict) and error:
+        error_code = re.sub(
+            r"[^A-Za-z0-9_-]+",
+            "_",
+            str(error.get("code") or "").strip(),
+        )[:80]
+        if error_code:
+            return "MODEL_RESPONSE_ERROR:" + error_code
+        return "MODEL_RESPONSE_ERROR"
+
+    if status == "completed":
+        return "MODEL_EMPTY_RESPONSE_COMPLETED"
+    return "MODEL_EMPTY_RESPONSE"
+
+
+def _model_response_diagnostics(payload, reason):
+    usage = payload.get("usage") or {}
+    output_details = usage.get("output_tokens_details") or {}
+    incomplete = payload.get("incomplete_details") or {}
+    error = payload.get("error") or {}
+    return {
+        "event": "EMS_AI_MODEL_RESPONSE_FAILURE",
+        "reason": reason,
+        "responseId": payload.get("id"),
+        "status": payload.get("status"),
+        "incompleteReason": incomplete.get("reason"),
+        "errorCode": error.get("code") if isinstance(error, dict) else None,
+        "refusalPresent": _model_refusal_present(payload),
+        "inputTokens": usage.get("input_tokens"),
+        "outputTokens": usage.get("output_tokens"),
+        "reasoningTokens": output_details.get("reasoning_tokens"),
+        "totalTokens": usage.get("total_tokens"),
+    }
+
+
+def _raise_model_response_failure(payload):
+    reason = _model_failure_reason(payload)
+    print(
+        json.dumps(
+            _model_response_diagnostics(payload, reason),
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
+    raise RuntimeError(reason)
+
+
 def ask_model(question, evidence):
     if not OPENAI_API_KEY:
         raise RuntimeError("MODEL_NOT_CONFIGURED")
@@ -1367,7 +1442,7 @@ def ask_model(question, evidence):
 
     answer = _extract_output_text(payload)
     if not answer:
-        raise RuntimeError("MODEL_EMPTY_RESPONSE")
+        _raise_model_response_failure(payload)
     return answer, payload.get("id")
 
 def send_json(handler, status, payload):
@@ -1569,12 +1644,9 @@ class Handler(BaseHTTPRequestHandler):
                     _job_fail(request_id, reason)
                 except sqlite3.Error:
                     pass
-            status = 503 if reason in {
-                "MODEL_NOT_CONFIGURED", "MODEL_UNAVAILABLE",
-                "TIMELINE_SOURCE_INCOMPLETE", "MODEL_EMPTY_RESPONSE"
-            } or reason.startswith("MODEL_HTTP_") or reason.startswith(
-                "EMS_PERFORMANCE_FAILED"
-            ) else 500
+            status = 503 if reason.startswith("MODEL_") or reason in {
+                "TIMELINE_SOURCE_INCOMPLETE",
+            } or reason.startswith("EMS_PERFORMANCE_FAILED") else 500
             send_json(self, status, {
                 "schema": SCHEMA,
                 "status": "UNAVAILABLE",
