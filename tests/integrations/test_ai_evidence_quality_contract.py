@@ -83,6 +83,13 @@ def main():
     assert planner[0]["deadline"]["deadlineSemantics"]["effective"] is False
     assert flex[0]["priority"]["ev"]["deadlineSemantics"]["state"] == "EXPIRED_OR_STALE"
 
+    instructions = ai.SYSTEM_INSTRUCTIONS
+    assert "directly observed device-state fields" in instructions
+    assert "washerActive" in instructions
+    assert "dryerActive" in instructions
+    assert "mention that state as a Feit" in instructions
+    assert "Never equate an active device state with measured power attribution" in instructions
+
     print("PASS: AI evidence quality semantics contract")
 
 
