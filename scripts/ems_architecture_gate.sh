@@ -52,6 +52,7 @@ HEATING_HOMEY_COMMISSION="services/pi/commissioning/install_heating_homey_shadow
 HEATING_HOMEY_SERVICE="deploy/systemd/ems-heating-homey-shadow-publish.service"
 HEATING_HOMEY_TIMER="deploy/systemd/ems-heating-homey-shadow-publish.timer"
 HEATING_HOMEY_TEST="tests/integrations/test_heating_homey_shadow_contract.py"
+HEATING_HOMEY_RESUME_TEST="tests/integrations/test_heating_homey_resume_contract.py"
 HEATING_HOMEY_NODE_TEST="tests/homey/heating-control-shadow.test.mjs"
 BASE_REF="${1:-}"
 
@@ -250,6 +251,7 @@ pass "Heating V0.5 remains Pi-local, shadow-only and physical-write-free"
 [[ -f "$HEATING_HOMEY_SERVICE" ]] || fail "Heating Homey SHADOW publisher service missing"
 [[ -f "$HEATING_HOMEY_TIMER" ]] || fail "Heating Homey SHADOW publisher timer missing"
 [[ -f "$HEATING_HOMEY_TEST" ]] || fail "Heating Homey SHADOW Pi contract test missing"
+[[ -f "$HEATING_HOMEY_RESUME_TEST" ]] || fail "Heating Homey READY resume contract test missing"
 [[ -f "$HEATING_HOMEY_NODE_TEST" ]] || fail "Heating Homey SHADOW edge contract test missing"
 grep -q 'EMS_HEATING_CONTROL_INTENT_V0.1' "$HEATING_HOMEY_PUBLISHER" || fail "Heating Homey intent schema missing"
 grep -q '"plannerAuthority": "SHADOW_ONLY"' "$HEATING_HOMEY_PUBLISHER" || fail "Heating Homey intent must remain shadow authority"
@@ -263,6 +265,7 @@ fi
 grep -q 'Homey.devices.getDevice' "$HEATING_HOMEY_GATE" || fail "Heating Homey gate targeted readback missing"
 grep -q 'OnCalendar=.*:35' "$HEATING_HOMEY_TIMER" || fail "Heating Homey publisher must run after V0.5 at :35"
 python3 "$HEATING_HOMEY_TEST" || fail "Heating Homey Pi intent contract failed"
+python3 "$HEATING_HOMEY_RESUME_TEST" || fail "Heating Homey READY resume contract failed"
 node "$HEATING_HOMEY_NODE_TEST" || fail "Heating Homey adapter/gate contract failed"
 python3 -m py_compile "$HEATING_HOMEY_PUBLISHER" "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey Python syntax invalid"
 if grep -q 'get-variables' "$HEATING_HOMEY_COMMISSION"; then
@@ -274,6 +277,9 @@ fi
 grep -q 'pendingOperation' "$HEATING_HOMEY_COMMISSION" || fail "Heating first commissioning write-ahead marker missing"
 grep -q 'AMBIGUOUS_PARTIAL_COMMISSIONING' "$HEATING_HOMEY_COMMISSION" || fail "Heating first commissioning ambiguous-create stop missing"
 grep -q '/api/manager/logic/variable/{var_id}' "$HEATING_HOMEY_COMMISSION" || fail "Heating Logic readback must be targeted by pinned ID"
+grep -q -- '--resume-ready' "$HEATING_HOMEY_COMMISSION" || fail "Heating READY resume mode missing"
+grep -q 'READ_SPACING_SECONDS = 5' "$HEATING_HOMEY_COMMISSION" || fail "Heating READY resume must pace targeted Homey reads"
+grep -q '"liveExecutionAllowed": False' "$HEATING_HOMEY_PUBLISHER" || fail "Heating intent must expose top-level liveExecutionAllowed=false"
 pass "Heating V0.5 -> Homey Adapter/Gate SHADOW transport is explicit and physical-write-free"
 
 grep -q 'services/pi/integrations/connectlife/' "$CONNECTLIFE_DOC" || fail "ConnectLife target repository boundary missing from architecture document"
