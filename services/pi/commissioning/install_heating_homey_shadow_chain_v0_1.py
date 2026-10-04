@@ -37,6 +37,8 @@ TIMER_SOURCE = ROOT / "deploy/systemd/ems-heating-homey-shadow-publish.timer"
 CONFIG_SCHEMA = "EMS_HEATING_HOMEY_SHADOW_CONFIG_V0.1"
 PLACEHOLDER_ASSIGNMENT = "const IDS=__EMS_HEATING_IDS__;"
 WRITE_SPACING_SECONDS = 3
+READ_SPACING_SECONDS = 5
+POST_PUBLISH_SETTLE_SECONDS = 8
 
 LOGIC_NAMES = {
     "intent": "EM2_Heating_Control_Intent",
@@ -444,6 +446,176 @@ def ensure_flow(key, candidate, config, apply):
     return meta
 
 
+def validate_ready_pinned_objects(config, adapter_source, gate_source):
+    if config.get("state") != "READY":
+        raise RuntimeError(f"RESUME_REQUIRES_READY_STATE:{config.get('state')}")
+
+    logic = config.get("logic") or {}
+    flows = config.get("flows") or {}
+    if set(logic) != set(LOGIC_NAMES):
+        raise RuntimeError("READY_LOGIC_IDS_INCOMPLETE")
+    if set(flows) != set(FLOW_NAMES):
+        raise RuntimeError("READY_FLOW_IDS_INCOMPLETE")
+
+    for key in ("intent", "adapter", "gate"):
+        meta = logic.get(key)
+        if not isinstance(meta, dict) or not isinstance(meta.get("id"), str):
+            raise RuntimeError(f"READY_LOGIC_METADATA_INVALID:{key}")
+        live = get_variable(meta["id"])
+        if live.get("name") != LOGIC_NAMES[key]:
+            raise RuntimeError(f"READY_LOGIC_NAME_MISMATCH:{key}")
+        if live.get("type") != "string":
+            raise RuntimeError(f"READY_LOGIC_TYPE_INVALID:{key}")
+        print("logic MATCH:", LOGIC_NAMES[key], meta["id"])
+        time.sleep(READ_SPACING_SECONDS)
+
+    candidates = {
+        "adapter": adapter_flow(logic, adapter_source),
+        "gate": gate_flow(logic, gate_source),
+    }
+    for key in ("adapter", "gate"):
+        meta = flows.get(key)
+        if not isinstance(meta, dict) or not isinstance(meta.get("id"), str):
+            raise RuntimeError(f"READY_FLOW_METADATA_INVALID:{key}")
+        live = get_flow(meta["id"])
+        if live.get("name") != FLOW_NAMES[key]:
+            raise RuntimeError(f"READY_FLOW_NAME_MISMATCH:{key}")
+        if writable_flow(live) != candidates[key]:
+            raise RuntimeError(f"READY_FLOW_READBACK_MISMATCH:{key}")
+        print("flow MATCH:", FLOW_NAMES[key], meta["id"])
+        time.sleep(READ_SPACING_SECONDS)
+
+    return logic, flows
+
+
+def _require_shadow_commands(payload, label):
+    commands = payload.get("commands")
+    if not isinstance(commands, list) or len(commands) != 4:
+        raise RuntimeError(f"{label}_COMMAND_SET_INVALID")
+    for command in commands:
+        if not isinstance(command, dict) or command.get("physicalWrite") is not False:
+            raise RuntimeError(f"{label}_PHYSICAL_WRITE_BOUNDARY_INVALID")
+
+
+def validate_shadow_outputs(intent, adapter_out, gate_out):
+    if not isinstance(intent, dict) or intent.get("schema") != "EMS_HEATING_CONTROL_INTENT_V0.1":
+        raise RuntimeError("RESUME_INTENT_SCHEMA_INVALID")
+    if intent.get("valid") is not True or intent.get("status") != "OK":
+        raise RuntimeError(f"RESUME_INTENT_NOT_VALID:{intent.get('reason')}")
+    if intent.get("physicalWriteAllowed") is not False:
+        raise RuntimeError("RESUME_INTENT_PHYSICAL_WRITE_ALLOWED")
+    if intent.get("deviceWrites") is not False:
+        raise RuntimeError("RESUME_INTENT_DEVICE_WRITES_ALLOWED")
+    if intent.get("liveExecutionAllowed") is not False:
+        raise RuntimeError("RESUME_INTENT_LIVE_EXECUTION_ALLOWED")
+    if (intent.get("safety") or {}).get("liveExecutionAllowed") is not False:
+        raise RuntimeError("RESUME_INTENT_SAFETY_LIVE_EXECUTION_ALLOWED")
+    _require_shadow_commands(intent, "RESUME_INTENT")
+
+    if not isinstance(adapter_out, dict) or adapter_out.get("schema") != "EMS_HEATING_CONTROL_ADAPTER_SHADOW_V0.1":
+        raise RuntimeError("RESUME_ADAPTER_SCHEMA_INVALID")
+    if adapter_out.get("valid") is not True or adapter_out.get("status") != "PASS":
+        raise RuntimeError(f"RESUME_ADAPTER_NOT_PASS:{adapter_out.get('errors')}")
+    if adapter_out.get("physicalWriteAllowed") is not False:
+        raise RuntimeError("RESUME_ADAPTER_PHYSICAL_WRITE_ALLOWED")
+    if adapter_out.get("deviceWrites") is not False:
+        raise RuntimeError("RESUME_ADAPTER_DEVICE_WRITES_ALLOWED")
+    if adapter_out.get("liveExecutionAllowed") is not False:
+        raise RuntimeError("RESUME_ADAPTER_LIVE_EXECUTION_ALLOWED")
+    _require_shadow_commands(adapter_out, "RESUME_ADAPTER")
+
+    if not isinstance(gate_out, dict) or gate_out.get("schema") != "EMS_HEATING_CONTROL_ADAPTER_GATE_SHADOW_V0.1":
+        raise RuntimeError("RESUME_GATE_SCHEMA_INVALID")
+    if gate_out.get("finalStatus") != "PASS" or (gate_out.get("errors") or []):
+        raise RuntimeError(f"RESUME_GATE_NOT_PASS:{gate_out.get('errors')}")
+    if gate_out.get("physicalWriteAllowed") is not False:
+        raise RuntimeError("RESUME_GATE_PHYSICAL_WRITE_ALLOWED")
+    if gate_out.get("deviceWrites") is not False:
+        raise RuntimeError("RESUME_GATE_DEVICE_WRITES_ALLOWED")
+    if gate_out.get("liveExecutionAllowed") is not False:
+        raise RuntimeError("RESUME_GATE_LIVE_EXECUTION_ALLOWED")
+    _require_shadow_commands(gate_out, "RESUME_GATE")
+
+    revision = intent.get("controlRevision")
+    if not isinstance(revision, str) or not revision:
+        raise RuntimeError("RESUME_CONTROL_REVISION_MISSING")
+    if adapter_out.get("sourceControlRevision") != revision:
+        raise RuntimeError("RESUME_ADAPTER_REVISION_MISMATCH")
+    if gate_out.get("sourceControlRevision") != revision:
+        raise RuntimeError("RESUME_GATE_SOURCE_REVISION_MISMATCH")
+    if gate_out.get("adapterControlRevision") != revision:
+        raise RuntimeError("RESUME_GATE_ADAPTER_REVISION_MISMATCH")
+    return revision
+
+
+def _timer_is_active():
+    cp = subprocess.run(
+        ["systemctl", "is-active", "ems-heating-homey-shadow-publish.timer"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return cp.stdout.strip() == "active"
+
+
+def resume_ready(config):
+    if _timer_is_active():
+        raise RuntimeError("RESUME_REQUIRES_PUBLISHER_TIMER_INACTIVE")
+
+    logic = config.get("logic") or {}
+    ids = {key: value["id"] for key, value in logic.items()}
+    adapter_src = render(ADAPTER_SOURCE, ids)
+    gate_src = render(GATE_SOURCE, ids)
+
+    logic, flows = validate_ready_pinned_objects(config, adapter_src, gate_src)
+
+    install_pi_runtime()
+
+    subprocess.run(
+        ["sudo", "systemctl", "start", "ems-heating-control-gate-shadow.service"],
+        check=True,
+    )
+    subprocess.run(
+        ["sudo", "systemctl", "start", "ems-heating-homey-shadow-publish.service"],
+        check=True,
+    )
+    print(f"waiting {POST_PUBLISH_SETTLE_SECONDS}s for Homey Adapter/Gate...")
+    time.sleep(POST_PUBLISH_SETTLE_SECONDS)
+
+    intent = read_logic(logic["intent"]["id"])
+    time.sleep(READ_SPACING_SECONDS)
+    adapter_out = read_logic(logic["adapter"]["id"])
+    time.sleep(READ_SPACING_SECONDS)
+    gate_out = read_logic(logic["gate"]["id"])
+
+    revision = validate_shadow_outputs(intent, adapter_out, gate_out)
+
+    subprocess.run([
+        "sudo", "systemctl", "enable", "--now",
+        "ems-heating-homey-shadow-publish.timer",
+    ], check=True)
+
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    config["lastValidatedAt"] = now
+    config["publisherTimerEnabledAt"] = now
+    config["publisherTimerEnabled"] = True
+    config["lastValidatedControlRevision"] = revision
+    save_config(config)
+
+    print()
+    print("PASS: Heating Pi -> Homey SHADOW READY resume validated")
+    print("intent:", logic["intent"]["id"], intent.get("status"), revision)
+    print("adapter:", logic["adapter"]["id"], adapter_out.get("status"))
+    print("gate:", logic["gate"]["id"], gate_out.get("finalStatus"))
+    print("adapter flow:", flows["adapter"]["id"])
+    print("gate flow:", flows["gate"]["id"])
+    print("publisher timer: enabled")
+    print("physicalWriteAllowed: false")
+    print("liveExecutionAllowed: false")
+    print("NOTE: no Homey object create/update and no Honeywell/device capability write")
+    return 0
+
+
 def install_pi_runtime():
     subprocess.run(
         ["sudo", "install", "-d", "-m", "0755", "/home/jeroen/ems/runtime/homey-deploy"],
@@ -473,10 +645,16 @@ def read_logic(var_id):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument(
         "--apply",
         action="store_true",
-        help="Create/update Homey Logic + Advanced Flows and enable publisher",
+        help="First-install create/update path for Homey Logic and Advanced Flows",
+    )
+    modes.add_argument(
+        "--resume-ready",
+        action="store_true",
+        help="Validate an existing READY SHADOW install with paced targeted readbacks, then enable publisher timer",
     )
     args = parser.parse_args()
 
@@ -486,7 +664,8 @@ def main():
         if not source.exists():
             raise RuntimeError(f"SOURCE_MISSING:{source}")
 
-    print("mode:", "APPLY" if args.apply else "DRY-RUN")
+    mode = "RESUME_READY" if args.resume_ready else "APPLY" if args.apply else "DRY-RUN"
+    print("mode:", mode)
     print("physical device writes: FORBIDDEN")
 
     config = load_config()
@@ -497,6 +676,9 @@ def main():
             + json.dumps(pending, separators=(",", ":"))
             + ":do not retry creation until the pending Homey object is reconciled"
         )
+
+    if args.resume_ready:
+        return resume_ready(config)
 
     logic = ensure_logic_variables(config, args.apply)
 
