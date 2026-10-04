@@ -78,10 +78,12 @@ Canonical thermostat IDs:
 
 ## Commissioning and Homey load
 
-The first installer is
+The installer is
 `services/pi/commissioning/install_heating_homey_shadow_chain_v0_1.py`.
-It is DRY-RUN by default. `--apply` is required for Logic/Advanced Flow and
-systemd writes.
+It is DRY-RUN by default. `--apply` creates or updates only the pinned
+Logic/Advanced Flow objects, installs the local publisher runtime and explicitly
+keeps the publisher timer disabled. Runtime activation is a separate
+`--resume` step.
 
 First commissioning performs no bulk Logic/Advanced Flow discovery. The live
 Homey collection response can be truncated, so first install bootstraps only
@@ -93,6 +95,22 @@ marker is cleared. An ambiguous interrupted create is therefore a hard stop
 requiring reconciliation rather than a duplicate-prone retry. Normal runtime
 thereafter uses targeted IDs only. Homey 429 is also a hard stop with no write
 retry.
+
+A READY installation is activated only through `--resume`. Resume performs
+paced targeted readback of the three pinned Logic IDs and two pinned Advanced
+Flow IDs, never bulk discovery. It then refreshes V0.5, performs exactly one
+SHADOW intent publish, waits for the event-driven Adapter/Gate chain and reads
+Intent, Adapter and Gate back with pacing. Promotion requires one identical
+`controlRevision`, Intent `valid=true/status=OK`, Adapter `status=PASS`,
+Gate `finalStatus=PASS/errors=[]`, and `deviceWrites=false`,
+`physicalWriteAllowed=false` and top-level `liveExecutionAllowed=false` at
+all three layers. Every command must still carry `physicalWrite=false`.
+
+The publisher timer is enabled only after all resume checks pass. A 429,
+revision mismatch, stale/fail-closed intent or any write-boundary mismatch stops
+resume with the timer disabled. Successful resume records `validatedAt`,
+`lastValidatedRevision` and `publisherTimerEnabled=true` in the host-local
+config.
 
 The Pi publisher runs at `:35`, after V0.5 at `:30`. It writes only the
 dedicated intent Logic variable. Homey Adapter/Gate execution is event-driven by
