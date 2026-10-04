@@ -150,7 +150,7 @@ def test_shadow_output_validation():
     )
 
 
-def test_resume_contains_no_homey_object_mutation():
+def test_resume_contains_no_structural_homey_mutation():
     source = inspect.getsource(m.resume_ready)
     for forbidden in (
         "create_variable",
@@ -168,7 +168,7 @@ def test_resume_contains_no_homey_object_mutation():
 def main():
     test_targeted_ready_readback()
     test_shadow_output_validation()
-    test_resume_contains_no_homey_object_mutation()
+    test_resume_contains_no_structural_homey_mutation()
     print("PASS: Heating Homey READY resume contract")
 
 
