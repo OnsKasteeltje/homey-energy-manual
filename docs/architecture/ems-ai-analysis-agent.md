@@ -51,6 +51,8 @@ Pi runtime
       |
       +--> /usr/local/bin/ems-performance
       +--> /usr/local/bin/ems-health
+      +--> /home/jeroen/ems/data/tesla-deadline-command.json
+      |       +--> current accepted EV user-intent command
       +--> planner-history.sqlite (frozen decision snapshots)
       +--> ems-history.sqlite measurements_15m + pv_forecast_v2_archive
       |
@@ -122,6 +124,28 @@ when evidence is insufficient. An observed export window is not by itself proof
 of an EMS fault.
 
 ## Evidence model
+
+### Current EV deadline command authority
+
+For questions about the **latest/current EV deadline command**, the AI evidence
+package includes `currentDeadlineCommand`, read directly from the canonical Pi
+runtime command file
+`/home/jeroen/ems/data/tesla-deadline-command.json`. This is the current
+accepted user-intent command and carries
+`provenanceClass=USER_INTENT_COMMAND` plus
+`authority=CURRENT_USER_INTENT_COMMAND`.
+
+This field is intentionally distinct from `evControlEvents`. EV control events
+are executor/realtime outputs such as target power, requested current, phase
+mode and physical-write evidence; they must never be described as the user's
+deadline command. `semanticEvents` remains the durable historical before/after
+record of deadline changes and provenance. The current command is included
+directly so questions about the latest command are not delayed by the
+once-per-minute semantic-event archive cadence.
+
+`currentDeadlineCommand` is exposed only for the current local day. Historical
+questions must use historical semantic/planner/telemetry evidence and must not
+project the current command backwards.
 
 ### Performance and electrical timeline
 

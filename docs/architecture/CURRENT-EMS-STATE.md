@@ -595,6 +595,17 @@ decision and performs no Logic/device/control writes. Realtime planner, Gate,
 actuator and physical-control ownership remain unchanged. `ems-health`
 monitors the semantic-event timer and its last oneshot execution.
 
+For latest/current EV-deadline questions, the AI evidence package also reads
+the canonical Pi runtime command
+`/home/jeroen/ems/data/tesla-deadline-command.json` directly as
+`currentDeadlineCommand`. This is the authority for the currently accepted
+user-intent command and is explicitly separate from Homey executor/realtime
+`evControlEvents`. Executor targets such as W/A/phase mode are never promoted
+to a user deadline command. Historical deadline changes remain sourced from
+`semanticEvents`; the current command is not projected backwards into earlier
+times or non-current days. This direct read is analysis-only and adds no write,
+planner or control authority.
+
 The current V0.4 evidence-quality semantics also require directly observed
 appliance state in `timeline5m` to be used when relevant to a power-event
 question. For example, `washerActive=true` is a recorded **Feit** that must
