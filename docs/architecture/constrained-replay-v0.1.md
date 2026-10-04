@@ -134,14 +134,20 @@ evidence is never converted into a performance conclusion.
 
 ## Temporal rules
 
-V0.1 uses high-resolution operational measurements, not the 15-minute
-capacity-planning backtest, because phase dwell/current response cannot be
-judged safely at quarter-hour granularity.
+V0.1 uses canonical sub-quarter-hour operational measurements, not the 15-minute
+capacity-planning backtest. The current operational cadence can be about five
+minutes, so V0.1 integrates valid measurement intervals up to ten minutes but
+uses durable EV-control events inside each measurement interval as additional
+classification boundaries. A control event is never carried beyond its bounded
+90-second evidence age.
 
 Defaults:
 
 - minimum export for classification: 250 W;
-- maximum measurement interval: 120 s;
+- maximum measurement interval accepted for energy integration: 600 s;
+- preferred attribution resolution: 120 s;
+- measurement intervals coarser than 120 s are segmented at EV-control-event and control-evidence-expiry boundaries;
+- otherwise-HIGH classifications sourced from a >120 s measurement interval are downgraded to MEDIUM confidence;
 - maximum EV-control evidence age: 90 s;
 - 1P mapping: 230 W/A;
 - 3P mapping: 690 W/A;
@@ -152,7 +158,11 @@ Defaults:
 - default 1P→3P dwell: 180 s.
 
 Where recorded controller values exist, the replay uses the event-specific
-values rather than inventing replacements.
+values rather than inventing replacements. The measurement value is held only
+across its accepted source interval for energy integration; control semantics
+may change within that interval at durable control-event boundaries. This keeps
+five-minute canonical history usable without pretending that it directly
+measures 120/180-second dwell behaviour.
 
 ## Output
 
