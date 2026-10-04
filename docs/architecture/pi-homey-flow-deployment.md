@@ -226,11 +226,18 @@ Use the lowest practical Homey API load:
 Heating control-contract V0.1 has no pre-existing Logic/Advanced Flow IDs.
 The controlled first installer
 `services/pi/commissioning/install_heating_homey_shadow_chain_v0_1.py`
-therefore may perform one bounded broad discovery during first commissioning to
-detect duplicate names and allocate the three dedicated string Logic variables.
-After creation, their IDs and the two new Advanced Flow IDs are pinned in
-`/home/jeroen/ems/data/heating-control-homey-shadow-config.json`. Normal
-runtime uses only targeted IDs.
+does **not** use bulk Logic or Advanced Flow discovery. The live Homey can emit
+a truncated large Logic collection, so collection-wide JSON is not accepted as
+a commissioning source of truth.
+
+On first APPLY, the installer creates only the source-controlled Heating SHADOW
+objects. Before each create it atomically records a host-local
+`pendingOperation` marker. After Homey returns an ID, the installer performs
+targeted readback, stores that exact ID in
+`/home/jeroen/ems/data/heating-control-homey-shadow-config.json`, clears the
+marker, and only then continues. If a create becomes ambiguous, the marker
+survives and the installer stops; it never retries that create blindly. All
+subsequent runs use targeted IDs only.
 
 The installer is DRY-RUN by default and requires `--apply` for Homey writes.
 Existing flows are targeted, backed up and verified by exact writable-state
