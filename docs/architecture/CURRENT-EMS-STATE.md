@@ -507,6 +507,15 @@ constraint. This is analysis-only normalization; the canonical EV deadline
 state machine, planner constraint logic, Homey executor and physical control
 paths are unchanged.
 
+The current V0.4 evidence-quality semantics also require directly observed
+appliance state in `timeline5m` to be used when relevant to a power-event
+question. For example, `washerActive=true` is a recorded **Feit** that must
+not be omitted from the explanation. It remains distinct from power
+attribution: without separate measured washer power, the AI may identify the
+active washer as a supported possible explanation but must not claim that it
+caused the measured P1 change. This changes analysis interpretation only; no
+evidence schema, polling, planner, Homey or physical-control route is added.
+
 Frontend V2 exposes the human interface at `/ai/`. Private Caddy ingress
 proxies `/agent/*` only to the loopback analysis service. Model credentials
 remain host-local under `/etc/ems/ai-agent.env` and must never be committed.
