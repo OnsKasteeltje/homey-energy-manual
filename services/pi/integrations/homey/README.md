@@ -94,7 +94,8 @@ If first commissioning already reached host-local `state=READY` but final
 post-publish readback was interrupted, `--resume-ready` validates only the
 pinned Logic/Flow IDs with paced targeted reads, performs one SHADOW publish,
 and enables the publisher timer only after Intent, Adapter and Gate pass on the
-same control revision. It performs no Homey object create/update.
+same control revision. The only Homey mutation in resume validation is the single
+normal SHADOW Intent Logic-value publish; no Logic/Flow structure is created or updated.
 
 
 ## Runtime compatibility
