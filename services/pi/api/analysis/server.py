@@ -63,6 +63,7 @@ Prefer exact local timestamps and quantitative values.
 An observed export window is not automatically an EMS fault; constraints may explain it.
 Use plannerDecisionWindow as historical intent evidence and never judge an earlier planner decision using a forecast generated later.
 Use forecastVsActual15m to distinguish forecast error from planner/control execution error when the evidence supports that distinction.
+For EV control questions, evControlEvents[].intentReason, realtimePhaseReason and realtimeCurrentReason are recorded Homey control reasons, not model inference. If a zero target/IDLE event has one of these reasons, use it before saying the underlying cause is unknown. Rolling available-power fields in the same event may support that reason but must not be invented when absent.
 Use flexContextWindow for historical Heating/WW eligibility and priority, and quookerEvents for Quooker adapter/actuator/detector evidence.
 When evidenceSelection.mode is EXPLICIT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally limited to the documented local window around clock times explicitly present in the user's question. Do not interpret absence outside that selected window as evidence that no activity occurred elsewhere in the day.
 Heating progression remains SHADOW. Quooker actuator evidence is versioned: use quookerEvents[].actuator.mode as the authority. For SHADOW evidence, desiredOn/wouldWrite is not a physical command. For LIVE evidence, physicalWritePerformed=true is direct proof that the Homey actuator executed a device write, while actualOnBefore/actualOnAfter describe the observed state transition. physicalWritePerformed=false may be an idempotent no-op when desired and actual state already matched. Detector HEATING is independent electrical evidence and must not by itself be described as a physical control write.
@@ -225,6 +226,56 @@ def _ev_telemetry(day):
         })
     return out[-180:]
 
+def _ev_intent_reason_context(raw_json):
+    context = {
+        "intentReason": None,
+        "intentSource": None,
+        "realtimeApplied": None,
+        "realtimePhaseReason": None,
+        "realtimeCurrentReason": None,
+        "realtimeAvailableTotalW": None,
+        "realtimeAvailableTotalAvg2mW": None,
+        "realtimeRollingReady": None,
+        "realtimeRollingCoverageMs": None,
+    }
+    if not raw_json:
+        return context
+    try:
+        payload = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+    except (json.JSONDecodeError, TypeError):
+        return context
+    if not isinstance(payload, dict):
+        return context
+
+    intent = payload.get("intent")
+    if not isinstance(intent, dict):
+        return context
+    projection = intent.get("policyProjection")
+    if not isinstance(projection, dict):
+        projection = {}
+    realtime = projection.get("realtime")
+    if not isinstance(realtime, dict):
+        realtime = {}
+    phase = realtime.get("phaseShadow")
+    if not isinstance(phase, dict):
+        phase = {}
+    targets = intent.get("targets")
+    ev = targets.get("ev") if isinstance(targets, dict) else {}
+    if not isinstance(ev, dict):
+        ev = {}
+
+    context["intentReason"] = projection.get("reason")
+    context["intentSource"] = ev.get("source")
+    context["realtimeApplied"] = realtime.get("applied")
+    context["realtimePhaseReason"] = phase.get("phaseReason") or phase.get("reason")
+    context["realtimeCurrentReason"] = phase.get("currentReason")
+    context["realtimeAvailableTotalW"] = phase.get("availableTotalW")
+    context["realtimeAvailableTotalAvg2mW"] = phase.get("availableTotalAvg2mW")
+    context["realtimeRollingReady"] = phase.get("rollingReady")
+    context["realtimeRollingCoverageMs"] = phase.get("rollingCoverageMs")
+    return context
+
+
 def _ev_control_events(day):
     start, end = _bounds(day)
     with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
@@ -243,7 +294,7 @@ def _ev_control_events(day):
                 actuator_phase_mode, actuator_confirmed_mode,
                 transition_stage, transition_failure, charge_state,
                 device_health_status, device_health_reason,
-                physical_write_performed
+                physical_write_performed, raw_json
             FROM ev_control_events
             WHERE ts_utc>=? AND ts_utc<?
             ORDER BY ts_utc
@@ -259,7 +310,7 @@ def _ev_control_events(day):
             actuator_status, actuator_reason, actuator_target_a,
             actuator_phase_mode, actuator_confirmed_mode,
             transition_stage, transition_failure, charge_state,
-            health_status, health_reason, physical_write,
+            health_status, health_reason, physical_write, raw_json,
         ) = row
         try:
             gate_errors = json.loads(gate_errors_json or "[]")
@@ -268,6 +319,7 @@ def _ev_control_events(day):
         local = datetime.fromisoformat(
             ts_text.replace("Z", "+00:00")
         ).astimezone(LOCAL_TZ)
+        intent_context = _ev_intent_reason_context(raw_json)
         out.append({
             "atLocal": local.isoformat(),
             "sourceRevision": source_revision,
@@ -288,6 +340,7 @@ def _ev_control_events(day):
             "deviceHealthStatus": health_status,
             "deviceHealthReason": health_reason,
             "physicalWritePerformed": physical_write == 1,
+            **intent_context,
         })
     return out
 
