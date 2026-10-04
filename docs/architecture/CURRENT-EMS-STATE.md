@@ -573,7 +573,10 @@ question-aware evidence selection to the four largest day-wide arrays:
 Only points within ±30 minutes of the explicit user times are transported to
 the model. A referential follow-up such as "dit tijdslot" may resolve one of
 those windows from the bounded recent conversation context and is then marked
-`CONTEXT_TIME_WINDOW`.
+`CONTEXT_TIME_WINDOW`. Topic filtering now runs after either explicit or
+contextual time scoping, so the window determines *when* while the detected
+topic set determines *which subsystem streams* remain. A PV/Flex-only time
+window therefore does not retain unrelated EV or Quooker evidence.
 
 Without an explicit/contextual time anchor, day-scope evidence is now bounded
 and topic-aware instead of transporting every available event. Event streams
