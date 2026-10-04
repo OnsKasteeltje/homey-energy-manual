@@ -229,19 +229,25 @@ Planner decisions are archived best-effort in `/home/jeroen/ems/data/planner-his
 Runtime validation on 2026-10-04 exposed that canonical operational power
 measurements are approximately five-minute cadence, while the initial V0.1
 candidate rejected every measurement interval over 120 seconds and therefore
-integrated zero hours. The corrected V0.1 accepts canonical measurement
+integrated zero hours. The cadence correction accepts canonical measurement
 intervals up to 600 seconds for energy integration, keeps 120 seconds as the
-preferred attribution resolution, segments coarse intervals at durable EV
-control-event boundaries and at the 90-second control-evidence expiry boundary,
-and downgrades otherwise-HIGH attribution confidence to MEDIUM when the
-underlying measurement interval exceeds 120 seconds. This preserves useful
-five-minute energy evidence without claiming direct 120/180-second measurement
-precision.
+preferred attribution resolution and segments coarse intervals at durable EV
+control state-change boundaries. The resulting replay integrated 22.5 hours
+and reproduced 6.8958 kWh observed export. Follow-up inspection showed that
+`ev_control_events` is intentionally semantically deduplicated: absence of a
+new row means no normalized control-state change, not a missing heartbeat.
+V0.1.1 therefore loads the latest pre-day state as a baseline and carries a
+known control state until the next durable change; age over 90 seconds reduces
+otherwise-HIGH confidence to MEDIUM instead of erasing the state. V0.1.1 also
+requires strictly positive proven additional capture before an actuator failure
+may be labelled `REAL_MISSED_OPPORTUNITY`; otherwise it is constraint-driven.
+This preserves useful five-minute energy evidence without claiming direct
+120/180-second measurement precision.
 
-Constrained Replay V0.1 is now a repository candidate for the first deterministic
+Constrained Replay V0.1.1 is now the repository candidate for the first deterministic
 short-timescale constrained replay. Canonical source is
 `services/pi/history/constrained_replay_v0_1.py`, schema
-`EMS_PI_CONSTRAINED_REPLAY_V0.1`, with explicit scope `EV_EXPORT_ONLY`.
+`EMS_PI_CONSTRAINED_REPLAY_V0.1.1`, with explicit scope `EV_EXPORT_ONLY`.
 It reads only `ems-history.sqlite/measurements`, durable
 `ev_control_events` and `semantic_events`; it performs no Homey/network,
 planner or device/control write. It classifies time-aligned observed export as
@@ -442,7 +448,7 @@ The planned battery architecture is Victron AC-coupled. When commissioned, Victr
 - WW ownership remains more distributed than EV ownership because Homey still carries substantial realtime WW state/safety policy.
 - PV forecast quality remains a follow-up item.
 - Planner schema V0.3 does not yet embed Homey `state_revision` / `source_sample_at` in the final decision output.
-- Constrained Replay V0.1 exists as a read-only EV-only candidate; runtime validation and later bounded AI-evidence integration remain open before it can replace the former 'future constrained replay' gap.
+- Constrained Replay V0.1.1 exists as a read-only EV-only candidate. V0.1 cadence/runtime integration is proven; V0.1.1 still needs one Pi replay validation before bounded AI-evidence integration.
 - Legacy backfill collectors remain source-only diagnostic/recovery tooling, not production live collectors.
 - Honeywell deployment must continue preserving host-local venv, credentials and OAuth cache.
 - Heating Thermal Learning still needs fine-grained empirical room-response data. The provisional 180-minute preheat horizon and <=0.5 °C steps must be evaluated in shadow against actual room temperature, Quatt activity, PV-export capture and rebound/reduced heating around the original Honeywell comfort time before any LIVE heating control is considered.
