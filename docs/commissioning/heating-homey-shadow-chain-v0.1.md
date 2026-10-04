@@ -135,6 +135,12 @@ tree while preserving the existing Homey authentication/config as read-only
 input. A notifier failure is transport failure and remains fail-closed; there
 is no retry that could mask a real Homey API error.
 
+Routine SHADOW transport is semantic, not heartbeat-driven. The one-minute timer still builds and validates the newest V0.5 intent locally, but it writes `EM2_Heating_Control_Intent` only when `controlRevision` changed since the last successful Homey write. An unchanged revision yields `publishStatus=SUPPRESSED_UNCHANGED` with no Homey call. The local cache is `/home/jeroen/ems/data/heating-homey-shadow-publish-cache.json`.
+
+On Homey 429 the attempted write remains failed and physical control remains impossible. The publisher stores a retry boundary and backs off consecutive attempts by 5, 15, 30 and 60 minutes. Invocations before `retryNotBefore` return `publishStatus=COOLDOWN_RATE_LIMIT` without touching Homey. A successful write resets the counter. No automatic immediate retry is permitted.
+
+For publisher-only source/systemd changes, commissioning supports `--runtime-only`. It requires the existing host-local state to be `READY`, performs no Homey Logic/Flow/device request, refreshes only the Pi publisher source and systemd units, and preserves the timer enabled/active state. This is the required deployment path when Homey itself is rate-limited.
+
 The upstream SHADOW minute chain is phase-locked to prevent false ordering
 failures: V0.3 runs at second `:00` on its five-minute refresh minute, Flex
 Priority at `:10`, V0.4 at `:20`, V0.5 at `:30`, and this publisher at
