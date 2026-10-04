@@ -95,6 +95,10 @@ def main():
     assert "omit washer/dryer state" in instructions
     assert "Never equate an active device state with measured power attribution" in instructions
     assert "evidenceSelection.mode is EXPLICIT_TIME_WINDOW" in instructions
+    assert "Recent conversation context" in instructions
+    assert "referential context only" in instructions
+    assert "TOPIC_DAY_SCOPE" in instructions
+    assert "omittedFields" in instructions
 
     day = date(2026, 10, 4)
     explicit = ai._explicit_question_anchors(
@@ -150,6 +154,120 @@ def main():
     assert len(fallback) == 1
     assert fallback[0].hour == 10
     assert fallback[0].minute == 0
+
+    context = ai._validate_conversation_context([
+        {
+            "role": "user",
+            "content": "De EV deadline loopt tot 17:00.",
+        },
+        {
+            "role": "assistant",
+            "content": "Om 16:45 zat de planner in dat tijdslot.",
+        },
+    ])
+    assert len(context) == 2
+    context_anchor = ai._context_followup_anchors(
+        "Waarom staat er in dit tijdslot geen waarde?",
+        day,
+        context,
+    )
+    assert len(context_anchor) == 1
+    assert context_anchor[0].hour == 16
+    assert context_anchor[0].minute == 45
+
+    assert ai._question_topics(
+        "is de deadline opdracht goed in de keten verwerkt?",
+        [],
+    ) == ["EV"]
+
+    followup_topics = ai._question_topics(
+        "waarom staat er op de PV&Flex pagina dan in dit tijdslot geen waarde?",
+        context,
+    )
+    assert "PV_FLEX" in followup_topics
+    assert "EV" in followup_topics
+
+    try:
+        ai._validate_conversation_context([
+            {
+                "role": "assistant",
+                "content": "x" * (ai.MAX_CONTEXT_MESSAGE_CHARS + 1),
+            }
+        ])
+        raise AssertionError("oversized context must fail")
+    except ValueError as exc:
+        assert str(exc) == "CONTEXT_INVALID"
+
+    bounded_source = [
+        {"id": index, "state": "A" if index < 50 else "B"}
+        for index in range(100)
+    ]
+    bounded = ai._bounded_points(
+        bounded_source,
+        10,
+        change_paths=(("state",),),
+    )
+    assert len(bounded) == 10
+    assert bounded[0]["id"] == 0
+    assert bounded[-1]["id"] == 99
+    assert any(item["state"] == "A" for item in bounded)
+    assert any(item["state"] == "B" for item in bounded)
+
+    def points(count, prefix):
+        return [
+            {
+                "atLocal": (
+                    f"2026-10-04T{index // 60:02d}:{index % 60:02d}:00+02:00"
+                ),
+                "id": f"{prefix}-{index}",
+            }
+            for index in range(count)
+        ]
+
+    ai._load_performance = lambda _day: {
+        "schema": "EMS_PI_DAY_PERFORMANCE_V0.1",
+        "surplusWindowsForReplay": [],
+    }
+    ai._ev_control_events = lambda _day: points(100, "control")
+    ai._ev_telemetry = lambda _day: points(100, "telemetry")
+    ai._quooker_events = lambda _day: points(100, "quooker")
+    ai._timeline = lambda _day: points(100, "timeline")
+    ai._planner_decision_window = lambda _day, _anchors: []
+    ai._flex_context_window = lambda _day, _anchors: [
+        {"id": index} for index in range(5)
+    ]
+    ai._forecast_vs_actual_15m = lambda _day, _anchors: {
+        "available": True,
+        "summary": {},
+        "slots": [],
+    }
+    ai._load_health = lambda: {
+        "schema": "EMS_PI_HEALTH_V0.1",
+        "status": "HEALTHY",
+    }
+
+    ev_evidence = ai.build_evidence(
+        day,
+        "is de deadline opdracht goed in de keten verwerkt?",
+        [],
+    )
+    assert ev_evidence["evidenceSelection"]["mode"] == "TOPIC_DAY_SCOPE"
+    assert ev_evidence["evidenceSelection"]["topics"] == ["EV"]
+    assert len(ev_evidence["evControlEvents"]) <= ai.DAY_SCOPE_LIMITS["evControlEvents"]
+    assert len(ev_evidence["evTelemetry5m"]) <= ai.DAY_SCOPE_LIMITS["evTelemetry5m"]
+    assert ev_evidence["quookerEvents"] == []
+    assert len(ev_evidence["flexContextWindow"]) <= ai.DAY_SCOPE_LIMITS["flexContextWindow"]
+
+    pv_evidence = ai.build_evidence(
+        day,
+        "waarom staat er op de PV&Flex pagina geen waarde?",
+        [],
+    )
+    assert pv_evidence["evidenceSelection"]["mode"] == "TOPIC_DAY_SCOPE"
+    assert "PV_FLEX" in pv_evidence["evidenceSelection"]["topics"]
+    assert pv_evidence["evControlEvents"] == []
+    assert pv_evidence["evTelemetry5m"] == []
+    assert pv_evidence["quookerEvents"] == []
 
     maxed = {
         "id": "resp_test_max",
