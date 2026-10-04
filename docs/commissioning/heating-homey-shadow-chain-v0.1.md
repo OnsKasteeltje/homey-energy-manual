@@ -83,11 +83,16 @@ The first installer is
 It is DRY-RUN by default. `--apply` is required for Logic/Advanced Flow and
 systemd writes.
 
-First commissioning may perform one broad Logic/Advanced Flow discovery because
-stable IDs do not yet exist. The resulting IDs are pinned in
-`/home/jeroen/ems/data/heating-control-homey-shadow-config.json`. Normal
-runtime thereafter uses targeted IDs only. Homey 429 is a hard stop with no
-write retry.
+First commissioning performs no bulk Logic/Advanced Flow discovery. The live
+Homey collection response can be truncated, so first install bootstraps only
+the dedicated source-controlled SHADOW objects. Each create is preceded by an
+atomic host-local `pendingOperation` marker; the returned ID is then verified
+with targeted readback, persisted in
+`/home/jeroen/ems/data/heating-control-homey-shadow-config.json`, and the
+marker is cleared. An ambiguous interrupted create is therefore a hard stop
+requiring reconciliation rather than a duplicate-prone retry. Normal runtime
+thereafter uses targeted IDs only. Homey 429 is also a hard stop with no write
+retry.
 
 The Pi publisher runs at `:35`, after V0.5 at `:30`. It writes only the
 dedicated intent Logic variable. Homey Adapter/Gate execution is event-driven by
