@@ -453,6 +453,12 @@ def pv_flex_analysis_resource(value):
                 "coverage": 0.0,
             },
             "devices": {"evPowerW": None, "boilerPowerW": None},
+            "heatingFlex": {
+                "opportunity": False,
+                "intent": False,
+                "opportunityRooms": [],
+                "intentRooms": [],
+            },
             "forecast": None,
         }
         cursor = nxt
@@ -516,7 +522,10 @@ def pv_flex_analysis_resource(value):
         if quality == "gap":
             gap_count += 1
             continue
-        if quality != "observed":
+        if quality == "discontinuity":
+            discontinuity_count += 1
+            continue
+        if quality not in {"observed", "held"}:
             discontinuity_count += 1
             continue
         row_seconds = max(1.0, (row_end - row_start).total_seconds())
@@ -580,6 +589,102 @@ def pv_flex_analysis_resource(value):
                 if parse_timestamp(generated_at) else None,
             }
 
+    # Project the already persisted Heating V0.4 opportunity/step history
+    # onto the same 15-minute observability timeline. This is presentation
+    # only: no opportunity or intent is reconstructed from current state.
+    heating_history_status = "UNAVAILABLE"
+    try:
+        heating_history = heating_preheat_progression_resource()
+    except (OSError, json.JSONDecodeError, ValueError):
+        heating_history = None
+
+    def mark_heating_interval(
+        room,
+        start_value,
+        end_value,
+        *,
+        kind,
+        target_c,
+        outcome=None,
+        reason=None,
+    ):
+        interval_start = parse_timestamp(start_value)
+        interval_end = parse_timestamp(end_value)
+        if (
+            interval_start is None
+            or interval_end is None
+            or interval_end <= interval_start
+        ):
+            return
+
+        for item in slots.values():
+            slot_start = parse_timestamp(item["start"])
+            slot_end = parse_timestamp(item["end"])
+            if slot_start is None or slot_end is None:
+                continue
+            if max(interval_start, slot_start) >= min(interval_end, slot_end):
+                continue
+
+            entry = {
+                "key": room.get("key"),
+                "displayName": room.get("displayName") or room.get("key"),
+                "target_C": target_c,
+                "start": start_value,
+                "end": end_value,
+            }
+
+            if kind == "intent":
+                entry["outcome"] = outcome
+                entry["reason"] = reason
+                field = "intentRooms"
+                flag = "intent"
+            else:
+                field = "opportunityRooms"
+                flag = "opportunity"
+
+            bucket = item["heatingFlex"]
+            bucket[flag] = True
+            if entry not in bucket[field]:
+                bucket[field].append(entry)
+
+    if heating_history is not None:
+        heating_history_status = "INTEGRATED"
+
+        for room in heating_history.get("rooms") or []:
+            for interval in room.get("opportunityHistory") or []:
+                mark_heating_interval(
+                    room,
+                    interval.get("opensAt"),
+                    interval.get("closesAt"),
+                    kind="opportunity",
+                    target_c=interval.get("target_C"),
+                )
+
+            for interval in room.get("stepHistory") or []:
+                mark_heating_interval(
+                    room,
+                    interval.get("startedAt"),
+                    interval.get("endedAt"),
+                    kind="intent",
+                    target_c=interval.get("target_C"),
+                    outcome=interval.get("outcome"),
+                    reason=interval.get("reason"),
+                )
+
+            progression = room.get("progression") or {}
+            active_target = progression.get("activeStepTarget_C")
+            active_started = progression.get("activeStepStartedAt")
+            if active_target is not None and active_started:
+                mark_heating_interval(
+                    room,
+                    active_started,
+                    heating_history.get("generatedAt"),
+                    kind="intent",
+                    target_c=active_target,
+                    outcome="ACTIVE",
+                    reason=progression.get("reason"),
+                )
+
     series = list(slots.values())
     totals = {
         name: round(sum(slot["actual"][name] for slot in series), 6)
@@ -618,9 +723,9 @@ def pv_flex_analysis_resource(value):
             "ev": {"actualSource": "measurements_15m:tesla/electrical_power_w"},
             "ww": {"actualSource": "measurements_15m:boiler/electrical_power_w"},
             "heatingFlex": {
-                "status": "SOURCE_NOT_YET_INTEGRATED",
-                "actualSource": None,
-                "note": "No Heating Flex events are inferred or fabricated.",
+                "status": heating_history_status,
+                "actualSource": "heating-preheat-progression-shadow-v0.4:opportunityHistory+stepHistory",
+                "note": "Persisted V0.4 opportunity/step intervals only; no historical Heating events are inferred.",
             },
         },
         "quality": {

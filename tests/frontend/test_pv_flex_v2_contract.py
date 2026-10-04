@@ -7,7 +7,7 @@ state=Path("frontend/pv-flex/state/pv-flex-state.js").read_text()
 render=Path("frontend/pv-flex/render/pv-flex.js").read_text()
 css=Path("frontend/pv-flex/styles/pv-flex.css").read_text()
 
-for token in ("PV & Flex Analyse","Forecast versus werkelijk PV-gebruik","EV uit PV","Overig eigen gebruik","Export","HEATING PREHEAT V0.3 · SHADOW","Voorverwarming"):
+for token in ("PV & Flex Analyse","Forecast versus werkelijk PV-gebruik","EV uit PV","Overig eigen gebruik","Export","Heating opportunity","Heating intent","HEATING PREHEAT V0.3 · SHADOW","Voorverwarming"):
     assert token in index, token
 for removed in ("flex-panel","ww-lane","evlane","EV laden","heating-note","WW boiler","Heating Flex"):
     assert removed not in index, f"duplicate/legacy render surface remains: {removed}"
@@ -23,6 +23,10 @@ assert 'EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1' in state
 assert "forecast?.confidence" in render
 assert 'function lane(' not in render
 assert 'evPowerW' in render
+assert 'heatingFlex' in render
+assert 'actualKnown' in render
+assert 'heating-opportunity-lane' in render
+assert 'heating-intent-lane' in render
 assert 'loadHeatingPreheatShadow' in render
 assert 'loadFlexPriorityShadow' in render
 assert 'loadHeatingPreheatProgressionShadow' in render
@@ -38,13 +42,15 @@ assert 'SHADOW_GRANT' in render
 assert 'Kamer niet klaar voor planner-grant' in render
 assert 'Planner:' in render
 assert 'PREHEAT_READY_FOR_GRANT' in render
-assert 'Volgende shadow-stap' in render
+assert 'Volgende V0.4-stap' in render
 assert 'Planner grant' in render
 assert 'CV actief' in render
 assert 'Tesla werkelijk' in render
 assert 'evPvW' in render
 assert 'class:cls' in render
 assert '.pv-ev' in css and '.pv-self' in css and '.pv-export' in css
+assert '.heating-opportunity-lane' in css
+assert '.heating-intent-lane' in css
 assert '.preheat-room' in css and '.preheat-state' in css
 assert '.evbar' not in css and '.evlane' not in css
 assert 'boilerPowerW' not in render

@@ -10,15 +10,17 @@ function summary(d){
  $("quality").textContent=`Dekking ${pct(d.quality.actualCoverage)}`; $("next").disabled=day>=todayAmsterdam();
 }
 function slotAllocation(x){
- const pvW=Math.max(0,Number(x.actual.pvKWh||0)*4000);
- const exportW=Math.min(pvW,Math.max(0,Number(x.actual.exportKWh||0)*4000));
+ const coverage=Number(x.actual?.coverage||0);
+ const actualKnown=Number.isFinite(coverage)&&coverage>0;
+ const pvW=actualKnown?Math.max(0,Number(x.actual.pvKWh||0)*4000):0;
+ const exportW=actualKnown?Math.min(pvW,Math.max(0,Number(x.actual.exportKWh||0)*4000)):0;
  const directPvW=Math.max(0,pvW-exportW);
- const houseW=Math.max(0,Number(x.actual.houseKWh||0)*4000);
+ const houseW=actualKnown?Math.max(0,Number(x.actual.houseKWh||0)*4000):0;
  const evActualW=(typeof x.devices?.evPowerW==="number"&&Number.isFinite(x.devices.evPowerW))?Math.max(0,x.devices.evPowerW):0;
  const nonEvHouseW=Math.max(0,houseW-evActualW);
- const evPvW=Math.min(evActualW,directPvW,Math.max(0,pvW-nonEvHouseW));
- const otherPvW=Math.max(0,directPvW-evPvW);
- return {pvW,exportW,directPvW,houseW,evActualW,evPvW,otherPvW};
+ const evPvW=actualKnown?Math.min(evActualW,directPvW,Math.max(0,pvW-nonEvHouseW)):0;
+ const otherPvW=actualKnown?Math.max(0,directPvW-evPvW):0;
+ return {pvW,exportW,directPvW,houseW,evActualW,evPvW,otherPvW,actualKnown,coverage};
 }
 function chart(d){
  const svg=$("pv-chart"), tip=$("tooltip"), a=d.series; svg.replaceChildren(); const has=a.some(x=>x.actual.coverage>0||x.forecast); $("empty").hidden=has; svg.hidden=!has;if(!has)return;
@@ -30,6 +32,9 @@ function chart(d){
  const step=iw/a.length, points=[];
  a.forEach((x,i)=>{
   const cx=p.l+(i+.5)*step,s=allocated[i],barW=step*.68;
+  const heat=x.heatingFlex||{};
+  if(heat.opportunity)add("rect",{x:p.l+i*step,y:p.t+ih+4,width:step,height:5,class:"heating-opportunity-lane"});
+  if(heat.intent)add("rect",{x:p.l+i*step,y:p.t+ih+12,width:step,height:5,class:"heating-intent-lane"});
   let y=p.t+ih;
   for(const [w,cls] of [[s.evPvW,"pv-ev"],[s.otherPvW,"pv-self"],[s.exportW,"pv-export"]]){
    const h=w/max*ih;
@@ -40,8 +45,17 @@ function chart(d){
   const hit=add("rect",{x:p.l+i*step,y:p.t,width:step,height:ih,class:"hit"});
   hit.addEventListener("mousemove",e=>{
    const forecast=x.forecast?(x.forecast.pvForecastW/1000).toFixed(2)+" kW":"—";
+   const actualPv=s.actualKnown?(s.pvW/1000).toFixed(2)+" kW":"—";
+   const evPv=s.actualKnown?(s.evPvW/1000).toFixed(2)+" kW":"—";
+   const otherPv=s.actualKnown?(s.otherPvW/1000).toFixed(2)+" kW":"—";
+   const exportPv=s.actualKnown?(s.exportW/1000).toFixed(2)+" kW":"—";
+   const heatingOpportunity=(heat.opportunityRooms||[]).map(r=>r.displayName||r.key).join(", ")||"—";
+   const heatingIntent=(heat.intentRooms||[]).map(r=>{
+    const target=Number(r.target_C);
+    return Number.isFinite(target)?`${r.displayName||r.key} ${target.toFixed(1)} °C`:(r.displayName||r.key);
+   }).join(", ")||"—";
    tip.hidden=false;
-   tip.innerHTML=`<strong>${time(x.start)}</strong><span>PV werkelijk ${(s.pvW/1000).toFixed(2)} kW</span><span>Forecast ${forecast}</span><span>EV uit PV ${(s.evPvW/1000).toFixed(2)} kW</span><span>Tesla werkelijk ${(s.evActualW/1000).toFixed(2)} kW</span><span>Overig eigen PV ${(s.otherPvW/1000).toFixed(2)} kW</span><span>Export ${(s.exportW/1000).toFixed(2)} kW</span><span>Confidence ${x.forecast?.confidence!=null?Math.round(x.forecast.confidence*100)+"%":"—"}</span><span>Lead ${x.forecast?.leadMinutes??"—"} min</span>`;
+   tip.innerHTML=`<strong>${time(x.start)}</strong><span>PV werkelijk ${actualPv}</span><span>Dekking werkelijk ${Math.round(s.coverage*100)}%</span><span>Forecast ${forecast}</span><span>EV uit PV ${evPv}</span><span>Tesla werkelijk ${(s.evActualW/1000).toFixed(2)} kW</span><span>Overig eigen PV ${otherPv}</span><span>Export ${exportPv}</span><span>Heating opportunity ${heatingOpportunity}</span><span>Heating intent ${heatingIntent}</span><span>Confidence ${x.forecast?.confidence!=null?Math.round(x.forecast.confidence*100)+"%":"—"}</span><span>Lead ${x.forecast?.leadMinutes??"—"} min</span>`;
    const r=svg.parentElement.getBoundingClientRect();tip.style.left=`${Math.min(r.width-210,Math.max(8,e.clientX-r.left+10))}px`;tip.style.top=`${Math.max(8,e.clientY-r.top-110)}px`;
   });
   hit.addEventListener("mouseleave",()=>tip.hidden=true);

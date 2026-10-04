@@ -170,7 +170,7 @@ The page must make it possible to verify that EMS shifts existing future heat de
 
 1. **Correct Live semantics** — split Net/P1 from derived Huis; introduce PV quality; show unknown household consumption when PV is insufficient; restore visible EMS decision/reason.
 2. **Complete Planner observability** — expose joint EV/WW/heating plan and constraints on the forecast timeline as the Planner V2 contracts become available.
-3. **Complete PV & Flex validation** — add P1 and planned-versus-actual flex lanes; integrate Heating history; add well-defined EMS outcome KPIs.
+3. **Complete PV & Flex validation** — persisted Heating opportunity/intent history is integrated; next add P1 and broader planned-versus-actual flex lanes plus well-defined EMS outcome KPIs.
 4. **Complete Heating Flex observability** — baseline, actual room state, preheat, PV/P1 and Quatt on one timeline.
 5. **Strengthen Historie KPIs** — self-consumption, self-sufficiency, flex energy and fixed-contract economic outcome.
 6. **Only then optimise presentation polish** — visual refinement must follow semantic correctness and validation value.
