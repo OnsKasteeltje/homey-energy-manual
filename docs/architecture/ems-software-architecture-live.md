@@ -91,6 +91,20 @@ De Pi combineert runtime-state, forecasts en historie en optimaliseert flexibele
 
 De canonical operationele historie staat in `/home/jeroen/ems/data/ems-history.sqlite`. Geaccepteerde Homey Core pushes schrijven de raw `measurements`; automatische Homey Insights/day-history polling is geen production transport. Afgeleide historie wordt uitsluitend lokaal op de Pi opgebouwd: `services/pi/history/build_15m_history.py` schrijft `measurements_15m`, `services/pi/history/build_house_energy_history.py` schrijft `house_energy_intervals` uit de vijf cumulatieve P1/PV-counters en `services/pi/history/build_daily_energy_history.py` schrijft `daily_energy_history`. `ems-history-15m.service` voert de 15-minuten- en huishoudhistoriebuilder samen uit op de bestaande kwartiercadans; de daily builder behoudt zijn eigen timer. Deze afgeleide builders zijn failure-isolated van realtime state ingest en control. Frontend V2 leest huishoudhistorie uitsluitend via de read-only Web Data API (`EMS_WEB_HISTORY_V1`), niet rechtstreeks uit SQLite of GitHub.
 
+Een aparte read-only analysis boundary is voorbereid met Constrained Replay
+V0.1 onder `services/pi/history/constrained_replay_v0_1.py`. Deze component
+is geen planner en geen optimizer in de realtime control-loop. Hij gebruikt
+high-resolution canonical P1/Tesla measurements plus durable EV control-events
+en semantic events om historische export deterministisch te classificeren als
+`UNAVOIDABLE_EXPORT`, `CONSTRAINT_DRIVEN_EXPORT`,
+`REAL_MISSED_OPPORTUNITY` of `INSUFFICIENT_EVIDENCE`. V0.1 is expliciet
+`EV_EXPORT_ONLY`; “unavoidable” betekent alleen dat de gemodelleerde EV-route
+geen extra opname kon leveren. Het resultaat is derived analysis state en mag
+niet door planner, Gate of actuator worden geconsumeerd. De bestaande
+PV-surplus absorption backtest blijft een andere, langere-horizon
+capacity/allocation-analyse. AI-integratie volgt pas na Pi-runtimevalidatie van
+de replay-output.
+
 Hoofdobjectief:
 
 ```text
