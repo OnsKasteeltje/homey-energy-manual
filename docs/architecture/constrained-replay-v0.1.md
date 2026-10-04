@@ -1,6 +1,6 @@
 # Constrained Replay V0.1.1 — deterministic EV export attribution
 
-Status: **CANDIDATE / READ_ONLY — V0.1 runtime validated; V0.1.1 semantic correction requires runtime replay validation**
+Status: **V0.1.1 RUNTIME VALIDATED / READ_ONLY — bounded AI-evidence integration candidate**
 
 ## Purpose
 
@@ -260,10 +260,28 @@ Runtime, after normal Pi deployment:
 6. results for 2026-10-04 are replayed again and reviewed against the already manually analysed
    EV/PV export behaviour before AI integration is enabled.
 
+## V0.1.1 production validation result
+
+The 2026-10-04 Pi replay validated the corrected semantics against the same
+canonical day:
+
+- 22.75 integrated hours;
+- 6.8958 kWh observed grid export;
+- 5.1359 kWh `CONSTRAINT_DRIVEN_EXPORT`;
+- 1.3829 kWh EV-relative `UNAVOIDABLE_EXPORT`;
+- 0.2200 kWh `REAL_MISSED_OPPORTUNITY`;
+- 0.0000 kWh `INSUFFICIENT_EVIDENCE`;
+- 0.1887 kWh bounded additional feasible EV capture.
+
+The replay loaded a pre-day control baseline, carried semantic control state
+forward across 35 segments, and retained zero insufficient-evidence export.
+All real-missed windows had strictly positive bounded extra capture.
+
 ## Next step after runtime validation
 
-Only after V0.1 runtime output is validated should the AI evidence builder gain
-a bounded `constrainedReplay` field.
+V0.1.1 runtime output is validated. The next candidate change adds a bounded
+`constrainedReplay` field to the AI evidence builder without changing replay
+classification or control authority.
 
 The proactive/daily analyst remains a later step. It must consume deterministic
 replay results rather than independently guessing missed opportunities.
