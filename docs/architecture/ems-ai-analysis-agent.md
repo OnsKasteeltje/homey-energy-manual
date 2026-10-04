@@ -63,6 +63,32 @@ configured language model
 Frontend V2 uses the same private LAN/Tailscale ingress as V0.1. GitHub is not
 a runtime evidence transport for the AI agent.
 
+### V2 conversation continuity
+
+Frontend V2 keeps the visible AI conversation in browser `sessionStorage`, so
+switching to another V2 page and returning in the same tab does not erase the
+question/answer history.
+
+Long-running model requests use a browser-generated `requestId`. When present,
+the analysis service records only the UI job lifecycle/result in the local
+`/home/jeroen/ems/data/ai-analysis-jobs.sqlite` cache. This cache is not EMS
+measurement, planner or control state and is never consumed by realtime EMS
+logic. Completed entries are retained for at most 24 hours.
+
+`POST /agent/ask` remains compatible with requests that omit `requestId`.
+With a request ID it becomes idempotent: a duplicate request cannot start a
+second model call while the first is pending, and a completed response is
+returned from the local job cache. `GET /agent/result?requestId=...` lets the
+browser recover a pending/completed result after page navigation. A pending job
+older than the bounded stale interval may be reclaimed with the same ID, which
+covers an AI-service/Pi restart without creating an unbounded duplicate path.
+
+The result is persisted before the HTTP response is written. Therefore a
+browser disconnect during navigation may discard its socket without discarding
+the completed analysis. The AI service remains read-only with respect to EMS
+state and physical control; this bounded UI result cache is the only write added
+for navigation continuity.
+
 ## Safety boundary
 
 - `readOnly=true`

@@ -18,7 +18,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib import error as urlerror
 from urllib import request as urlrequest
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
 HOST = os.environ.get("EMS_AI_HOST", "127.0.0.1")
@@ -30,6 +30,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_RESPONSES_URL = os.environ.get("OPENAI_RESPONSES_URL", "https://api.openai.com/v1/responses")
 HISTORY_DB = os.environ.get("EMS_HISTORY_DB", "/home/jeroen/ems/data/ems-history.sqlite")
 PLANNER_DB = os.environ.get("EMS_PLANNER_DB", "/home/jeroen/ems/data/planner-history.sqlite")
+JOBS_DB = os.environ.get("EMS_AI_JOBS_DB", "/home/jeroen/ems/data/ai-analysis-jobs.sqlite")
 PERFORMANCE_COMMAND = os.environ.get("EMS_PERFORMANCE_COMMAND", "/usr/local/bin/ems-performance")
 HEALTH_COMMAND = os.environ.get("EMS_HEALTH_COMMAND", "/usr/local/bin/ems-health")
 LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
@@ -38,6 +39,10 @@ SCHEMA = "EMS_AI_ANALYSIS_V0.4"
 EVIDENCE_SCHEMA = "EMS_AI_EVIDENCE_V0.4"
 MAX_BODY_BYTES = 16 * 1024
 MAX_QUESTION_CHARS = 1200
+MAX_REQUEST_ID_CHARS = 80
+JOB_RETENTION_HOURS = 24
+JOB_PENDING_STALE_SECONDS = 180
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 
 SYSTEM_INSTRUCTIONS = """You are the read-only analysis layer for a household Energy Management System.
 Answer in Dutch unless the user's question is clearly in another language.
@@ -969,6 +974,236 @@ def build_evidence(day, question=""):
         ],
     }
 
+
+def _job_now():
+    return datetime.now(timezone.utc)
+
+
+def _ensure_job_schema(db):
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS analysis_jobs (
+            request_id TEXT PRIMARY KEY,
+            question TEXT NOT NULL,
+            day_local TEXT NOT NULL,
+            status TEXT NOT NULL,
+            response_json TEXT,
+            error_reason TEXT,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_analysis_jobs_updated
+        ON analysis_jobs(updated_at_utc)
+        """
+    )
+
+
+def _validate_request_id(value):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("REQUEST_ID_INVALID")
+    value = value.strip()
+    if (
+        not value
+        or len(value) > MAX_REQUEST_ID_CHARS
+        or _REQUEST_ID_RE.fullmatch(value) is None
+    ):
+        raise ValueError("REQUEST_ID_INVALID")
+    return value
+
+
+def _job_cleanup(db, now):
+    cutoff = _iso_z(now - timedelta(hours=JOB_RETENTION_HOURS))
+    db.execute(
+        "DELETE FROM analysis_jobs WHERE updated_at_utc < ?",
+        (cutoff,),
+    )
+
+
+def _job_claim(request_id, question, day):
+    now = _job_now()
+    now_text = _iso_z(now)
+    day_text = day.isoformat()
+
+    with sqlite3.connect(JOBS_DB, timeout=3.0) as db:
+        db.execute("PRAGMA busy_timeout=3000")
+        _ensure_job_schema(db)
+        _job_cleanup(db, now)
+        cur = db.execute(
+            """
+            INSERT OR IGNORE INTO analysis_jobs (
+                request_id,question,day_local,status,
+                response_json,error_reason,created_at_utc,updated_at_utc
+            )
+            VALUES (?, ?, ?, 'PENDING', NULL, NULL, ?, ?)
+            """,
+            (request_id, question, day_text, now_text, now_text),
+        )
+        if cur.rowcount == 1:
+            db.commit()
+            return {"claimed": True, "status": "PENDING"}
+
+        row = db.execute(
+            """
+            SELECT question,day_local,status,response_json,error_reason,updated_at_utc
+            FROM analysis_jobs
+            WHERE request_id=?
+            """,
+            (request_id,),
+        ).fetchone()
+
+        if row is None:
+            raise RuntimeError("ANALYSIS_JOB_LOOKUP_FAILED")
+
+        old_question, old_day, status, response_json, error_reason, updated_text = row
+        if old_question != question or old_day != day_text:
+            raise ValueError("REQUEST_ID_CONFLICT")
+
+        if status == "PENDING":
+            updated = _parse_ts(updated_text)
+            stale = (
+                updated is None
+                or (now - updated.astimezone(timezone.utc)).total_seconds()
+                > JOB_PENDING_STALE_SECONDS
+            )
+            if stale:
+                db.execute(
+                    """
+                    UPDATE analysis_jobs
+                    SET response_json=NULL,error_reason=NULL,updated_at_utc=?
+                    WHERE request_id=?
+                    """,
+                    (now_text, request_id),
+                )
+                db.commit()
+                return {"claimed": True, "status": "PENDING", "reclaimed": True}
+
+        db.commit()
+        return {
+            "claimed": False,
+            "status": status,
+            "response": (
+                json.loads(response_json)
+                if status == "OK" and response_json
+                else None
+            ),
+            "reason": error_reason,
+        }
+
+
+def _job_complete(request_id, response):
+    now_text = _iso_z(_job_now())
+    encoded = json.dumps(
+        response, separators=(",", ":"), ensure_ascii=False
+    )
+    with sqlite3.connect(JOBS_DB, timeout=3.0) as db:
+        db.execute("PRAGMA busy_timeout=3000")
+        _ensure_job_schema(db)
+        db.execute(
+            """
+            UPDATE analysis_jobs
+            SET status='OK',response_json=?,error_reason=NULL,updated_at_utc=?
+            WHERE request_id=?
+            """,
+            (encoded, now_text, request_id),
+        )
+        db.commit()
+
+
+def _job_fail(request_id, reason):
+    now_text = _iso_z(_job_now())
+    with sqlite3.connect(JOBS_DB, timeout=3.0) as db:
+        db.execute("PRAGMA busy_timeout=3000")
+        _ensure_job_schema(db)
+        db.execute(
+            """
+            UPDATE analysis_jobs
+            SET status='ERROR',response_json=NULL,error_reason=?,updated_at_utc=?
+            WHERE request_id=?
+            """,
+            (str(reason)[:500], now_text, request_id),
+        )
+        db.commit()
+
+
+def _job_get(request_id):
+    with sqlite3.connect(JOBS_DB, timeout=3.0) as db:
+        db.execute("PRAGMA busy_timeout=3000")
+        _ensure_job_schema(db)
+        row = db.execute(
+            """
+            SELECT status,response_json,error_reason,updated_at_utc
+            FROM analysis_jobs
+            WHERE request_id=?
+            """,
+            (request_id,),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    status, response_json, error_reason, updated_at = row
+    public_status = status
+    if status == "PENDING":
+        updated = _parse_ts(updated_at)
+        if (
+            updated is None
+            or (_job_now() - updated.astimezone(timezone.utc)).total_seconds()
+            > JOB_PENDING_STALE_SECONDS
+        ):
+            public_status = "STALE"
+
+    return {
+        "status": public_status,
+        "response": (
+            json.loads(response_json)
+            if status == "OK" and response_json
+            else None
+        ),
+        "reason": error_reason,
+        "updatedAt": updated_at,
+    }
+
+
+def _evidence_summary(evidence):
+    return {
+        "performanceSchema": evidence["performance"].get("schema"),
+        "timelinePoints": len(evidence["timeline5m"]),
+        "evTelemetryPoints": len(evidence["evTelemetry5m"]),
+        "evControlEvents": len(evidence["evControlEvents"]),
+        "quookerEvents": len(evidence["quookerEvents"]),
+        "plannerDecisionPoints": len(evidence["plannerDecisionWindow"]),
+        "flexContextPoints": len(evidence["flexContextWindow"]),
+        "forecastComparisonSlots": len(
+            evidence["forecastVsActual15m"].get("slots") or []
+        ),
+        "piHealthStatus": evidence["piHealthCurrent"].get("status"),
+        "limitations": evidence["limitations"],
+    }
+
+
+def _analysis_response(day, answer, response_id, evidence, request_id=None):
+    result = {
+        "schema": SCHEMA,
+        "status": "OK",
+        "readOnly": True,
+        "controlWrites": False,
+        "dateLocal": day.isoformat(),
+        "model": MODEL,
+        "modelResponseId": response_id,
+        "answer": answer,
+        "evidenceSummary": _evidence_summary(evidence),
+    }
+    if request_id is not None:
+        result["requestId"] = request_id
+    return result
+
+
 def _extract_output_text(payload):
     texts = []
     for item in payload.get("output") or []:
@@ -1032,7 +1267,12 @@ def send_json(handler, status, payload):
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     if handler.command != "HEAD":
-        handler.wfile.write(body)
+        try:
+            handler.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            # The browser may navigate away while a model request finishes.
+            # The result is already persisted when requestId was supplied.
+            return
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "EMSAIAnalysis"
@@ -1049,61 +1289,186 @@ class Handler(BaseHTTPRequestHandler):
                 "model": MODEL,
             })
             return
-        send_json(self, 404, {"schema": SCHEMA, "status": "ERROR", "reason": "NOT_FOUND"})
+
+        if path.path == "/agent/result":
+            query = parse_qs(path.query, keep_blank_values=False)
+            values = query.get("requestId") or []
+            try:
+                request_id = _validate_request_id(values[0] if len(values) == 1 else None)
+            except ValueError as exc:
+                send_json(self, 400, {
+                    "schema": SCHEMA,
+                    "status": "ERROR",
+                    "reason": str(exc),
+                })
+                return
+            if request_id is None:
+                send_json(self, 400, {
+                    "schema": SCHEMA,
+                    "status": "ERROR",
+                    "reason": "REQUEST_ID_REQUIRED",
+                })
+                return
+
+            try:
+                job = _job_get(request_id)
+            except sqlite3.Error:
+                send_json(self, 500, {
+                    "schema": SCHEMA,
+                    "status": "UNAVAILABLE",
+                    "reason": "ANALYSIS_JOB_STORE_FAILED",
+                })
+                return
+
+            if job is None:
+                send_json(self, 404, {
+                    "schema": SCHEMA,
+                    "status": "NOT_FOUND",
+                    "requestId": request_id,
+                })
+                return
+            if job["status"] == "PENDING":
+                send_json(self, 202, {
+                    "schema": SCHEMA,
+                    "status": "PENDING",
+                    "requestId": request_id,
+                    "updatedAt": job.get("updatedAt"),
+                })
+                return
+            if job["status"] == "STALE":
+                send_json(self, 409, {
+                    "schema": SCHEMA,
+                    "status": "STALE",
+                    "requestId": request_id,
+                    "updatedAt": job.get("updatedAt"),
+                })
+                return
+            if job["status"] == "OK" and isinstance(job.get("response"), dict):
+                send_json(self, 200, job["response"])
+                return
+
+            send_json(self, 200, {
+                "schema": SCHEMA,
+                "status": "ERROR",
+                "requestId": request_id,
+                "reason": job.get("reason") or "ANALYSIS_FAILED",
+            })
+            return
+
+        send_json(self, 404, {
+            "schema": SCHEMA,
+            "status": "ERROR",
+            "reason": "NOT_FOUND",
+        })
 
     def do_POST(self):
         path = urlsplit(self.path)
         if path.path != "/agent/ask" or path.query:
-            send_json(self, 404, {"schema": SCHEMA, "status": "ERROR", "reason": "NOT_FOUND"})
+            send_json(self, 404, {
+                "schema": SCHEMA,
+                "status": "ERROR",
+                "reason": "NOT_FOUND",
+            })
             return
+
         try:
             length = int(self.headers.get("Content-Length") or "0")
         except ValueError:
             length = 0
         if length <= 0 or length > MAX_BODY_BYTES:
-            send_json(self, 413, {"schema": SCHEMA, "status": "ERROR", "reason": "REQUEST_TOO_LARGE"})
+            send_json(self, 413, {
+                "schema": SCHEMA,
+                "status": "ERROR",
+                "reason": "REQUEST_TOO_LARGE",
+            })
             return
+
+        request_id = None
+        claimed_job = False
         try:
             request_payload = json.loads(self.rfile.read(length).decode("utf-8"))
             question = request_payload.get("question")
-            if not isinstance(question, str) or not question.strip() or len(question) > MAX_QUESTION_CHARS:
+            if (
+                not isinstance(question, str)
+                or not question.strip()
+                or len(question) > MAX_QUESTION_CHARS
+            ):
                 raise ValueError("QUESTION_INVALID")
+            question = question.strip()
             day = _resolve_day(request_payload.get("day"))
-            evidence = build_evidence(day, question.strip())
-            answer, response_id = ask_model(question.strip(), evidence)
-            send_json(self, 200, {
-                "schema": SCHEMA,
-                "status": "OK",
-                "readOnly": True,
-                "controlWrites": False,
-                "dateLocal": day.isoformat(),
-                "model": MODEL,
-                "modelResponseId": response_id,
-                "answer": answer,
-                "evidenceSummary": {
-                    "performanceSchema": evidence["performance"].get("schema"),
-                    "timelinePoints": len(evidence["timeline5m"]),
-                    "evTelemetryPoints": len(evidence["evTelemetry5m"]),
-                    "evControlEvents": len(evidence["evControlEvents"]),
-                    "quookerEvents": len(evidence["quookerEvents"]),
-                    "plannerDecisionPoints": len(evidence["plannerDecisionWindow"]),
-                    "flexContextPoints": len(evidence["flexContextWindow"]),
-                    "forecastComparisonSlots": len(evidence["forecastVsActual15m"].get("slots") or []),
-                    "piHealthStatus": evidence["piHealthCurrent"].get("status"),
-                    "limitations": evidence["limitations"],
-                },
-            })
+            request_id = _validate_request_id(request_payload.get("requestId"))
+
+            if request_id is not None:
+                job = _job_claim(request_id, question, day)
+                if not job["claimed"]:
+                    if job["status"] == "OK" and isinstance(job.get("response"), dict):
+                        send_json(self, 200, job["response"])
+                        return
+                    if job["status"] == "PENDING":
+                        send_json(self, 202, {
+                            "schema": SCHEMA,
+                            "status": "PENDING",
+                            "requestId": request_id,
+                        })
+                        return
+                    send_json(self, 503, {
+                        "schema": SCHEMA,
+                        "status": "UNAVAILABLE",
+                        "requestId": request_id,
+                        "reason": job.get("reason") or "ANALYSIS_FAILED",
+                    })
+                    return
+                claimed_job = True
+
+            evidence = build_evidence(day, question)
+            answer, response_id = ask_model(question, evidence)
+            result = _analysis_response(
+                day, answer, response_id, evidence, request_id=request_id
+            )
+
+            # Persist before writing the HTTP response. If the user navigates
+            # away, the model result remains retrievable by requestId.
+            if request_id is not None:
+                _job_complete(request_id, result)
+
+            send_json(self, 200, result)
+
         except (json.JSONDecodeError, UnicodeDecodeError):
-            send_json(self, 400, {"schema": SCHEMA, "status": "ERROR", "reason": "JSON_INVALID"})
+            send_json(self, 400, {
+                "schema": SCHEMA,
+                "status": "ERROR",
+                "reason": "JSON_INVALID",
+            })
         except ValueError as exc:
-            send_json(self, 400, {"schema": SCHEMA, "status": "ERROR", "reason": str(exc)})
+            if request_id is not None and claimed_job:
+                try:
+                    _job_fail(request_id, str(exc))
+                except sqlite3.Error:
+                    pass
+            send_json(self, 400, {
+                "schema": SCHEMA,
+                "status": "ERROR",
+                "reason": str(exc),
+            })
         except (OSError, sqlite3.Error, subprocess.SubprocessError, RuntimeError) as exc:
             reason = str(exc)
+            if request_id is not None and claimed_job:
+                try:
+                    _job_fail(request_id, reason)
+                except sqlite3.Error:
+                    pass
             status = 503 if reason in {
                 "MODEL_NOT_CONFIGURED", "MODEL_UNAVAILABLE",
                 "TIMELINE_SOURCE_INCOMPLETE", "MODEL_EMPTY_RESPONSE"
-            } or reason.startswith("MODEL_HTTP_") or reason.startswith("EMS_PERFORMANCE_FAILED") else 500
-            send_json(self, status, {"schema": SCHEMA, "status": "UNAVAILABLE", "reason": reason})
+            } or reason.startswith("MODEL_HTTP_") or reason.startswith(
+                "EMS_PERFORMANCE_FAILED"
+            ) else 500
+            send_json(self, status, {
+                "schema": SCHEMA,
+                "status": "UNAVAILABLE",
+                "requestId": request_id,
+                "reason": reason,
+            })
 
     def log_message(self, fmt, *args):
         return
