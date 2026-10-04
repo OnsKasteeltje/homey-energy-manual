@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import sqlite3
+import sys
 import tempfile
 import unittest
 from datetime import date, datetime, timedelta, timezone
@@ -17,6 +18,7 @@ def load_module():
     spec = importlib.util.spec_from_file_location("constrained_replay_v0_1", SOURCE)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
