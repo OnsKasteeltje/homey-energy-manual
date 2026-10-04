@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Controlled first commissioning of the Heating Pi -> Homey SHADOW chain.
 
-Default is DRY-RUN. --apply is required for Homey Logic/Advanced Flow writes
-and for enabling the Pi publisher timer. No Honeywell/device write is present
-in this installer or in the rendered Homey sources.
+Default is DRY-RUN. --apply is required for Homey Logic/Advanced Flow writes.
+The Pi publisher timer remains disabled until an authoritative production
+Heating grant and LIVE actuator contract exist. No Honeywell/device write is
+present in this installer or in the rendered Homey sources.
 """
 
 from __future__ import annotations
@@ -606,7 +607,7 @@ def _prepare_runtime_with_timer_off():
     )
 
 
-def _resume_validate_and_enable(config):
+def _resume_validate_with_timer_off(config):
     print("resume: validating pinned Homey objects with paced targeted readback")
     logic, flows = _validate_ready_objects(config)
 
@@ -630,16 +631,18 @@ def _resume_validate_and_enable(config):
 
     revision = _validate_shadow_chain_payloads(intent, adapter_out, gate_out)
 
+    # KISS: this SHADOW boundary is proven, but there is no production Heating
+    # grant and no Honeywell actuator. Keep automatic Homey transport parked.
     subprocess.run(
         [
-            "sudo", "systemctl", "enable", "--now",
+            "sudo", "systemctl", "disable", "--now",
             "ems-heating-homey-shadow-publish.timer",
         ],
-        check=True,
+        check=False,
     )
 
     config["validatedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    config["publisherTimerEnabled"] = True
+    config["publisherTimerEnabled"] = False
     config["lastValidatedRevision"] = revision
     save_config(config)
 
@@ -650,7 +653,7 @@ def _resume_validate_and_enable(config):
     print("gate:", logic["gate"]["id"], gate_out.get("finalStatus"))
     print("adapter flow:", flows["adapter"]["id"])
     print("gate flow:", flows["gate"]["id"])
-    print("publisher timer: enabled")
+    print("publisher timer: disabled (parked until production Heating grant)")
     print("physicalWriteAllowed: false")
     print("liveExecutionAllowed: false")
     print("NOTE: no Honeywell/device capability was written")
@@ -663,45 +666,28 @@ def _runtime_only(config):
         raise RuntimeError("RUNTIME_ONLY_BLOCKED_BY_PENDING_OPERATION")
 
     timer = "ems-heating-homey-shadow-publish.timer"
-    was_enabled = subprocess.run(
-        ["systemctl", "is-enabled", timer],
-        text=True,
-        capture_output=True,
-        check=False,
-    ).stdout.strip()
-    was_active = subprocess.run(
-        ["systemctl", "is-active", timer],
-        text=True,
-        capture_output=True,
-        check=False,
-    ).stdout.strip()
-
-    print("runtime-only: timer enabled=", was_enabled, "active=", was_active)
-    subprocess.run(["sudo", "systemctl", "stop", timer], check=False)
     install_pi_runtime()
-
-    if was_active == "active":
-        subprocess.run(["sudo", "systemctl", "start", timer], check=True)
-
-    now_enabled = subprocess.run(
-        ["systemctl", "is-enabled", timer],
-        text=True,
-        capture_output=True,
+    subprocess.run(
+        ["sudo", "systemctl", "disable", "--now", timer],
         check=False,
-    ).stdout.strip()
-    if now_enabled != was_enabled:
-        raise RuntimeError(
-            f"RUNTIME_ONLY_ENABLED_STATE_CHANGED:{was_enabled}->{now_enabled}"
-        )
+    )
+    config["publisherTimerEnabled"] = False
+    save_config(config)
 
     print("PASS: Heating Homey publisher runtime refreshed without Homey API calls")
-    print("publisher timer enabled:", now_enabled)
+    print("publisher timer enabled:", subprocess.run(
+        ["systemctl", "is-enabled", timer],
+        text=True,
+        capture_output=True,
+        check=False,
+    ).stdout.strip())
     print("publisher timer active:", subprocess.run(
         ["systemctl", "is-active", timer],
         text=True,
         capture_output=True,
         check=False,
     ).stdout.strip())
+    print("NOTE: automatic Homey SHADOW transport remains parked")
     print("NOTE: no Homey Logic, Flow or device call was issued")
 
 
@@ -716,7 +702,7 @@ def main():
     mode.add_argument(
         "--resume",
         action="store_true",
-        help="Validate an existing READY SHADOW installation and enable publisher timer",
+        help="Validate an existing READY SHADOW installation once; keep publisher timer disabled",
     )
     mode.add_argument(
         "--runtime-only",
@@ -754,7 +740,7 @@ def main():
         return 0
 
     if args.resume:
-        _resume_validate_and_enable(config)
+        _resume_validate_with_timer_off(config)
         return 0
 
     logic = ensure_logic_variables(config, args.apply)
