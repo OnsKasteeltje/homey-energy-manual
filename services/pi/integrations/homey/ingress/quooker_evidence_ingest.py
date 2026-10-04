@@ -115,11 +115,16 @@ def _ensure_schema(con):
             p1_fresh INTEGER,
             start_export_w REAL,
             stop_import_w REAL,
+            actuator_schema TEXT,
+            actuator_mode TEXT,
             actuator_control_valid INTEGER,
             actuator_control_fresh INTEGER,
             actuator_desired_on INTEGER,
             actuator_actual_on INTEGER,
+            actuator_actual_on_before INTEGER,
+            actuator_actual_on_after INTEGER,
             actuator_would_write INTEGER,
+            actuator_write_error TEXT,
             actuator_reason TEXT,
             detector_valid INTEGER,
             detector_switch_on INTEGER,
@@ -135,6 +140,23 @@ def _ensure_schema(con):
         )
         """
     )
+
+    existing = {
+        row[1] for row in con.execute("PRAGMA table_info(quooker_control_events)")
+    }
+    migrations = (
+        ("actuator_schema", "TEXT"),
+        ("actuator_mode", "TEXT"),
+        ("actuator_actual_on_before", "INTEGER"),
+        ("actuator_actual_on_after", "INTEGER"),
+        ("actuator_write_error", "TEXT"),
+    )
+    for name, ddl in migrations:
+        if name not in existing:
+            con.execute(
+                f"ALTER TABLE quooker_control_events ADD COLUMN {name} {ddl}"
+            )
+
     con.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_quooker_control_events_time
@@ -153,7 +175,8 @@ def _extract(payload):
     detector_safety = detector.get("safety") if isinstance(detector.get("safety"), dict) else {}
 
     physical = (
-        actuator_safety.get("physicalWritePerformed") is True
+        actuator.get("physicalWritePerformed") is True
+        or actuator_safety.get("physicalWritePerformed") is True
         or detector_safety.get("physicalWritePerformed") is True
     )
 
@@ -166,11 +189,16 @@ def _extract(payload):
         "p1_fresh": _bool_int(p1.get("p1Fresh")),
         "start_export_w": _number(thresholds.get("startExportW")),
         "stop_import_w": _number(thresholds.get("stopImportW")),
+        "actuator_schema": _text(actuator.get("schema")),
+        "actuator_mode": _text(actuator.get("mode")),
         "actuator_control_valid": _bool_int(actuator.get("controlValid")),
         "actuator_control_fresh": _bool_int(actuator.get("controlFresh")),
         "actuator_desired_on": _bool_int(actuator.get("desiredOn")),
         "actuator_actual_on": _bool_int(actuator.get("actualOn")),
+        "actuator_actual_on_before": _bool_int(actuator.get("actualOnBefore")),
+        "actuator_actual_on_after": _bool_int(actuator.get("actualOnAfter")),
         "actuator_would_write": _bool_int(actuator.get("wouldWrite")),
+        "actuator_write_error": _text(actuator.get("writeError")),
         "actuator_reason": _text(actuator.get("reason")),
         "detector_valid": _bool_int(detector.get("valid")),
         "detector_switch_on": _bool_int(detector.get("switchOn")),
@@ -193,11 +221,16 @@ NORMALIZED_COLUMNS = (
     "p1_fresh",
     "start_export_w",
     "stop_import_w",
+    "actuator_schema",
+    "actuator_mode",
     "actuator_control_valid",
     "actuator_control_fresh",
     "actuator_desired_on",
     "actuator_actual_on",
+    "actuator_actual_on_before",
+    "actuator_actual_on_after",
     "actuator_would_write",
+    "actuator_write_error",
     "actuator_reason",
     "detector_valid",
     "detector_switch_on",
@@ -219,11 +252,16 @@ DEDUPE_COLUMNS = (
     "control_target_on",
     "control_reason",
     "p1_fresh",
+    "actuator_schema",
+    "actuator_mode",
     "actuator_control_valid",
     "actuator_control_fresh",
     "actuator_desired_on",
     "actuator_actual_on",
+    "actuator_actual_on_before",
+    "actuator_actual_on_after",
     "actuator_would_write",
+    "actuator_write_error",
     "actuator_reason",
     "detector_valid",
     "detector_switch_on",
