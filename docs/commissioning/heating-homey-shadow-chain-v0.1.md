@@ -98,6 +98,29 @@ The Pi publisher runs at `:35`, after V0.5 at `:30`. It writes only the
 dedicated intent Logic variable. Homey Adapter/Gate execution is event-driven by
 Logic changes.
 
+### READY resume after interrupted final validation
+
+A first APPLY can legitimately finish object creation and reach host-local
+`state=READY` before the final Intent/Adapter/Gate readback completes. If that
+final validation is interrupted, do **not** rerun `--apply`. Use
+`--resume-ready`.
+
+The READY resume path creates and updates no Homey object. It reads only the
+three pinned Logic IDs and two pinned Advanced Flow IDs, with at least five
+seconds pacing between targeted Homey API reads. It then deploys the reviewed
+Pi publisher locally, refreshes V0.5, performs one SHADOW publish, waits for the
+event-driven Adapter/Gate, and validates all three contracts on the same
+`controlRevision`.
+
+`EMS_HEATING_CONTROL_INTENT_V0.1` exposes
+`liveExecutionAllowed=false` explicitly at top level as well as under
+`safety`. Resume additionally requires Adapter and Gate
+`liveExecutionAllowed=false`, all command `physicalWrite=false`, and
+top-level `deviceWrites=false` / `physicalWriteAllowed=false` throughout.
+Only then may `ems-heating-homey-shadow-publish.timer` be enabled. Homey 429,
+stale/fail-closed intent or any revision/contract mismatch leaves the timer
+disabled.
+
 ## LIVE blockers
 
 Physical Heating control remains blocked until both are separately delivered and
