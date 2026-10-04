@@ -349,7 +349,12 @@ The analysis model is configured through the systemd service environment.
 - `EMS_AI_REASONING_EFFORT` selects reasoning effort; the application default is `medium`.
 - `EMS_AI_MAX_OUTPUT_TOKENS` limits the combined reasoning and answer output budget; the application default is `1200`.
 
-The deployed analysis service may deliberately use a higher reasoning effort and output-token ceiling than the application defaults. These settings affect analysis only and do not grant control-write authority.
+The deployed analysis service currently uses `medium` reasoning effort with a
+4096-token output ceiling. A measured successful request on 2026-10-04 spent
+about 198 seconds end-to-end while local evidence construction took about
+0.68 seconds, so `high` reasoning was retired as the production default while
+latency is observed. These settings affect analysis only and do not grant
+control-write authority.
 
 Model-response failures are classified before an empty answer is reported. A
 Responses API result with `status=incomplete` and
@@ -360,5 +365,16 @@ separate diagnostic codes. On such failures the service writes one bounded JSON
 diagnostic event to the systemd journal containing only response ID, response
 status/reason and token-count metadata. The user's question, EMS evidence,
 model text/refusal text and credentials are never written to that diagnostic
-event. This observability path does not retry the model request and does not
-change the configured reasoning effort or output-token limit.
+event. Successful model calls also emit one bounded
+`EMS_AI_MODEL_RESPONSE_SUCCESS` journal event with response ID, model-call
+duration and aggregate token counts. The same privacy boundary applies: no
+question, EMS evidence or model answer text is logged.
+
+A PENDING UI job is considered stale only when its age exceeds the stale
+threshold **and** no active request in the current analysis-service process owns
+that request ID. This prevents a valid long-running model call from being
+reclaimed and duplicated after 180 seconds, while still allowing an orphaned
+PENDING row left by a process restart or crash to be reclaimed later.
+
+This observability/lifecycle path does not retry the model request and does not
+change the output-token limit.

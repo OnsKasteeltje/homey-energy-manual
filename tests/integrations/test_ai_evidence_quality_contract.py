@@ -116,6 +116,7 @@ def main():
         "reason",
         "responseId",
         "status",
+        "durationMs",
         "incompleteReason",
         "errorCode",
         "refusalPresent",
@@ -154,6 +155,28 @@ def main():
         }],
     }
     assert ai._extract_output_text(normal) == "antwoord"
+    success_diag = ai._model_success_diagnostics(
+        {
+            **normal,
+            "usage": {
+                "input_tokens": 2000,
+                "output_tokens": 300,
+                "output_tokens_details": {"reasoning_tokens": 120},
+                "total_tokens": 2300,
+            },
+        },
+        1234,
+    )
+    assert success_diag == {
+        "event": "EMS_AI_MODEL_RESPONSE_SUCCESS",
+        "responseId": "resp_test_ok",
+        "status": "completed",
+        "durationMs": 1234,
+        "inputTokens": 2000,
+        "outputTokens": 300,
+        "reasoningTokens": 120,
+        "totalTokens": 2300,
+    }
 
     print("PASS: AI evidence quality semantics contract")
 

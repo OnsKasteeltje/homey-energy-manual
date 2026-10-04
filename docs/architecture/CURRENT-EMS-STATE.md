@@ -535,8 +535,18 @@ responses caused by the configured output budget are reported as
 response-error paths remain separately identifiable. A bounded journal event
 records only model response ID, response status/reason and aggregate token
 counts. It never records the question, EMS evidence, model/refusal text or
-credentials. No automatic retry, reasoning-effort change or output-budget
-increase is part of this observability hardening.
+credentials. No automatic retry or output-budget increase is part of this
+observability hardening. The deployed AI service now runs with
+`EMS_AI_REASONING_EFFORT=medium` and retains the 4096-token ceiling. This
+follows a measured successful 2026-10-04 request of about 198 seconds
+end-to-end while the same evidence build completed in about 0.68 seconds.
+
+Successful model responses additionally emit a bounded journal record with
+response ID, model-call duration and aggregate token counts. A locally active
+request ID remains PENDING regardless of the 180-second stale threshold, so a
+long-running valid model request cannot be reclaimed into a duplicate call.
+Only an old PENDING row with no active owner in the current service process may
+become STALE/reclaimable, preserving restart/crash recovery.
 
 V2 AI navigation is resumable. The browser keeps the visible conversation in
 tab-scoped `sessionStorage` and attaches a generated `requestId` to an

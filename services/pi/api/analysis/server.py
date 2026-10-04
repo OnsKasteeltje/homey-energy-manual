@@ -12,10 +12,12 @@ import os
 import re
 import sqlite3
 import subprocess
+import threading
 import zlib
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from time import monotonic
 from urllib import error as urlerror
 from urllib import request as urlrequest
 from urllib.parse import parse_qs, urlsplit
@@ -43,6 +45,8 @@ MAX_REQUEST_ID_CHARS = 80
 JOB_RETENTION_HOURS = 24
 JOB_PENDING_STALE_SECONDS = 180
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
+_ACTIVE_JOB_IDS = set()
+_ACTIVE_JOB_LOCK = threading.Lock()
 
 SYSTEM_INSTRUCTIONS = """You are the read-only analysis layer for a household Energy Management System.
 Answer in Dutch unless the user's question is clearly in another language.
@@ -1237,11 +1241,26 @@ def _job_cleanup(db, now):
     )
 
 
+def _job_is_active(request_id):
+    with _ACTIVE_JOB_LOCK:
+        return request_id in _ACTIVE_JOB_IDS
+
+
+def _job_release(request_id):
+    with _ACTIVE_JOB_LOCK:
+        _ACTIVE_JOB_IDS.discard(request_id)
+
+
 def _job_claim(request_id, question, day):
     now = _job_now()
     now_text = _iso_z(now)
     day_text = day.isoformat()
 
+    with _ACTIVE_JOB_LOCK:
+        return _job_claim_locked(request_id, question, day_text, now, now_text)
+
+
+def _job_claim_locked(request_id, question, day_text, now, now_text):
     with sqlite3.connect(JOBS_DB, timeout=3.0) as db:
         db.execute("PRAGMA busy_timeout=3000")
         _ensure_job_schema(db)
@@ -1257,6 +1276,7 @@ def _job_claim(request_id, question, day):
             (request_id, question, day_text, now_text, now_text),
         )
         if cur.rowcount == 1:
+            _ACTIVE_JOB_IDS.add(request_id)
             db.commit()
             return {"claimed": True, "status": "PENDING"}
 
@@ -1277,11 +1297,15 @@ def _job_claim(request_id, question, day):
             raise ValueError("REQUEST_ID_CONFLICT")
 
         if status == "PENDING":
+            active_here = request_id in _ACTIVE_JOB_IDS
             updated = _parse_ts(updated_text)
             stale = (
-                updated is None
-                or (now - updated.astimezone(timezone.utc)).total_seconds()
-                > JOB_PENDING_STALE_SECONDS
+                not active_here
+                and (
+                    updated is None
+                    or (now - updated.astimezone(timezone.utc)).total_seconds()
+                    > JOB_PENDING_STALE_SECONDS
+                )
             )
             if stale:
                 db.execute(
@@ -1292,6 +1316,7 @@ def _job_claim(request_id, question, day):
                     """,
                     (now_text, request_id),
                 )
+                _ACTIVE_JOB_IDS.add(request_id)
                 db.commit()
                 return {"claimed": True, "status": "PENDING", "reclaimed": True}
 
@@ -1313,34 +1338,40 @@ def _job_complete(request_id, response):
     encoded = json.dumps(
         response, separators=(",", ":"), ensure_ascii=False
     )
-    with sqlite3.connect(JOBS_DB, timeout=3.0) as db:
-        db.execute("PRAGMA busy_timeout=3000")
-        _ensure_job_schema(db)
-        db.execute(
-            """
-            UPDATE analysis_jobs
-            SET status='OK',response_json=?,error_reason=NULL,updated_at_utc=?
-            WHERE request_id=?
-            """,
-            (encoded, now_text, request_id),
-        )
-        db.commit()
+    try:
+        with sqlite3.connect(JOBS_DB, timeout=3.0) as db:
+            db.execute("PRAGMA busy_timeout=3000")
+            _ensure_job_schema(db)
+            db.execute(
+                """
+                UPDATE analysis_jobs
+                SET status='OK',response_json=?,error_reason=NULL,updated_at_utc=?
+                WHERE request_id=?
+                """,
+                (encoded, now_text, request_id),
+            )
+            db.commit()
+    finally:
+        _job_release(request_id)
 
 
 def _job_fail(request_id, reason):
     now_text = _iso_z(_job_now())
-    with sqlite3.connect(JOBS_DB, timeout=3.0) as db:
-        db.execute("PRAGMA busy_timeout=3000")
-        _ensure_job_schema(db)
-        db.execute(
-            """
-            UPDATE analysis_jobs
-            SET status='ERROR',response_json=NULL,error_reason=?,updated_at_utc=?
-            WHERE request_id=?
-            """,
-            (str(reason)[:500], now_text, request_id),
-        )
-        db.commit()
+    try:
+        with sqlite3.connect(JOBS_DB, timeout=3.0) as db:
+            db.execute("PRAGMA busy_timeout=3000")
+            _ensure_job_schema(db)
+            db.execute(
+                """
+                UPDATE analysis_jobs
+                SET status='ERROR',response_json=NULL,error_reason=?,updated_at_utc=?
+                WHERE request_id=?
+                """,
+                (str(reason)[:500], now_text, request_id),
+            )
+            db.commit()
+    finally:
+        _job_release(request_id)
 
 
 def _job_get(request_id):
@@ -1361,7 +1392,7 @@ def _job_get(request_id):
 
     status, response_json, error_reason, updated_at = row
     public_status = status
-    if status == "PENDING":
+    if status == "PENDING" and not _job_is_active(request_id):
         updated = _parse_ts(updated_at)
         if (
             updated is None
@@ -1468,19 +1499,10 @@ def _model_failure_reason(payload):
     return "MODEL_EMPTY_RESPONSE"
 
 
-def _model_response_diagnostics(payload, reason):
+def _model_token_usage(payload):
     usage = payload.get("usage") or {}
     output_details = usage.get("output_tokens_details") or {}
-    incomplete = payload.get("incomplete_details") or {}
-    error = payload.get("error") or {}
     return {
-        "event": "EMS_AI_MODEL_RESPONSE_FAILURE",
-        "reason": reason,
-        "responseId": payload.get("id"),
-        "status": payload.get("status"),
-        "incompleteReason": incomplete.get("reason"),
-        "errorCode": error.get("code") if isinstance(error, dict) else None,
-        "refusalPresent": _model_refusal_present(payload),
         "inputTokens": usage.get("input_tokens"),
         "outputTokens": usage.get("output_tokens"),
         "reasoningTokens": output_details.get("reasoning_tokens"),
@@ -1488,11 +1510,39 @@ def _model_response_diagnostics(payload, reason):
     }
 
 
-def _raise_model_response_failure(payload):
+def _model_response_diagnostics(payload, reason, duration_ms=None):
+    incomplete = payload.get("incomplete_details") or {}
+    error = payload.get("error") or {}
+    result = {
+        "event": "EMS_AI_MODEL_RESPONSE_FAILURE",
+        "reason": reason,
+        "responseId": payload.get("id"),
+        "status": payload.get("status"),
+        "durationMs": duration_ms,
+        "incompleteReason": incomplete.get("reason"),
+        "errorCode": error.get("code") if isinstance(error, dict) else None,
+        "refusalPresent": _model_refusal_present(payload),
+    }
+    result.update(_model_token_usage(payload))
+    return result
+
+
+def _model_success_diagnostics(payload, duration_ms):
+    result = {
+        "event": "EMS_AI_MODEL_RESPONSE_SUCCESS",
+        "responseId": payload.get("id"),
+        "status": payload.get("status"),
+        "durationMs": duration_ms,
+    }
+    result.update(_model_token_usage(payload))
+    return result
+
+
+def _raise_model_response_failure(payload, duration_ms=None):
     reason = _model_failure_reason(payload)
     print(
         json.dumps(
-            _model_response_diagnostics(payload, reason),
+            _model_response_diagnostics(payload, reason, duration_ms),
             separators=(",", ":"),
             ensure_ascii=False,
         ),
@@ -1523,6 +1573,7 @@ def ask_model(question, evidence):
             "Content-Type": "application/json",
         },
     )
+    model_started = monotonic()
     try:
         with urlrequest.urlopen(req, timeout=45) as response:
             payload = json.loads(response.read().decode("utf-8"))
@@ -1540,9 +1591,18 @@ def ask_model(question, evidence):
     except (urlerror.URLError, TimeoutError) as exc:
         raise RuntimeError("MODEL_UNAVAILABLE") from exc
 
+    duration_ms = round((monotonic() - model_started) * 1000)
     answer = _extract_output_text(payload)
     if not answer:
-        _raise_model_response_failure(payload)
+        _raise_model_response_failure(payload, duration_ms)
+    print(
+        json.dumps(
+            _model_success_diagnostics(payload, duration_ms),
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
     return answer, payload.get("id")
 
 def send_json(handler, status, payload):
@@ -1753,6 +1813,9 @@ class Handler(BaseHTTPRequestHandler):
                 "requestId": request_id,
                 "reason": reason,
             })
+        finally:
+            if request_id is not None and claimed_job:
+                _job_release(request_id)
 
     def log_message(self, fmt, *args):
         return
