@@ -567,6 +567,28 @@ constraint. This is analysis-only normalization; the canonical EV deadline
 state machine, planner constraint logic, Homey executor and physical control
 paths are unchanged.
 
+Semantic Event History V0.1 adds durable, sparse state-change evidence
+without adding control authority. A Pi-local observer at `:50` reads only
+already-derived local artifacts and stores transitions in
+`ems-history.sqlite/semantic_events`. Initial observations establish a
+baseline only; no event is invented at commissioning and no earlier state is
+backfilled.
+
+The first bounded event classes are EV connect/charge transitions, EV deadline
+command and deadline-state transitions, warm-water source-mode changes, Flex
+Priority changes and per-room Heating SHADOW progression changes. Every event
+carries explicit provenance:
+`USER_INTENT_COMMAND`, `OBSERVED_STATE`, `DERIVED_STATE` or
+`SHADOW_DECISION`. A user-intent command is not proof of physical execution,
+an observed state change does not identify its actor, and a SHADOW decision is
+never a physical write. The AI exposes the commissioning boundary separately as
+`semanticEventCoverage`.
+
+The semantic observer contains no Homey/network client, creates no planner
+decision and performs no Logic/device/control writes. Realtime planner, Gate,
+actuator and physical-control ownership remain unchanged. `ems-health`
+monitors the semantic-event timer and its last oneshot execution.
+
 The current V0.4 evidence-quality semantics also require directly observed
 appliance state in `timeline5m` to be used when relevant to a power-event
 question. For example, `washerActive=true` is a recorded **Feit** that must
