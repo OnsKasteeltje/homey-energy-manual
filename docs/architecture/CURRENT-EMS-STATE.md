@@ -569,6 +569,34 @@ constraint. This is analysis-only normalization; the canonical EV deadline
 state machine, planner constraint logic, Homey executor and physical control
 paths are unchanged.
 
+Semantic Event History V0.1 adds durable, sparse state-change evidence
+without adding control authority. A Pi-local observer at `:50` reads only
+already-derived local artifacts and stores transitions in
+`ems-history.sqlite/semantic_events`. Initial observations establish a
+baseline only; no event is invented at commissioning and no earlier state is
+backfilled.
+
+The first bounded event classes are EV connect/charge transitions, EV deadline
+command and deadline-state transitions, warm-water source-mode changes, Flex
+Priority changes and per-room Heating SHADOW progression changes. Warm-water
+source state is normalized at the semantic boundary from the canonical Homey
+boolean contract (`false = CV`, `true = BOILER`) to explicit `CV` /
+`BOILER` values. A pre-normalization boolean baseline is upgraded in place;
+that representation-only migration must not create a synthetic
+`WW_SOURCE_CHANGED` event.
+
+Every event carries explicit provenance:
+`USER_INTENT_COMMAND`, `OBSERVED_STATE`, `DERIVED_STATE` or
+`SHADOW_DECISION`. A user-intent command is not proof of physical execution,
+an observed state change does not identify its actor, and a SHADOW decision is
+never a physical write. The AI exposes the commissioning boundary separately as
+`semanticEventCoverage`.
+
+The semantic observer contains no Homey/network client, creates no planner
+decision and performs no Logic/device/control writes. Realtime planner, Gate,
+actuator and physical-control ownership remain unchanged. `ems-health`
+monitors the semantic-event timer and its last oneshot execution.
+
 The current V0.4 evidence-quality semantics also require directly observed
 appliance state in `timeline5m` to be used when relevant to a power-event
 question. For example, `washerActive=true` is a recorded **Feit** that must
@@ -582,10 +610,10 @@ active washer as a supported possible explanation but must not claim that it
 caused the measured P1 change.
 
 For questions containing explicit local clock times, V0.4 applies
-question-aware evidence selection to the four largest day-wide arrays:
-`timeline5m`, `evTelemetry5m`, `evControlEvents` and `quookerEvents`.
-Only points within ±30 minutes of the explicit user times are transported to
-the model. A referential follow-up such as "dit tijdslot" may resolve one of
+question-aware evidence selection to the large day-wide arrays:
+`timeline5m`, `evTelemetry5m`, `evControlEvents`, `quookerEvents`
+and `semanticEvents`. Only points within ±30 minutes of the explicit user
+times are transported to the model. A referential follow-up such as "dit tijdslot" may resolve one of
 those windows from the bounded recent conversation context and is then marked
 `CONTEXT_TIME_WINDOW`. Topic filtering now runs after either explicit or
 contextual time scoping, so the window determines *when* while the detected
