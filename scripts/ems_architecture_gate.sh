@@ -265,6 +265,15 @@ grep -q 'OnCalendar=.*:35' "$HEATING_HOMEY_TIMER" || fail "Heating Homey publish
 python3 "$HEATING_HOMEY_TEST" || fail "Heating Homey Pi intent contract failed"
 node "$HEATING_HOMEY_NODE_TEST" || fail "Heating Homey adapter/gate contract failed"
 python3 -m py_compile "$HEATING_HOMEY_PUBLISHER" "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey Python syntax invalid"
+if grep -q 'get-variables' "$HEATING_HOMEY_COMMISSION"; then
+  fail "Heating first commissioning must not bulk-discover Logic variables"
+fi
+if grep -q 'get-advanced-flows' "$HEATING_HOMEY_COMMISSION"; then
+  fail "Heating first commissioning must not bulk-discover Advanced Flows"
+fi
+grep -q 'pendingOperation' "$HEATING_HOMEY_COMMISSION" || fail "Heating first commissioning write-ahead marker missing"
+grep -q 'AMBIGUOUS_PARTIAL_COMMISSIONING' "$HEATING_HOMEY_COMMISSION" || fail "Heating first commissioning ambiguous-create stop missing"
+grep -q '/api/manager/logic/variable/{var_id}' "$HEATING_HOMEY_COMMISSION" || fail "Heating Logic readback must be targeted by pinned ID"
 pass "Heating V0.5 -> Homey Adapter/Gate SHADOW transport is explicit and physical-write-free"
 
 grep -q 'services/pi/integrations/connectlife/' "$CONNECTLIFE_DOC" || fail "ConnectLife target repository boundary missing from architecture document"
