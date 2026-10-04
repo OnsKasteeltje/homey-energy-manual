@@ -567,13 +567,21 @@ attribution: without separate measured washer power, the AI may identify the
 active washer as a supported possible explanation but must not claim that it
 caused the measured P1 change.
 
-For questions containing explicit local clock times, V0.4 now applies
+For questions containing explicit local clock times, V0.4 applies
 question-aware evidence selection to the four largest day-wide arrays:
 `timeline5m`, `evTelemetry5m`, `evControlEvents` and `quookerEvents`.
 Only points within ±30 minutes of the explicit user times are transported to
-the model, and `evidenceSelection` records the scope. Questions without an
-explicit clock time preserve the previous bounded day scope; automatically
-chosen fallback analysis anchors do not trigger trimming. This is
+the model. A referential follow-up such as "dit tijdslot" may resolve one of
+those windows from the bounded recent conversation context and is then marked
+`CONTEXT_TIME_WINDOW`.
+
+Without an explicit/contextual time anchor, day-scope evidence is now bounded
+and topic-aware instead of transporting every available event. Event streams
+are compacted deterministically; unrelated EV or Quooker streams are omitted
+for topic-specific questions. `evidenceSelection` records the mode, topics,
+context-anchor use, compacted/omitted fields and original/selected counts. The
+browser supplies at most four recent non-error messages (1200 characters each)
+as referential context only; prior chat text is not EMS evidence. This is
 analysis-transport optimization only: canonical history, source authority,
 polling, planner, Homey and physical-control paths are unchanged.
 
@@ -605,9 +613,11 @@ become STALE/reclaimable, preserving restart/crash recovery.
 
 V2 AI navigation is resumable. The browser keeps the visible conversation in
 tab-scoped `sessionStorage` and attaches a generated `requestId` to an
-analysis request. The Pi persists only the corresponding short-lived UI
-job/result in `/home/jeroen/ems/data/ai-analysis-jobs.sqlite` (24-hour
-retention). `GET /agent/result?requestId=...` lets the browser recover an
+analysis request. New requests also carry a bounded four-message recent
+conversation context for referent resolution; model/API error messages are
+excluded and the current request is not duplicated in that context. The Pi
+persists only the corresponding short-lived UI job/result in
+`/home/jeroen/ems/data/ai-analysis-jobs.sqlite` (24-hour retention). `GET /agent/result?requestId=...` lets the browser recover an
 answer after navigating to another V2 page and returning. Duplicate POSTs with
 the same ID are idempotent and therefore do not create a second OpenAI model
 call while a job is pending or after it has completed.
