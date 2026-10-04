@@ -53,6 +53,7 @@ HEATING_HOMEY_SERVICE="deploy/systemd/ems-heating-homey-shadow-publish.service"
 HEATING_HOMEY_TIMER="deploy/systemd/ems-heating-homey-shadow-publish.timer"
 HEATING_HOMEY_TEST="tests/integrations/test_heating_homey_shadow_contract.py"
 HEATING_HOMEY_NODE_TEST="tests/homey/heating-control-shadow.test.mjs"
+HEATING_HOMEY_RESUME_TEST="tests/integrations/test_heating_homey_resume_contract.py"
 BASE_REF="${1:-}"
 
 fail() { echo "ARCHITECTURE GATE: FAIL: $*" >&2; exit 1; }
@@ -255,6 +256,7 @@ grep -q 'EMS_HEATING_CONTROL_INTENT_V0.1' "$HEATING_HOMEY_PUBLISHER" || fail "He
 grep -q '"plannerAuthority": "SHADOW_ONLY"' "$HEATING_HOMEY_PUBLISHER" || fail "Heating Homey intent must remain shadow authority"
 grep -q '"productionPlannerHeatingGrantPresent": False' "$HEATING_HOMEY_PUBLISHER" || fail "Heating Homey intent must not claim production Heating grant"
 grep -q '"physicalWriteAllowed": False' "$HEATING_HOMEY_PUBLISHER" || fail "Heating Homey intent must forbid physical writes"
+grep -q '"liveExecutionAllowed": False' "$HEATING_HOMEY_PUBLISHER" || fail "Heating Homey intent must explicitly forbid LIVE execution"
 grep -q 'const IDS=__EMS_HEATING_IDS__;' "$HEATING_HOMEY_ADAPTER" || fail "Heating Homey adapter render token missing"
 grep -q 'const IDS=__EMS_HEATING_IDS__;' "$HEATING_HOMEY_GATE" || fail "Heating Homey gate render token missing"
 if grep -Eq 'setCapabilityValue|setCapabilityValues|set_devices_capabilities' "$HEATING_HOMEY_ADAPTER" "$HEATING_HOMEY_GATE"; then
@@ -263,6 +265,8 @@ fi
 grep -q 'Homey.devices.getDevice' "$HEATING_HOMEY_GATE" || fail "Heating Homey gate targeted readback missing"
 grep -q 'OnCalendar=.*:35' "$HEATING_HOMEY_TIMER" || fail "Heating Homey publisher must run after V0.5 at :35"
 python3 "$HEATING_HOMEY_TEST" || fail "Heating Homey Pi intent contract failed"
+[[ -f "$HEATING_HOMEY_RESUME_TEST" ]] || fail "Heating Homey resume validation test missing"
+python3 "$HEATING_HOMEY_RESUME_TEST" || fail "Heating Homey resume validation contract failed"
 node "$HEATING_HOMEY_NODE_TEST" || fail "Heating Homey adapter/gate contract failed"
 python3 -m py_compile "$HEATING_HOMEY_PUBLISHER" "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey Python syntax invalid"
 if grep -q 'get-variables' "$HEATING_HOMEY_COMMISSION"; then
@@ -274,7 +278,12 @@ fi
 grep -q 'pendingOperation' "$HEATING_HOMEY_COMMISSION" || fail "Heating first commissioning write-ahead marker missing"
 grep -q 'AMBIGUOUS_PARTIAL_COMMISSIONING' "$HEATING_HOMEY_COMMISSION" || fail "Heating first commissioning ambiguous-create stop missing"
 grep -q '/api/manager/logic/variable/{var_id}' "$HEATING_HOMEY_COMMISSION" || fail "Heating Logic readback must be targeted by pinned ID"
-pass "Heating V0.5 -> Homey Adapter/Gate SHADOW transport is explicit and physical-write-free"
+grep -q -- '--resume' "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey commissioning must have explicit resume validation"
+grep -q 'READBACK_SPACING_SECONDS = 6' "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey resume readback pacing missing"
+grep -q 'RESUME_REQUIRES_READY_STATE' "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey resume must require READY state"
+grep -q 'RESUME_REVISION_MISMATCH' "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey resume revision gate missing"
+grep -q 'enable", "--now"' "$HEATING_HOMEY_COMMISSION" || fail "Heating Homey timer promotion action missing"
+pass "Heating V0.5 -> Homey Adapter/Gate SHADOW transport is explicit, paced and physical-write-free"
 
 grep -q 'services/pi/integrations/connectlife/' "$CONNECTLIFE_DOC" || fail "ConnectLife target repository boundary missing from architecture document"
 grep -q 'read-only telemetry' "$CONNECTLIFE_DOC" || fail "ConnectLife read-only safety boundary missing from architecture document"
