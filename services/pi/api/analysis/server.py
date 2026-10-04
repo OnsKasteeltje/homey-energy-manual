@@ -1148,8 +1148,18 @@ def _job_get(request_id):
         return None
 
     status, response_json, error_reason, updated_at = row
+    public_status = status
+    if status == "PENDING":
+        updated = _parse_ts(updated_at)
+        if (
+            updated is None
+            or (_job_now() - updated.astimezone(timezone.utc)).total_seconds()
+            > JOB_PENDING_STALE_SECONDS
+        ):
+            public_status = "STALE"
+
     return {
-        "status": status,
+        "status": public_status,
         "response": (
             json.loads(response_json)
             if status == "OK" and response_json
@@ -1321,6 +1331,14 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 202, {
                     "schema": SCHEMA,
                     "status": "PENDING",
+                    "requestId": request_id,
+                    "updatedAt": job.get("updatedAt"),
+                })
+                return
+            if job["status"] == "STALE":
+                send_json(self, 409, {
+                    "schema": SCHEMA,
+                    "status": "STALE",
                     "requestId": request_id,
                     "updatedAt": job.get("updatedAt"),
                 })
