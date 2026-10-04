@@ -125,6 +125,16 @@ The Pi publisher runs at `:35`, after V0.5 at `:30`. It writes only the
 dedicated intent Logic variable. Homey Adapter/Gate execution is event-driven by
 Logic changes.
 
+The publisher is a noninteractive Homey CLI caller. Its systemd sandbox keeps
+`ProtectHome=read-only`; it must not be weakened merely so the CLI can persist
+startup/update-notifier state. Both the service environment and Python Homey CLI
+wrapper therefore set `HOMEY_SKIP_STARTUP_NOTIFIERS=1` and
+`NO_UPDATE_NOTIFIER=1`. The commissioning wrapper applies the same
+environment. This prevents nonessential CLI startup writes to the user config
+tree while preserving the existing Homey authentication/config as read-only
+input. A notifier failure is transport failure and remains fail-closed; there
+is no retry that could mask a real Homey API error.
+
 The upstream SHADOW minute chain is phase-locked to prevent false ordering
 failures: V0.3 runs at second `:00` on its five-minute refresh minute, Flex
 Priority at `:10`, V0.4 at `:20`, V0.5 at `:30`, and this publisher at
