@@ -121,6 +121,14 @@ washer/dryer active state when available. A derived residual household value is
 included only as a labelled derivation from measured house power minus the
 tracked large loads; it is not a new measurement authority.
 
+Directly observed appliance state in `timeline5m` is first-class diagnostic
+evidence. When a power event is analysed and a relevant state such as
+`washerActive=true` or `dryerActive=true` is present in the corresponding
+interval, the model must mention that state as a **Feit**. Device-active state
+does not by itself prove power attribution: without separate measured
+device-power evidence the model may describe the active device as a supported
+possible explanation, but must not claim that it caused the measured P1 change.
+
 For an in-progress local day, performance quality separates three different
 concepts: `dayProgressPct` (how much of the calendar day has elapsed),
 `coveragePctFullDay` (integrated evidence as a fraction of the complete day)
