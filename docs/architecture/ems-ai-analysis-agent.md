@@ -35,7 +35,8 @@ Homey Quooker observability
       +--> POST /state/quooker
               +--> ems-history.sqlite / quooker_control_events
                     +--> adapter/control target + reason
-                    +--> SHADOW actuator desired/actual/wouldWrite
+                    +--> versioned actuator mode + desired/actual state
+                    +--> LIVE write proof when physicalWritePerformed=true
                     +--> detector status / measured pulse power
 
 Pi local flex state
@@ -103,8 +104,12 @@ for navigation continuity.
   observability evidence;
 - the local flex-context archive reads already-derived Pi artifacts only and
   performs no network/Homey/device call;
-- Heating progression and the Quooker actuator remain SHADOW; a grant,
-  `desiredOn` or `wouldWrite` is not proof of a physical write;
+- Heating progression remains SHADOW;
+- Quooker actuator evidence is versioned. Historical v0.1 evidence may be
+  `SHADOW`; v0.2 is `LIVE`. Only explicit LIVE actuator evidence with
+  `physicalWritePerformed=true` proves a Homey physical device write;
+- `physicalWritePerformed=false` on the LIVE actuator may be an idempotent
+  no-op when desired and actual state already matched;
 - model output is explanatory text and is never converted into an EMS command.
 
 The model must distinguish **Feit**, **Afleiding** and **Advies** and must state
@@ -193,17 +198,21 @@ only when the V0.4 archive is commissioned.
 V0.4 keeps Quooker out of the canonical Core snapshot and adds a separate,
 authenticated, control-neutral evidence path. Homey source
 `apps/homey/observability/quooker/quooker-pi-push-v0.1.homeyscript.js` reads
-only existing Logic contracts for Quooker Control, SHADOW Actuator Status and
-the Quooker detector diagnostic. It posts to `POST /state/quooker`; Pi-side
+only existing Logic contracts for Quooker Control, versioned Actuator Status
+and the Quooker detector diagnostic. It posts to `POST /state/quooker`; Pi-side
 validation and persistence live in
 `services/pi/integrations/homey/ingress/quooker_evidence_ingest.py`.
 
 Accepted snapshots are semantically deduplicated in
 `ems-history.sqlite/quooker_control_events`. The archive distinguishes the
-planner/adapter mode and target, SHADOW actuator desired/actual/would-write
-state, and detector-observed switch/heating state. The field
-`physicalWritePerformed` remains explicit and false for the current SHADOW
-actuator contract.
+planner/adapter mode and target, actuator schema/mode, desired state,
+v0.1 SHADOW actual/would-write state, v0.2 LIVE actual-before/actual-after state,
+write error and detector-observed switch/heating state. For v0.2 LIVE,
+top-level actuator `physicalWritePerformed=true` is preserved as direct
+evidence that Homey executed a physical Cooker write. Historical rows retain
+their raw JSON, allowing the analysis reader to recover v0.2 LIVE fields from
+events captured before the normalized schema was extended. Missing/UNKNOWN
+mode remains missing evidence and is never inferred from detector HEATING.
 
 ### Canonical EV telemetry history
 
