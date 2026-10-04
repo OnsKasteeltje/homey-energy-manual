@@ -105,7 +105,7 @@ A first APPLY can legitimately finish object creation and reach host-local
 final validation is interrupted, do **not** rerun `--apply`. Use
 `--resume-ready`.
 
-The READY resume path creates and updates no Homey object. It reads only the
+The READY resume path performs no structural Homey Logic/Advanced Flow create or update. It reads only the
 three pinned Logic IDs and two pinned Advanced Flow IDs, with at least five
 seconds pacing between targeted Homey API reads. It then deploys the reviewed
 Pi publisher locally, refreshes V0.5, performs one SHADOW publish, waits for the
