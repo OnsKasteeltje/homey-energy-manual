@@ -2,8 +2,9 @@
 """Archive read-only flex context for retrospective EMS analysis.
 
 The archive is observability-only. It reads already-derived Pi artifacts for
-Heating Preheat, cross-domain flex priority, Heating progression, WW input and
-WW seasonal advice, and stores a compact semantic snapshot in planner-history.
+Heating Preheat, cross-domain flex priority, Heating progression, the V0.5
+control-boundary SHADOW, WW input and WW seasonal advice, and stores a compact
+semantic snapshot in planner-history.
 
 It performs no Homey calls, no network calls, no planner decisions and no
 physical/control writes.
@@ -22,6 +23,7 @@ DB_FILE = DATA / "planner-history.sqlite"
 HEATING_FILE = DATA / "heating-preheat-shadow-v0.3.json"
 PRIORITY_FILE = DATA / "flex-priority-shadow-v0.1.json"
 PROGRESSION_FILE = DATA / "heating-preheat-progression-shadow-v0.4.json"
+CONTROL_GATE_FILE = DATA / "heating-control-gate-shadow-v0.5.json"
 WW_INPUT_FILE = DATA / "ww-input.json"
 WW_SEASONAL_FILE = DATA / "ww-seasonal-advisor.json"
 ENERGY_STATE_FILE = DATA / "energy-state-v2.json"
@@ -33,6 +35,7 @@ HEARTBEAT_MINUTES = 15
 HEATING_SCHEMA = "EMS_HEATING_PREHEAT_SHADOW_V0.3"
 PRIORITY_SCHEMA = "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1"
 PROGRESSION_SCHEMA = "EMS_HEATING_PREHEAT_PROGRESSION_SHADOW_V0.4"
+CONTROL_GATE_SCHEMA = "EMS_HEATING_CONTROL_GATE_SHADOW_V0.5"
 WW_INPUT_SCHEMA = "EMS_PI_WW_INPUT_V0.1"
 WW_SEASONAL_SCHEMA = "EMS_WW_SEASONAL_SOURCE_V0.4_PI"
 
@@ -138,6 +141,46 @@ def _project_progression(payload):
     }
 
 
+def _validate_control_gate(payload):
+    _validate_shadow(payload, CONTROL_GATE_SCHEMA, "control gate")
+    if payload.get("physicalWriteAllowed") is not False:
+        raise RuntimeError("control gate physicalWriteAllowed boundary invalid")
+    for room in payload.get("rooms") or []:
+        if not isinstance(room, dict):
+            continue
+        command = room.get("command")
+        if isinstance(command, dict) and command.get("physicalWrite") is not False:
+            raise RuntimeError("control gate command physicalWrite boundary invalid")
+
+
+def _project_control_gate(payload):
+    rooms = []
+    for room in payload.get("rooms") or []:
+        if not isinstance(room, dict):
+            continue
+        rooms.append({
+            "key": room.get("key"),
+            "displayName": room.get("displayName"),
+            "preheatScope": room.get("preheatScope"),
+            "group": room.get("group"),
+            "opportunityId": room.get("opportunityId"),
+            "source": room.get("source"),
+            "checks": room.get("checks"),
+            "command": room.get("command"),
+            "shadowOwnership": room.get("shadowOwnership"),
+        })
+    return {
+        "generatedAt": payload.get("generatedAt"),
+        "physicalWriteAllowed": payload.get("physicalWriteAllowed"),
+        "baselineAuthority": payload.get("baselineAuthority"),
+        "sourceFreshness": payload.get("sourceFreshness"),
+        "failureReason": payload.get("failureReason"),
+        "policy": payload.get("policy"),
+        "lifecycle": payload.get("lifecycle"),
+        "rooms": rooms,
+    }
+
+
 def _project_ww_input(payload, path):
     if not isinstance(payload, dict) or payload.get("schema") != WW_INPUT_SCHEMA:
         return None
@@ -191,10 +234,12 @@ def build_snapshot(now=None):
     heating = _load(HEATING_FILE)
     priority = _load(PRIORITY_FILE)
     progression = _load(PROGRESSION_FILE)
+    control_gate = _load(CONTROL_GATE_FILE)
 
     _validate_shadow(heating, HEATING_SCHEMA, "heating")
     _validate_shadow(priority, PRIORITY_SCHEMA, "priority")
     _validate_shadow(progression, PROGRESSION_SCHEMA, "progression")
+    _validate_control_gate(control_gate)
 
     ww_input = _load(WW_INPUT_FILE, required=False)
     ww_seasonal = _load(WW_SEASONAL_FILE, required=False)
@@ -209,6 +254,7 @@ def build_snapshot(now=None):
         "heating": _project_heating(heating),
         "priority": _project_priority(priority),
         "progression": _project_progression(progression),
+        "controlGate": _project_control_gate(control_gate),
         "warmWaterInput": _project_ww_input(ww_input, WW_INPUT_FILE),
         "warmWaterSeasonal": _project_ww_seasonal(ww_seasonal),
         "energyState": _project_energy_state(energy_state),
@@ -221,7 +267,7 @@ def _semantic_payload(snapshot):
     clone = json.loads(json.dumps(snapshot))
     clone.pop("capturedAt", None)
 
-    for section in ("heating", "priority", "progression", "warmWaterSeasonal"):
+    for section in ("heating", "priority", "progression", "controlGate", "warmWaterSeasonal"):
         value = clone.get(section)
         if isinstance(value, dict):
             value.pop("generatedAt", None)
@@ -233,9 +279,11 @@ def _semantic_payload(snapshot):
         energy.pop("sourceSampleAt", None)
         energy.pop("generatedAt", None)
 
-    progression = clone.get("progression")
-    if isinstance(progression, dict):
-        freshness = progression.get("sourceFreshness")
+    for section in ("progression", "controlGate"):
+        value = clone.get(section)
+        if not isinstance(value, dict):
+            continue
+        freshness = value.get("sourceFreshness")
         if isinstance(freshness, dict):
             for source in freshness.values():
                 if isinstance(source, dict):

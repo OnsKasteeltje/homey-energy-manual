@@ -16,7 +16,7 @@ def load_module():
     return module
 
 
-def snapshot(at):
+def snapshot(at, control_action="HOLD"):
     iso = at.isoformat().replace("+00:00", "Z")
     return {
         "schema": "EMS_PI_FLEX_CONTEXT_SNAPSHOT_V0.1",
@@ -62,6 +62,33 @@ def snapshot(at):
                 },
             }],
         },
+        "controlGate": {
+            "generatedAt": iso,
+            "physicalWriteAllowed": False,
+            "baselineAuthority": "HONEYWELL",
+            "sourceFreshness": {
+                "heating": {"status": "OK", "ageSeconds": 20.0},
+                "progression": {"status": "OK", "ageSeconds": 10.0},
+                "progressionConsistentWithHeating": True,
+                "progressionUpstreamSafe": True,
+            },
+            "failureReason": None,
+            "rooms": [{
+                "key": "serre",
+                "preheatScope": True,
+                "opportunityId": "serre|2026-10-03T16:00:00+02:00|21.000",
+                "command": {
+                    "action": control_action,
+                    "target_C": 20.5 if control_action in {"WOULD_SET_TEMP", "WOULD_KEEP_TEMP"} else None,
+                    "reason": "GUARDS_PASS_ACTIVE_STEP" if control_action in {"WOULD_SET_TEMP", "WOULD_KEEP_TEMP"} else "HEATING_NOT_READY",
+                    "physicalWrite": False,
+                },
+                "shadowOwnership": {
+                    "wouldOwnOverride": control_action in {"WOULD_SET_TEMP", "WOULD_KEEP_TEMP"},
+                    "physicalOwnershipProven": False,
+                },
+            }],
+        },
         "warmWaterInput": {
             "fileMtimeAt": iso,
             "mode": "shadow",
@@ -96,14 +123,45 @@ def main():
         assert second["inserted"] is False
         assert second["dedupe"] == "UNCHANGED_WITHIN_HEARTBEAT"
 
-        t2 = t0 + timedelta(minutes=16)
-        third = module.archive(snapshot(t2), db_path=db, now=t2)
+        # A V0.5 command transition is semantic evidence and must be retained
+        # immediately, even inside the normal 15-minute heartbeat window.
+        t2 = t0 + timedelta(minutes=6)
+        third = module.archive(
+            snapshot(t2, control_action="WOULD_SET_TEMP"),
+            db_path=db,
+            now=t2,
+        )
         assert third["inserted"] is True
 
+        t3 = t0 + timedelta(minutes=7)
+        fourth = module.archive(
+            snapshot(t3, control_action="WOULD_RESET_TO_SCHEDULE"),
+            db_path=db,
+            now=t3,
+        )
+        assert fourth["inserted"] is True
+
+        # Unchanged control state still receives the normal heartbeat row.
+        t4 = t3 + timedelta(minutes=16)
+        fifth = module.archive(
+            snapshot(t4, control_action="WOULD_RESET_TO_SCHEDULE"),
+            db_path=db,
+            now=t4,
+        )
+        assert fifth["inserted"] is True
+
         con = sqlite3.connect(db)
-        count = con.execute("SELECT COUNT(*) FROM flex_context_snapshots").fetchone()[0]
+        rows = con.execute(
+            "SELECT captured_at_utc,snapshot_zlib FROM flex_context_snapshots "
+            "ORDER BY captured_at_utc"
+        ).fetchall()
         con.close()
-        assert count == 2
+        assert len(rows) == 4
+
+        import json, zlib
+        latest = json.loads(zlib.decompress(rows[-1][1]).decode("utf-8"))
+        assert latest["controlGate"]["rooms"][0]["command"]["action"] == "WOULD_RESET_TO_SCHEDULE"
+        assert latest["controlGate"]["rooms"][0]["command"]["physicalWrite"] is False
 
     print("PASS: flex context history archive contract")
 

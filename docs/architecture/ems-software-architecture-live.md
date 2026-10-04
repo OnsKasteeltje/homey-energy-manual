@@ -261,6 +261,15 @@ planner grant, target ceiling en <=0.5 C progression. Rollback is alleen
 Homey adapter/gate, exact één Honeywell writer en acknowledgement/readback.
 V0.5 moet bij cutover worden gepromoveerd of retired/archived.
 
+De commissioning-observability is eveneens lokaal: `ems-flex-context-history`
+archiveert V0.3, Flex Priority, V0.4 en de V0.5 control-gate semantiek in
+`planner-history.sqlite/flex_context_snapshots`. Het bestaande V0.1
+flex-context schema blijft behouden; `controlGate` is een additief veld zodat
+historische snapshots leesbaar blijven. `ems-health` bewaakt voor dezelfde
+Heating-keten zowel artefact-freshness als timer/service-functionaliteit. Deze
+evidence-route is read-only en kan nooit upstream planner-, gate- of
+actuatorautoriteit krijgen.
+
 ## 12. Actieve EV execution chain
 
 Actuele Homey-keten:

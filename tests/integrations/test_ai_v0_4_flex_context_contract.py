@@ -92,6 +92,31 @@ def create_planner_db(path):
         "warmWaterSeasonal": {
             "status": "OK", "currentMode": "CV", "advice": "KEEP_CURRENT"
         },
+        "controlGate": {
+            "generatedAt": "2026-10-03T13:57:30Z",
+            "physicalWriteAllowed": False,
+            "baselineAuthority": "HONEYWELL",
+            "sourceFreshness": {
+                "heating": {"status": "OK"},
+                "progression": {"status": "OK"},
+                "progressionConsistentWithHeating": True,
+                "progressionUpstreamSafe": True,
+            },
+            "rooms": [{
+                "key": "serre",
+                "preheatScope": True,
+                "command": {
+                    "action": "WOULD_SET_TEMP",
+                    "target_C": 20.3,
+                    "reason": "GUARDS_PASS_ACTIVE_STEP",
+                    "physicalWrite": False,
+                },
+                "shadowOwnership": {
+                    "wouldOwnOverride": True,
+                    "physicalOwnershipProven": False,
+                },
+            }],
+        },
         "energyState": {
             "hotWater": {"mode": False, "boilerOn": False, "boilerPowerW": 0}
         },
@@ -187,6 +212,10 @@ def main():
         room = flex[0]["progression"]["rooms"][0]
         assert room["planner"]["domainGrant"] == "SHADOW_GRANT"
         assert room["progression"]["physicalWritePerformed"] is False
+        gate = flex[0]["controlGate"]["rooms"][0]
+        assert gate["command"]["action"] == "WOULD_SET_TEMP"
+        assert gate["command"]["physicalWrite"] is False
+        assert gate["shadowOwnership"]["physicalOwnershipProven"] is False
 
         q = ai._quooker_events(day)
         assert len(q) == 1

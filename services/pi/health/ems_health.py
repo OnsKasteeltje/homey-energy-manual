@@ -23,6 +23,18 @@ DATA_SOURCES = {
     "weatherForecast": (DATA / "weather-forecast.json", ("generated_at",), 2100),
     "quattForecast": (DATA / "quatt-forecast.json", ("generated_at",), 2100),
     "wwPlan": (DATA / "ww-plan.json", ("generated_at",), 2100),
+    "heatingPreheatV03": (
+        DATA / "heating-preheat-shadow-v0.3.json", ("generatedAt",), 420
+    ),
+    "flexPriorityV01": (
+        DATA / "flex-priority-shadow-v0.1.json", ("generatedAt",), 120
+    ),
+    "heatingProgressionV04": (
+        DATA / "heating-preheat-progression-shadow-v0.4.json", ("generatedAt",), 120
+    ),
+    "heatingControlGateV05": (
+        DATA / "heating-control-gate-shadow-v0.5.json", ("generatedAt",), 120
+    ),
 }
 
 FUNCTION_UNITS = {
@@ -68,6 +80,26 @@ FUNCTION_UNITS = {
     "honeywellSchedule": {
         "unit": "ems-honeywell-schedule.timer",
         "service": "ems-honeywell-schedule.service",
+    },
+    "heatingPreheatV03": {
+        "unit": "ems-heating-preheat-shadow.timer",
+        "service": "ems-heating-preheat-shadow.service",
+        "proofData": "heatingPreheatV03",
+    },
+    "flexPriorityV01": {
+        "unit": "ems-flex-priority-shadow.timer",
+        "service": "ems-flex-priority-shadow.service",
+        "proofData": "flexPriorityV01",
+    },
+    "heatingProgressionV04": {
+        "unit": "ems-heating-preheat-progression-shadow.timer",
+        "service": "ems-heating-preheat-progression-shadow.service",
+        "proofData": "heatingProgressionV04",
+    },
+    "heatingControlGateV05": {
+        "unit": "ems-heating-control-gate-shadow.timer",
+        "service": "ems-heating-control-gate-shadow.service",
+        "proofData": "heatingControlGateV05",
     },
 }
 
@@ -150,6 +182,7 @@ def _systemctl_show(unit, expected_active=True):
     props = (
         "LoadState", "ActiveState", "SubState", "Result",
         "ExecMainStatus", "ExecMainExitTimestamp", "ActiveEnterTimestamp",
+        "LastTriggerUSec",
     )
     try:
         proc = subprocess.run(
@@ -212,7 +245,8 @@ def _execution_status(unit):
     return state
 
 
-def _functions_status():
+def _functions_status(data_status=None):
+    data_status = data_status or {}
     items = {}
     degraded = False
 
@@ -227,7 +261,39 @@ def _functions_status():
         if service:
             execution = _execution_status(service)
             item["lastExecution"] = execution
-            if execution.get("status") != "OK":
+            execution_ok = execution.get("status") == "OK"
+
+            # Some inactive oneshot units do not retain ExecMainExitTimestamp.
+            # For explicitly mapped Heating functions, a timer trigger plus a
+            # fresh derived artifact may close only that NOT_PROVEN gap. A
+            # failed/non-zero service result still degrades immediately.
+            proof_name = spec.get("proofData")
+            proof = data_status.get(proof_name) if proof_name else None
+            last_trigger = schedule.get("LastTriggerUSec")
+            fallback_ok = (
+                execution.get("status") == "NOT_PROVEN"
+                and isinstance(last_trigger, str)
+                and bool(last_trigger.strip())
+                and isinstance(proof, dict)
+                and proof.get("status") == "OK"
+                and execution.get("Result") in (None, "", "success")
+                and execution.get("ExecMainStatus") in (None, "", "0")
+            )
+            if fallback_ok:
+                item["executionProof"] = {
+                    "status": "OK",
+                    "method": "TIMER_TRIGGER_PLUS_FRESH_ARTIFACT",
+                    "proofData": proof_name,
+                    "lastTrigger": last_trigger,
+                }
+                execution_ok = True
+            elif execution_ok:
+                item["executionProof"] = {
+                    "status": "OK",
+                    "method": "SYSTEMD_SERVICE_EXECUTION",
+                }
+
+            if not execution_ok:
                 item["status"] = "DEGRADED"
 
         if item["status"] != "OK":
@@ -384,7 +450,7 @@ def _recent_incidents():
 
 def build_health():
     data, data_degraded = _data_status()
-    functions, functions_degraded = _functions_status()
+    functions, functions_degraded = _functions_status(data)
     incidents = _recent_incidents()
     current_degraded = data_degraded or functions_degraded
     has_recent = bool(incidents.get("events"))
