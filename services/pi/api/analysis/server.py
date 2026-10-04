@@ -44,6 +44,7 @@ MAX_QUESTION_CHARS = 1200
 MAX_REQUEST_ID_CHARS = 80
 JOB_RETENTION_HOURS = 24
 JOB_PENDING_STALE_SECONDS = 180
+EXPLICIT_TIME_WINDOW_MINUTES = 30
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 _ACTIVE_JOB_IDS = set()
 _ACTIVE_JOB_LOCK = threading.Lock()
@@ -63,6 +64,7 @@ An observed export window is not automatically an EMS fault; constraints may exp
 Use plannerDecisionWindow as historical intent evidence and never judge an earlier planner decision using a forecast generated later.
 Use forecastVsActual15m to distinguish forecast error from planner/control execution error when the evidence supports that distinction.
 Use flexContextWindow for historical Heating/WW eligibility and priority, and quookerEvents for Quooker adapter/actuator/detector evidence.
+When evidenceSelection.mode is EXPLICIT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally limited to the documented local window around clock times explicitly present in the user's question. Do not interpret absence outside that selected window as evidence that no activity occurred elsewhere in the day.
 Heating progression remains SHADOW. Quooker actuator evidence is versioned: use quookerEvents[].actuator.mode as the authority. For SHADOW evidence, desiredOn/wouldWrite is not a physical command. For LIVE evidence, physicalWritePerformed=true is direct proof that the Homey actuator executed a device write, while actualOnBefore/actualOnAfter describe the observed state transition. physicalWritePerformed=false may be an idempotent no-op when desired and actual state already matched. Detector HEATING is independent electrical evidence and must not by itself be described as a physical control write.
 Never backfill missing pre-commissioning flex or Quooker history by inference.
 For an in-progress day, PARTIAL_TODAY means the calendar day is not finished; never call data incomplete from full-day coverage alone. Use quality.coveragePctElapsed, quality.elapsedCoverageStatus and quality.dayProgressPct.
@@ -411,25 +413,7 @@ def _annotate_deadline_semantics(ev_telemetry, planner_window, flex_context):
         )
 
 
-def _question_anchors(question, day, performance, ev_control):
-    anchors = []
-    for match in _TIME_RE.finditer(question or ""):
-        anchors.append(datetime.combine(
-            day,
-            time(int(match.group(1)), int(match.group(2))),
-            LOCAL_TZ,
-        ))
-
-    if not anchors:
-        for window in (performance.get("surplusWindowsForReplay") or [])[:3]:
-            dt = _parse_ts(window.get("start"))
-            if dt is not None:
-                anchors.append(dt.astimezone(LOCAL_TZ))
-        for event in (ev_control or [])[-3:]:
-            dt = _parse_ts(event.get("atLocal"))
-            if dt is not None:
-                anchors.append(dt.astimezone(LOCAL_TZ))
-
+def _normalize_anchors(anchors):
     result = []
     seen = set()
     for anchor in anchors:
@@ -442,6 +426,63 @@ def _question_anchors(question, day, performance, ev_control):
         if len(result) >= 6:
             break
     return result
+
+
+def _explicit_question_anchors(question, day):
+    anchors = []
+    for match in _TIME_RE.finditer(question or ""):
+        anchors.append(datetime.combine(
+            day,
+            time(int(match.group(1)), int(match.group(2))),
+            LOCAL_TZ,
+        ))
+    return _normalize_anchors(anchors)
+
+
+def _question_anchors(question, day, performance, ev_control):
+    anchors = _explicit_question_anchors(question, day)
+
+    if not anchors:
+        for window in (performance.get("surplusWindowsForReplay") or [])[:3]:
+            dt = _parse_ts(window.get("start"))
+            if dt is not None:
+                anchors.append(dt.astimezone(LOCAL_TZ))
+        for event in (ev_control or [])[-3:]:
+            dt = _parse_ts(event.get("atLocal"))
+            if dt is not None:
+                anchors.append(dt.astimezone(LOCAL_TZ))
+
+    return _normalize_anchors(anchors)
+
+
+def _select_points_near_anchors(
+    points,
+    anchors,
+    window_minutes=EXPLICIT_TIME_WINDOW_MINUTES,
+):
+    if not anchors:
+        return list(points)
+
+    window_seconds = max(0, int(window_minutes)) * 60
+    selected = []
+    for point in points:
+        if not isinstance(point, dict):
+            continue
+        point_time = _parse_ts(point.get("atLocal"))
+        if point_time is None:
+            continue
+        point_utc = point_time.astimezone(timezone.utc)
+        if any(
+            abs(
+                (
+                    point_utc
+                    - anchor.astimezone(timezone.utc)
+                ).total_seconds()
+            ) <= window_seconds
+            for anchor in anchors
+        ):
+            selected.append(point)
+    return selected
 
 
 def _timeline(day):
@@ -1138,15 +1179,62 @@ def _forecast_vs_actual_15m(day, anchors):
 
 def build_evidence(day, question=""):
     performance = _load_performance(day)
+    ev_control_all = _ev_control_events(day)
+    explicit_anchors = _explicit_question_anchors(question, day)
+    anchors = _question_anchors(question, day, performance, ev_control_all)
+
     ev_telemetry = _ev_telemetry(day)
-    ev_control = _ev_control_events(day)
-    anchors = _question_anchors(question, day, performance, ev_control)
+    quooker_events = _quooker_events(day)
+    timeline = _timeline(day)
+    ev_control = ev_control_all
+
+    if explicit_anchors:
+        ev_telemetry = _select_points_near_anchors(
+            ev_telemetry, explicit_anchors
+        )
+        ev_control = _select_points_near_anchors(
+            ev_control_all, explicit_anchors
+        )
+        quooker_events = _select_points_near_anchors(
+            quooker_events, explicit_anchors
+        )
+        timeline = _select_points_near_anchors(
+            timeline, explicit_anchors
+        )
+
     health = _load_health()
     planner_window = _planner_decision_window(day, anchors)
     flex_context = _flex_context_window(day, anchors)
-    quooker_events = _quooker_events(day)
     _annotate_deadline_semantics(ev_telemetry, planner_window, flex_context)
     forecast_actual = _forecast_vs_actual_15m(day, anchors)
+
+    selection = {
+        "mode": (
+            "EXPLICIT_TIME_WINDOW"
+            if explicit_anchors
+            else "DAY_SCOPE"
+        ),
+        "explicitTimeAnchorsLocal": [
+            anchor.isoformat() for anchor in explicit_anchors
+        ],
+        "windowMinutesBefore": (
+            EXPLICIT_TIME_WINDOW_MINUTES if explicit_anchors else None
+        ),
+        "windowMinutesAfter": (
+            EXPLICIT_TIME_WINDOW_MINUTES if explicit_anchors else None
+        ),
+        "scopedFields": (
+            [
+                "timeline5m",
+                "evTelemetry5m",
+                "evControlEvents",
+                "quookerEvents",
+            ]
+            if explicit_anchors
+            else []
+        ),
+    }
+
     return {
         "schema": EVIDENCE_SCHEMA,
         "generatedAt": _iso_z(datetime.now(timezone.utc)),
@@ -1163,8 +1251,9 @@ def build_evidence(day, question=""):
             "currentHealth": "EMS_PI_HEALTH_V0.1 via ems-health",
         },
         "analysisAnchorsLocal": [anchor.isoformat() for anchor in anchors],
+        "evidenceSelection": selection,
         "performance": performance,
-        "timeline5m": _timeline(day),
+        "timeline5m": timeline,
         "evTelemetry5m": ev_telemetry,
         "evControlEvents": ev_control,
         "quookerEvents": quooker_events,
@@ -1174,6 +1263,7 @@ def build_evidence(day, question=""):
         "piHealthCurrent": health,
         "limitations": [
             "For today, full-calendar-day coverage is not evidence completeness. Use coveragePctElapsed and elapsedCoverageStatus to judge elapsed-time measurement coverage.",
+            "When evidenceSelection.mode is EXPLICIT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally scoped to the documented local window around explicit user-provided clock times; absence outside that window is not evidence of no activity.",
             "EV deadline values may retain historical deadlineAt/remainingKWh metadata after the constraint becomes inactive; deadlineSemantics.effective is the authority for whether those values constrain the referenced decision time.",
             "EV telemetry and control-event history only exist from their V0.2 commissioning onward; earlier gaps must not be backfilled by inference.",
             "Heating/WW flex-context history only exists from V0.4 flex-context archive commissioning onward; earlier gaps must not be backfilled from current JSON.",
@@ -1426,6 +1516,9 @@ def _evidence_summary(evidence):
             evidence["forecastVsActual15m"].get("slots") or []
         ),
         "piHealthStatus": evidence["piHealthCurrent"].get("status"),
+        "evidenceSelectionMode": (
+            evidence.get("evidenceSelection") or {}
+        ).get("mode"),
         "limitations": evidence["limitations"],
     }
 
