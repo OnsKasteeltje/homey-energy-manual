@@ -54,6 +54,56 @@ DAY_SCOPE_LIMITS = {
     "quookerEvents": 36,
     "flexContextWindow": 3,
 }
+MODEL_INPUT_TARGET_TOKENS = 80000
+MODEL_INPUT_HARD_LIMIT_TOKENS = 100000
+MODEL_INPUT_ESTIMATE_BYTES_PER_TOKEN = 2.5
+MODEL_INPUT_BUDGET_STEPS = (
+    {
+        "timeline5m": 60,
+        "evTelemetry5m": 40,
+        "evControlEvents": 40,
+        "quookerEvents": 30,
+        "flexContextWindow": 3,
+        "plannerDecisionWindow": 12,
+        "forecastSlots": 24,
+    },
+    {
+        "timeline5m": 48,
+        "evTelemetry5m": 32,
+        "evControlEvents": 32,
+        "quookerEvents": 24,
+        "flexContextWindow": 3,
+        "plannerDecisionWindow": 10,
+        "forecastSlots": 20,
+    },
+    {
+        "timeline5m": 36,
+        "evTelemetry5m": 24,
+        "evControlEvents": 24,
+        "quookerEvents": 18,
+        "flexContextWindow": 2,
+        "plannerDecisionWindow": 8,
+        "forecastSlots": 16,
+    },
+    {
+        "timeline5m": 24,
+        "evTelemetry5m": 16,
+        "evControlEvents": 16,
+        "quookerEvents": 12,
+        "flexContextWindow": 2,
+        "plannerDecisionWindow": 6,
+        "forecastSlots": 12,
+    },
+    {
+        "timeline5m": 16,
+        "evTelemetry5m": 12,
+        "evControlEvents": 12,
+        "quookerEvents": 8,
+        "flexContextWindow": 1,
+        "plannerDecisionWindow": 4,
+        "forecastSlots": 8,
+    },
+)
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 _ACTIVE_JOB_IDS = set()
 _ACTIVE_JOB_LOCK = threading.Lock()
@@ -77,6 +127,7 @@ For EV control questions, evControlEvents[].intentReason, realtimePhaseReason an
 Use flexContextWindow for historical Heating/WW eligibility and priority, and quookerEvents for Quooker adapter/actuator/detector evidence.
 When evidenceSelection.mode is EXPLICIT_TIME_WINDOW or CONTEXT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally limited to the documented local window around the selected clock time. Do not interpret absence outside that selected window as evidence that no activity occurred elsewhere in the day.
 When evidenceSelection.mode is TOPIC_DAY_SCOPE or DAY_SCOPE_COMPACT, listed compactedFields are bounded samples across the day and listed omittedFields were intentionally excluded as unrelated to the current question. Do not interpret omitted or unsampled records as proof that no activity occurred.
+When evidenceSelection.inputBudget.status is COMPACTED_TO_BUDGET or WITHIN_HARD_LIMIT, budgetCompactedFields were additionally reduced before the model call to stay within the documented estimated input budget. This is deliberate selection, not evidence that omitted records did not occur.
 Heating progression remains SHADOW. Quooker actuator evidence is versioned: use quookerEvents[].actuator.mode as the authority. For SHADOW evidence, desiredOn/wouldWrite is not a physical command. For LIVE evidence, physicalWritePerformed=true is direct proof that the Homey actuator executed a device write, while actualOnBefore/actualOnAfter describe the observed state transition. physicalWritePerformed=false may be an idempotent no-op when desired and actual state already matched. Detector HEATING is independent electrical evidence and must not by itself be described as a physical control write.
 Never backfill missing pre-commissioning flex or Quooker history by inference.
 For an in-progress day, PARTIAL_TODAY means the calendar day is not finished; never call data incomplete from full-day coverage alone. Use quality.coveragePctElapsed, quality.elapsedCoverageStatus and quality.dayProgressPct.
@@ -650,6 +701,276 @@ def _bounded_points(points, max_points, change_paths=(), important=None):
                 break
 
     return [values[index] for index in sorted(chosen)]
+
+
+def _model_context_block(conversation_context=None):
+    context_lines = [
+        f"{item['role']}: {item['content']}"
+        for item in (conversation_context or [])
+    ]
+    if not context_lines:
+        return ""
+    return (
+        "Recente conversatiecontext (alleen voor referenties; "
+        "geen EMS-bewijs):\n"
+        + "\n".join(context_lines)
+        + "\n\n"
+    )
+
+
+def _model_input_text(question, evidence, conversation_context=None):
+    return (
+        _model_context_block(conversation_context)
+        + "Vraag:\n"
+        + question
+        + "\n\nEMS evidence JSON:\n"
+        + json.dumps(evidence, ensure_ascii=False)
+    )
+
+
+def _estimate_model_input_tokens(question, evidence, conversation_context=None):
+    # No runtime tokenizer dependency: use an intentionally conservative
+    # byte-based estimator calibrated against observed EMS model calls.
+    model_text = (
+        SYSTEM_INSTRUCTIONS
+        + "\n"
+        + _model_input_text(question, evidence, conversation_context)
+    )
+    input_bytes = len(model_text.encode("utf-8"))
+    estimated_tokens = (
+        int(input_bytes / MODEL_INPUT_ESTIMATE_BYTES_PER_TOKEN) + 1
+    )
+    return estimated_tokens, input_bytes
+
+
+def _budget_compact_field(
+    evidence,
+    field,
+    max_points,
+    change_paths=(),
+    important=None,
+):
+    points = evidence.get(field)
+    if not isinstance(points, list) or len(points) <= max_points:
+        return False
+    evidence[field] = _bounded_points(
+        points,
+        max_points,
+        change_paths=change_paths,
+        important=important,
+    )
+    return len(evidence[field]) < len(points)
+
+
+def _budget_compact_evidence(evidence, limits):
+    changed = []
+
+    if _budget_compact_field(
+        evidence,
+        "timeline5m",
+        limits["timeline5m"],
+        change_paths=(("washerActive",), ("dryerActive",)),
+    ):
+        changed.append("timeline5m")
+
+    if _budget_compact_field(
+        evidence,
+        "evTelemetry5m",
+        limits["evTelemetry5m"],
+        change_paths=(
+            ("connected",),
+            ("charging",),
+            ("observedPhaseMode",),
+            ("chargeState",),
+            ("deadlineActive",),
+            ("managerDecision",),
+            ("managerReason",),
+        ),
+    ):
+        changed.append("evTelemetry5m")
+
+    if _budget_compact_field(
+        evidence,
+        "evControlEvents",
+        limits["evControlEvents"],
+        change_paths=(
+            ("gateStatus",),
+            ("actuatorStatus",),
+            ("actuatorReason",),
+            ("transitionStage",),
+            ("transitionFailure",),
+            ("chargeState",),
+            ("deviceHealthStatus",),
+            ("phaseMode",),
+            ("intentReason",),
+            ("realtimePhaseReason",),
+            ("realtimeCurrentReason",),
+        ),
+        important=lambda point: bool(
+            point.get("physicalWritePerformed")
+            or point.get("transitionFailure")
+            or point.get("gateErrors")
+        ),
+    ):
+        changed.append("evControlEvents")
+
+    if _budget_compact_field(
+        evidence,
+        "quookerEvents",
+        limits["quookerEvents"],
+        change_paths=(
+            ("control", "targetOn"),
+            ("actuator", "mode"),
+            ("actuator", "actualOn"),
+            ("detector", "active"),
+            ("detector", "status"),
+            ("physicalWritePerformed",),
+        ),
+        important=lambda point: bool(
+            point.get("physicalWritePerformed")
+            or (point.get("actuator") or {}).get("writeError")
+        ),
+    ):
+        changed.append("quookerEvents")
+
+    if _budget_compact_field(
+        evidence,
+        "flexContextWindow",
+        limits["flexContextWindow"],
+        change_paths=(
+            ("priority", "ev", "deadlineActive"),
+            ("priority", "ev", "urgency"),
+            ("priority", "decision", "priorityOwner"),
+        ),
+    ):
+        changed.append("flexContextWindow")
+
+    if _budget_compact_field(
+        evidence,
+        "plannerDecisionWindow",
+        limits["plannerDecisionWindow"],
+        change_paths=(
+            ("deadline", "active"),
+            ("deadline", "deadlineAt"),
+            ("action", "tesla"),
+            ("action", "warmWater"),
+        ),
+    ):
+        changed.append("plannerDecisionWindow")
+
+    forecast = evidence.get("forecastVsActual15m")
+    if isinstance(forecast, dict):
+        slots = forecast.get("slots")
+        if (
+            isinstance(slots, list)
+            and len(slots) > limits["forecastSlots"]
+        ):
+            forecast["slots"] = _bounded_points(
+                slots, limits["forecastSlots"]
+            )
+            changed.append("forecastVsActual15m.slots")
+
+    return changed
+
+
+def _refresh_budget_selected_counts(evidence):
+    selection = evidence.get("evidenceSelection") or {}
+    counts = selection.get("selectedCounts")
+    if not isinstance(counts, dict):
+        return
+    for field in (
+        "timeline5m",
+        "evTelemetry5m",
+        "evControlEvents",
+        "quookerEvents",
+        "flexContextWindow",
+    ):
+        value = evidence.get(field)
+        if isinstance(value, list):
+            counts[field] = len(value)
+
+
+def _apply_model_input_budget(
+    evidence,
+    question,
+    conversation_context=None,
+):
+    selection = evidence.get("evidenceSelection")
+    if not isinstance(selection, dict):
+        selection = {}
+        evidence["evidenceSelection"] = selection
+
+    budget = {
+        "targetTokens": MODEL_INPUT_TARGET_TOKENS,
+        "hardLimitTokens": MODEL_INPUT_HARD_LIMIT_TOKENS,
+        "estimatedTokens": None,
+        "estimatedInputBytes": None,
+        "preBudgetEstimatedTokens": None,
+        "status": "PENDING",
+        "estimator": "UTF8_BYTES_DIV_2_5_CONSERVATIVE",
+        "exactTokenizer": False,
+        "compactionStepsApplied": 0,
+        "budgetCompactedFields": [],
+    }
+    selection["inputBudget"] = budget
+
+    estimated, input_bytes = _estimate_model_input_tokens(
+        question, evidence, conversation_context
+    )
+    budget["preBudgetEstimatedTokens"] = estimated
+
+    compacted = []
+    steps_applied = 0
+
+    if estimated > MODEL_INPUT_TARGET_TOKENS:
+        for step_number, limits in enumerate(
+            MODEL_INPUT_BUDGET_STEPS, start=1
+        ):
+            changed = _budget_compact_evidence(evidence, limits)
+            steps_applied = step_number
+            compacted.extend(changed)
+            _refresh_budget_selected_counts(evidence)
+
+            estimated, input_bytes = _estimate_model_input_tokens(
+                question, evidence, conversation_context
+            )
+            if estimated <= MODEL_INPUT_TARGET_TOKENS:
+                break
+
+    compacted_unique = sorted(set(compacted))
+    selection["compactedFields"] = sorted(set(
+        (selection.get("compactedFields") or []) + compacted_unique
+    ))
+    budget["compactionStepsApplied"] = steps_applied
+    budget["budgetCompactedFields"] = compacted_unique
+
+    estimated, input_bytes = _estimate_model_input_tokens(
+        question, evidence, conversation_context
+    )
+    budget["estimatedTokens"] = estimated
+    budget["estimatedInputBytes"] = input_bytes
+
+    if estimated > MODEL_INPUT_HARD_LIMIT_TOKENS:
+        budget["status"] = "HARD_LIMIT_EXCEEDED"
+        raise RuntimeError("MODEL_INPUT_BUDGET_EXCEEDED")
+    if compacted_unique and estimated <= MODEL_INPUT_TARGET_TOKENS:
+        budget["status"] = "COMPACTED_TO_BUDGET"
+    elif estimated <= MODEL_INPUT_TARGET_TOKENS:
+        budget["status"] = "WITHIN_BUDGET"
+    else:
+        budget["status"] = "WITHIN_HARD_LIMIT"
+
+    # Re-estimate once with the final status/diagnostics included.
+    estimated, input_bytes = _estimate_model_input_tokens(
+        question, evidence, conversation_context
+    )
+    budget["estimatedTokens"] = estimated
+    budget["estimatedInputBytes"] = input_bytes
+    if estimated > MODEL_INPUT_HARD_LIMIT_TOKENS:
+        budget["status"] = "HARD_LIMIT_EXCEEDED"
+        raise RuntimeError("MODEL_INPUT_BUDGET_EXCEEDED")
+
+    return evidence
 
 
 def _select_points_near_anchors(
@@ -1586,7 +1907,7 @@ def build_evidence(day, question="", conversation_context=None):
         "selectedCounts": selected_counts,
     }
 
-    return {
+    evidence = {
         "schema": EVIDENCE_SCHEMA,
         "generatedAt": _iso_z(datetime.now(timezone.utc)),
         "dateLocal": day.isoformat(),
@@ -1617,6 +1938,7 @@ def build_evidence(day, question="", conversation_context=None):
             "Recent conversation context is referential context only and is not EMS evidence. Factual claims still require support from the current evidence package.",
             "When evidenceSelection.mode is EXPLICIT_TIME_WINDOW or CONTEXT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally scoped to the documented local window; absence outside that window is not evidence of no activity.",
             "When evidenceSelection.mode is TOPIC_DAY_SCOPE or DAY_SCOPE_COMPACT, compactedFields are bounded samples across the day and omittedFields were intentionally excluded as unrelated to the question; absence or omission is not evidence of no activity.",
+            "evidenceSelection.inputBudget uses a conservative UTF-8 byte-based token estimate rather than the model tokenizer. If budget compaction is applied, budgetCompactedFields records the additional deterministic reductions; HARD_LIMIT_EXCEEDED prevents the model call.",
             "EV deadline values may retain historical deadlineAt/remainingKWh metadata after the constraint becomes inactive; deadlineSemantics.effective is the authority for whether those values constrain the referenced decision time.",
             "EV telemetry and control-event history only exist from their V0.2 commissioning onward; earlier gaps must not be backfilled by inference.",
             "Heating/WW flex-context history only exists from V0.4 flex-context archive commissioning onward; earlier gaps must not be backfilled from current JSON.",
@@ -1632,6 +1954,11 @@ def build_evidence(day, question="", conversation_context=None):
             "Export windows are observations and require constraint context before classifying them as missed opportunities.",
         ],
     }
+    return _apply_model_input_budget(
+        evidence,
+        question,
+        conversation_context,
+    )
 
 def _job_now():
     return datetime.now(timezone.utc)
@@ -1877,6 +2204,9 @@ def _evidence_summary(evidence):
         "conversationContextMessages": (
             evidence.get("evidenceSelection") or {}
         ).get("conversationContextMessages") or 0,
+        "inputBudget": (
+            evidence.get("evidenceSelection") or {}
+        ).get("inputBudget"),
         "limitations": evidence["limitations"],
     }
 
@@ -2006,28 +2336,17 @@ def ask_model(question, evidence, conversation_context=None):
     if not OPENAI_API_KEY:
         raise RuntimeError("MODEL_NOT_CONFIGURED")
 
-    context_lines = [
-        f"{item['role']}: {item['content']}"
-        for item in (conversation_context or [])
-    ]
-    context_block = ""
-    if context_lines:
-        context_block = (
-            "Recente conversatiecontext (alleen voor referenties; "
-            "geen EMS-bewijs):\n"
-            + "\n".join(context_lines)
-            + "\n\n"
-        )
+    estimated, _ = _estimate_model_input_tokens(
+        question, evidence, conversation_context
+    )
+    if estimated > MODEL_INPUT_HARD_LIMIT_TOKENS:
+        raise RuntimeError("MODEL_INPUT_BUDGET_EXCEEDED")
 
     body = json.dumps({
         "model": MODEL,
         "instructions": SYSTEM_INSTRUCTIONS,
-        "input": (
-            context_block
-            + "Vraag:\n"
-            + question
-            + "\n\nEMS evidence JSON:\n"
-            + json.dumps(evidence, ensure_ascii=False)
+        "input": _model_input_text(
+            question, evidence, conversation_context
         ),
         "reasoning": {
             "effort": REASONING_EFFORT,
