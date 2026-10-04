@@ -129,10 +129,14 @@ tracked large loads; it is not a new measurement authority.
 Directly observed appliance state in `timeline5m` is first-class diagnostic
 evidence. When a power event is analysed and a relevant state such as
 `washerActive=true` or `dryerActive=true` is present in the corresponding
-interval, the model must mention that state as a **Feit**. Device-active state
-does not by itself prove power attribution: without separate measured
-device-power evidence the model may describe the active device as a supported
-possible explanation, but must not claim that it caused the measured P1 change.
+interval, the model must mention that state as a **Feit**. Relevance is
+question-specific: an observed device state must not be surfaced merely because
+it exists in the evidence. For a subsystem-specific question such as whether
+the Tesla charged, unrelated washer/dryer state is omitted unless it materially
+explains or constrains the Tesla event being analysed. Device-active state does
+not by itself prove power attribution: without separate measured device-power
+evidence the model may describe the active device as a supported possible
+explanation, but must not claim that it caused the measured P1 change.
 
 When the user's question contains one or more explicit local clock times, the
 large day-wide historical arrays `timeline5m`, `evTelemetry5m`,
