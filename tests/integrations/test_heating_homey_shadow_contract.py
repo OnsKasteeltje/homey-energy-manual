@@ -71,6 +71,7 @@ def main():
     hold = m.build_intent(source(), generated_at=NOW)
     assert hold["valid"] is True
     assert hold["physicalWriteAllowed"] is False
+    assert hold["liveExecutionAllowed"] is False
     assert hold["safety"]["productionPlannerHeatingGrantPresent"] is False
     assert len(hold["commands"]) == 4
     assert all(c["physicalWrite"] is False for c in hold["commands"])
@@ -95,6 +96,7 @@ def main():
     assert stale["valid"] is False
     assert stale["commands"] == []
     assert stale["physicalWriteAllowed"] is False
+    assert stale["liveExecutionAllowed"] is False
 
     bad = source("WOULD_SET_TEMP", 17.5)
     bad["rooms"][0]["command"]["physicalWrite"] = True
