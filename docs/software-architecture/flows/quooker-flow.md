@@ -50,27 +50,27 @@ owner: EMS
 <!-- GENERATED_MERMAID:quooker-flow-1 START -->
 ```mermaid
 flowchart TD
-    A[Elke 15 s / Cooker ON / Cooker OFF] --> B[Targeted Cooker + Diagnostic read]
-    B --> C{P1 sample nodig?}
-    C -->|Ja| D[Targeted P1 L1/L2/L3 read]
-    C -->|Nee| E[Hergebruik OFF-baseline]
-    D --> F{Cooker ON?}
-    F -->|Nee| G[OFF + update 3-fasenbaseline]
-    F -->|Ja| H{Baseline compleet?}
-    H -->|Nee| I[ON_IDLE + baseline init]
-    H -->|Ja| J[Bereken delta L1/L2/L3]
-    J --> K{90 s HEATING overschreden?}
-    K -->|Ja| L[ON_IDLE + fail-safe baseline reset]
-    K -->|Nee| M{L3 signature + L1/L2 stabiel?}
-    M -->|Ja| N[HEATING]
-    M -->|Nee| O[ON_IDLE]
-    E --> P[Publiceer targeted Logic-state]
-    G --> P
-    I --> P
-    L --> P
-    N --> P
-    O --> P
-    P --> Q[Core consumeert bestaand Quooker-contract]
+A[Elke 15 s / Cooker ON / Cooker OFF] --> B[Targeted Cooker + Diagnostic read]
+B --> C{P1 sample nodig?}
+C -->|Ja| D[Targeted P1 L1/L2/L3 read]
+C -->|Nee| E[Hergebruik OFF-baseline]
+D --> F{Cooker ON?}
+F -->|Nee| G[OFF + update 3-fasenbaseline]
+F -->|Ja| H{Baseline compleet?}
+H -->|Nee| I[ON_IDLE + baseline init]
+H -->|Ja| J[Bereken delta L1/L2/L3]
+J --> K{90 s HEATING overschreden?}
+K -->|Ja| L[ON_IDLE + fail-safe baseline reset]
+K -->|Nee| M{L3 signature + L1/L2 stabiel?}
+M -->|Ja| N[HEATING]
+M -->|Nee| O[ON_IDLE]
+E --> P[Publiceer targeted Logic-state]
+G --> P
+I --> P
+L --> P
+N --> P
+O --> P
+P --> Q[Core consumeert bestaand Quooker-contract]
 ```
 <!-- GENERATED_MERMAID:quooker-flow-1 END -->
 
