@@ -163,9 +163,13 @@ async function resumePending(){
     const r=await fetch(`/agent/result?${qs}`,{cache:"no-store"});
     const d=await r.json();
 
-    if(r.status===404||d.status==="NOT_FOUND"){
-      // The original page may have disappeared before the POST reached the Pi.
-      // Re-use the same idempotency key so an accepted job can never double-run.
+    if(
+      r.status===404||
+      d.status==="NOT_FOUND"||
+      d.status==="STALE"
+    ){
+      // The original page may have disappeared before POST acceptance, or the
+      // Pi may have restarted during a job. Re-use the same idempotency key.
       await submitRequest(
         pending.question,
         pending.requestId,
