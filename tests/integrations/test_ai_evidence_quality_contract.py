@@ -269,6 +269,46 @@ def main():
     assert pv_evidence["evTelemetry5m"] == []
     assert pv_evidence["quookerEvents"] == []
 
+    pv_context = [
+        {
+            "role": "user",
+            "content": "Ik kijk naar het PV&Flex tijdslot rond 00:45.",
+        },
+        {
+            "role": "assistant",
+            "content": "Rond 00:45 is dit het relevante PV&Flex tijdslot.",
+        },
+    ]
+    pv_context_evidence = ai.build_evidence(
+        day,
+        "waarom staat er op de PV&Flex pagina dan in dit tijdslot geen waarde?",
+        pv_context,
+    )
+    assert pv_context_evidence["evidenceSelection"]["mode"] == "CONTEXT_TIME_WINDOW"
+    assert pv_context_evidence["evidenceSelection"]["topics"] == ["PV_FLEX"]
+    assert pv_context_evidence["evidenceSelection"]["contextTimeAnchorsLocal"] == [
+        "2026-10-04T00:45:00+02:00"
+    ]
+    assert pv_context_evidence["evidenceSelection"]["originalCounts"]["evControlEvents"] == 100
+    assert pv_context_evidence["evidenceSelection"]["selectedCounts"]["evControlEvents"] == 0
+    assert pv_context_evidence["evidenceSelection"]["selectedCounts"]["evTelemetry5m"] == 0
+    assert pv_context_evidence["evControlEvents"] == []
+    assert pv_context_evidence["evTelemetry5m"] == []
+    assert pv_context_evidence["quookerEvents"] == []
+    assert "evControlEvents" in pv_context_evidence["evidenceSelection"]["omittedFields"]
+    assert "evTelemetry5m" in pv_context_evidence["evidenceSelection"]["omittedFields"]
+
+    pv_explicit_evidence = ai.build_evidence(
+        day,
+        "waarom ontbreekt PV&Flex om 00:45?",
+        [],
+    )
+    assert pv_explicit_evidence["evidenceSelection"]["mode"] == "EXPLICIT_TIME_WINDOW"
+    assert pv_explicit_evidence["evidenceSelection"]["topics"] == ["PV_FLEX"]
+    assert pv_explicit_evidence["evControlEvents"] == []
+    assert pv_explicit_evidence["evTelemetry5m"] == []
+    assert pv_explicit_evidence["quookerEvents"] == []
+
     maxed = {
         "id": "resp_test_max",
         "status": "incomplete",

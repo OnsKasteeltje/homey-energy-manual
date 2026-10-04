@@ -1503,20 +1503,24 @@ def build_evidence(day, question="", conversation_context=None):
             if len(after) < len(before):
                 compacted_fields.append(field)
 
-        if topics:
-            if "EV" not in topics:
-                if ev_telemetry:
-                    omitted_fields.append("evTelemetry5m")
-                if ev_control:
-                    omitted_fields.append("evControlEvents")
-                ev_telemetry = []
-                ev_control = []
-            if "QUOOKER" not in topics:
-                if quooker_events:
-                    omitted_fields.append("quookerEvents")
-                quooker_events = []
-
         mode = "TOPIC_DAY_SCOPE" if topics else "DAY_SCOPE_COMPACT"
+
+    # Time scoping answers *when* to look; topic routing answers *which*
+    # subsystem evidence is relevant. Apply topic routing after either
+    # selection path so CONTEXT_TIME_WINDOW/EXPLICIT_TIME_WINDOW do not
+    # accidentally carry unrelated EV or Quooker streams.
+    if topics:
+        if "EV" not in topics:
+            if ev_telemetry:
+                omitted_fields.append("evTelemetry5m")
+            if ev_control:
+                omitted_fields.append("evControlEvents")
+            ev_telemetry = []
+            ev_control = []
+        if "QUOOKER" not in topics:
+            if quooker_events:
+                omitted_fields.append("quookerEvents")
+            quooker_events = []
 
     health = _load_health()
     planner_window = _planner_decision_window(day, anchors)

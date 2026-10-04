@@ -156,7 +156,11 @@ A contextual follow-up with no clock time in the current question may reuse an
 explicit clock time from the bounded recent conversation context. In that case
 the mode is `CONTEXT_TIME_WINDOW`; the selected context anchors are recorded
 separately from explicit current-question anchors. Conversation text remains
-referential only and does not become evidence.
+referential only and does not become evidence. Topic routing is applied after
+time scoping as an independent second step: the time window decides *when* to
+look, while detected topics decide *which subsystem streams* are transported.
+Therefore a PV/Flex-only explicit/context window still omits unrelated EV and
+Quooker streams.
 
 Questions without an explicit or contextual time anchor use bounded day scope.
 The large event streams are deterministically compacted while preserving day
