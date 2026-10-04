@@ -656,6 +656,55 @@ def _resume_validate_and_enable(config):
     print("NOTE: no Honeywell/device capability was written")
 
 
+def _runtime_only(config):
+    if config.get("state") != "READY":
+        raise RuntimeError(f"RUNTIME_ONLY_REQUIRES_READY_STATE:{config.get('state')}")
+    if config.get("pendingOperation") is not None:
+        raise RuntimeError("RUNTIME_ONLY_BLOCKED_BY_PENDING_OPERATION")
+
+    timer = "ems-heating-homey-shadow-publish.timer"
+    was_enabled = subprocess.run(
+        ["systemctl", "is-enabled", timer],
+        text=True,
+        capture_output=True,
+        check=False,
+    ).stdout.strip()
+    was_active = subprocess.run(
+        ["systemctl", "is-active", timer],
+        text=True,
+        capture_output=True,
+        check=False,
+    ).stdout.strip()
+
+    print("runtime-only: timer enabled=", was_enabled, "active=", was_active)
+    subprocess.run(["sudo", "systemctl", "stop", timer], check=False)
+    install_pi_runtime()
+
+    if was_active == "active":
+        subprocess.run(["sudo", "systemctl", "start", timer], check=True)
+
+    now_enabled = subprocess.run(
+        ["systemctl", "is-enabled", timer],
+        text=True,
+        capture_output=True,
+        check=False,
+    ).stdout.strip()
+    if now_enabled != was_enabled:
+        raise RuntimeError(
+            f"RUNTIME_ONLY_ENABLED_STATE_CHANGED:{was_enabled}->{now_enabled}"
+        )
+
+    print("PASS: Heating Homey publisher runtime refreshed without Homey API calls")
+    print("publisher timer enabled:", now_enabled)
+    print("publisher timer active:", subprocess.run(
+        ["systemctl", "is-active", timer],
+        text=True,
+        capture_output=True,
+        check=False,
+    ).stdout.strip())
+    print("NOTE: no Homey Logic, Flow or device call was issued")
+
+
 def main():
     parser = argparse.ArgumentParser()
     mode = parser.add_mutually_exclusive_group()
@@ -669,6 +718,11 @@ def main():
         action="store_true",
         help="Validate an existing READY SHADOW installation and enable publisher timer",
     )
+    mode.add_argument(
+        "--runtime-only",
+        action="store_true",
+        help="Refresh only Pi publisher source/systemd units; perform no Homey API calls",
+    )
     args = parser.parse_args()
 
     for source in (
@@ -677,7 +731,13 @@ def main():
         if not source.exists():
             raise RuntimeError(f"SOURCE_MISSING:{source}")
 
-    print("mode:", "RESUME" if args.resume else "APPLY" if args.apply else "DRY-RUN")
+    print(
+        "mode:",
+        "RUNTIME_ONLY" if args.runtime_only
+        else "RESUME" if args.resume
+        else "APPLY" if args.apply
+        else "DRY-RUN",
+    )
     print("physical device writes: FORBIDDEN")
 
     config = load_config()
@@ -688,6 +748,10 @@ def main():
             + json.dumps(pending, separators=(",", ":"))
             + ":do not retry creation until the pending Homey object is reconciled"
         )
+
+    if args.runtime_only:
+        _runtime_only(config)
+        return 0
 
     if args.resume:
         _resume_validate_and_enable(config)

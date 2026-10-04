@@ -17,6 +17,7 @@ DATA = Path("/home/jeroen/ems/data")
 SOURCE = DATA / "heating-control-gate-shadow-v0.5.json"
 CONFIG = DATA / "heating-control-homey-shadow-config.json"
 STATUS = DATA / "heating-control-homey-shadow-publish-status.json"
+CACHE = DATA / "heating-homey-shadow-publish-cache.json"
 
 HOMEY_PROJECT = Path("/home/jeroen/ems-homey-adapter")
 HOMEY_CLI = HOMEY_PROJECT / "node_modules/.bin/homey"
@@ -27,6 +28,7 @@ OUTPUT_SCHEMA = "EMS_HEATING_CONTROL_INTENT_V0.1"
 CONFIG_SCHEMA = "EMS_HEATING_HOMEY_SHADOW_CONFIG_V0.1"
 MAX_SOURCE_AGE_SECONDS = 120
 INTENT_VALID_SECONDS = 120
+RATE_LIMIT_COOLDOWN_SECONDS = (300, 900, 1800, 3600)
 
 ALLOWED_ROOM_KEYS = {"woonkamer", "eetkamer", "keuken", "serre"}
 ACTION_MAP = {
@@ -273,6 +275,62 @@ def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _load_cache() -> dict[str, Any]:
+    try:
+        payload = _load_json(CACHE)
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _cache_time(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        return None
+    return dt.astimezone(timezone.utc)
+
+
+def _publish_decision(cache: dict[str, Any], revision: str, now: datetime) -> tuple[str, str | None]:
+    retry_not_before = _cache_time(cache.get("retryNotBefore"))
+    if retry_not_before is not None and now < retry_not_before:
+        return "COOLDOWN_RATE_LIMIT", _iso(retry_not_before)
+
+    if cache.get("lastPublishedRevision") == revision:
+        return "SUPPRESS_UNCHANGED", None
+
+    return "PUBLISH", None
+
+
+def _rate_limit_cache(cache: dict[str, Any], now: datetime) -> dict[str, Any]:
+    previous = cache.get("rateLimitCount")
+    count = int(previous) + 1 if isinstance(previous, int) and previous >= 0 else 1
+    delay = RATE_LIMIT_COOLDOWN_SECONDS[min(count - 1, len(RATE_LIMIT_COOLDOWN_SECONDS) - 1)]
+    retry = now + timedelta(seconds=delay)
+    out = dict(cache)
+    out.update({
+        "rateLimitCount": count,
+        "lastRateLimitedAt": _iso(now),
+        "retryNotBefore": _iso(retry),
+    })
+    return out
+
+
+def _success_cache(cache: dict[str, Any], intent: dict[str, Any], now: datetime) -> dict[str, Any]:
+    out = dict(cache)
+    out.update({
+        "lastPublishedRevision": intent.get("controlRevision"),
+        "lastHomeyWriteAt": _iso(now),
+        "rateLimitCount": 0,
+        "retryNotBefore": None,
+    })
+    return out
+
+
 def _run_homey(args: list[str]) -> str:
     env = os.environ.copy()
     env["PATH"] = NODE_PATH + ":" + env.get("PATH", "")
@@ -358,6 +416,11 @@ def main() -> int:
     if source_error:
         intent = _fail_closed(source_error, now, None)
 
+    cache = _load_cache()
+    decision, retry_not_before = _publish_decision(
+        cache, str(intent.get("controlRevision") or ""), now
+    )
+
     status = {
         "schema": "EMS_HEATING_HOMEY_SHADOW_PUBLISH_STATUS_V0.1",
         "generatedAt": _iso(now),
@@ -370,16 +433,59 @@ def main() -> int:
         "deviceWrites": False,
         "physicalWriteAllowed": False,
         "targetVariableId": intent_var_id,
+        "publishDecision": decision,
+        "lastPublishedRevision": cache.get("lastPublishedRevision"),
+        "lastHomeyWriteAt": cache.get("lastHomeyWriteAt"),
+        "retryNotBefore": retry_not_before or cache.get("retryNotBefore"),
     }
+
+    if decision == "COOLDOWN_RATE_LIMIT":
+        status["publishStatus"] = "COOLDOWN_RATE_LIMIT"
+        _atomic_json(STATUS, status)
+        print(
+            "PASS: Heating Homey publish skipped during rate-limit cooldown "
+            f"until={status['retryNotBefore']} revision={intent['controlRevision']}"
+        )
+        print("deviceWrites: false")
+        print("physicalWriteAllowed: false")
+        return 0
+
+    if decision == "SUPPRESS_UNCHANGED":
+        status["publishStatus"] = "SUPPRESSED_UNCHANGED"
+        _atomic_json(STATUS, status)
+        print(
+            "PASS: Heating Homey publish unchanged; Homey write suppressed "
+            f"revision={intent['controlRevision']}"
+        )
+        print("deviceWrites: false")
+        print("physicalWriteAllowed: false")
+        return 0
 
     try:
         _publish_logic(intent_var_id, intent)
+        cache = _success_cache(cache, intent, now)
+        _atomic_json(CACHE, cache)
         status["homeyLogicWrite"] = True
         status["publishStatus"] = "OK"
+        status["lastPublishedRevision"] = cache.get("lastPublishedRevision")
+        status["lastHomeyWriteAt"] = cache.get("lastHomeyWriteAt")
+        status["retryNotBefore"] = None
         _atomic_json(STATUS, status)
     except Exception as exc:
+        message = str(exc)
+        if "HOMEY_RATE_LIMIT_429_NO_RETRY" in message:
+            cache = _rate_limit_cache(cache, now)
+            _atomic_json(CACHE, cache)
+            status["publishStatus"] = "RATE_LIMITED"
+            status["retryNotBefore"] = cache.get("retryNotBefore")
+            status["error"] = "HOMEY_RATE_LIMIT_429_NO_RETRY"
+            _atomic_json(STATUS, status)
+            raise SystemExit(
+                "FAIL_CLOSED: Heating SHADOW intent publish rate limited; "
+                f"cooldown until {cache.get('retryNotBefore')}"
+            )
         status["publishStatus"] = "FAILED"
-        status["error"] = str(exc)[:500]
+        status["error"] = message[:500]
         _atomic_json(STATUS, status)
         raise SystemExit(f"FAIL_CLOSED: Heating SHADOW intent publish failed: {exc}")
 
