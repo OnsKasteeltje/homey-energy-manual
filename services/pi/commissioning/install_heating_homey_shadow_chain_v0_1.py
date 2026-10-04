@@ -54,6 +54,8 @@ FLOW_NAMES = {
 def run_homey(*args: str) -> str:
     env = os.environ.copy()
     env["PATH"] = NODE_PATH + ":" + env.get("PATH", "")
+    env["HOMEY_SKIP_STARTUP_NOTIFIERS"] = "1"
+    env["NO_UPDATE_NOTIFIER"] = "1"
     cp = subprocess.run(
         [str(HOMEY_CLI), *args],
         cwd=HOMEY_PROJECT,

@@ -276,6 +276,8 @@ def _load_json(path: Path) -> dict[str, Any]:
 def _run_homey(args: list[str]) -> str:
     env = os.environ.copy()
     env["PATH"] = NODE_PATH + ":" + env.get("PATH", "")
+    env["HOMEY_SKIP_STARTUP_NOTIFIERS"] = "1"
+    env["NO_UPDATE_NOTIFIER"] = "1"
     proc = subprocess.run(
         [str(HOMEY_CLI)] + args,
         cwd=HOMEY_PROJECT,
