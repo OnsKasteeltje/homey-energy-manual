@@ -350,3 +350,15 @@ The analysis model is configured through the systemd service environment.
 - `EMS_AI_MAX_OUTPUT_TOKENS` limits the combined reasoning and answer output budget; the application default is `1200`.
 
 The deployed analysis service may deliberately use a higher reasoning effort and output-token ceiling than the application defaults. These settings affect analysis only and do not grant control-write authority.
+
+Model-response failures are classified before an empty answer is reported. A
+Responses API result with `status=incomplete` and
+`incomplete_details.reason=max_output_tokens` is exposed as
+`MODEL_INCOMPLETE_MAX_OUTPUT_TOKENS`; content-filter incompleteness,
+refusals, explicit response errors and genuinely empty completed responses keep
+separate diagnostic codes. On such failures the service writes one bounded JSON
+diagnostic event to the systemd journal containing only response ID, response
+status/reason and token-count metadata. The user's question, EMS evidence,
+model text/refusal text and credentials are never written to that diagnostic
+event. This observability path does not retry the model request and does not
+change the configured reasoning effort or output-token limit.

@@ -526,6 +526,16 @@ remain host-local under `/etc/ems/ai-agent.env` and must never be committed.
 Missing credentials fail explicitly rather than degrading to fabricated
 analysis.
 
+AI model-response handling now preserves the distinction between an actually
+empty completed response and other non-text Responses API outcomes. Incomplete
+responses caused by the configured output budget are reported as
+`MODEL_INCOMPLETE_MAX_OUTPUT_TOKENS`; refusal, content-filter and explicit
+response-error paths remain separately identifiable. A bounded journal event
+records only model response ID, response status/reason and aggregate token
+counts. It never records the question, EMS evidence, model/refusal text or
+credentials. No automatic retry, reasoning-effort change or output-budget
+increase is part of this observability hardening.
+
 V2 AI navigation is resumable. The browser keeps the visible conversation in
 tab-scoped `sessionStorage` and attaches a generated `requestId` to an
 analysis request. The Pi persists only the corresponding short-lived UI

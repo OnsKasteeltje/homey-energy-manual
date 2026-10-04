@@ -90,6 +90,71 @@ def main():
     assert "mention that state as a Feit" in instructions
     assert "Never equate an active device state with measured power attribution" in instructions
 
+    maxed = {
+        "id": "resp_test_max",
+        "status": "incomplete",
+        "incomplete_details": {"reason": "max_output_tokens"},
+        "usage": {
+            "input_tokens": 1200,
+            "output_tokens": 4096,
+            "output_tokens_details": {"reasoning_tokens": 4096},
+            "total_tokens": 5296,
+        },
+        "output": [{"type": "reasoning"}],
+    }
+    assert ai._model_failure_reason(maxed) == "MODEL_INCOMPLETE_MAX_OUTPUT_TOKENS"
+    maxed_diag = ai._model_response_diagnostics(
+        maxed, ai._model_failure_reason(maxed)
+    )
+    assert maxed_diag["responseId"] == "resp_test_max"
+    assert maxed_diag["status"] == "incomplete"
+    assert maxed_diag["incompleteReason"] == "max_output_tokens"
+    assert maxed_diag["outputTokens"] == 4096
+    assert maxed_diag["reasoningTokens"] == 4096
+    assert set(maxed_diag) == {
+        "event",
+        "reason",
+        "responseId",
+        "status",
+        "incompleteReason",
+        "errorCode",
+        "refusalPresent",
+        "inputTokens",
+        "outputTokens",
+        "reasoningTokens",
+        "totalTokens",
+    }
+
+    refused = {
+        "id": "resp_test_refused",
+        "status": "completed",
+        "output": [{
+            "type": "message",
+            "content": [{"type": "refusal", "refusal": "not logged"}],
+        }],
+    }
+    assert ai._model_failure_reason(refused) == "MODEL_REFUSED"
+    assert ai._model_response_diagnostics(
+        refused, ai._model_failure_reason(refused)
+    )["refusalPresent"] is True
+
+    completed_empty = {
+        "id": "resp_test_empty",
+        "status": "completed",
+        "output": [{"type": "message", "content": []}],
+    }
+    assert ai._model_failure_reason(completed_empty) == "MODEL_EMPTY_RESPONSE_COMPLETED"
+
+    normal = {
+        "id": "resp_test_ok",
+        "status": "completed",
+        "output": [{
+            "type": "message",
+            "content": [{"type": "output_text", "text": "antwoord"}],
+        }],
+    }
+    assert ai._extract_output_text(normal) == "antwoord"
+
     print("PASS: AI evidence quality semantics contract")
 
 
