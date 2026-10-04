@@ -54,6 +54,7 @@ const intent={
   controlMode:'SHADOW',
   deviceWrites:false,
   physicalWriteAllowed:false,
+  liveExecutionAllowed:false,
   plannerAuthority:'SHADOW_ONLY',
   executor:'HOMEY_SHADOW',
   baselineAuthority:'HONEYWELL',
@@ -97,6 +98,7 @@ assert.equal(adapter.schema,'EMS_HEATING_CONTROL_ADAPTER_SHADOW_V0.1');
 assert.equal(adapter.valid,true);
 assert.equal(adapter.physicalWriteAllowed,false);
 assert.equal(adapter.deviceWrites,false);
+assert.equal(intent.liveExecutionAllowed,false);
 assert.equal(adapter.commands.find(x=>x.roomKey==='woonkamer').action,'SET_TEMP');
 
 const gateRun=new AsyncFunction('Homey',gateSource);
