@@ -316,6 +316,8 @@ Pi Dynamic Planner
 
 De adapter blijft translation-only en verricht geen fysieke writes. Sinds 2 oktober 2026 is `EM v2 | 60 Actuator | Quooker v0.2 LIVE` de enige automatische fysieke writer voor `Cooker`. Hij gebruikt het gevalideerde `EM2_Control_Quooker`, schrijft idempotent en failt closed naar OFF bij ongeldig of stale control. De drie legacy Waterkoker-tijdflows zijn in dezelfde cutover disabled en mogen niet gelijktijdig met de LIVE-actuator worden geactiveerd.
 
+De aparte Homey→Pi observability-route blijft control-neutral, maar transporteert sinds 4 oktober 2026 het actuatorcontract versiegetrouw. Voor v0.2 LIVE worden `mode=LIVE`, `actualOnBefore`, `actualOnAfter`, top-level `physicalWritePerformed` en `writeError` als evidence behouden. De AI mag alleen `physicalWritePerformed=true` als direct bewijs van een fysieke actuator-write gebruiken; een idempotente LIVE-run met `false` is geen fout en detector-HEATING is afzonderlijke elektrische observatie.
+
 Canonical Homey actuator-device:
 
 `Cooker` — device ID `42992d14-c4e4-43fc-aaf0-29a73a8e2eb9`, capability `onoff`.
