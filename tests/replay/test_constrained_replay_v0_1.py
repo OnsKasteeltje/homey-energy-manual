@@ -271,7 +271,7 @@ class ReplayIntegrationTests(unittest.TestCase):
             )
 
             start = datetime(2026, 10, 4, 12, 0, tzinfo=timezone.utc)
-            for minute in range(3):
+            for minute in (0, 5, 10):
                 ts = replay._iso_z(start + timedelta(minutes=minute))
                 values = {
                     "grid_p1": -2000,
@@ -322,6 +322,36 @@ class ReplayIntegrationTests(unittest.TestCase):
                     json.dumps(event.raw),
                 ),
             )
+            event2 = control_event(
+                at=start + timedelta(minutes=2),
+                requested_a=6,
+                offered_a=6,
+                available_w=6500,
+                rolling_w=6500,
+                current_reason="HOLD_A",
+            )
+            con.execute(
+                """
+                INSERT INTO ev_control_events(
+                    ts_utc,requested_a,phase_mode,gate_status,
+                    actuator_status,actuator_reason,actuator_target_a,
+                    transition_stage,transition_failure,charge_state,raw_json
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    replay._iso_z(event2.at),
+                    event2.requested_a,
+                    event2.phase_mode,
+                    event2.gate_status,
+                    event2.actuator_status,
+                    event2.actuator_reason,
+                    event2.actuator_target_a,
+                    event2.transition_stage,
+                    event2.transition_failure,
+                    event2.charge_state,
+                    json.dumps(event2.raw),
+                ),
+            )
             con.execute(
                 """
                 INSERT INTO semantic_events(
@@ -345,7 +375,17 @@ class ReplayIntegrationTests(unittest.TestCase):
         self.assertTrue(report["readOnly"])
         self.assertFalse(report["controlWrites"])
         self.assertEqual(report["scope"], "EV_EXPORT_ONLY")
-        self.assertEqual(report["coverage"]["controlEvents"], 1)
+        self.assertEqual(report["coverage"]["controlEvents"], 2)
+        self.assertGreater(report["coverage"]["integratedHours"], 0)
+        self.assertEqual(report["coverage"]["measurementIntervalSecP50"], 300.0)
+        self.assertEqual(
+            report["coverage"]["measurementIntervalsOverPreferredAttributionSec"],
+            2,
+        )
+        self.assertGreaterEqual(
+            report["coverage"]["controlSegmentedMeasurementIntervals"],
+            1,
+        )
         self.assertEqual(report["coverage"]["semanticEvents"], 1)
         self.assertGreater(
             report["totals"]["byClassificationKWh"][replay.CLASS_MISSED],
@@ -355,6 +395,11 @@ class ReplayIntegrationTests(unittest.TestCase):
         self.assertEqual(
             report["windows"][0]["semanticEvents"][0]["eventType"],
             "EV_CHARGING_STARTED",
+        )
+        self.assertEqual(report["windows"][0]["confidence"], "MEDIUM")
+        self.assertGreater(
+            report["totals"]["byClassificationKWh"][replay.CLASS_INSUFFICIENT],
+            0,
         )
 
 
