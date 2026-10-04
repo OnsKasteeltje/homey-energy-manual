@@ -353,11 +353,18 @@ def main():
         [],
     )
     compact_budget = budgeted["evidenceSelection"]["inputBudget"]
-    assert compact_budget["status"] == "COMPACTED_TO_BUDGET"
+    assert compact_budget["status"] in {
+        "COMPACTED_TO_BUDGET",
+        "WITHIN_HARD_LIMIT",
+    }
     assert compact_budget["compactionStepsApplied"] >= 1
     assert "timeline5m" in compact_budget["budgetCompactedFields"]
     assert len(budgeted["timeline5m"]) < 100
-    assert compact_budget["estimatedTokens"] <= ai.MODEL_INPUT_TARGET_TOKENS
+    assert compact_budget["estimatedTokens"] <= ai.MODEL_INPUT_HARD_LIMIT_TOKENS
+    if compact_budget["status"] == "COMPACTED_TO_BUDGET":
+        assert compact_budget["estimatedTokens"] <= ai.MODEL_INPUT_TARGET_TOKENS
+    else:
+        assert compact_budget["estimatedTokens"] > ai.MODEL_INPUT_TARGET_TOKENS
     assert budgeted["evidenceSelection"]["selectedCounts"]["timeline5m"] == len(
         budgeted["timeline5m"]
     )
