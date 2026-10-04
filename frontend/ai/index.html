@@ -23,19 +23,28 @@
     </div>
   </section>
 
-  <section class="quick-actions" aria-label="Snelle vragen">
-    <button data-question="Waarom hebben we vandaag PV geëxporteerd terwijl de Tesla aangesloten was?">Waarom export met Tesla?</button>
-    <button data-question="Heeft het EMS vandaag opvallende gemiste PV-kansen gehad?">Gemiste PV-kansen</button>
-    <button data-question="Hoe heeft het EMS vandaag gepresteerd en wat zijn de belangrijkste verklaringen?">Analyseer vandaag</button>
-  </section>
-
   <section class="panel chat-panel">
-    <div id="messages" class="messages" aria-live="polite">
+    <header class="panel-header">
+      <div>
+        <small>EMS AI</small>
+        <h2>Vraag &amp; antwoord</h2>
+      </div>
+      <span class="badge">READ-ONLY</span>
+    </header>
+
+    <div class="quick-actions" aria-label="Snelle vragen">
+      <button data-question="Waarom hebben we vandaag PV geëxporteerd terwijl de Tesla aangesloten was?">Waarom export met Tesla?</button>
+      <button data-question="Heeft het EMS vandaag opvallende gemiste PV-kansen gehad?">Gemiste PV-kansen</button>
+      <button data-question="Hoe heeft het EMS vandaag gepresteerd en wat zijn de belangrijkste verklaringen?">Analyseer vandaag</button>
+    </div>
+
+    <div id="messages" class="messages" aria-live="polite" tabindex="0">
       <article class="message agent">
         <small>EMS AI</small>
         <p>Stel een vraag over vandaag. V0.4 combineert performance, plannerbeslissingen, forecast-vs-werkelijkheid en historische EV-, Quooker-, warmwater- en heating-context.</p>
       </article>
     </div>
+
     <form id="ask-form" class="ask-form">
       <label for="question">Vraag</label>
       <textarea id="question" rows="3" maxlength="1200" placeholder="Bijv. waarom exporteerden we rond 14:00 terwijl de Tesla aangesloten was?"></textarea>
