@@ -2116,7 +2116,7 @@ def build_evidence(day, question="", conversation_context=None):
     if constrained_replay_relevant:
         constrained_replay = _project_constrained_replay(
             _load_constrained_replay(day),
-            selected_time_anchors or anchors,
+            selected_time_anchors,
         )
 
     original_counts = {
