@@ -73,6 +73,23 @@ Pi planner/control
 
 The Pi planner never writes devices directly. Homey remains responsible for bounded realtime execution and local safety.
 
+### Heating control-contract SHADOW egress
+
+Heating V0.5 adds a separate commissioning-only egress source:
+`services/pi/integrations/homey/egress/publish_heating_control_intent_shadow.py`.
+It writes only the dedicated string Logic contract
+`EM2_Heating_Control_Intent`, schema `EMS_HEATING_CONTROL_INTENT_V0.1`.
+
+This is deliberately **not** a production Power Intent producer. It declares
+`plannerAuthority=SHADOW_ONLY`,
+`productionPlannerHeatingGrantPresent=false`,
+`deviceWrites=false` and `physicalWriteAllowed=false`. The downstream Homey
+Heating Adapter/Gate remain SHADOW and no Heating actuator exists. Normal
+runtime uses the pinned Logic ID from host-local
+`heating-control-homey-shadow-config.json`; broad discovery is limited to
+controlled first commissioning.
+
+
 ## Runtime compatibility
 
 Repository placement is independent from the installed Pi runtime layout. During the incremental repository migration the existing runtime contracts stay unchanged:
@@ -83,6 +100,8 @@ Repository placement is independent from the installed Pi runtime layout. During
   → runtime: `/home/jeroen/ems/runtime/status-api/ev_control_ingest.py`
 - compatibility egress source: `services/pi/integrations/homey/egress/publish_pi_control_intent.py`
   → runtime: `/home/jeroen/ems/runtime/homey-deploy/publish_pi_control_intent.py`
+- Heating SHADOW egress source: `services/pi/integrations/homey/egress/publish_heating_control_intent_shadow.py`
+  → runtime: `/home/jeroen/ems/runtime/homey-deploy/publish_heating_control_intent_shadow.py`
 
 This keeps existing imports and callers stable while the Git source converges to the target architecture.
 
