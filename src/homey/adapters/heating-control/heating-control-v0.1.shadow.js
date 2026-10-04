@@ -70,6 +70,14 @@ if(Array.isArray(intent?.commands)){
         : target===null;
     const sourceWriteSafe=src?.physicalWrite===false;
     const ownershipSafe=src?.shadowOwnership?.physicalOwnershipProven===false;
+    const ownershipSemantics=
+      action==='SET_TEMP'||action==='KEEP_TEMP'
+        ? src?.shadowOwnership?.wouldOwnOverride===true&&
+          src?.shadowOwnership?.simulatedRollback===false
+        : action==='RESET_TO_SCHEDULE'
+          ? src?.shadowOwnership?.simulatedRollback===true&&
+            src?.shadowOwnership?.wouldOwnOverride===false
+          : true;
     const unique=!seen.has(key);
     if(key)seen.add(key);
 
@@ -80,7 +88,8 @@ if(Array.isArray(intent?.commands)){
       target:targetOK,
       schedule:Number.isFinite(scheduleAt),
       sourceWriteSafe,
-      ownershipSafe
+      ownershipSafe,
+      ownershipSemantics
     };
     const errors=Object.entries(checks).filter(([,ok])=>!ok).map(([name])=>name.toUpperCase());
     commandErrors=commandErrors.concat(errors.map(e=>(key||'UNKNOWN')+':'+e));
