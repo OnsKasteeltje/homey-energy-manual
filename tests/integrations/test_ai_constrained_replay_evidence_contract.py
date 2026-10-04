@@ -140,6 +140,17 @@ def main():
     assert args[-1] == "--no-write-output"
     assert "2026-10-04" in args
 
+    with mock.patch.object(
+        ai.subprocess,
+        "run",
+        side_effect=FileNotFoundError("ems-constrained-replay missing"),
+    ):
+        unavailable = ai._load_constrained_replay(
+            datetime(2026, 10, 4, tzinfo=timezone.utc).date()
+        )
+    assert unavailable["available"] is False
+    assert unavailable["reason"] == "CONSTRAINED_REPLAY_COMMAND_UNAVAILABLE"
+
     invalid = subprocess.CompletedProcess(
         args=["ems-constrained-replay"],
         returncode=0,
