@@ -519,8 +519,17 @@ question. For example, `washerActive=true` is a recorded **Feit** that must
 not be omitted from the explanation. It remains distinct from power
 attribution: without separate measured washer power, the AI may identify the
 active washer as a supported possible explanation but must not claim that it
-caused the measured P1 change. This changes analysis interpretation only; no
-evidence schema, polling, planner, Homey or physical-control route is added.
+caused the measured P1 change.
+
+For questions containing explicit local clock times, V0.4 now applies
+question-aware evidence selection to the four largest day-wide arrays:
+`timeline5m`, `evTelemetry5m`, `evControlEvents` and `quookerEvents`.
+Only points within ±30 minutes of the explicit user times are transported to
+the model, and `evidenceSelection` records the scope. Questions without an
+explicit clock time preserve the previous bounded day scope; automatically
+chosen fallback analysis anchors do not trigger trimming. This is
+analysis-transport optimization only: canonical history, source authority,
+polling, planner, Homey and physical-control paths are unchanged.
 
 Frontend V2 exposes the human interface at `/ai/`. Private Caddy ingress
 proxies `/agent/*` only to the loopback analysis service. Model credentials
