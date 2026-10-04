@@ -1,6 +1,6 @@
 # EV Bridge v1.5.8 production tuning — 2026-10-04
 
-Status: **APPROVED FOR DIRECT PRODUCTION PROMOTION**
+Status: **DEPLOYED / EXACT READBACK VERIFIED**
 
 ## Scope
 
@@ -97,6 +97,31 @@ Runtime acceptance after the normal minute trigger:
 - `currentImportLimitW=300`;
 - Adapter/Gate remain aligned and Gate remains PASS for valid control;
 - no additional physical writer exists.
+
+## Production cutover result — 2026-10-04
+
+GitHub PR #165 passed the repository structure gate, EMS Architecture Gate,
+all canonical/EV regressions and the full EMS Security Scan, then squash-merged
+as `af8da3041f5d09abc50b33d5cc3b7b9ad8b7e6e4`.
+
+The Homey deployment then updated only stable Advanced Flow
+`8bf53fdb-76f4-47db-8ccb-773ac515f06e` from v1.5.7 to:
+
+`EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.8 PRODUCTION TUNED [READY]`
+
+Targeted post-write readback proved:
+
+- flow ID unchanged;
+- enabled = true;
+- broken = false;
+- card count remained 5;
+- every non-script card was byte-for-byte semantically unchanged;
+- script-card source exactly matched GitHub `main`;
+- no Adapter, Gate or writer flow was changed;
+- no physical actuator flow was manually triggered for deployment validation.
+
+The exact pre-deploy v1.5.7 writable body was retained in-memory for immediate
+rollback during the transaction; rollback was not required.
 
 ## Rollback
 
