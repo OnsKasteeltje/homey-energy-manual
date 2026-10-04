@@ -36,7 +36,7 @@ TIMER_SOURCE = ROOT / "deploy/systemd/ems-heating-homey-shadow-publish.timer"
 
 CONFIG_SCHEMA = "EMS_HEATING_HOMEY_SHADOW_CONFIG_V0.1"
 PLACEHOLDER_ASSIGNMENT = "const IDS=__EMS_HEATING_IDS__;"
-WRITE_SPACING_SECONDS = 3
+WRITE_SPACING_SECONDS = 6
 READBACK_SPACING_SECONDS = 6
 CHAIN_SETTLE_SECONDS = 8
 
@@ -212,10 +212,12 @@ def create_variable(name: str):
 def ensure_logic_variables(config, apply: bool):
     result = dict(config.get("logic") or {})
 
-    # Existing commissioned IDs are always validated by targeted readback.
-    for key, meta in list(result.items()):
-        if key not in LOGIC_NAMES:
-            continue
+    # Existing commissioned IDs are always validated by paced targeted
+    # readback. This is especially important on READY resyncs: never burst the
+    # three Logic reads into Homey immediately after each other.
+    existing_keys = [key for key in ("intent", "adapter", "gate") if key in result]
+    for index, key in enumerate(existing_keys):
+        meta = result[key]
         if not isinstance(meta, dict) or not isinstance(meta.get("id"), str):
             raise RuntimeError(f"LOCAL_LOGIC_METADATA_INVALID:{key}")
         live = get_variable(meta["id"])
@@ -223,6 +225,8 @@ def ensure_logic_variables(config, apply: bool):
             raise RuntimeError(f"TARGETED_LOGIC_NAME_MISMATCH:{key}")
         if live.get("type") != "string":
             raise RuntimeError(f"TARGETED_LOGIC_TYPE_INVALID:{key}")
+        if index < len(existing_keys) - 1:
+            time.sleep(READBACK_SPACING_SECONDS)
 
     missing = [(key, name) for key, name in LOGIC_NAMES.items() if key not in result]
     if missing and not apply:
@@ -703,6 +707,11 @@ def main():
     adapter_meta = ensure_flow(
         "adapter", adapter_flow(logic, adapter_src), config, args.apply
     )
+    # Keep the two targeted Advanced Flow reads/updates separated as well.
+    # A READY resync must be safe to run after a failed resume without
+    # recreating objects or bursting Homey API calls.
+    if adapter_meta is not None:
+        _sleep_between_reads()
     gate_meta = ensure_flow(
         "gate", gate_flow(logic, gate_src), config, args.apply
     )
@@ -719,6 +728,11 @@ def main():
     config["logic"] = logic
     config["flows"] = {"adapter": adapter_meta, "gate": gate_meta}
     config["pendingOperation"] = None
+    # Any source resync invalidates a previous activation proof until --resume
+    # has revalidated the exact installed Logic/Flow code and one fresh chain.
+    config["publisherTimerEnabled"] = False
+    config.pop("validatedAt", None)
+    config.pop("lastValidatedRevision", None)
     save_config(config)
 
     _prepare_runtime_with_timer_off()
