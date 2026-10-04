@@ -1,0 +1,17 @@
+[Unit]
+Description=EMS read-only semantic event history archive
+After=ems-flex-context-history.service ems-ev-deadline-state.service
+
+[Service]
+Type=oneshot
+User=jeroen
+WorkingDirectory=/home/jeroen/ems/runtime/history
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/history/archive_semantic_events.py
+TimeoutStartSec=30
+Nice=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jeroen/ems/data
