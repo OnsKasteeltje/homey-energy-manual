@@ -116,7 +116,7 @@ def main():
         == 0.1227
     )
 
-    anchor = datetime(2026, 10, 4, 12, 45, tzinfo=timezone.utc)
+    anchor = datetime(2026, 10, 4, 10, 45, tzinfo=timezone.utc)
     scoped = ai._project_constrained_replay(payload, [anchor])
     assert scoped["windowSelection"] == "AROUND_ANALYSIS_ANCHORS"
     assert len(scoped["selectedWindows"]) == 2
