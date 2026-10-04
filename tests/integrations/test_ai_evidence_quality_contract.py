@@ -89,6 +89,10 @@ def main():
     assert "washerActive" in instructions
     assert "dryerActive" in instructions
     assert "mention that state as a Feit" in instructions
+    assert "Relevance is mandatory" in instructions
+    assert "do not mention unrelated device-state observations" in instructions
+    assert "whether the Tesla charged" in instructions
+    assert "omit washer/dryer state" in instructions
     assert "Never equate an active device state with measured power attribution" in instructions
     assert "evidenceSelection.mode is EXPLICIT_TIME_WINDOW" in instructions
 
