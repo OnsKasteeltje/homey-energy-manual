@@ -171,6 +171,16 @@ def build_intent(source: dict[str, Any], *, generated_at=None) -> dict[str, Any]
             action = ACTION_MAP.get(source_action)
             if action is None:
                 raise IntentError(f"{key} source action unsupported: {source_action}")
+            if action in {"SET_TEMP", "KEEP_TEMP"}:
+                if ownership.get("wouldOwnOverride") is not True:
+                    raise IntentError(f"{key} set/keep requires shadow ownership")
+                if ownership.get("simulatedRollback") is not False:
+                    raise IntentError(f"{key} set/keep cannot be rollback")
+            elif action == "RESET_TO_SCHEDULE":
+                if ownership.get("simulatedRollback") is not True:
+                    raise IntentError(f"{key} reset requires simulated rollback ownership")
+                if ownership.get("wouldOwnOverride") is not False:
+                    raise IntentError(f"{key} reset cannot retain shadow ownership")
 
             current_target = _number(
                 baseline.get("currentTarget_C"), f"{key}.baseline.currentTarget_C"
