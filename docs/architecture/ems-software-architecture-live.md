@@ -28,7 +28,7 @@ HOMEY DEVICES / P1 / PV / EASEE / BOILER / QUATT
                          ↓
                /control/current
                          ↓ LAN
-              HOMEY PI BRIDGE v1.5.8 LIVE / v1.5.9 candidate
+              HOMEY PI BRIDGE v1.5.9 LIVE
                          ↓
                  EM2_Power_Intent
                   ↙             ↘
@@ -186,7 +186,7 @@ Er mag nooit gelijktijdig dubbele plannerauthority bestaan.
 
 ## 9. Pi → Homey control via /control/current
 
-De actieve bridge is nog `EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.8 PRODUCTION TUNED [READY]`; v1.5.9 is de same-flow kandidaat voor adaptive 3P-upscale. De bridge leest:
+De actieve bridge is `EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.9 ADAPTIVE UPSCALE [READY]`. De bridge leest:
 
 ```text
 http://192.168.1.42:3100/control/current
@@ -304,11 +304,11 @@ OFF re-entry dwell = 120 s
 downward phase transitions = no extra dwell after rolling condition
 same-phase current preference = up to +300 W predicted import
 same-phase current down-limit = +300 W effective; 250 W phase-entry viability margin remains
-3P baseline upstep = +2 A; candidate adaptive upstep = max +4 A only with current export + ready rolling support + settled physical target
+3P baseline upstep = +2 A; LIVE adaptive upstep = max +4 A only with current export + ready rolling support + settled physical target
 deadline = forced 3P within Pi request maxA
 ```
 
-De bridge owns de bounded realtime phase-selector binnen de Pi-envelope. In v1.5.8 blijven het 120-second rolling venster en minimaal 90-second coverage leidend; upward hysterese is opgesplitst in 120 s OFF re-entry en 180 s 1P→3P. De current-loop gebruikt bounded settled stappen (+3 A 1P, +2 A 3P) en is getuned op maximaal ongeveer +300 W voorspelde netimport om vermijdbare export verder te absorberen. De v1.5.9 kandidaat laat uitsluitend in reeds bevestigde 3P-modus een grotere stap toe tot maximaal +4 A, en alleen wanneer actuele P1-export, het ready 2-minute rolling signaal en het instantaneous predictive target diezelfde extra stap ondersteunen én de fysieke Easee current eerst op het vorige target is gesettled. Zonder deze gezamenlijke bevestiging blijft de normale +2 A 3P-bound actief. Down-regulation, dwell/phase-transities en deadline-force blijven ongewijzigd. De adapter vertaalt het authoritative phase contract exact; de Gate valideert schema, control revisions, freshness en de 230/690 W/A mapping. Alleen de actuator schrijft fysiek naar Easee. Voor 1P↔3P gebruikt de actuator een bounded pause/phase/deadtime/resume-transactie. De aparte Easee Cloud-authenticatie voor phase control is fail-closed. Writer v0.4.5 onderscheidt refresh-, phase-command- en retry-authfouten en stuurt bij een terminale authfout één gededupliceerde Owner-push, met Timeline fallback; melding heeft geen control impact.
+De bridge owns de bounded realtime phase-selector binnen de Pi-envelope. In v1.5.8 blijven het 120-second rolling venster en minimaal 90-second coverage leidend; upward hysterese is opgesplitst in 120 s OFF re-entry en 180 s 1P→3P. De current-loop gebruikt bounded settled stappen (+3 A 1P, +2 A 3P) en is getuned op maximaal ongeveer +300 W voorspelde netimport om vermijdbare export verder te absorberen. v1.5.9 laat uitsluitend in reeds bevestigde 3P-modus een grotere stap toe tot maximaal +4 A, en alleen wanneer actuele P1-export, het ready 2-minute rolling signaal en het instantaneous predictive target diezelfde extra stap ondersteunen én de fysieke Easee current eerst op het vorige target is gesettled. Zonder deze gezamenlijke bevestiging blijft de normale +2 A 3P-bound actief. Down-regulation, dwell/phase-transities en deadline-force blijven ongewijzigd. De adapter vertaalt het authoritative phase contract exact; de Gate valideert schema, control revisions, freshness en de 230/690 W/A mapping. Alleen de actuator schrijft fysiek naar Easee. Voor 1P↔3P gebruikt de actuator een bounded pause/phase/deadtime/resume-transactie. De aparte Easee Cloud-authenticatie voor phase control is fail-closed. Writer v0.4.5 onderscheidt refresh-, phase-command- en retry-authfouten en stuurt bij een terminale authfout één gededupliceerde Owner-push, met Timeline fallback; melding heeft geen control impact.
 
 ## 13. Actieve WW execution chain
 
