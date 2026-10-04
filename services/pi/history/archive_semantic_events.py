@@ -147,12 +147,19 @@ def build_observations(now: datetime | None = None) -> list[dict[str, Any]]:
                 source_at=at,
                 provenance_class="OBSERVED_STATE",
             ))
-        if hot_water.get("mode") is not None:
+        raw_ww_mode = hot_water.get("mode")
+        if raw_ww_mode is not None:
+            if raw_ww_mode is True:
+                ww_mode = "BOILER"
+            elif raw_ww_mode is False:
+                ww_mode = "CV"
+            else:
+                ww_mode = str(raw_ww_mode)
             observations.append(_observation(
                 state_key="warm_water.source_mode",
                 domain="WARM_WATER",
                 subject="warm_water",
-                value=hot_water.get("mode"),
+                value=ww_mode,
                 source_name="energy-state-v2.json",
                 source_at=at,
                 provenance_class="OBSERVED_STATE",
@@ -411,6 +418,19 @@ def _canonical(value: Any) -> str:
     )
 
 
+def _normalize_previous_value(state_key: str, value: Any) -> Any:
+    # Pre-normalization V0.1 commissioning could store WW_Boilermodus as a
+    # boolean. Canonical contract semantics are false=CV / true=BOILER.
+    # Normalize that already-observed baseline in place so a source-code
+    # upgrade does not manufacture a WW_SOURCE_CHANGED event.
+    if state_key == "warm_water.source_mode":
+        if value is True:
+            return "BOILER"
+        if value is False:
+            return "CV"
+    return value
+
+
 def archive(
     observations: list[dict[str, Any]] | None = None,
     *,
@@ -497,22 +517,25 @@ def archive(
                 stale_skipped += 1
                 continue
 
-            if previous_json == value_json:
-                con.execute(
-                    """
-                    UPDATE semantic_event_state
-                    SET source_at_utc=?,last_observed_at_utc=?
-                    WHERE state_key=?
-                    """,
-                    (source_at, observed_at, state_key),
-                )
-                unchanged += 1
-                continue
-
             try:
                 before = json.loads(previous_json)
             except json.JSONDecodeError:
                 before = None
+            before = _normalize_previous_value(state_key, before)
+            normalized_previous_json = _canonical(before)
+
+            if normalized_previous_json == value_json:
+                con.execute(
+                    """
+                    UPDATE semantic_event_state
+                    SET value_json=?,source_at_utc=?,last_observed_at_utc=?
+                    WHERE state_key=?
+                    """,
+                    (value_json, source_at, observed_at, state_key),
+                )
+                unchanged += 1
+                continue
+
             after = observation.get("value")
             event_type = _event_type(state_key, before, after)
             event_at = source_at if _parse_ts(source_at) is not None else observed_at
