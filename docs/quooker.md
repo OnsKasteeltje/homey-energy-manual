@@ -97,6 +97,14 @@ Plannerregel:
 - de resterende forced-slots reserveren geen tweede, derde of vierde 0,25 kWh;
 - realtime `OPPORTUNITY`/`FORCED_ON` control-envelope blijft afzonderlijk van deze energieboekhouding.
 
+## AI / historische actuator-evidence
+
+De control-neutrale Quooker evidence-push naar de Pi bewaart het actuatorcontract versiegetrouw. Historische v0.1-events blijven herkenbaar als `mode=SHADOW` met `actualOn`/`wouldWrite`. Voor de huidige v0.2 LIVE-actuator worden `mode=LIVE`, `actualOnBefore`, `actualOnAfter`, `physicalWritePerformed` en `writeError` vastgelegd.
+
+`physicalWritePerformed=true` is direct bewijs dat de Homey-actuator een Cooker-device-write heeft uitgevoerd. `false` kan bij LIVE juist een correcte idempotente no-op betekenen wanneer de gewenste en actuele toestand al gelijk waren. De detectorstatus `HEATING` blijft afzonderlijk bewijs van elektrisch verwarmen en mag zonder actuatorbewijs niet als fysieke EMS-write worden geïnterpreteerd.
+
+De analyse-reader kan voor reeds vóór 4 oktober 2026 volgens het oude normalisatieschema opgeslagen v0.2-events de originele `raw_json` gebruiken om expliciete LIVE-velden terug te halen; ontbrekende actuator-mode wordt nooit uit HEATING afgeleid.
+
 ## Live View
 
 De Live View toont Quooker als afzonderlijke verbruiker:
@@ -111,4 +119,4 @@ Quooker-vermogen wordt één keer van `Overig` afgetrokken. Daardoor blijft de w
 
 De detector en publicatielaag voeren **geen fysieke Quooker-write** uit. De fysieke write is exclusief eigendom van `EM v2 | 60 Actuator | Quooker v0.2 LIVE` (Flow ID `2d0ca017-0d35-4071-bd06-87742032c399`). De drie oude tijdflows zijn disabled en dienen alleen als rollback-evidence.
 
-> Laatste update: **2 oktober 2026** — plannergestuurde Quooker actuator v0.2 LIVE als sole physical writer; drie legacy tijdflows disabled.
+> Laatste update: **4 oktober 2026** — Quooker actuator v0.2 LIVE blijft sole physical writer; AI/evidenceketen is LIVE-actuator-aware en behoudt expliciet physical-write bewijs.
