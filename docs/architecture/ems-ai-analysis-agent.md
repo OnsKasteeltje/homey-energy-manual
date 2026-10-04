@@ -121,6 +121,16 @@ washer/dryer active state when available. A derived residual household value is
 included only as a labelled derivation from measured house power minus the
 tracked large loads; it is not a new measurement authority.
 
+For an in-progress local day, performance quality separates three different
+concepts: `dayProgressPct` (how much of the calendar day has elapsed),
+`coveragePctFullDay` (integrated evidence as a fraction of the complete day)
+and `coveragePctElapsed` / `elapsedCoverageStatus` (how complete the
+measurements are for the time that has actually elapsed). `PARTIAL_TODAY`
+therefore means the day is still in progress, not that the elapsed evidence is
+necessarily incomplete. The legacy `coveragePct` field remains as the
+full-calendar-day percentage for compatibility.
+
+
 ### Planner decision window
 
 For question-specific timestamps the agent extracts a bounded historical
@@ -203,6 +213,21 @@ the following fields into canonical `ems-history.sqlite`:
 Observed phase mode may be derived from measured phase currents for correlation.
 When an explicit actuator/control event exists, its commanded and confirmed
 phase fields are the stronger explanation evidence.
+
+### EV deadline relevance semantics
+
+Deadline evidence can legitimately retain fields such as `deadlineAt` and
+`remainingKWh` after a command becomes inactive or after its historical
+deadline has passed. V0.4.1 therefore annotates EV deadline evidence with
+`deadlineSemantics` relative to the timestamp being analysed.
+
+Only `deadlineSemantics.effective=true` means the deadline may be treated as
+an active constraint for that historical decision. Inactive, expired/stale,
+complete or invalid metadata remains visible for audit but must not be used to
+explain urgency or allocation as if it were live. This annotation is applied to
+canonical EV telemetry, frozen planner deadline context and archived flex
+priority evidence. It changes analysis semantics only and does not alter EV
+deadline control behaviour.
 
 ### EV control event history
 

@@ -492,6 +492,21 @@ measured physical behavior separate. A `SHADOW_GRANT`, `desiredOn` or
 Heating/WW and Quooker coverage begins only at V0.4 commissioning; earlier
 missing evidence is never reconstructed from present state.
 
+V0.4.1 hardens evidence interpretation without changing control ownership.
+For an in-progress day, `ems-performance` now distinguishes calendar-day
+progress from completeness of the elapsed measurement interval:
+`dayProgressPct`, `coveragePctFullDay`, `coveragePctElapsed` and
+`elapsedCoverageStatus`. The existing `PARTIAL_TODAY` state means the day is
+not complete; it must not by itself be interpreted as missing measurements.
+
+The AI evidence layer also adds explicit EV `deadlineSemantics` at each
+historical reference time. Old `deadlineAt` and `remainingKWh` values remain
+available for audit, but only evidence with
+`deadlineSemantics.effective=true` may be treated as an active deadline
+constraint. This is analysis-only normalization; the canonical EV deadline
+state machine, planner constraint logic, Homey executor and physical control
+paths are unchanged.
+
 Frontend V2 exposes the human interface at `/ai/`. Private Caddy ingress
 proxies `/agent/*` only to the loopback analysis service. Model credentials
 remain host-local under `/etc/ems/ai-agent.env` and must never be committed.

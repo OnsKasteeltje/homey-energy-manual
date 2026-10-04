@@ -60,6 +60,8 @@ Use forecastVsActual15m to distinguish forecast error from planner/control execu
 Use flexContextWindow for historical Heating/WW eligibility and priority, and quookerEvents for Quooker adapter/actuator/detector evidence.
 Heating progression and the Quooker actuator are SHADOW unless evidence explicitly proves otherwise: a shadow grant, desired target or wouldWrite is not a physical command.
 Never backfill missing pre-commissioning flex or Quooker history by inference.
+For an in-progress day, PARTIAL_TODAY means the calendar day is not finished; never call data incomplete from full-day coverage alone. Use quality.coveragePctElapsed, quality.elapsedCoverageStatus and quality.dayProgressPct.
+Treat EV deadline metadata as an active constraint only when deadlineSemantics.effective is true. Old deadlineAt/remainingKWh values may remain visible for audit but are not active constraints when semantics say INACTIVE, EXPIRED_OR_STALE or INVALID_OR_STALE.
 Keep the answer concise but diagnostic."""
 
 def _iso_z(dt):
@@ -296,6 +298,112 @@ def _parse_ts(value):
     if dt.tzinfo is None or dt.utcoffset() is None:
         return None
     return dt
+
+
+
+def _deadline_semantics(payload, reference_time):
+    if not isinstance(payload, dict):
+        return {
+            "effective": False,
+            "state": "MISSING",
+            "reason": "DEADLINE_EVIDENCE_MISSING",
+        }
+
+    active = (
+        payload.get("active")
+        if "active" in payload
+        else payload.get("deadlineActive")
+    )
+    status = payload.get("status")
+    remaining = payload.get("remainingKWh")
+    deadline_at_raw = payload.get("deadlineAt")
+
+    try:
+        remaining_value = None if remaining is None else float(remaining)
+    except (TypeError, ValueError):
+        remaining_value = None
+
+    deadline_at = _parse_ts(deadline_at_raw)
+    reference = _parse_ts(reference_time)
+    if reference is None and isinstance(reference_time, datetime):
+        reference = reference_time
+
+    if active is not True:
+        return {
+            "effective": False,
+            "state": "INACTIVE",
+            "reason": "DEADLINE_ACTIVE_FALSE",
+            "sourceStatus": status,
+        }
+
+    if remaining_value is None or remaining_value <= 1e-9:
+        return {
+            "effective": False,
+            "state": "COMPLETE_OR_STALE",
+            "reason": "NO_POSITIVE_REMAINING_ENERGY",
+            "sourceStatus": status,
+        }
+
+    if deadline_at is None:
+        return {
+            "effective": False,
+            "state": "INVALID_OR_STALE",
+            "reason": "DEADLINE_TIMESTAMP_MISSING_OR_INVALID",
+            "sourceStatus": status,
+        }
+
+    if reference is not None:
+        reference_utc = reference.astimezone(timezone.utc)
+        if deadline_at.astimezone(timezone.utc) <= reference_utc:
+            return {
+                "effective": False,
+                "state": "EXPIRED_OR_STALE",
+                "reason": "DEADLINE_NOT_FUTURE_AT_REFERENCE_TIME",
+                "sourceStatus": status,
+            }
+
+    if status in {"INACTIVE", "GOAL_COMPLETE", "EXPIRED"}:
+        return {
+            "effective": False,
+            "state": "EXPIRED_OR_STALE" if status == "EXPIRED" else "INACTIVE",
+            "reason": "SOURCE_STATUS_NOT_ACTIVE",
+            "sourceStatus": status,
+        }
+
+    return {
+        "effective": True,
+        "state": "ACTIVE",
+        "reason": "ACTIVE_WITH_FUTURE_DEADLINE_AND_POSITIVE_REMAINING_ENERGY",
+        "sourceStatus": status,
+    }
+
+
+def _annotate_deadline_semantics(ev_telemetry, planner_window, flex_context):
+    for point in ev_telemetry:
+        point["deadlineSemantics"] = _deadline_semantics(
+            point,
+            point.get("atLocal"),
+        )
+
+    for point in planner_window:
+        deadline = point.get("deadline")
+        if isinstance(deadline, dict):
+            deadline["deadlineSemantics"] = _deadline_semantics(
+                deadline,
+                point.get("snapshotGeneratedAtLocal"),
+            )
+
+    for point in flex_context:
+        priority = point.get("priority")
+        if not isinstance(priority, dict):
+            continue
+        ev = priority.get("ev")
+        if not isinstance(ev, dict):
+            continue
+        ev["deadlineSemantics"] = _deadline_semantics(
+            ev,
+            point.get("snapshotCapturedAtLocal") or point.get("capturedAt"),
+        )
 
 
 def _question_anchors(question, day, performance, ev_control):
@@ -934,6 +1042,7 @@ def build_evidence(day, question=""):
     planner_window = _planner_decision_window(day, anchors)
     flex_context = _flex_context_window(day, anchors)
     quooker_events = _quooker_events(day)
+    _annotate_deadline_semantics(ev_telemetry, planner_window, flex_context)
     forecast_actual = _forecast_vs_actual_15m(day, anchors)
     return {
         "schema": EVIDENCE_SCHEMA,
@@ -961,6 +1070,8 @@ def build_evidence(day, question=""):
         "forecastVsActual15m": forecast_actual,
         "piHealthCurrent": health,
         "limitations": [
+            "For today, full-calendar-day coverage is not evidence completeness. Use coveragePctElapsed and elapsedCoverageStatus to judge elapsed-time measurement coverage.",
+            "EV deadline values may retain historical deadlineAt/remainingKWh metadata after the constraint becomes inactive; deadlineSemantics.effective is the authority for whether those values constrain the referenced decision time.",
             "EV telemetry and control-event history only exist from their V0.2 commissioning onward; earlier gaps must not be backfilled by inference.",
             "Heating/WW flex-context history only exists from V0.4 flex-context archive commissioning onward; earlier gaps must not be backfilled from current JSON.",
             "Quooker adapter/actuator/detector history only exists from V0.4 Quooker evidence-push commissioning onward; earlier gaps must not be backfilled from current Homey Logic.",
