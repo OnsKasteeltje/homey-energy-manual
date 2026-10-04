@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import time
 from datetime import datetime, timezone
@@ -73,7 +74,10 @@ def jrun(*args: str):
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"HOMEY_JSON_INVALID:{' '.join(args)}") from exc
+        raise RuntimeError(
+            f"HOMEY_JSON_INVALID:{' '.join(args)}:"
+            f"chars={len(raw)}:line={exc.lineno}:col={exc.colno}"
+        ) from exc
 
 
 def body_file(payload: dict[str, Any]) -> str:
@@ -106,7 +110,33 @@ def normalize_collection(raw, wrapper: str):
 
 
 def get_variables():
-    return normalize_collection(jrun("api", "logic", "get-variables", "--json"), "variables")
+    """Discover Logic variables without trusting one large CLI wrapper payload.
+
+    Homey CLI's manager wrapper has been observed to return a truncated JSON
+    document on installations with a large Logic-variable set. First use the
+    direct documented REST path through `api raw`, which avoids wrapper-side
+    object serialization. If that fails syntactically, fall back to the manager
+    command for compatibility. Both paths are read-only and failure remains
+    fail-closed; malformed JSON is never partially accepted.
+    """
+    attempts = (
+        ("api", "raw", "--path", "/api/manager/logic/variable"),
+        ("api", "logic", "get-variables", "--json"),
+    )
+    errors = []
+    for args in attempts:
+        try:
+            raw = run_homey(*args)
+            parsed = json.loads(raw)
+            variables = normalize_collection(parsed, "variables")
+            if not variables and parsed not in ({}, []):
+                raise RuntimeError("HOMEY_VARIABLE_COLLECTION_SHAPE_INVALID")
+            return variables
+        except (json.JSONDecodeError, RuntimeError) as exc:
+            errors.append(f"{' '.join(args)} -> {exc}")
+    raise RuntimeError(
+        "HOMEY_VARIABLE_DISCOVERY_FAILED:" + " | ".join(errors)
+    )
 
 
 def get_advanced_flows():
