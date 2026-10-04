@@ -498,6 +498,20 @@ remain host-local under `/etc/ems/ai-agent.env` and must never be committed.
 Missing credentials fail explicitly rather than degrading to fabricated
 analysis.
 
+V2 AI navigation is resumable. The browser keeps the visible conversation in
+tab-scoped `sessionStorage` and attaches a generated `requestId` to an
+analysis request. The Pi persists only the corresponding short-lived UI
+job/result in `/home/jeroen/ems/data/ai-analysis-jobs.sqlite` (24-hour
+retention). `GET /agent/result?requestId=...` lets the browser recover an
+answer after navigating to another V2 page and returning. Duplicate POSTs with
+the same ID are idempotent and therefore do not create a second OpenAI model
+call while a job is pending or after it has completed.
+
+This UI job cache is not EMS history, planner state or control state and is
+never an input to realtime control. The analysis service remains read-only
+toward EMS state and physical devices; its only mutable state is this bounded
+human-interface result cache.
+
 The AI evidence path preserves read-only query semantics. `ems-performance`
 and the AI timeline/event readers open live SQLite with `mode=ro` and
 `PRAGMA query_only=ON`. Because `ems-history.sqlite` runs in WAL mode, the
