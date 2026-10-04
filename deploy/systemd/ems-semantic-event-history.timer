@@ -1,0 +1,13 @@
+[Unit]
+Description=Archive EMS semantic events every minute
+
+[Timer]
+# Run after Heating/flex local shadow artifacts and flex-context history.
+# Reads Pi-local artifacts only; no Homey/network/device calls.
+OnCalendar=*-*-* *:*:50
+Persistent=true
+AccuracySec=5s
+Unit=ems-semantic-event-history.service
+
+[Install]
+WantedBy=timers.target
