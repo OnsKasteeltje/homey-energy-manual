@@ -152,6 +152,25 @@ Reusable shortest check:
 
 A terminal writer auth failure is a trustworthy command-boundary signal. Writer v0.4.5 therefore keeps fail-closed control behavior and emits a deduplicated operational alert. A successfully auto-refreshed first 401 must not alert.
 
+### Verified diagnostic lesson — planner opportunity versus realtime EV stop
+
+A quarter-hour planner slot marked `Tesla RUN / OPPORTUNITY` proves strategic
+permission/allocation, not continuous physical charging. The production Homey
+Bridge v1.5.7 remains the realtime executor inside the Pi envelope and can emit
+`OFF/IDLE` when its rolling available-power phase policy requires it.
+
+For a historical EV pause, inspect the recorded Power Intent reasons before
+attributing the pause to forecast error, Gate failure or actuator failure.
+`ev_control_events.raw_json` already retains this evidence. The EMS AI reader
+must project at least `intentReason`, `realtimePhaseReason` and
+`realtimeCurrentReason`, with bounded rolling-power context when present.
+
+The 2026-10-04 12:45–13:00 event established the reusable pattern:
+the quarter-hour planner retained EV opportunity, while the realtime controller
+temporarily produced IDLE during a rapidly changing PV interval and later
+re-entered charging. If the stored realtime reason is present, calling the
+control cause “unknown” is a diagnostic error.
+
 
 
 ## 6. Private V2 web-data diagnostic sequence
