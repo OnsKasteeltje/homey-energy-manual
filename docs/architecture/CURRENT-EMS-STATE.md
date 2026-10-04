@@ -226,6 +226,18 @@ Heating Preheat V0.2 does not alter the active Dynamic Pi Planner. It exposes on
 
 Planner decisions are archived best-effort in `/home/jeroen/ems/data/planner-history.sqlite`; measured actuals remain in `/home/jeroen/ems/data/ems-history.sqlite`. Retrospective performance analysis must distinguish measured actuals, archived decision context and any unconstrained upper-bound benchmark from a future constrained replay optimum.
 
+Runtime validation on 2026-10-04 exposed that canonical operational power
+measurements are approximately five-minute cadence, while the initial V0.1
+candidate rejected every measurement interval over 120 seconds and therefore
+integrated zero hours. The corrected V0.1 accepts canonical measurement
+intervals up to 600 seconds for energy integration, keeps 120 seconds as the
+preferred attribution resolution, segments coarse intervals at durable EV
+control-event boundaries and at the 90-second control-evidence expiry boundary,
+and downgrades otherwise-HIGH attribution confidence to MEDIUM when the
+underlying measurement interval exceeds 120 seconds. This preserves useful
+five-minute energy evidence without claiming direct 120/180-second measurement
+precision.
+
 Constrained Replay V0.1 is now a repository candidate for the first deterministic
 short-timescale constrained replay. Canonical source is
 `services/pi/history/constrained_replay_v0_1.py`, schema
