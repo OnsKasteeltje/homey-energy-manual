@@ -248,3 +248,15 @@ pinned IDs.
 
 This exception creates no Honeywell/device writer: Logic writes and targeted
 thermostat reads are the only Homey effects.
+
+When host-local Heating commissioning has already reached `state=READY` but
+the final post-publish validation was interrupted (for example by Homey 429),
+operators must use `--resume-ready` rather than rerun `--apply`.
+The resume path performs no Logic/Advanced Flow create or update. It validates
+the pinned three Logic IDs and two Advanced Flow IDs by targeted readback with
+at least five seconds between Homey API reads, performs one SHADOW publish,
+then validates Intent, Adapter and Gate on one shared `controlRevision`.
+The publisher timer is enabled only after all three contracts are PASS and
+`deviceWrites=false`, `physicalWriteAllowed=false` and
+`liveExecutionAllowed=false` are confirmed. Any 429 or mismatch leaves the
+timer disabled.
