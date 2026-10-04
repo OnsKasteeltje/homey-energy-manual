@@ -3,10 +3,11 @@ Description=Refresh EMS Heating Preheat V0.3 shadow every five minutes
 
 [Timer]
 # Honeywell state runs at :00/5 and Quatt current at :02/5.
-# This local-only builder runs afterwards and performs no Homey calls.
+# V0.3 is the first member of the deterministic Heating SHADOW minute chain:
+# on its five-minute refresh minute it completes at second :00 before Flex :10.
 OnCalendar=*-*-* *:04/5:00
 Persistent=true
-AccuracySec=15s
+AccuracySec=1s
 Unit=ems-heating-preheat-shadow.service
 
 [Install]

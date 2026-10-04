@@ -54,6 +54,13 @@ HEATING_HOMEY_TIMER="deploy/systemd/ems-heating-homey-shadow-publish.timer"
 HEATING_HOMEY_TEST="tests/integrations/test_heating_homey_shadow_contract.py"
 HEATING_HOMEY_NODE_TEST="tests/homey/heating-control-shadow.test.mjs"
 HEATING_HOMEY_RESUME_TEST="tests/integrations/test_heating_homey_resume_contract.py"
+HEATING_CADENCE_TEST="tests/integrations/test_heating_shadow_cadence_contract.py"
+HEATING_CADENCE_INSTALL="deploy/install/install_heating_shadow_cadence_v0_1.sh"
+HEATING_V03_TIMER="deploy/systemd/ems-heating-preheat-shadow.timer"
+HEATING_FLEX_TIMER="deploy/systemd/ems-flex-priority-shadow.timer"
+HEATING_V04_TIMER="deploy/systemd/ems-heating-preheat-progression-shadow.timer"
+HEATING_V05_TIMER="deploy/systemd/ems-heating-control-gate-shadow.timer"
+HEATING_HOMEY_PUBLISH_TIMER="deploy/systemd/ems-heating-homey-shadow-publish.timer"
 BASE_REF="${1:-}"
 
 fail() { echo "ARCHITECTURE GATE: FAIL: $*" >&2; exit 1; }
@@ -226,6 +233,35 @@ grep -q 'MAX_HEATING_AGE_SECONDS = 420' "$FLEX_PRIORITY_SHADOW" || fail "Flex Pr
 grep -q '"sourceFreshness"' "$FLEX_PRIORITY_SHADOW" || fail "Flex Priority must expose Heating source freshness"
 grep -q 'elif not heating_current:' "$FLEX_PRIORITY_SHADOW" || fail "Flex Priority must refuse stale Heating grants"
 pass "Heating preheat runtime-state preservation and freshness propagation present"
+
+[[ -f "$HEATING_CADENCE_TEST" ]] || fail "Heating deterministic cadence test missing"
+[[ -f "$HEATING_CADENCE_INSTALL" ]] || fail "Heating deterministic cadence installer missing"
+[[ -f "$HEATING_V03_TIMER" ]] || fail "Heating V0.3 timer missing"
+[[ -f "$HEATING_FLEX_TIMER" ]] || fail "Heating Flex timer missing"
+[[ -f "$HEATING_V04_TIMER" ]] || fail "Heating V0.4 timer missing"
+[[ -f "$HEATING_V05_TIMER" ]] || fail "Heating V0.5 timer missing"
+[[ -f "$HEATING_HOMEY_PUBLISH_TIMER" ]] || fail "Heating Homey publish timer missing"
+python3 "$HEATING_CADENCE_TEST" || fail "Heating deterministic cadence contract failed"
+grep -Fqx 'OnCalendar=*-*-* *:04/5:00' "$HEATING_V03_TIMER" || fail "Heating V0.3 cadence must start refresh minute at :00"
+grep -Fqx 'AccuracySec=1s' "$HEATING_V03_TIMER" || fail "Heating V0.3 timer accuracy must be 1s"
+grep -Fqx 'OnCalendar=*-*-* *:*:10' "$HEATING_FLEX_TIMER" || fail "Heating Flex cadence must be fixed at :10"
+grep -Fqx 'AccuracySec=1s' "$HEATING_FLEX_TIMER" || fail "Heating Flex timer accuracy must be 1s"
+if grep -Fq 'OnUnitActiveSec=' "$HEATING_FLEX_TIMER"; then
+  fail "Heating Flex timer must not use relative OnUnitActiveSec cadence"
+fi
+if grep -Fq 'OnBootSec=' "$HEATING_FLEX_TIMER"; then
+  fail "Heating Flex timer must not use separate boot phase"
+fi
+grep -Fqx 'OnCalendar=*-*-* *:*:20' "$HEATING_V04_TIMER" || fail "Heating V0.4 cadence must be fixed at :20"
+grep -Fqx 'AccuracySec=1s' "$HEATING_V04_TIMER" || fail "Heating V0.4 timer accuracy must be 1s"
+grep -Fqx 'OnCalendar=*-*-* *:*:30' "$HEATING_V05_TIMER" || fail "Heating V0.5 cadence must be fixed at :30"
+grep -Fqx 'AccuracySec=1s' "$HEATING_V05_TIMER" || fail "Heating V0.5 timer accuracy must be 1s"
+grep -Fqx 'OnCalendar=*-*-* *:*:35' "$HEATING_HOMEY_PUBLISH_TIMER" || fail "Heating Homey publish cadence must be fixed at :35"
+grep -Fqx 'AccuracySec=1s' "$HEATING_HOMEY_PUBLISH_TIMER" || fail "Heating Homey publish timer accuracy must be 1s"
+if grep -Eq 'Homey\.|requests|urllib|urlopen|http://' "$HEATING_CADENCE_INSTALL"; then
+  fail "Heating cadence installer must not contain Homey/network control"
+fi
+pass "Heating SHADOW timers are phase-locked V0.3 :00 -> Flex :10 -> V0.4 :20 -> V0.5 :30 -> publish :35"
 
 [[ -f "$HEATING_V05_BUILD" ]] || fail "Heating V0.5 builder missing"
 [[ -f "$HEATING_V05_RUNNER" ]] || fail "Heating V0.5 runner missing"

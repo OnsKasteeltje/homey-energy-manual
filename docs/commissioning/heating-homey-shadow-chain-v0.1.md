@@ -125,6 +125,16 @@ The Pi publisher runs at `:35`, after V0.5 at `:30`. It writes only the
 dedicated intent Logic variable. Homey Adapter/Gate execution is event-driven by
 Logic changes.
 
+The upstream SHADOW minute chain is phase-locked to prevent false ordering
+failures: V0.3 runs at second `:00` on its five-minute refresh minute, Flex
+Priority at `:10`, V0.4 at `:20`, V0.5 at `:30`, and this publisher at
+`:35`. All five timers use `AccuracySec=1s`. Flex MUST use calendar phase
+`:10`; relative `OnUnitActiveSec` scheduling is forbidden because it can
+drift beyond the fresh V0.3 snapshot and race V0.4. The targeted cadence
+installer is `deploy/install/install_heating_shadow_cadence_v0_1.sh`; it
+replaces timer unit files and restarts only timers that were already active,
+without changing enabled state or issuing a Homey/device command.
+
 ## LIVE blockers
 
 Physical Heating control remains blocked until both are separately delivered and
