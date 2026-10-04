@@ -41,6 +41,7 @@ const topChecks={
     intent?.executor==='HOMEY_SHADOW'&&
     intent?.baselineAuthority==='HONEYWELL',
   liveBlocked:
+    intent?.liveExecutionAllowed===false&&
     intent?.safety?.liveExecutionAllowed===false&&
     intent?.safety?.productionPlannerHeatingGrantPresent===false&&
     intent?.safety?.physicalOwnershipProven===false,
