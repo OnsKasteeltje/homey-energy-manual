@@ -1,6 +1,6 @@
 # EMS Software Architecture - Live As-Is
 
-**Datum:** 19 september 2026
+**Datum:** 4 oktober 2026
 **Status:** Live-code synopsis  
 **Scope:** Raspberry Pi runtime + actieve Homey flows + actuele GitHub-architectuur  
 **Doel:** Vastleggen van de actuele softwarearchitectuur na cross-check van live Homey, Pi-controlarchitectuur en GitHub `main`.
@@ -241,6 +241,25 @@ PLAN
  -> ACTUATOR
  -> PHYSICAL DEVICE
 ```
+
+### 11.1 Heating control-boundary — V0.5 SHADOW
+
+Heating heeft nog geen LIVE Power Intent target of Honeywell-writer. De eerste
+control-boundary is daarom lokaal en shadow-only:
+
+```text
+V0.3 safety -> Flex Priority / V0.4 -> V0.5 Control Gate SHADOW
+                                      -X-> no Homey / no Honeywell write
+```
+
+V0.5 staat onder `services/pi/control/heating/`, is geen tweede planner en
+hercontroleert freshness/order, upstream safety, Honeywell-UP, CV safety,
+planner grant, target ceiling en <=0.5 C progression. Rollback is alleen
+`WOULD_RESET_TO_SCHEDULE` na eigen gesimuleerde shadow ownership.
+`controlWrites=false`, `physicalWriteAllowed=false` en per-command
+`physicalWrite=false` zijn hard. LIVE vereist later Pi->Homey transport,
+Homey adapter/gate, exact één Honeywell writer en acknowledgement/readback.
+V0.5 moet bij cutover worden gepromoveerd of retired/archived.
 
 ## 12. Actieve EV execution chain
 

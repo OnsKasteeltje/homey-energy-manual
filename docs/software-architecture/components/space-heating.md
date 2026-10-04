@@ -175,7 +175,8 @@ De bestaande technische lagen blijven leidend:
 services/pi/integrations/honeywell/
   -> services/pi/state/heating/
   -> services/pi/planner/heating/
-  -> future: services/pi/control/heating/
+  -> services/pi/control/heating/     # V0.5 SHADOW only
+  -X-> Homey/Honeywell physical write
 ```
 
 Bestaande schema's bij start van dit document:
@@ -185,7 +186,7 @@ Bestaande schema's bij start van dit document:
 - `EMS_HEATING_ROOM_MODEL_V0.1`;
 - `EMS_HEATING_PREHEAT_PLAN_V0.1`.
 
-De volgende plannerincrement mag deze ontwerpregels modelleren, maar blijft SHADOW. Een toekomstige LIVE-fase vereist afzonderlijk gevalideerde adapter/gate/actuator-grenzen en expliciete commissioning.
+De V0.5 control-boundary gate valideert deze ontwerpregels uitsluitend als SHADOW command-contract. Hij blijft Pi-local en write-free. LIVE vereist nog steeds afzonderlijk gevalideerde Pi->Homey transport-, Homey adapter/gate- en single-actuatorgrenzen plus acknowledgement/readback en expliciete commissioning.
 
 ## Vervolg
 

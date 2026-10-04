@@ -38,6 +38,11 @@ PV_FORECAST_V2_UNIT="deploy/systemd/ems-pv-forecast-v2-shadow.service"
 HEATING_V03_RUNNER="services/pi/planner/heating/run_heating_preheat_shadow_v0_3.py"
 FLEX_PRIORITY_SHADOW="services/pi/planner/joint/build_flex_priority_shadow_v0_1.py"
 PI_DEPLOY="scripts/deploy_ems_pi.sh"
+HEATING_V05_BUILD="services/pi/control/heating/build_heating_control_gate_shadow_v0_5.py"
+HEATING_V05_RUNNER="services/pi/control/heating/run_heating_control_gate_shadow_v0_5.py"
+HEATING_V05_SERVICE="deploy/systemd/ems-heating-control-gate-shadow.service"
+HEATING_V05_TIMER="deploy/systemd/ems-heating-control-gate-shadow.timer"
+HEATING_V05_INSTALL="deploy/install/install_heating_control_gate_shadow_v0_5.sh"
 BASE_REF="${1:-}"
 
 fail() { echo "ARCHITECTURE GATE: FAIL: $*" >&2; exit 1; }
@@ -193,6 +198,23 @@ grep -q 'MAX_HEATING_AGE_SECONDS = 420' "$FLEX_PRIORITY_SHADOW" || fail "Flex Pr
 grep -q '"sourceFreshness"' "$FLEX_PRIORITY_SHADOW" || fail "Flex Priority must expose Heating source freshness"
 grep -q 'elif not heating_current:' "$FLEX_PRIORITY_SHADOW" || fail "Flex Priority must refuse stale Heating grants"
 pass "Heating preheat runtime-state preservation and freshness propagation present"
+
+[[ -f "$HEATING_V05_BUILD" ]] || fail "Heating V0.5 builder missing"
+[[ -f "$HEATING_V05_RUNNER" ]] || fail "Heating V0.5 runner missing"
+[[ -f "$HEATING_V05_SERVICE" ]] || fail "Heating V0.5 service missing"
+[[ -f "$HEATING_V05_TIMER" ]] || fail "Heating V0.5 timer missing"
+[[ -f "$HEATING_V05_INSTALL" ]] || fail "Heating V0.5 installer missing"
+grep -q 'EMS_HEATING_CONTROL_GATE_SHADOW_V0.5' "$HEATING_V05_BUILD" || fail "Heating V0.5 schema missing"
+grep -q '"controlWrites": False' "$HEATING_V05_BUILD" || fail "Heating V0.5 must disallow control writes"
+grep -q '"physicalWriteAllowed": False' "$HEATING_V05_BUILD" || fail "Heating V0.5 must disallow physical writes"
+grep -q '"physicalWrite": False' "$HEATING_V05_BUILD" || fail "Heating V0.5 commands must be hypothetical"
+grep -q 'RESET_TO_HONEYWELL_SCHEDULE_IF_SHADOW_OWNED' "$HEATING_V05_BUILD" || fail "Heating V0.5 rollback contract missing"
+grep -q 'HOMEY_HONEYWELL_ACTUATOR_ONLY' "$HEATING_V05_BUILD" || fail "Heating V0.5 single-writer boundary missing"
+if grep -Eq '^[[:space:]]*(import|from)[[:space:]]+(requests|urllib|httpx|aiohttp)|Homey\.' "$HEATING_V05_BUILD" "$HEATING_V05_RUNNER"; then
+  fail "Heating V0.5 SHADOW must not contain a Homey/network client"
+fi
+python3 -m py_compile "$HEATING_V05_BUILD" "$HEATING_V05_RUNNER" || fail "Heating V0.5 Python syntax invalid"
+pass "Heating V0.5 remains Pi-local, shadow-only and physical-write-free"
 
 grep -q 'services/pi/integrations/connectlife/' "$CONNECTLIFE_DOC" || fail "ConnectLife target repository boundary missing from architecture document"
 grep -q 'read-only telemetry' "$CONNECTLIFE_DOC" || fail "ConnectLife read-only safety boundary missing from architecture document"
