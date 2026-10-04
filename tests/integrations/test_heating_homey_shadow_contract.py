@@ -107,6 +107,12 @@ def main():
     assert w["action"] == "RESET_TO_SCHEDULE"
     assert w["target_C"] is None
 
+    bad_reset = source("WOULD_RESET_TO_SCHEDULE", None)
+    bad_reset["rooms"][0]["shadowOwnership"]["simulatedRollback"] = False
+    rejected_reset = m.build_intent(bad_reset, generated_at=NOW)
+    assert rejected_reset["valid"] is False
+    assert rejected_reset["commands"] == []
+
     print("PASS: Heating V0.5 -> Homey SHADOW intent contract")
 
 
