@@ -15,6 +15,10 @@ def main():
         "resumePending",
         "pagehide",
         "messages.scrollTo",
+        "recentConversationContext",
+        "conversationContext",
+        "MAX_CONTEXT_MESSAGES",
+        "MAX_CONTEXT_MESSAGE_CHARS",
     ]
     missing = [item for item in required if item not in source]
     assert not missing, "missing AI navigation-resume markers: " + ", ".join(missing)
@@ -22,6 +26,9 @@ def main():
     assert "scrollIntoView" not in source
     assert "state.pending" in source
     assert "addUser:false" in source
+    assert "conversationContext:context" in source
+    assert "item.requestId!==excludeRequestId" in source
+    assert 'item.text.startsWith("Analyse niet beschikbaar:")' in source
 
     print("PASS: AI navigation resume frontend contract")
 
