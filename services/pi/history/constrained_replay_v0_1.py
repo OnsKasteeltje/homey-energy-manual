@@ -34,7 +34,8 @@ SCHEMA = "EMS_PI_CONSTRAINED_REPLAY_V0.1"
 SCOPE = "EV_EXPORT_ONLY"
 
 MIN_EXPORT_W = 250.0
-MAX_MEASUREMENT_INTERVAL_S = 120.0
+MAX_MEASUREMENT_INTERVAL_S = 600.0
+PREFERRED_ATTRIBUTION_INTERVAL_S = 120.0
 MAX_CONTROL_EVENT_AGE_S = 90.0
 
 MIN_A = 6
@@ -723,6 +724,9 @@ def build_replay(
     below_threshold_kwh = 0.0
     total_export_kwh = 0.0
     integrated_s = 0.0
+    measurement_intervals_s = []
+    intervals_over_preferred = 0
+    control_segmented_intervals = 0
 
     for i in range(len(measurements) - 1):
         row = measurements[i]
@@ -730,6 +734,10 @@ def build_replay(
         dt_s = (next_row.at - row.at).total_seconds()
         if dt_s <= 0 or dt_s > MAX_MEASUREMENT_INTERVAL_S:
             continue
+
+        measurement_intervals_s.append(dt_s)
+        if dt_s > PREFERRED_ATTRIBUTION_INTERVAL_S:
+            intervals_over_preferred += 1
 
         while control_i < len(controls) and controls[control_i].at <= row.at:
             latest_control = controls[control_i]
@@ -744,37 +752,75 @@ def build_replay(
             below_threshold_kwh += export_kwh
             continue
 
-        result = classify_export_interval(
-            at=row.at,
-            export_w=export_w,
-            ev_w=row.ev_w,
-            event=latest_control,
-        )
+        segment_start = row.at
+        segment_control = latest_control
+        segmented = False
 
-        ctx = _control_context(latest_control) if latest_control else {}
-        additional_w = min(export_w, result["additionalFeasibleW"])
-        samples.append({
-            "start": _iso_z(row.at),
-            "end": _iso_z(next_row.at),
-            "exportW": export_w,
-            "exportKWh": export_kwh,
-            "evW": row.ev_w,
-            "pvW": row.pv_w,
-            "classification": result["classification"],
-            "reason": result["reason"],
-            "confidence": result["confidence"],
-            "additionalFeasibleCaptureKWh": additional_w * dt_s / 3_600_000.0,
-            "phaseMode": ctx.get("mode"),
-            "currentReason": ctx.get("currentReason"),
-            "phaseReason": ctx.get("phaseReason"),
-            "requestedA": ctx.get("requestedA"),
-            "offeredA": ctx.get("offeredA"),
-            "maxA": ctx.get("maxA"),
-            "availableTotalW": ctx.get("availableTotalW"),
-            "rollingAvgW": ctx.get("rollingAvgW"),
-            "rollingReady": ctx.get("rollingReady"),
-            "controlEvidenceAt": _iso_z(latest_control.at) if latest_control else None,
-        })
+        while segment_start < next_row.at:
+            next_control_at = None
+            if control_i < len(controls):
+                candidate_at = controls[control_i].at
+                if row.at < candidate_at < next_row.at:
+                    next_control_at = candidate_at
+
+            segment_end = next_control_at or next_row.at
+            segment_dt_s = (segment_end - segment_start).total_seconds()
+
+            if segment_dt_s > 0:
+                result = classify_export_interval(
+                    at=segment_start,
+                    export_w=export_w,
+                    ev_w=row.ev_w,
+                    event=segment_control,
+                )
+
+                ctx = _control_context(segment_control) if segment_control else {}
+                additional_w = min(export_w, result["additionalFeasibleW"])
+                confidence = result["confidence"]
+                resolution_limited = dt_s > PREFERRED_ATTRIBUTION_INTERVAL_S
+                if resolution_limited and confidence == "HIGH":
+                    confidence = "MEDIUM"
+
+                samples.append({
+                    "start": _iso_z(segment_start),
+                    "end": _iso_z(segment_end),
+                    "exportW": export_w,
+                    "exportKWh": export_w * segment_dt_s / 3_600_000.0,
+                    "evW": row.ev_w,
+                    "pvW": row.pv_w,
+                    "classification": result["classification"],
+                    "reason": result["reason"],
+                    "confidence": confidence,
+                    "measurementIntervalSec": dt_s,
+                    "resolutionLimited": resolution_limited,
+                    "additionalFeasibleCaptureKWh": additional_w * segment_dt_s / 3_600_000.0,
+                    "phaseMode": ctx.get("mode"),
+                    "currentReason": ctx.get("currentReason"),
+                    "phaseReason": ctx.get("phaseReason"),
+                    "requestedA": ctx.get("requestedA"),
+                    "offeredA": ctx.get("offeredA"),
+                    "maxA": ctx.get("maxA"),
+                    "availableTotalW": ctx.get("availableTotalW"),
+                    "rollingAvgW": ctx.get("rollingAvgW"),
+                    "rollingReady": ctx.get("rollingReady"),
+                    "controlEvidenceAt": _iso_z(segment_control.at) if segment_control else None,
+                })
+
+            if next_control_at is None:
+                break
+
+            segmented = True
+            while (
+                control_i < len(controls)
+                and controls[control_i].at == next_control_at
+            ):
+                latest_control = controls[control_i]
+                control_i += 1
+            segment_control = latest_control
+            segment_start = next_control_at
+
+        if segmented:
+            control_segmented_intervals += 1
 
     windows = _group_samples(samples, semantic_events)
 
@@ -806,6 +852,8 @@ def build_replay(
         "policy": {
             "minimumExportForClassificationW": MIN_EXPORT_W,
             "maxMeasurementIntervalSec": MAX_MEASUREMENT_INTERVAL_S,
+            "preferredAttributionIntervalSec": PREFERRED_ATTRIBUTION_INTERVAL_S,
+            "controlEventSegmentation": True,
             "maxControlEvidenceAgeSec": MAX_CONTROL_EVENT_AGE_S,
             "evCurrentRangeA": [MIN_A, MAX_A],
             "wattsPerAmp": {"1P": W_PER_A_1P, "3P": W_PER_A_3P},
@@ -819,6 +867,13 @@ def build_replay(
             "controlEvents": len(controls),
             "semanticEvents": len(semantic_events),
             "integratedHours": round(integrated_s / 3600.0, 3),
+            "measurementIntervalSecP50": (
+                round(sorted(measurement_intervals_s)[len(measurement_intervals_s) // 2], 1)
+                if measurement_intervals_s
+                else None
+            ),
+            "measurementIntervalsOverPreferredAttributionSec": intervals_over_preferred,
+            "controlSegmentedMeasurementIntervals": control_segmented_intervals,
             "classifiedExportKWh": round(classified_export, 4),
             "sufficientEvidenceExportKWh": round(max(0.0, sufficient_export), 4),
             "insufficientEvidenceExportKWh": round(
@@ -864,6 +919,7 @@ def build_replay(
             "REAL_MISSED_OPPORTUNITY is emitted only when time-aligned durable control evidence supports EV connection/eligibility and no recorded controller constraint explains unused current or phase headroom.",
             "CONSTRAINT_DRIVEN_EXPORT includes rolling-power readiness, dwell, envelope/current caps, physical target settling, downstream offered-current limits and safe phase-transition execution.",
             "Intervals without control evidence within the bounded age are INSUFFICIENT_EVIDENCE and are never silently reclassified.",
+            "Canonical measurements may be coarser than 120 seconds. V0.1 integrates valid intervals up to 600 seconds, segments them at durable EV-control event boundaries, and downgrades otherwise HIGH attribution confidence to MEDIUM when the underlying measurement interval exceeds 120 seconds.",
             "The replay does not invent pre-commissioning semantic events or backfill unavailable control history.",
         ],
     }
