@@ -68,7 +68,12 @@ a runtime evidence transport for the AI agent.
 
 Frontend V2 keeps the visible AI conversation in browser `sessionStorage`, so
 switching to another V2 page and returning in the same tab does not erase the
-question/answer history.
+question/answer history. For a new analysis request the browser sends at most
+the four most recent non-error conversation messages, each bounded to 1200
+characters. This recent context is only referential context: it can resolve
+follow-ups such as "dit tijdslot", "die deadline" or "waarom dan", but prior
+user/assistant text is never promoted to EMS evidence and factual claims must
+still be supported by the current evidence package.
 
 Long-running model requests use a browser-generated `requestId`. When present,
 the analysis service records only the UI job lifecycle/result in the local
@@ -146,9 +151,24 @@ windows. The evidence includes `evidenceSelection.mode=EXPLICIT_TIME_WINDOW`,
 the explicit anchors and the configured window size, so the model can
 distinguish deliberate selection from missing history. Absence outside such a
 window must never be interpreted as evidence that no activity occurred there.
-When the question contains no explicit clock time, these four arrays retain the
-existing bounded day-scope behavior; fallback planner/export anchors must not
-silently trigger evidence trimming.
+
+A contextual follow-up with no clock time in the current question may reuse an
+explicit clock time from the bounded recent conversation context. In that case
+the mode is `CONTEXT_TIME_WINDOW`; the selected context anchors are recorded
+separately from explicit current-question anchors. Conversation text remains
+referential only and does not become evidence.
+
+Questions without an explicit or contextual time anchor use bounded day scope.
+The large event streams are deterministically compacted while preserving day
+spread plus important/state-transition points. Topic routing then omits
+unrelated heavy streams: EV questions keep EV evidence, Quooker questions keep
+Quooker evidence, and PV/Flex questions do not automatically carry unrelated
+EV/Quooker history. Mixed follow-ups inherit relevant topics from the last
+question/answer pair. `evidenceSelection` records `TOPIC_DAY_SCOPE` or
+`DAY_SCOPE_COMPACT`, detected topics, compacted/omitted fields, and
+original/selected counts. Omission or sampling is never evidence that activity
+did not occur outside the transported records. Canonical history itself is not
+deleted or modified.
 
 For an in-progress local day, performance quality separates three different
 concepts: `dayProgressPct` (how much of the calendar day has elapsed),
