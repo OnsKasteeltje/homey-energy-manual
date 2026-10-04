@@ -11,12 +11,18 @@ spec.loader.exec_module(m)
 NOW = datetime(2026, 9, 26, 12, 0, tzinfo=timezone.utc)
 
 
-def heating(state="PREHEAT_READY_FOR_GRANT", closes="2026-09-26T15:00:00Z", key="woonkamer"):
+def heating(
+    state="PREHEAT_READY_FOR_GRANT",
+    closes="2026-09-26T15:00:00Z",
+    key="woonkamer",
+    generated="2026-09-26T11:59:00Z",
+):
     return {
         "schema": "EMS_HEATING_PREHEAT_SHADOW_V0.3",
         "mode": "READ_ONLY",
         "controlMode": "SHADOW",
         "controlWrites": False,
+        "generatedAt": generated,
         "rooms": [{
             "key": key,
             "group": "living_area",
@@ -106,10 +112,32 @@ def test_earliest_ready_heating_window_drives_domain_priority():
     assert out["decision"]["priorityOwner"] == "HEATING"
 
 
+def test_stale_heating_source_cannot_create_new_heating_grant():
+    out = build(h=heating(generated="2026-09-26T11:52:00Z"))
+    assert out["sourceFreshness"]["heating"]["status"] == "STALE"
+    assert out["sourceFreshness"]["heating"]["reason"] == "HEATING_SHADOW_STALE"
+    assert out["heating"]["readyRooms"] == []
+    assert out["decision"]["priorityOwner"] == "HOLD_UNKNOWN"
+    assert out["decision"]["heatingShadowGrant"] == "HOLD"
+    assert out["decision"]["reason"] == "HEATING_SHADOW_STALE"
+
+
+def test_ev_must_remains_authoritative_even_when_heating_source_is_stale():
+    out = build(
+        h=heating(generated="2026-09-26T11:52:00Z"),
+        e=ev(active=True, remaining=4.0, status="TRACKING", latest="2026-09-26T11:59:00Z"),
+    )
+    assert out["sourceFreshness"]["heating"]["status"] == "STALE"
+    assert out["decision"]["priorityOwner"] == "EV"
+    assert out["decision"]["heatingShadowGrant"] == "HOLD"
+    assert out["decision"]["evRole"] == "MUST"
+
+
 def test_output_is_explicitly_read_only_shadow():
     out = build()
     assert out["schema"] == "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1"
     assert out["mode"] == "READ_ONLY"
     assert out["controlMode"] == "SHADOW"
     assert out["controlWrites"] is False
+    assert out["sourceFreshness"]["heating"]["status"] == "OK"
     assert out["policy"]["realtimeOpportunityAuthority"] == "P1"
