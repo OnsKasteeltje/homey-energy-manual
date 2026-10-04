@@ -107,6 +107,48 @@ installer is `deploy/install/install_heating_shadow_cadence_v0_1.sh`; it
 replaces timer unit files and restarts only timers that were already active,
 without changing enabled state or issuing a Homey/device command.
 
+## Continuation checkpoint — 2026-10-04
+
+Stable handoff marker: `NEXT_HEATING_STEP_PRODUCTION_DYNAMIC_PI_PLANNER_GRANT`.
+
+Do **not** restart Heating work by rebuilding the Pi -> Homey SHADOW transport.
+That proof is complete. The installed Intent -> Adapter -> Gate objects, pinned
+room IDs, no-write guards and one-shot `--resume` path are retained as
+commissioning evidence. The recurring publisher is deliberately parked.
+
+The next implementation step is the production Dynamic Pi Planner Heating grant.
+Start there and preserve these already-proven boundaries:
+
+- P1/current grid exchange remains the realtime authority for actual Heating
+  permission; forecast opportunity alone is never a realtime grant.
+- Honeywell remains comfort/schedule authority. Heating may only advance an
+  already scheduled future `UP`, never create new comfort demand, never exceed
+  the future Honeywell target and never intentionally create grid import.
+- V0.3 eligibility/safety, Flex arbitration, V0.4 stateful <=0.5 C progression
+  and V0.5 control-boundary checks are inputs/guards to reuse, not replace.
+- Missing/stale/ambiguous P1 or planner inputs fail closed.
+- Heating must join the existing production Dynamic Pi Planner allocation with
+  EV and WW; it must not introduce a separate PV pot or second planner.
+- The production grant must be explicit, fresh/revisioned and independently
+  distinguish forecast opportunity from realtime permission.
+- Keep the Homey publisher timer disabled while the grant is still SHADOW or
+  absent.
+
+Only after that production grant has been implemented and validated should
+Heating cross into LIVE actuation. At that point reuse the proven Homey
+Intent/Adapter/Gate mapping and add exactly one Honeywell writer. The actuator
+must use a temporary override bounded to the original Honeywell `UP`, prove
+write acknowledgement plus Honeywell readback/ownership, and provide explicit
+reset/watchdog rollback. Begin with a bounded canary; do not infer physical
+ownership from the existing SHADOW chain.
+
+Already solved and not a reason to reopen this phase unless new evidence
+contradicts it: V0.3/Flex/V0.4/V0.5 cadence ordering, Pi -> Homey SHADOW
+transport shape, pinned thermostat mapping, no-write/live-block guards,
+commissioning pacing, CLI notifier behavior and Homey 429 suppression. The
+latter two are retained as defensive code only; normal runtime does not depend
+on them because the publisher is parked.
+
 ## LIVE blockers
 
 Physical Heating control remains blocked until both are separately delivered and

@@ -85,6 +85,15 @@ promotion remains blocked until both a production Dynamic Pi Planner Heating
 grant and exactly one guarded Honeywell actuator with acknowledgement/readback
 and rollback semantics are implemented.
 
+**Heating continuation checkpoint:** `NEXT_HEATING_STEP_PRODUCTION_DYNAMIC_PI_PLANNER_GRANT`.
+When Heating work resumes, the first task is the authoritative production
+Dynamic Pi Planner Heating grant, not another Pi -> Homey transport iteration.
+The completed/parked SHADOW boundary and exact re-entry sequence are recorded in
+`docs/commissioning/heating-homey-shadow-chain-v0.1.md` under
+“Continuation checkpoint — 2026-10-04”. That checkpoint is the canonical
+handoff to prevent cadence, Homey commissioning, notifier or 429 work from
+being repeated without new evidence.
+
 The former legacy `src/pi/ems-runtime/thermal/build_thermal_observer.py` is retired rather than migrated as a parallel thermal model. Its overlapping Honeywell/schedule/room-state responsibility is superseded by the canonical Heating Room Model. There must not be both `EMS_THERMAL_OBSERVER_V0.1` and `EMS_HEATING_ROOM_MODEL_V0.1` as competing descriptions of room-heating state.
 
 Quatt acquisition that remains useful for thermal analysis is canonicalized under `services/pi/integrations/quatt/collect_quatt_current.py`. The production systemd unit points to this target-structure source. Quatt telemetry, canonical room state and historical measurements form the input basis for **Heating Thermal Learning**: empirical evaluation of room response, heat retention, useful advancement horizon and rebound around the original Honeywell comfort time. Thermal Learning is observational; it does not create a second comfort authority or physical writer.
