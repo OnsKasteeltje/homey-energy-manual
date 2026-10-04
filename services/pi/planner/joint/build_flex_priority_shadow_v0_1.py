@@ -16,6 +16,9 @@ HEATING_SCHEMA = "EMS_HEATING_PREHEAT_SHADOW_V0.3"
 EV_SCHEMA = "EMS_PI_EV_DEADLINE_SHADOW_STATE_V0.2"
 OUTPUT_SCHEMA = "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1"
 
+MAX_HEATING_AGE_SECONDS = 420
+MAX_FUTURE_SKEW_SECONDS = 30
+
 
 class PriorityError(ValueError):
     pass
@@ -37,6 +40,15 @@ def _number(value: Any, label: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise PriorityError(f"{label} must be numeric")
     return float(value)
+
+
+def _freshness(generated: datetime, now: datetime, max_age: int, label: str) -> dict[str, Any]:
+    age = (now - generated).total_seconds()
+    if age < -MAX_FUTURE_SKEW_SECONDS:
+        return {"status": "INVALID", "reason": f"{label}_FROM_FUTURE", "ageSeconds": round(age, 1)}
+    if age > max_age:
+        return {"status": "STALE", "reason": f"{label}_STALE", "ageSeconds": round(age, 1)}
+    return {"status": "OK", "reason": f"{label}_CURRENT", "ageSeconds": round(max(0.0, age), 1)}
 
 
 def _ready_heating(heating: dict[str, Any]) -> list[dict[str, Any]]:
@@ -85,7 +97,16 @@ def build_priority(
         raise PriorityError("generated_at must be offset-aware")
     now = now.astimezone(timezone.utc)
 
-    ready = _ready_heating(heating_shadow)
+    heating_generated = _aware(heating_shadow.get("generatedAt"), "heating.generatedAt")
+    heating_freshness = _freshness(
+        heating_generated,
+        now,
+        MAX_HEATING_AGE_SECONDS,
+        "HEATING_SHADOW",
+    )
+    heating_current = heating_freshness["status"] == "OK"
+
+    ready = _ready_heating(heating_shadow) if heating_current else []
     ready.sort(key=lambda item: item["opportunityClosesAt"])
     earliest_close = ready[0]["opportunityClosesAt"] if ready else None
 
@@ -124,6 +145,11 @@ def build_priority(
         heating_grant = "HOLD"
         ev_role = "MUST"
         reason = "EV_DEADLINE_MUST"
+    elif not heating_current:
+        owner = "HOLD_UNKNOWN"
+        heating_grant = "HOLD"
+        ev_role = "PRIMARY_OPPORTUNITY"
+        reason = heating_freshness["reason"]
     elif ready:
         if ev_state == "AVAILABLE_LATER" and latest_start is not None and earliest_close is not None and latest_start < earliest_close:
             owner = "EV"
@@ -152,6 +178,9 @@ def build_priority(
         "controlWrites": False,
         "generatedAt": now.isoformat().replace("+00:00", "Z"),
         "authority": "DYNAMIC_PI_PLANNER_SHADOW",
+        "sourceFreshness": {
+            "heating": heating_freshness,
+        },
         "policy": {
             "strategy": "CONSTRAINT_FIRST_THEN_EARLIEST_CLOSING_FLEX",
             "powerReservationW": 0,

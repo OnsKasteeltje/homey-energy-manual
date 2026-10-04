@@ -40,6 +40,24 @@ def load_json(path: Path):
         return json.load(handle)
 
 
+def load_optional_json(path: Path, *, label: str):
+    """Return an invalid source object instead of leaving stale shadow output.
+
+    Quatt is an observer-only safety input. A transiently missing or malformed
+    artifact must therefore produce a fresh V0.3 fail-closed state rather than
+    crash the runner and leave an older V0.3 artifact looking current upstream.
+    """
+    try:
+        return load_json(path)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"WARN: {label} unavailable; publishing fresh fail-closed shadow: {exc}")
+        return {
+            "schema": None,
+            "mode": "READ_ONLY",
+            "sourceError": type(exc).__name__,
+        }
+
+
 def atomic_write(path: Path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent, text=True)
@@ -79,7 +97,7 @@ def main() -> int:
     shadow = shadow_mod.build_shadow(
         room_model,
         candidate,
-        load_json(QUATT_FILE),
+        load_optional_json(QUATT_FILE, label="Quatt current"),
         generated_at=now,
     )
 

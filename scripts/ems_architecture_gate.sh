@@ -35,6 +35,9 @@ FRONTEND_CADDY="deploy/caddy/ems-frontend-v2.Caddyfile"
 FORECAST_CHAIN="deploy/systemd/ems-forecast-chain.service"
 PV_FORECAST_V2_SOURCE="services/pi/forecast/pv/build_pv_forecast_v2.py"
 PV_FORECAST_V2_UNIT="deploy/systemd/ems-pv-forecast-v2-shadow.service"
+HEATING_V03_RUNNER="services/pi/planner/heating/run_heating_preheat_shadow_v0_3.py"
+FLEX_PRIORITY_SHADOW="services/pi/planner/joint/build_flex_priority_shadow_v0_1.py"
+PI_DEPLOY="scripts/deploy_ems_pi.sh"
 BASE_REF="${1:-}"
 
 fail() { echo "ARCHITECTURE GATE: FAIL: $*" >&2; exit 1; }
@@ -182,6 +185,14 @@ grep -q -- "-not -path './.venv/\*'" scripts/ems_pi_drift_check.sh || fail "Hone
 grep -q 'services/pi/integrations/honeywell/' "$HONEYWELL_DOC" || fail "Honeywell target repository boundary missing from architecture document"
 grep -q '/home/jeroen/ems/runtime/tools/honeywell/' "$HONEYWELL_DOC" || fail "Honeywell runtime compatibility path missing from architecture document"
 pass "Honeywell target-structure deployment preserves host-local runtime state"
+
+grep -Fq -- "-not -path './thermal/*'" "$PI_DEPLOY" || fail "generic Pi deploy unmanaged-file check must ignore derived runtime/thermal state"
+grep -Fq -- "--exclude='thermal/'" "$PI_DEPLOY" || fail "generic Pi rsync must preserve derived runtime/thermal state"
+grep -q 'load_optional_json(QUATT_FILE' "$HEATING_V03_RUNNER" || fail "Heating V0.3 runner must fail closed on unavailable Quatt artifact"
+grep -q 'MAX_HEATING_AGE_SECONDS = 420' "$FLEX_PRIORITY_SHADOW" || fail "Flex Priority must bound Heating V0.3 freshness"
+grep -q '"sourceFreshness"' "$FLEX_PRIORITY_SHADOW" || fail "Flex Priority must expose Heating source freshness"
+grep -q 'elif not heating_current:' "$FLEX_PRIORITY_SHADOW" || fail "Flex Priority must refuse stale Heating grants"
+pass "Heating preheat runtime-state preservation and freshness propagation present"
 
 grep -q 'services/pi/integrations/connectlife/' "$CONNECTLIFE_DOC" || fail "ConnectLife target repository boundary missing from architecture document"
 grep -q 'read-only telemetry' "$CONNECTLIFE_DOC" || fail "ConnectLife read-only safety boundary missing from architecture document"
