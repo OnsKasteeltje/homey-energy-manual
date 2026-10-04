@@ -83,11 +83,18 @@ It writes only the dedicated string Logic contract
 This is deliberately **not** a production Power Intent producer. It declares
 `plannerAuthority=SHADOW_ONLY`,
 `productionPlannerHeatingGrantPresent=false`,
-`deviceWrites=false` and `physicalWriteAllowed=false`. The downstream Homey
-Heating Adapter/Gate remain SHADOW and no Heating actuator exists. Normal
+`deviceWrites=false`, `physicalWriteAllowed=false` and top-level
+`liveExecutionAllowed=false` (also repeated under `safety`). The downstream
+Homey Heating Adapter/Gate remain SHADOW and no Heating actuator exists. Normal
 runtime uses the pinned Logic ID from host-local
-`heating-control-homey-shadow-config.json`; broad discovery is limited to
-controlled first commissioning.
+`heating-control-homey-shadow-config.json`; first commissioning performs no
+bulk Homey discovery.
+
+If first commissioning already reached host-local `state=READY` but final
+post-publish readback was interrupted, `--resume-ready` validates only the
+pinned Logic/Flow IDs with paced targeted reads, performs one SHADOW publish,
+and enables the publisher timer only after Intent, Adapter and Gate pass on the
+same control revision. It performs no Homey object create/update.
 
 
 ## Runtime compatibility
