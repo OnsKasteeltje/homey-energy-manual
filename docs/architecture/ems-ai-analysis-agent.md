@@ -174,6 +174,28 @@ original/selected counts. Omission or sampling is never evidence that activity
 did not occur outside the transported records. Canonical history itself is not
 deleted or modified.
 
+As a final defense-in-depth step, V0.4 applies a pre-flight **estimated model
+input budget** to instructions + bounded conversation context + current
+question + selected evidence. The target is 80,000 estimated input tokens and
+the hard ceiling is 100,000 estimated input tokens. Exact model tokenization is
+not reproduced on the Pi; to avoid a new tokenizer/runtime dependency the
+estimate deliberately uses UTF-8 input bytes divided by 2.5. This conservative
+ratio was calibrated against successful 2026-10-04 EMS model calls and is
+recorded as an estimate, never as an exact token count.
+
+If the target is exceeded, deterministic budget-compaction steps further bound
+the already-selected timeline, EV telemetry/control, Quooker, flex-context,
+planner-window and forecast-slot collections while continuing to preserve
+state-transition/important-event points where those contracts define them.
+`evidenceSelection.inputBudget` records the target, hard limit, estimator,
+pre/post estimate, number of compaction steps and `budgetCompactedFields`.
+The model is explicitly told that budget-compacted absence is not evidence that
+an event did not occur. If the conservative estimate remains above 100,000
+after all defined compaction steps, the request fails closed as
+`MODEL_INPUT_BUDGET_EXCEEDED` and **no model call is made**. This protects
+against single-request input explosions; it does not guarantee that provider
+rolling rate limits cannot still be reached by multiple valid requests.
+
 For an in-progress local day, performance quality separates three different
 concepts: `dayProgressPct` (how much of the calendar day has elapsed),
 `coveragePctFullDay` (integrated evidence as a fraction of the complete day)
