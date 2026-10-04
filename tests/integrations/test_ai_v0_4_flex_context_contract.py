@@ -132,16 +132,39 @@ def create_history_db(path):
             detector_reason TEXT,
             detector_last_heating_at TEXT,
             detector_last_heating_power_w REAL,
-            physical_write_performed INTEGER
+            physical_write_performed INTEGER,
+            raw_json TEXT
         )
     """)
-    con.execute("""
+    raw = json.dumps({
+        "actuator": {
+            "schema": "EM2_QUOOKER_ACTUATOR_STATUS_V0.2",
+            "mode": "LIVE",
+            "controlValid": True,
+            "controlFresh": True,
+            "desiredOn": True,
+            "actualOnBefore": False,
+            "actualOnAfter": True,
+            "physicalWritePerformed": True,
+            "writeError": None,
+            "reason": "OPPORTUNITY_START_EXPORT",
+            "safety": {
+                "shadow": False,
+                "deviceWrites": True,
+                "soleWriterClaimed": True,
+            },
+        }
+    })
+    con.execute(
+        """
         INSERT INTO quooker_control_events VALUES
         (1,'2026-10-03T14:00:00Z','OPPORTUNITY',1,'OPPORTUNITY_START_EXPORT',
-         1580,-2200,1,1250,600,1,1,1,1,0,'OPPORTUNITY_START_EXPORT',
+         1580,-2200,1,1250,600,1,1,1,NULL,NULL,'OPPORTUNITY_START_EXPORT',
          1,1,0,'ON_IDLE',0,'ON_IDLE_BASELINE_TRACK','2026-10-03T12:30:00Z',
-         1570,0)
-    """)
+         1570,0,?)
+        """,
+        (raw,),
+    )
     con.commit()
     con.close()
 
@@ -169,8 +192,12 @@ def main():
         assert len(q) == 1
         assert q[0]["control"]["targetOn"] is True
         assert q[0]["detector"]["status"] == "ON_IDLE"
-        assert q[0]["actuatorShadow"]["wouldWrite"] is False
-        assert q[0]["physicalWritePerformed"] is False
+        assert q[0]["actuator"]["schema"] == "EM2_QUOOKER_ACTUATOR_STATUS_V0.2"
+        assert q[0]["actuator"]["mode"] == "LIVE"
+        assert q[0]["actuator"]["actualOnBefore"] is False
+        assert q[0]["actuator"]["actualOnAfter"] is True
+        assert q[0]["actuator"]["physicalWritePerformed"] is True
+        assert q[0]["physicalWritePerformed"] is True
 
         ai._load_performance = lambda _day: {
             "schema": "EMS_PI_DAY_PERFORMANCE_V0.1",
@@ -189,7 +216,10 @@ def main():
         assert evidence["schema"] == "EMS_AI_EVIDENCE_V0.4"
         assert len(evidence["flexContextWindow"]) == 1
         assert len(evidence["quookerEvents"]) == 1
-        assert any("SHADOW" in item for item in evidence["limitations"])
+        assert any(
+            "Quooker actuator mode is evidence-driven" in item
+            for item in evidence["limitations"]
+        )
 
     print("PASS: AI V0.4 flex context contract")
 

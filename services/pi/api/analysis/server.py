@@ -59,7 +59,7 @@ An observed export window is not automatically an EMS fault; constraints may exp
 Use plannerDecisionWindow as historical intent evidence and never judge an earlier planner decision using a forecast generated later.
 Use forecastVsActual15m to distinguish forecast error from planner/control execution error when the evidence supports that distinction.
 Use flexContextWindow for historical Heating/WW eligibility and priority, and quookerEvents for Quooker adapter/actuator/detector evidence.
-Heating progression and the Quooker actuator are SHADOW unless evidence explicitly proves otherwise: a shadow grant, desired target or wouldWrite is not a physical command.
+Heating progression remains SHADOW. Quooker actuator evidence is versioned: use quookerEvents[].actuator.mode as the authority. For SHADOW evidence, desiredOn/wouldWrite is not a physical command. For LIVE evidence, physicalWritePerformed=true is direct proof that the Homey actuator executed a device write, while actualOnBefore/actualOnAfter describe the observed state transition. physicalWritePerformed=false may be an idempotent no-op when desired and actual state already matched. Detector HEATING is independent electrical evidence and must not by itself be described as a physical control write.
 Never backfill missing pre-commissioning flex or Quooker history by inference.
 For an in-progress day, PARTIAL_TODAY means the calendar day is not finished; never call data incomplete from full-day coverage alone. Use quality.coveragePctElapsed, quality.elapsedCoverageStatus and quality.dayProgressPct.
 Treat EV deadline metadata as an active constraint only when deadlineSemantics.effective is true. Old deadlineAt/remainingKWh values may remain visible for audit but are not active constraints when semantics say INACTIVE, EXPIRED_OR_STALE or INVALID_OR_STALE.
@@ -697,6 +697,14 @@ def _planner_decision_window(day, anchors):
 
 
 
+def _bool_db(value):
+    if value is True:
+        return 1
+    if value is False:
+        return 0
+    return None
+
+
 def _quooker_events(day):
     start, end = _bounds(day)
     with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
@@ -707,17 +715,51 @@ def _quooker_events(day):
         ).fetchone()
         if not exists:
             return []
+
+        available = {
+            row[1] for row in db.execute(
+                "PRAGMA table_info(quooker_control_events)"
+            )
+        }
+
+        def column(name):
+            return name if name in available else f"NULL AS {name}"
+
+        selected = [
+            "ts_utc",
+            "control_mode",
+            "control_target_on",
+            "control_reason",
+            "modeled_power_w",
+            "avg_grid_w",
+            "p1_fresh",
+            "start_export_w",
+            "stop_import_w",
+            column("actuator_schema"),
+            column("actuator_mode"),
+            "actuator_control_valid",
+            "actuator_control_fresh",
+            "actuator_desired_on",
+            "actuator_actual_on",
+            column("actuator_actual_on_before"),
+            column("actuator_actual_on_after"),
+            "actuator_would_write",
+            column("actuator_write_error"),
+            "actuator_reason",
+            "detector_valid",
+            "detector_switch_on",
+            "detector_active",
+            "detector_status",
+            "detector_power_w",
+            "detector_reason",
+            "detector_last_heating_at",
+            "detector_last_heating_power_w",
+            "physical_write_performed",
+            column("raw_json"),
+        ]
         rows = db.execute(
-            """
-            SELECT
-                ts_utc,control_mode,control_target_on,control_reason,
-                modeled_power_w,avg_grid_w,p1_fresh,start_export_w,stop_import_w,
-                actuator_control_valid,actuator_control_fresh,
-                actuator_desired_on,actuator_actual_on,actuator_would_write,
-                actuator_reason,detector_valid,detector_switch_on,
-                detector_active,detector_status,detector_power_w,
-                detector_reason,detector_last_heating_at,
-                detector_last_heating_power_w,physical_write_performed
+            f"""
+            SELECT {",".join(selected)}
             FROM quooker_control_events
             WHERE ts_utc>=? AND ts_utc<?
             ORDER BY ts_utc
@@ -730,11 +772,56 @@ def _quooker_events(day):
         (
             ts_text, mode, target_on, control_reason,
             modeled_w, avg_grid_w, p1_fresh, start_export_w, stop_import_w,
-            actuator_valid, actuator_fresh, desired_on, actual_on, would_write,
-            actuator_reason, detector_valid, switch_on, active, detector_status,
+            actuator_schema, actuator_mode, actuator_valid, actuator_fresh,
+            desired_on, actual_on, actual_on_before, actual_on_after,
+            would_write, actuator_write_error, actuator_reason,
+            detector_valid, switch_on, active, detector_status,
             detector_power_w, detector_reason, last_heating_at,
-            last_heating_power_w, physical_write,
+            last_heating_power_w, physical_write, raw_json,
         ) = row
+
+        raw_actuator = {}
+        if raw_json:
+            try:
+                raw_payload = json.loads(raw_json)
+                candidate = raw_payload.get("actuator")
+                if isinstance(candidate, dict):
+                    raw_actuator = candidate
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        raw_safety = (
+            raw_actuator.get("safety")
+            if isinstance(raw_actuator.get("safety"), dict)
+            else {}
+        )
+        actuator_schema = actuator_schema or raw_actuator.get("schema")
+        actuator_mode = actuator_mode or raw_actuator.get("mode")
+        if actual_on_before is None:
+            actual_on_before = _bool_db(raw_actuator.get("actualOnBefore"))
+        if actual_on_after is None:
+            actual_on_after = _bool_db(raw_actuator.get("actualOnAfter"))
+        if actual_on is None:
+            actual_on = _bool_db(raw_actuator.get("actualOn"))
+        if actuator_write_error is None:
+            actuator_write_error = raw_actuator.get("writeError")
+        if physical_write != 1 and (
+            raw_actuator.get("physicalWritePerformed") is True
+            or raw_safety.get("physicalWritePerformed") is True
+        ):
+            physical_write = 1
+
+        if actuator_mode is None and would_write is not None:
+            actuator_mode = "SHADOW"
+
+        effective_actual = (
+            actual_on_after
+            if actual_on_after is not None
+            else actual_on
+            if actual_on is not None
+            else actual_on_before
+        )
+
         local = datetime.fromisoformat(
             ts_text.replace("Z", "+00:00")
         ).astimezone(LOCAL_TZ)
@@ -750,12 +837,22 @@ def _quooker_events(day):
                 "startExportW": start_export_w,
                 "stopImportW": stop_import_w,
             },
-            "actuatorShadow": {
+            "actuator": {
+                "schema": actuator_schema,
+                "mode": actuator_mode or "UNKNOWN",
                 "controlValid": None if actuator_valid is None else actuator_valid == 1,
                 "controlFresh": None if actuator_fresh is None else actuator_fresh == 1,
                 "desiredOn": None if desired_on is None else desired_on == 1,
-                "actualOn": None if actual_on is None else actual_on == 1,
+                "actualOn": None if effective_actual is None else effective_actual == 1,
+                "actualOnBefore": (
+                    None if actual_on_before is None else actual_on_before == 1
+                ),
+                "actualOnAfter": (
+                    None if actual_on_after is None else actual_on_after == 1
+                ),
                 "wouldWrite": None if would_write is None else would_write == 1,
+                "physicalWritePerformed": physical_write == 1,
+                "writeError": actuator_write_error,
                 "reason": actuator_reason,
             },
             "detector": {
@@ -771,6 +868,7 @@ def _quooker_events(day):
             "physicalWritePerformed": physical_write == 1,
         })
     return out
+
 
 
 def _flex_context_window(day, anchors):
@@ -1076,7 +1174,9 @@ def build_evidence(day, question=""):
             "EV telemetry and control-event history only exist from their V0.2 commissioning onward; earlier gaps must not be backfilled by inference.",
             "Heating/WW flex-context history only exists from V0.4 flex-context archive commissioning onward; earlier gaps must not be backfilled from current JSON.",
             "Quooker adapter/actuator/detector history only exists from V0.4 Quooker evidence-push commissioning onward; earlier gaps must not be backfilled from current Homey Logic.",
-            "Heating progression and Quooker actuator evidence are SHADOW: grant, desiredOn and wouldWrite do not prove a physical command or device change.",
+            "Heating progression remains SHADOW. Quooker actuator mode is evidence-driven: SHADOW desiredOn/wouldWrite does not prove a physical command; LIVE physicalWritePerformed=true does.",
+            "For Quooker LIVE evidence, physicalWritePerformed=false can be an idempotent no-op when the requested state already matched; use actualOnBefore/actualOnAfter plus detector evidence for context.",
+            "If a historical Quooker event has actuator.mode=UNKNOWN, do not infer a physical write from detector HEATING alone.",
             "Planner decision windows use the latest frozen snapshot at or before each analysis anchor; missing snapshots remain missing.",
             "PV forecast comparison uses a fixed 12-hour no-hindsight archive selection and must not substitute a later forecast.",
             "Observed phase mode is derived from measured phase currents; use explicit actuator/gate phase fields when control-event evidence exists.",

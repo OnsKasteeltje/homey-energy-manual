@@ -68,6 +68,11 @@ jobs:
       - name: Run Quooker detector regression tests
         run: node --test tests/quooker-detector-v0.4.test.mjs
 
+      - name: Run Quooker AI evidence regression tests
+        run: |
+          python tests/integrations/test_quooker_evidence_contract.py
+          python tests/integrations/test_ai_v0_4_flex_context_contract.py
+
       - name: Run history integration regression tests
         run: |
           python -m pytest -q \
