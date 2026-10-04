@@ -1,0 +1,12 @@
+[Unit]
+Description=Publish Heating V0.5 to Homey SHADOW every minute
+
+[Timer]
+# V0.5 control gate runs at :30. Publish the validated SHADOW contract at :35.
+OnCalendar=*-*-* *:*:35
+Persistent=true
+AccuracySec=5s
+Unit=ems-heating-homey-shadow-publish.service
+
+[Install]
+WantedBy=timers.target

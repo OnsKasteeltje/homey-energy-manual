@@ -93,7 +93,7 @@ UNMANAGED="$(
             -not -path './analysis-api/*' \
             -not -path './health/*' \
             -not -path './tools/honeywell/*' \
-            -not -path './homey-deploy/publish_pi_control_intent.py' \
+            -not -path './homey-deploy/*' \
             -not -path '*/__pycache__/*' \
             -not -name '*.pyc' \
             -printf '%P\n' | sort) \
@@ -178,11 +178,13 @@ for ingress_file in state_ingest.py ev_control_ingest.py quooker_evidence_ingest
 done
 
 mkdir -p "$TARGET_HOMEY_EGRESS_RUNTIME"
-if [[ ! -f "$TARGET_HOMEY_EGRESS_SOURCE/publish_pi_control_intent.py" ]]; then
-    echo "ERROR: Homey egress source is missing."
-    echo "Deployment aborted to protect the Pi -> Homey control path."
-    exit 1
-fi
+for egress_file in publish_pi_control_intent.py publish_heating_control_intent_shadow.py; do
+    if [[ ! -f "$TARGET_HOMEY_EGRESS_SOURCE/$egress_file" ]]; then
+        echo "ERROR: Homey egress source is missing: $egress_file"
+        echo "Deployment aborted to protect the Pi -> Homey control path."
+        exit 1
+    fi
+done
 
 mkdir -p "$TARGET_STATUS_RUNTIME"
 STATUS_UNMANAGED="$(
@@ -319,9 +321,12 @@ rsync -a --delete \
     "$TARGET_HONEYWELL_SOURCE/" "$TARGET_HONEYWELL_RUNTIME/"
 
 mkdir -p "$TARGET_HOMEY_EGRESS_RUNTIME"
-cp -a \
-    "$TARGET_HOMEY_EGRESS_SOURCE/publish_pi_control_intent.py" \
-    "$TARGET_HOMEY_EGRESS_RUNTIME/publish_pi_control_intent.py"
+# Runtime/homey-deploy also contains maintenance tooling. Copy canonical egress
+# sources additively so this deploy step never deletes those host-managed tools.
+rsync -a \
+    --exclude='__pycache__/' \
+    --exclude='*.pyc' \
+    "$TARGET_HOMEY_EGRESS_SOURCE/" "$TARGET_HOMEY_EGRESS_RUNTIME/"
 
 mkdir -p "$TARGET_STATUS_RUNTIME"
 rsync -a --delete \

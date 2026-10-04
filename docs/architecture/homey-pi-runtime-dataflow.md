@@ -396,3 +396,35 @@ Correction:
 - automatic Pi-side control publishing is removed from the production timer set because the Homey PI Bridge is the canonical control consumer.
 
 This correction aligns runtime behavior with the already-documented one-way ownership boundaries and the mandatory Homey low-load API rules.
+
+
+## Heating Pi -> Homey SHADOW control-contract boundary
+
+Heating commissioning adds a dedicated non-production path:
+
+```text
+Pi V0.5 Control Gate SHADOW
+        |
+        v
+EMS_HEATING_CONTROL_INTENT_V0.1
+        |
+        v
+Homey EM2_Heating_Control_Intent
+        |
+        v
+Heating Adapter v0.1 SHADOW
+        |
+        v
+Heating Gate v0.1 SHADOW
+        |
+        +--> targeted Honeywell thermostat READS only
+        |
+       -X- no actuator / no capability write
+```
+
+This is not a second production Power Intent bus. It carries V0.5 commissioning
+semantics only and explicitly reports `plannerAuthority=SHADOW_ONLY` and
+`productionPlannerHeatingGrantPresent=false`. The transport becomes eligible
+for LIVE redesign only after Heating allocation is owned by the production
+Dynamic Pi Planner and a separately commissioned sole Honeywell writer can
+acknowledge and read back its own temporary override ownership.

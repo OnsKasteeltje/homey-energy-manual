@@ -42,3 +42,12 @@ unchanged state remains deduplicated with the normal heartbeat.
 chain as artifact freshness plus timer/service health. This observability is a
 commissioning prerequisite for any later Pi->Homey Heating adapter/gate work.
 It remains read-only and must never become a control input.
+
+
+## Next boundary: Pi -> Homey SHADOW
+
+The next commissioned layer is documented in
+`docs/commissioning/heating-homey-shadow-chain-v0.1.md`. It transports the
+V0.5 result to a dedicated Homey SHADOW intent, Adapter and Gate, but still
+contains no Heating actuator. The active Dynamic Pi Planner Heating-grant gap
+remains an explicit LIVE blocker.

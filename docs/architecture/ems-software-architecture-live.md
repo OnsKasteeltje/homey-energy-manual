@@ -270,6 +270,15 @@ Heating-keten zowel artefact-freshness als timer/service-functionaliteit. Deze
 evidence-route is read-only en kan nooit upstream planner-, gate- of
 actuatorautoriteit krijgen.
 
+Heating crosses the Pi -> Homey boundary only in a separate SHADOW contract:
+`EMS_HEATING_CONTROL_INTENT_V0.1 -> EMS_HEATING_CONTROL_ADAPTER_SHADOW_V0.1
+-> EMS_HEATING_CONTROL_ADAPTER_GATE_SHADOW_V0.1`. This path is intentionally
+not part of production `EM2_POWER_INTENT_V0.2` until the Dynamic Pi Planner
+owns an authoritative Heating allocation. Homey may perform targeted thermostat
+reads for edge validation, but there is no actuator and every layer keeps
+`liveExecutionAllowed=false`, `deviceWrites=false` and
+`physicalWriteAllowed=false`.
+
 ## 12. Actieve EV execution chain
 
 Actuele Homey-keten:
