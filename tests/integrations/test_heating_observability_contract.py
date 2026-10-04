@@ -68,8 +68,13 @@ def main():
             "ExecMainExitTimestamp": "",
         }
 
-    original = m._systemctl_show
+    original_systemctl = m._systemctl_show
+    original_units = m.FUNCTION_UNITS
     m._systemctl_show = fake_systemctl
+    m.FUNCTION_UNITS = {
+        key: original_units[key]
+        for key in expected_units
+    }
     try:
         data = {key: {"status": "OK"} for key in expected_data}
         functions, degraded = m._functions_status(data)
@@ -87,7 +92,8 @@ def main():
         assert degraded is True
         assert functions["heatingControlGateV05"]["status"] == "DEGRADED"
     finally:
-        m._systemctl_show = original
+        m._systemctl_show = original_systemctl
+        m.FUNCTION_UNITS = original_units
 
     print("PASS: Heating V0.3 -> Flex -> V0.4 -> V0.5 health contract")
 
