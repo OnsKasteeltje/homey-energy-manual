@@ -52,6 +52,7 @@ DAY_SCOPE_LIMITS = {
     "evTelemetry5m": 48,
     "evControlEvents": 48,
     "quookerEvents": 36,
+    "semanticEvents": 48,
     "flexContextWindow": 3,
 }
 MODEL_INPUT_TARGET_TOKENS = 80000
@@ -63,6 +64,7 @@ MODEL_INPUT_BUDGET_STEPS = (
         "evTelemetry5m": 40,
         "evControlEvents": 40,
         "quookerEvents": 30,
+        "semanticEvents": 36,
         "flexContextWindow": 3,
         "plannerDecisionWindow": 12,
         "forecastSlots": 24,
@@ -72,6 +74,7 @@ MODEL_INPUT_BUDGET_STEPS = (
         "evTelemetry5m": 32,
         "evControlEvents": 32,
         "quookerEvents": 24,
+        "semanticEvents": 30,
         "flexContextWindow": 3,
         "plannerDecisionWindow": 10,
         "forecastSlots": 20,
@@ -81,6 +84,7 @@ MODEL_INPUT_BUDGET_STEPS = (
         "evTelemetry5m": 24,
         "evControlEvents": 24,
         "quookerEvents": 18,
+        "semanticEvents": 24,
         "flexContextWindow": 2,
         "plannerDecisionWindow": 8,
         "forecastSlots": 16,
@@ -90,6 +94,7 @@ MODEL_INPUT_BUDGET_STEPS = (
         "evTelemetry5m": 16,
         "evControlEvents": 16,
         "quookerEvents": 12,
+        "semanticEvents": 18,
         "flexContextWindow": 2,
         "plannerDecisionWindow": 6,
         "forecastSlots": 12,
@@ -99,6 +104,7 @@ MODEL_INPUT_BUDGET_STEPS = (
         "evTelemetry5m": 12,
         "evControlEvents": 12,
         "quookerEvents": 8,
+        "semanticEvents": 12,
         "flexContextWindow": 1,
         "plannerDecisionWindow": 4,
         "forecastSlots": 8,
@@ -126,6 +132,7 @@ Use forecastVsActual15m to distinguish forecast error from planner/control execu
 For EV control questions, evControlEvents[].intentReason, realtimePhaseReason and realtimeCurrentReason are recorded Homey control reasons, not model inference. If a zero target/IDLE event has one of these reasons, use it before saying the underlying cause is unknown. Rolling available-power fields in the same event may support that reason but must not be invented when absent.
 When an EV is charging below a deadline/current request, compare the control requestedA/actuatorTargetA with Easee requestedA, Easee offeredA, measured Easee phase currents and Equalizer/P1 phase currents from evControlEvents before diagnosing a control failure. Easee requestedA matching the EMS request while offeredA is lower proves that the reduction occurred downstream of the EMS/Homey target. If fresh Equalizer evidence is present, describe the pattern as consistent with Equalizer/load-balancing constraint; do not claim the Equalizer as the unique cause unless the evidence explicitly proves that attribution.
 Use flexContextWindow for historical Heating/WW eligibility and priority, and quookerEvents for Quooker adapter/actuator/detector evidence.
+Use semanticEvents as durable historical state-change evidence. provenanceClass=USER_INTENT_COMMAND proves that a user-intent command was recorded, but not that a physical device action occurred. provenanceClass=OBSERVED_STATE proves an observed state transition but does not identify who or what caused it. provenanceClass=DERIVED_STATE is Pi-derived state, and provenanceClass=SHADOW_DECISION is never proof of a physical write. The semantic-event archive starts at semanticEventCoverage.commissionedAt; its initial baseline creates no synthetic event, so absence before commissioning or absence of an event at baseline is not proof that no earlier change occurred.
 When evidenceSelection.mode is EXPLICIT_TIME_WINDOW or CONTEXT_TIME_WINDOW, timeline5m, evTelemetry5m, evControlEvents and quookerEvents are intentionally limited to the documented local window around the selected clock time. Do not interpret absence outside that selected window as evidence that no activity occurred elsewhere in the day.
 When evidenceSelection.mode is TOPIC_DAY_SCOPE or DAY_SCOPE_COMPACT, listed compactedFields are bounded samples across the day and listed omittedFields were intentionally excluded as unrelated to the current question. Do not interpret omitted or unsampled records as proof that no activity occurred.
 When evidenceSelection.inputBudget.status is COMPACTED_TO_BUDGET or WITHIN_HARD_LIMIT, budgetCompactedFields were additionally reduced before the model call to stay within the documented estimated input budget. This is deliberate selection, not evidence that omitted records did not occur.
@@ -1486,6 +1493,104 @@ def _quooker_events(day):
         })
     return out
 
+
+
+
+def _semantic_events(day):
+    start, end = _bounds(day)
+    coverage = {
+        "available": False,
+        "schema": None,
+        "commissionedAt": None,
+        "historicalBackfill": False,
+        "eventCount": 0,
+        "oldestEventAt": None,
+        "newestEventAt": None,
+    }
+
+    if not os.path.exists(HISTORY_DB):
+        return [], coverage
+
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
+        db.execute("PRAGMA query_only=ON")
+        tables = {
+            row[0]
+            for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        if "semantic_events" not in tables:
+            return [], coverage
+
+        coverage["available"] = True
+        if "semantic_event_meta" in tables:
+            meta = dict(db.execute(
+                "SELECT key,value_text FROM semantic_event_meta"
+            ).fetchall())
+            coverage["schema"] = meta.get("schema")
+            commissioned = _parse_ts(meta.get("commissioned_at_utc"))
+            coverage["commissionedAt"] = (
+                commissioned.astimezone(LOCAL_TZ).isoformat()
+                if commissioned is not None
+                else meta.get("commissioned_at_utc")
+            )
+
+        stats = db.execute(
+            """
+            SELECT COUNT(*),MIN(ts_utc),MAX(ts_utc)
+            FROM semantic_events
+            """
+        ).fetchone()
+        coverage["eventCount"] = int(stats[0] or 0)
+        coverage["oldestEventAt"] = stats[1]
+        coverage["newestEventAt"] = stats[2]
+
+        rows = db.execute(
+            """
+            SELECT
+                ts_utc,event_type,domain,subject,state_key,
+                provenance_class,source_name,source_at_utc,
+                before_json,after_json,details_json
+            FROM semantic_events
+            WHERE ts_utc>=? AND ts_utc<?
+            ORDER BY ts_utc,id
+            """,
+            (_iso_z(start), _iso_z(end)),
+        ).fetchall()
+
+    out = []
+    for (
+        ts_text,event_type,domain,subject,state_key,
+        provenance,source_name,source_at,
+        before_json,after_json,details_json,
+    ) in rows:
+        ts = _parse_ts(ts_text)
+        if ts is None:
+            continue
+
+        def decode(value, fallback):
+            if value is None:
+                return fallback
+            try:
+                return json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                return fallback
+
+        out.append({
+            "atLocal": ts.astimezone(LOCAL_TZ).isoformat(),
+            "eventType": event_type,
+            "domain": domain,
+            "subject": subject,
+            "stateKey": state_key,
+            "provenanceClass": provenance,
+            "sourceName": source_name,
+            "sourceAt": source_at,
+            "before": decode(before_json, None),
+            "after": decode(after_json, None),
+            "details": decode(details_json, {}),
+        })
+
+    return out, coverage
 
 
 def _flex_context_window(day, anchors):
