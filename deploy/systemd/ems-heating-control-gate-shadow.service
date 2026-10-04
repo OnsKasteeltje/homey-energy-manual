@@ -1,0 +1,17 @@
+[Unit]
+Description=EMS Heating Control Gate V0.5 shadow
+After=ems-heating-preheat-progression-shadow.service
+
+[Service]
+Type=oneshot
+User=jeroen
+WorkingDirectory=/home/jeroen/ems/repo/homey-energy-manual
+ExecStart=/usr/bin/python3 /home/jeroen/ems/repo/homey-energy-manual/services/pi/control/heating/run_heating_control_gate_shadow_v0_5.py
+TimeoutStartSec=30
+Nice=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jeroen/ems/data

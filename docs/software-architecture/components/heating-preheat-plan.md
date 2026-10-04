@@ -155,6 +155,25 @@ For analysis, V0.4 retains two bounded 48-hour histories in the same local progr
 
 The V0.4 minute cadence is Pi-local only and performs no Homey call. It accepts V0.3 only within its bounded freshness horizon and accepts Flex Priority only when the priority artifact is fresh and was generated at or after the V0.3 state it is granting. Otherwise progression fails closed to a waiting/hold state.
 
+## V0.5 control-boundary gate SHADOW
+
+V0.5 lives under `services/pi/control/heating/`, not under the planner. It is
+not a second planner: it only translates already-decided V0.3/V0.4 state into a
+hypothetical edge command after independently checking freshness/order, V0.4
+upstream safety, Honeywell `UP`, CV safety, planner grant, target ceiling and
+the <=0.5 C progression bound.
+
+Allowed outputs are `HOLD`, `WOULD_SET_TEMP`, `WOULD_KEEP_TEMP` and
+`WOULD_RESET_TO_SCHEDULE`. Reset is allowed only for a room this V0.5 shadow
+previously simulated as owned, so a future design cannot reset unrelated manual
+or normal Honeywell state. Shadow ownership is explicitly not physical proof.
+
+V0.5 has no Homey/Honeywell/network client. `controlWrites=false`,
+`physicalWriteAllowed=false` and per-command `physicalWrite=false` are
+invariants. LIVE requires a separate Pi->Homey contract, Homey adapter/gate,
+single Honeywell writer and acknowledgement/readback. V0.5 is a commissioning
+lifecycle state and must be promoted or retired/archived at LIVE cutover.
+
 ## PV Flex observability
 
 Frontend V2 PV & Flex exposes the current V0.3 shadow state through the read-only Web Data API endpoint `/web/planner/heating-preheat-shadow`.
