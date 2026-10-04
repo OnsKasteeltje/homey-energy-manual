@@ -1,6 +1,6 @@
 # EV Bridge v1.5.9 adaptive 3P upscale — 2026-10-04
 
-Status: **CANDIDATE — repository validation required before Homey cutover**
+Status: **DEPLOYED / EXACT READBACK VERIFIED**
 
 ## Evidence and scope
 
@@ -142,3 +142,34 @@ After the normal minute trigger, verify:
 Rollback is the exact pre-deploy v1.5.8 writable body captured from stable
 Advanced Flow `8bf53fdb-76f4-47db-8ccb-773ac515f06e`. No Pi planner,
 Adapter, Gate or actuator rollback is required.
+
+
+## Production cutover result — 2026-10-04
+
+GitHub PR #177 passed the repository structure gate, EMS Architecture Gate,
+canonical Pi tests, Quooker regressions, EV evidence regression, history
+integration tests, PV surplus replay tests, EV phase-current controller tests
+and EV writer contract tests, then merged to `main` as
+`f9e9108cb8c8f090475a106043f5062b2d4ed547`.
+
+The Homey deployment updated only stable Advanced Flow
+`8bf53fdb-76f4-47db-8ccb-773ac515f06e` from v1.5.8 to:
+
+`EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.9 ADAPTIVE UPSCALE [READY]`
+
+Targeted post-write readback proved:
+
+- flow ID unchanged;
+- enabled = true;
+- broken = false;
+- card count remained 5;
+- every non-script card was byte-for-byte semantically unchanged;
+- script-card source exactly matched GitHub `main`;
+- source policy is `PI_DYNAMIC_PLANNER_BRIDGE_V1.5.9_ADAPTIVE_UPSCALE`;
+- controller diagnostics use `EM2_EV_PHASE_CURRENT_CONTROLLER_V0.4`;
+- adaptive 3P maximum is 4 A above the settled current;
+- no Adapter, Gate or writer flow was changed;
+- no physical actuator flow was manually triggered for deployment validation.
+
+The exact pre-deploy v1.5.8 writable body was retained during the transaction;
+rollback was not required.
