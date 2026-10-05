@@ -65,6 +65,127 @@ def iso_z(dt):
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def load_counter_delta(
+    day,
+    db_path,
+    *,
+    device_key,
+    metric_key,
+    cutoff_utc=None,
+):
+    start, end = bounds(day)
+    cutoff = min(
+        end,
+        (cutoff_utc or datetime.now(timezone.utc)).astimezone(timezone.utc),
+    )
+    if cutoff <= start:
+        return {
+            "available": False,
+            "reason": "COUNTER_PERIOD_NOT_STARTED",
+            "deviceKey": device_key,
+            "metricKey": metric_key,
+        }
+    if not db_path.exists():
+        return {
+            "available": False,
+            "reason": "COUNTER_DB_MISSING",
+            "deviceKey": device_key,
+            "metricKey": metric_key,
+        }
+
+    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    con.execute("PRAGMA query_only=ON")
+    try:
+        ids = con.execute(
+            """
+            SELECT d.id,m.id
+            FROM devices d
+            CROSS JOIN metrics m
+            WHERE d.device_key=? AND m.metric_key=?
+            """,
+            (device_key, metric_key),
+        ).fetchone()
+        if not ids:
+            return {
+                "available": False,
+                "reason": "COUNTER_NOT_COMMISSIONED",
+                "deviceKey": device_key,
+                "metricKey": metric_key,
+            }
+
+        device_id, metric_id = ids
+        baseline = con.execute(
+            """
+            SELECT ts_utc,value_real,quality
+            FROM measurements
+            WHERE device_id=? AND metric_id=? AND ts_utc<=?
+              AND value_real IS NOT NULL
+            ORDER BY ts_utc DESC
+            LIMIT 1
+            """,
+            (device_id, metric_id, iso_z(start)),
+        ).fetchone()
+        endpoint = con.execute(
+            """
+            SELECT ts_utc,value_real,quality
+            FROM measurements
+            WHERE device_id=? AND metric_id=? AND ts_utc<=?
+              AND value_real IS NOT NULL
+            ORDER BY ts_utc DESC
+            LIMIT 1
+            """,
+            (device_id, metric_id, iso_z(cutoff)),
+        ).fetchone()
+    finally:
+        con.close()
+
+    if baseline is None:
+        return {
+            "available": False,
+            "reason": "COUNTER_BASELINE_MISSING",
+            "deviceKey": device_key,
+            "metricKey": metric_key,
+        }
+    if endpoint is None:
+        return {
+            "available": False,
+            "reason": "COUNTER_ENDPOINT_MISSING",
+            "deviceKey": device_key,
+            "metricKey": metric_key,
+        }
+
+    start_value = float(baseline[1])
+    end_value = float(endpoint[1])
+    delta = end_value - start_value
+    if delta < -0.001:
+        return {
+            "available": False,
+            "reason": "COUNTER_RESET_OR_DECREASE",
+            "deviceKey": device_key,
+            "metricKey": metric_key,
+            "startValueKWh": round(start_value, 3),
+            "endValueKWh": round(end_value, 3),
+        }
+
+    return {
+        "available": True,
+        "authority": "EASEE_CUMULATIVE_METER_DELTA",
+        "deviceKey": device_key,
+        "metricKey": metric_key,
+        "startAt": baseline[0],
+        "endAt": endpoint[0],
+        "startValueKWh": round(start_value, 3),
+        "endValueKWh": round(end_value, 3),
+        "deliveredKWh": round(max(0.0, delta), 3),
+        "startQuality": baseline[2],
+        "endQuality": endpoint[2],
+        "interpretation": (
+            "Authoritative charged-energy delta from the cumulative Easee meter. "
+            "This is measured delivered EV energy; it does not identify PV versus grid origin."
+        ),
+    }
+
+
 def load_measurements(day, db_path=MEASUREMENTS_DB):
     start, end = bounds(day)
     if not db_path.exists():
@@ -123,6 +244,8 @@ def integrate(rows):
         "direct_pv_self_use_kwh": 0.0,
         "boiler_kwh": 0.0,
         "tesla_kwh": 0.0,
+        "tesla_pv_covered_derived_kwh": 0.0,
+        "tesla_grid_covered_derived_kwh": 0.0,
         "quatt_kwh": 0.0,
         "flex_load_kwh": 0.0,
         "flex_pv_capture_kwh": 0.0,
@@ -156,7 +279,13 @@ def integrate(rows):
         imp = max(0.0, grid)
         direct = min(pv, house)
         available_for_flex = max(0.0, pv - base)
-        flex_pv = min(flex, available_for_flex)
+        tesla_pv = min(tesla, available_for_flex)
+        tesla_grid = max(0.0, tesla - tesla_pv)
+        boiler_pv = min(
+            boiler,
+            max(0.0, available_for_flex - tesla_pv),
+        )
+        flex_pv = tesla_pv + boiler_pv
         preflex = export + flex_pv
 
         totals["pv_kwh"] += pv / 1000 * h
@@ -166,6 +295,8 @@ def integrate(rows):
         totals["direct_pv_self_use_kwh"] += direct / 1000 * h
         totals["boiler_kwh"] += boiler / 1000 * h
         totals["tesla_kwh"] += tesla / 1000 * h
+        totals["tesla_pv_covered_derived_kwh"] += tesla_pv / 1000 * h
+        totals["tesla_grid_covered_derived_kwh"] += tesla_grid / 1000 * h
         totals["quatt_kwh"] += quatt / 1000 * h
         totals["flex_load_kwh"] += flex / 1000 * h
         totals["flex_pv_capture_kwh"] += flex_pv / 1000 * h
@@ -299,6 +430,14 @@ def build_report(
     now_local = now_utc.astimezone(TZ)
     today = now_local.date()
 
+    ev_meter_energy = load_counter_delta(
+        day,
+        measurement_db,
+        device_key="tesla",
+        metric_key="energy_delivered_kwh",
+        cutoff_utc=now_utc,
+    )
+
     day_duration_minutes = (end_utc - start_utc).total_seconds() / 60.0
     full_day_coverage_pct = min(
         100.0,
@@ -366,6 +505,12 @@ def build_report(
     )
 
     metrics = {k: round(v, 3) for k, v in totals.items()}
+    metrics["tesla_power_integral_kwh"] = metrics["tesla_kwh"]
+    metrics["tesla_meter_delivered_kwh"] = (
+        ev_meter_energy.get("deliveredKWh")
+        if ev_meter_energy.get("available")
+        else None
+    )
     metrics["pv_self_consumption_rate"] = None if pv <= 0 else round(direct / pv, 4)
     metrics["flex_pv_capture_rate_of_preflex_surplus"] = None if surplus <= 0 else round(captured / surplus, 4)
 
@@ -422,6 +567,34 @@ def build_report(
             ),
         },
         "metrics": metrics,
+        "evEnergySemantics": {
+            "actualChargedEnergy": ev_meter_energy,
+            "powerIntegral": {
+                "metric": "tesla_power_integral_kwh",
+                "authority": "DERIVED_FROM_SAMPLED_EV_POWER",
+                "measuredDirectly": False,
+                "interpretation": (
+                    "Time integral of sampled Tesla/Easee power. Useful as a derived estimate, "
+                    "but not authoritative charged energy when the Easee cumulative meter delta is available."
+                ),
+            },
+            "pvGridAllocation": {
+                "pvMetric": "tesla_pv_covered_derived_kwh",
+                "gridMetric": "tesla_grid_covered_derived_kwh",
+                "authority": "DERIVED_ALLOCATION_FROM_P1_PV_EV_TIMING",
+                "measuredDirectly": False,
+                "allocationOrder": "EV_BEFORE_WW_WITHIN_FLEX",
+                "interpretation": (
+                    "Derived attribution from simultaneous P1/PV/EV power. "
+                    "It is not a directly measured physical split of charger energy into PV and grid origin."
+                ),
+            },
+            "legacyTeslaKWh": {
+                "metric": "tesla_kwh",
+                "semantics": "ALIAS_OF_TESLA_POWER_INTEGRAL_KWH",
+                "deprecatedForActualChargedEnergyClaims": True,
+            },
+        },
         "benchmark": benchmark,
         "plannerHistory": planner,
         "surplusWindowsForReplay": windows,
@@ -430,6 +603,8 @@ def build_report(
             "surplusWindowsForReplay are observations, not automatically missed EMS opportunities",
             "upperBoundScore is not the final constrained-theoretical-optimum score",
             "plannerHistory is used to explain decisions and will support a later constrained replay optimiser",
+            "tesla_meter_delivered_kwh is authoritative only when evEnergySemantics.actualChargedEnergy.available=true",
+            "tesla_pv_covered_derived_kwh and tesla_grid_covered_derived_kwh are derived allocations, not direct measurements",
         ],
     }
     return result
