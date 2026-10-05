@@ -103,6 +103,13 @@ def main():
     assert "budgetCompactedFields" in instructions
     assert "Easee requestedA matching the EMS request while offeredA is lower" in instructions
     assert "consistent with Equalizer/load-balancing constraint" in instructions
+    assert "performance.evEnergySemantics" in instructions
+    assert "tesla_meter_delivered_kwh" in instructions
+    assert "authoritative measured charged energy" in instructions
+    assert "tesla_power_integral_kwh" in instructions
+    assert "derived allocation estimates" in instructions
+    assert "Afleiding, not directly measured Feit" in instructions
+    assert "instead of promoting the power integral to measured truth" in instructions
 
     downstream = ai._ev_intent_reason_context({
         "intent": {
