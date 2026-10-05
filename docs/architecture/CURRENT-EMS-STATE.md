@@ -492,6 +492,21 @@ windows around the selected time. The system prompt forbids model-side
 reclassification or inflation of bounded feasible capture. Replay remains
 outside planner/Gate/actuator authority.
 
+## EV energy accounting semantics
+
+The current candidate archives Homey Core's existing
+`tesla.meter_kwh` (Easee cumulative delivered-energy meter) into canonical
+history as `energy_delivered_kwh`. `ems-performance` exposes this as
+`evEnergyAccounting.authoritativeChargedEnergy` only when both day boundaries
+have bounded counter coverage. Sampled Tesla power integration remains available
+but is explicitly non-authoritative for charged kWh.
+
+PV-covered and grid-covered EV energy are exposed only as
+`derivedSourceAllocation`, based on simultaneous P1/PV/EV power and the
+configured EV-first flex priority after house baseload. The AI must present
+those values as derived allocation, never as directly measured source energy.
+Constrained Replay V0.1.1 is unchanged.
+
 ## Read-only AI analysis layer — V0.4
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
