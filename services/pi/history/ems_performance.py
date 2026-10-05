@@ -422,6 +422,46 @@ def build_report(
             ),
         },
         "metrics": metrics,
+        "metricSemantics": {
+            "tesla_kwh": {
+                "provenanceClass": "DERIVED_POWER_INTEGRAL",
+                "source": "ems-history.sqlite/measurements tesla electrical_power_w",
+                "authoritativeActualChargedEnergy": False,
+                "interpretation": (
+                    "Time-integrated sampled EV power. This is not the authoritative "
+                    "charger energy meter and must not be presented as exact charged kWh."
+                ),
+            },
+            "flex_pv_capture_kwh": {
+                "provenanceClass": "DERIVED_ALLOCATION",
+                "scope": "TESLA_PLUS_BOILER_FLEX",
+                "directlyMeasured": False,
+                "interpretation": (
+                    "Derived contemporaneous PV allocation for the combined flexible load. "
+                    "It is not directly measured PV energy delivered to the EV."
+                ),
+            },
+            "flex_grid_energy_kwh": {
+                "provenanceClass": "DERIVED_ALLOCATION",
+                "scope": "TESLA_PLUS_BOILER_FLEX",
+                "directlyMeasured": False,
+                "interpretation": (
+                    "Derived contemporaneous grid allocation for the combined flexible load. "
+                    "It is not directly measured grid energy delivered to the EV."
+                ),
+            },
+            "authoritativeEvChargedEnergy": {
+                "provenanceClass": "MEASURED_CUMULATIVE_METER_DELTA",
+                "preferredSource": "Easee meter_power cumulative kWh",
+                "available": False,
+                "reason": "NOT_ARCHIVED_IN_EMS_PI_DAY_PERFORMANCE_V0.1",
+                "interpretation": (
+                    "Exact daily charged energy requires the Easee cumulative energy-meter "
+                    "delta. Until that meter is durably archived here, no performance field "
+                    "may be promoted to authoritative charged kWh."
+                ),
+            },
+        },
         "benchmark": benchmark,
         "plannerHistory": planner,
         "surplusWindowsForReplay": windows,
@@ -430,6 +470,8 @@ def build_report(
             "surplusWindowsForReplay are observations, not automatically missed EMS opportunities",
             "upperBoundScore is not the final constrained-theoretical-optimum score",
             "plannerHistory is used to explain decisions and will support a later constrained replay optimiser",
+            "tesla_kwh is a sampled-power integral, not the authoritative Easee cumulative energy-meter delta",
+            "flex_pv_capture_kwh and flex_grid_energy_kwh are derived combined-flex allocations, not directly measured EV source energy",
         ],
     }
     return result
