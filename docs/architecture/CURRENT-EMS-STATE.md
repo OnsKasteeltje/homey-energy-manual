@@ -492,6 +492,18 @@ windows around the selected time. The system prompt forbids model-side
 reclassification or inflation of bounded feasible capture. Replay remains
 outside planner/Gate/actuator authority.
 
+## EV charged-energy provenance correction
+
+The current candidate closes an AI evidence-semantics gap: Homey's canonical
+public state already exposes the cumulative Easee `tesla.meter_kwh`, and the
+Pi history archive now persists that value as Tesla
+`energy_delivered_kwh`. `ems-performance` exposes the local-day counter
+delta as authoritative charged energy only when a midnight baseline and
+in-period endpoint exist. Sampled Tesla power integration and PV/grid coverage
+remain explicitly derived estimates. AI V0.4 is instructed to present those
+allocation values as `Afleiding`, never as directly measured PV/grid energy.
+Constrained Replay V0.1.1 is unchanged.
+
 ## Read-only AI analysis layer — V0.4
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
