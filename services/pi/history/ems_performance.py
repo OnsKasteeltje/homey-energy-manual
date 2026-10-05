@@ -154,6 +154,17 @@ def load_counter_delta(
             "metricKey": metric_key,
         }
 
+    endpoint_at = datetime.fromisoformat(
+        str(endpoint[0]).replace("Z", "+00:00")
+    ).astimezone(timezone.utc)
+    if endpoint_at <= start:
+        return {
+            "available": False,
+            "reason": "COUNTER_ENDPOINT_MISSING",
+            "deviceKey": device_key,
+            "metricKey": metric_key,
+        }
+
     start_value = float(baseline[1])
     end_value = float(endpoint[1])
     delta = end_value - start_value
