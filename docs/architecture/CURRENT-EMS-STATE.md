@@ -492,6 +492,19 @@ windows around the selected time. The system prompt forbids model-side
 reclassification or inflation of bounded feasible capture. Replay remains
 outside planner/Gate/actuator authority.
 
+## EV energy accounting semantics
+
+EV energy evidence now distinguishes measured authority from analysis
+derivations. `metrics.tesla_kwh` in the day-performance report is explicitly a
+`DERIVED_POWER_INTEGRAL` of sampled Tesla power. Combined-flex PV/grid capture
+metrics are explicitly `DERIVED_ALLOCATION`. Exact charged EV energy is
+reserved for a delta of the Easee cumulative `meter_power` meter; that source
+is not yet durably archived in the day-performance report, so the report marks
+the authoritative value unavailable instead of silently substituting the power
+integral. AI V0.4 is instructed to keep derived PV/grid coverage under
+Afleiding and never present it as directly measured EV energy. Constrained
+Replay V0.1.1 is unchanged.
+
 ## Read-only AI analysis layer — V0.4
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
