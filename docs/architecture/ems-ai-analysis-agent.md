@@ -183,6 +183,33 @@ once-per-minute semantic-event archive cadence.
 questions must use historical semantic/planner/telemetry evidence and must not
 project the current command backwards.
 
+### EV charged-energy provenance
+
+The AI must distinguish **measured charged energy** from **derived source
+allocation**.
+
+The canonical Homey public state already exposes Easee `tesla.meter_kwh`.
+The Pi history archive now persists that cumulative counter as
+`energy_delivered_kwh` on the `tesla` device. The performance report derives
+a local-day counter delta only when both a baseline at/before local midnight
+and an in-period endpoint exist.
+
+`performance.evEnergySemantics.actualChargedEnergy` is therefore the authority
+for charged-energy claims:
+
+- when `available=true`, `metrics.tesla_meter_delivered_kwh` is the
+  authoritative measured delivered EV energy from the Easee cumulative meter;
+- `metrics.tesla_power_integral_kwh` (and legacy alias `tesla_kwh`) is a
+  time integral of sampled EV power and is a derived estimate;
+- `metrics.tesla_pv_covered_derived_kwh` and
+  `tesla_grid_covered_derived_kwh` are timing-based allocations from P1/PV/EV
+  evidence and are **Afleiding**, never directly measured energy origin.
+
+No historical Easee meter delta is backfilled when the counter baseline is
+missing. In that case the AI must say authoritative charged energy is
+unavailable for that period rather than promoting the sampled-power integral
+to a measured fact.
+
 ### Performance and electrical timeline
 
 V0.3 retains `EMS_PI_DAY_PERFORMANCE_V0.1` and expands the bounded 5-minute
