@@ -183,6 +183,28 @@ once-per-minute semantic-event archive cadence.
 questions must use historical semantic/planner/telemetry evidence and must not
 project the current command backwards.
 
+### EV charged-energy versus source-attribution semantics
+
+`EMS_PI_DAY_PERFORMANCE_V0.1` now carries explicit `metricSemantics` for
+EV-related energy values.
+
+- `metrics.tesla_kwh` is `DERIVED_POWER_INTEGRAL`: a time integral of sampled
+  Tesla power from canonical history. It is useful for performance analysis but
+  is **not** the authoritative charger energy meter.
+- `metrics.flex_pv_capture_kwh` and `metrics.flex_grid_energy_kwh` are
+  `DERIVED_ALLOCATION` values for the combined Tesla+boiler flexible load.
+  They are not directly measured PV/grid energy delivered to the EV.
+- Authoritative actual charged energy is defined as a delta of the Easee
+  cumulative `meter_power` energy meter. That cumulative meter is not yet
+  durably archived in `EMS_PI_DAY_PERFORMANCE_V0.1`, so
+  `metricSemantics.authoritativeEvChargedEnergy.available=false` is explicit
+  until that source is added.
+
+AI output must keep this provenance boundary: only an explicit authoritative
+Easee cumulative-meter delta may be stated as actual charged kWh. Sampled-power
+integration and PV/grid allocation are derivations and belong under
+**Afleiding**, not **Feit**.
+
 ### Performance and electrical timeline
 
 V0.3 retains `EMS_PI_DAY_PERFORMANCE_V0.1` and expands the bounded 5-minute
