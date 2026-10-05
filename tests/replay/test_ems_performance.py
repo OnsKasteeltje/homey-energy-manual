@@ -34,6 +34,7 @@ class EmsPerformanceTest(unittest.TestCase):
         for i, key in enumerate(devices, 1):
             con.execute("INSERT INTO devices(id,device_key) VALUES (?,?)", (i, key))
         con.execute("INSERT INTO metrics(id,metric_key) VALUES (1,'electrical_power_w')")
+        con.execute("INSERT INTO metrics(id,metric_key) VALUES (2,'energy_delivered_kwh')")
         return con, devices
 
     def make_measurements(self, path):
@@ -50,6 +51,15 @@ class EmsPerformanceTest(unittest.TestCase):
                     "INSERT INTO measurements(ts_utc,device_id,metric_id,value_real,quality) VALUES (?,?,?,?,?)",
                     (ts,did[key],1,value,"observed"),
                 )
+        # Authoritative Easee cumulative meter counter spanning the local day.
+        con.execute(
+            "INSERT INTO measurements(ts_utc,device_id,metric_id,value_real,quality) VALUES (?,?,?,?,?)",
+            ("2026-09-14T22:00:00Z", did["tesla"], 2, 1000.000, "observed"),
+        )
+        con.execute(
+            "INSERT INTO measurements(ts_utc,device_id,metric_id,value_real,quality) VALUES (?,?,?,?,?)",
+            ("2026-09-15T21:55:00Z", did["tesla"], 2, 1033.005, "observed"),
+        )
         con.commit()
         con.close()
 
@@ -133,6 +143,25 @@ class EmsPerformanceTest(unittest.TestCase):
             self.assertEqual(report["schema"], "EMS_PI_DAY_PERFORMANCE_V0.1")
             self.assertGreater(report["metrics"]["pv_kwh"], 0)
             self.assertGreater(report["metrics"]["boiler_kwh"], 0)
+            self.assertEqual(report["metrics"]["tesla_meter_delivered_kwh"], 33.005)
+            self.assertEqual(
+                report["evEnergySemantics"]["actualChargedEnergy"]["authority"],
+                "EASEE_CUMULATIVE_METER_DELTA",
+            )
+            self.assertTrue(
+                report["evEnergySemantics"]["actualChargedEnergy"]["available"]
+            )
+            self.assertFalse(
+                report["evEnergySemantics"]["pvGridAllocation"]["measuredDirectly"]
+            )
+            self.assertEqual(
+                report["evEnergySemantics"]["pvGridAllocation"]["authority"],
+                "DERIVED_ALLOCATION_FROM_P1_PV_EV_TIMING",
+            )
+            self.assertEqual(
+                report["evEnergySemantics"]["legacyTeslaKWh"]["semantics"],
+                "ALIAS_OF_TESLA_POWER_INTEGRAL_KWH",
+            )
             self.assertEqual(
                 report["benchmark"]["mode"],
                 "SAME_FLEX_ENERGY_UNCONSTRAINED_UPPER_BOUND_V0.1",
@@ -143,6 +172,29 @@ class EmsPerformanceTest(unittest.TestCase):
                 "REPLAY_CONTEXT_INSUFFICIENT",
             )
             self.assertEqual(report["plannerHistory"]["snapshotCount"], 1)
+
+
+    def test_missing_precommission_counter_does_not_backfill_actual_charge(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            mdb = Path(tmp) / "ems-history.sqlite"
+            pdb = Path(tmp) / "planner-history.sqlite"
+            self.make_today_measurements(mdb)
+            self.make_planner(pdb, "2026-10-04T06:00:00Z")
+
+            report = ems.build_report(
+                ems.date(2026, 10, 4),
+                mdb,
+                pdb,
+                now_utc=datetime(2026, 10, 4, 7, 0, tzinfo=timezone.utc),
+            )
+
+            self.assertIsNone(report["metrics"]["tesla_meter_delivered_kwh"])
+            actual = report["evEnergySemantics"]["actualChargedEnergy"]
+            self.assertFalse(actual["available"])
+            self.assertIn(
+                actual["reason"],
+                {"COUNTER_BASELINE_MISSING", "COUNTER_ENDPOINT_MISSING"},
+            )
 
 
 if __name__ == "__main__":
