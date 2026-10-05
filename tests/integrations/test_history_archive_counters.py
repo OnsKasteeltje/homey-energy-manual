@@ -64,6 +64,7 @@ def test_archive_cumulative_energy_counters(tmp_path):
             "goodwe_4200_energy_kwh": 23772.8,
             "goodwe_2000_energy_kwh": 10708.9,
         },
+        "tesla": {"power_w": 0.0, "meter_kwh": 8175.181},
         "balance": {
             "control_gate": {"grid_measurement_valid": True},
             "source_timing": {
@@ -97,6 +98,7 @@ def test_archive_cumulative_energy_counters(tmp_path):
         ("pv_goodwe2000", "energy_produced_kwh", 10708.9),
         ("pv_goodwe4200", "energy_produced_kwh", 23772.8),
         ("pv_solaredge", "energy_produced_kwh", 17351.444),
+        ("tesla", "energy_delivered_kwh", 8175.181),
     ]
 
 
