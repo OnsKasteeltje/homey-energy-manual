@@ -84,6 +84,12 @@ COUNTER_DEVICES = {
             "energy_produced_kwh": ("pv", "goodwe_2000_energy_kwh"),
         },
     },
+    "tesla": {
+        "spec": POWER_DEVICES["tesla"],
+        "metrics": {
+            "energy_delivered_kwh": ("tesla", "meter_kwh"),
+        },
+    },
 }
 
 STATE_DEVICES = {
@@ -268,6 +274,7 @@ def archive_state_history(payload, db_path=HISTORY_DB):
             ("energy_import_kwh", "Cumulative lifetime grid import"),
             ("energy_export_kwh", "Cumulative lifetime grid export"),
             ("energy_produced_kwh", "Cumulative lifetime energy production"),
+            ("energy_delivered_kwh", "Cumulative Easee delivered charging energy"),
         ):
             con.execute(
                 """
