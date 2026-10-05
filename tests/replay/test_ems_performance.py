@@ -99,6 +99,65 @@ class EmsPerformanceTest(unittest.TestCase):
         con.commit()
         con.close()
 
+    def add_easee_meter_boundaries(self, path, start_value=1000.0, end_value=1012.5):
+        con = sqlite3.connect(path)
+        con.execute("INSERT INTO metrics(id,metric_key) VALUES (2,'energy_delivered_kwh')")
+        tesla_id = con.execute(
+            "SELECT id FROM devices WHERE device_key='tesla'"
+        ).fetchone()[0]
+        con.execute(
+            "INSERT INTO measurements(ts_utc,device_id,metric_id,value_real,quality) VALUES (?,?,?,?,?)",
+            ("2026-09-14T21:55:00Z", tesla_id, 2, start_value, "observed"),
+        )
+        con.execute(
+            "INSERT INTO measurements(ts_utc,device_id,metric_id,value_real,quality) VALUES (?,?,?,?,?)",
+            ("2026-09-15T21:55:00Z", tesla_id, 2, end_value, "observed"),
+        )
+        con.commit()
+        con.close()
+
+    def test_easee_counter_is_authoritative_and_allocation_is_derived(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            mdb = Path(tmp) / "ems-history.sqlite"
+            pdb = Path(tmp) / "planner-history.sqlite"
+            self.make_measurements(mdb)
+            self.add_easee_meter_boundaries(mdb, 1000.0, 1012.5)
+            self.make_planner(pdb)
+
+            report = ems.build_report(
+                ems.date(2026, 9, 15),
+                mdb,
+                pdb,
+                now_utc=datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc),
+            )
+
+            accounting = report["evEnergyAccounting"]
+            actual = accounting["authoritativeChargedEnergy"]
+            self.assertTrue(actual["available"])
+            self.assertEqual(actual["chargedKWh"], 12.5)
+            self.assertEqual(actual["coverageStatus"], "FULL_DAY")
+            self.assertIn("Easee", actual["source"])
+
+            integrated = accounting["powerIntegratedEnergy"]
+            self.assertFalse(integrated["authoritativeChargedEnergy"])
+            self.assertEqual(
+                integrated["semantics"],
+                "DERIVED_FROM_SAMPLED_POWER_INTEGRATION",
+            )
+
+            allocation = accounting["derivedSourceAllocation"]
+            self.assertFalse(allocation["measuredDirectly"])
+            self.assertFalse(allocation["authoritativeChargedEnergy"])
+            self.assertEqual(
+                allocation["method"],
+                "SIMULTANEOUS_POWER_ALLOCATION_EV_FIRST_V0.1",
+            )
+            self.assertAlmostEqual(
+                allocation["pvCoveredKWh"] + allocation["gridCoveredKWh"],
+                allocation["allocationBasisKWh"],
+                places=3,
+            )
+
     def test_today_separates_calendar_progress_from_elapsed_coverage(self):
         with tempfile.TemporaryDirectory() as tmp:
             mdb = Path(tmp) / "ems-history.sqlite"

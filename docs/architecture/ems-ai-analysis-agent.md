@@ -183,6 +183,28 @@ once-per-minute semantic-event archive cadence.
 questions must use historical semantic/planner/telemetry evidence and must not
 project the current command backwards.
 
+### EV energy accounting provenance
+
+EV daily-energy semantics are explicit:
+
+- `evEnergyAccounting.authoritativeChargedEnergy` is sourced from the
+  cumulative Easee `meter_power` counter archived as
+  `energy_delivered_kwh`. A full-day value is authoritative only when both
+  day boundaries have bounded counter coverage.
+- `metrics.tesla_kwh` / `powerIntegratedEnergy` is an integration of sampled
+  charger power and is not authoritative charged energy.
+- `derivedSourceAllocation.pvCoveredKWh` and `gridCoveredKWh` are a
+  deterministic simultaneous-power allocation with EV first after house
+  baseload. They are useful analysis, but they are not directly metered
+  PV-to-EV or grid-to-EV energy flows.
+- When authoritative Easee boundary coverage is unavailable, the AI must say so
+  and may not silently promote the sampled-power integral to a measured total.
+- PV/grid allocation belongs under **Afleiding**, not directly observed
+  **Feit**.
+
+This is evidence-semantics only. It does not alter EV planning, Gate, actuator,
+Homey control, or Constrained Replay V0.1.1.
+
 ### Performance and electrical timeline
 
 V0.3 retains `EMS_PI_DAY_PERFORMANCE_V0.1` and expands the bounded 5-minute
