@@ -132,6 +132,32 @@ class EmsPerformanceTest(unittest.TestCase):
 
             self.assertEqual(report["schema"], "EMS_PI_DAY_PERFORMANCE_V0.1")
             self.assertGreater(report["metrics"]["pv_kwh"], 0)
+            self.assertEqual(
+                report["metricSemantics"]["tesla_kwh"]["provenanceClass"],
+                "DERIVED_POWER_INTEGRAL",
+            )
+            self.assertFalse(
+                report["metricSemantics"]["tesla_kwh"][
+                    "authoritativeActualChargedEnergy"
+                ]
+            )
+            self.assertEqual(
+                report["metricSemantics"]["flex_pv_capture_kwh"][
+                    "provenanceClass"
+                ],
+                "DERIVED_ALLOCATION",
+            )
+            self.assertFalse(
+                report["metricSemantics"]["authoritativeEvChargedEnergy"][
+                    "available"
+                ]
+            )
+            self.assertEqual(
+                report["metricSemantics"]["authoritativeEvChargedEnergy"][
+                    "preferredSource"
+                ],
+                "Easee meter_power cumulative kWh",
+            )
             self.assertGreater(report["metrics"]["boiler_kwh"], 0)
             self.assertEqual(
                 report["benchmark"]["mode"],
