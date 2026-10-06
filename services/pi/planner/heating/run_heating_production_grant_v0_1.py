@@ -2,7 +2,8 @@
 """Build and persist the Pi-local production Heating grant V0.1 artifact.
 
 This runner is intentionally one-shot. It reads only existing local planner /
-Heating / Flex / P1 artifacts and performs no network or device call. No timer
+Heating / Flex / P1 artifacts and performs no network or device call. P1 is
+retained as advisory observation only; no timer
 or Homey publisher is enabled by this file.
 """
 
@@ -70,7 +71,8 @@ def main() -> int:
     print("validUntil:", out["validUntil"])
     print("heating:", out["heating"])
     print("forecastOpportunity:", out["forecastOpportunity"])
-    print("realtimePermission:", out["realtimePermission"])
+    print("p1Observation:", out["p1Observation"])
+    print("executionGuard:", out["executionGuard"])
     print("physicalWriteAllowed:", out["physicalWriteAllowed"])
     print("output:", OUTPUT)
     return 0

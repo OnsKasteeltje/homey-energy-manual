@@ -21,10 +21,10 @@ For grouped opportunities such as `living_area`, a subsequent step waits until a
 - the current authoritative Dynamic Pi Planner slot;
 - V0.3 Heating eligibility/safety;
 - Flex Priority V0.1 central Heating↔EV arbitration;
-- fresh canonical P1 import/export state.
+- canonical Pi P1 import/export only as advisory observation.
 
-The output schema is `EMS_PI_DYNAMIC_HEATING_GRANT_V0.1`. Forecast opportunity and realtime permission are deliberately separate. The shared planner opportunity is read from the existing slot's `evResidualExportW`, i.e. the common residual after non-EV planned flex and before EV acts as residual consumer when Heating owns first claim. No Heating watt reservation is invented: `powerReservationW=0`.
+The output schema is `EMS_PI_DYNAMIC_HEATING_GRANT_V0.1`. Planner authority and realtime execution permission are deliberately separate. The shared planner opportunity is read from the existing slot's `evResidualExportW`, i.e. the common residual after non-EV planned flex and before EV acts as residual consumer when Heating owns first claim. No Heating watt reservation is invented: `powerReservationW=0`.
 
-Fresh P1 is the realtime authority. Forecast alone can never produce `PRODUCTION_GRANT`; conversely, fresh measured export may authorize an otherwise valid Heating grant even when the current forecast slot did not predict export. Any P1 import, stale/ambiguous P1, stale planner state, stale/misordered Heating/Flex state or loss of Heating priority fails closed to `HOLD`.
+The Pi grant does **not** use its local P1 snapshot as physical execution authority. P1 in this artifact is advisory evidence only and does not affect `grantRevision`, `PRODUCTION_GRANT` or `validUntil`. A downstream Homey execution edge must re-read fresh realtime P1 immediately before any physical Heating start or progression increment and must fail closed unless export is present and import is absent. Stale planner state, stale/misordered Heating/Flex state or loss of Heating priority still fails closed to `HOLD`.
 
 V0.1 is a **planner grant only**. `controlWrites=false` and `physicalWriteAllowed=false` remain hard invariants. The parked Pi→Homey Heating SHADOW publisher is not resumed by this increment. V0.4 is not switched to this contract until the grant builder, replay/contract tests and architecture gate have passed.
