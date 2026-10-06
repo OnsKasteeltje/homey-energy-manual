@@ -27,6 +27,12 @@ TARGET_HEALTH_RUNTIME="$RUNTIME/health"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 HEALTH_COMMAND="/usr/local/bin/ems-health"
 SYSTEMD="$REPO/deploy/systemd"
+RETIRED_FORECAST_UNITS=(
+    "ems-weather-forecast.timer"
+    "ems-weather-forecast.service"
+    "ems-pv-forecast.timer"
+    "ems-pv-forecast.service"
+)
 
 echo "=== EMS PI DRIFT CHECK ==="
 echo "Repo:      $REPO"
@@ -381,6 +387,17 @@ for src in "$SYSTEMD"/*; do
     if ! cmp -s "$src" "$dst"; then
         echo "DRIFT:   $name"
         FAIL=1
+    fi
+done
+
+echo
+echo "=== RETIRED FORECAST SYSTEMD UNITS ==="
+for unit in "${RETIRED_FORECAST_UNITS[@]}"; do
+    if [[ -e "/etc/systemd/system/$unit" ]]; then
+        echo "STALE RETIRED UNIT: $unit"
+        FAIL=1
+    else
+        echo "PASS: retired unit absent: $unit"
     fi
 done
 
