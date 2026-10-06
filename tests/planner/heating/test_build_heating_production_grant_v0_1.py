@@ -109,11 +109,14 @@ def test_fresh_p1_export_plus_heating_priority_yields_production_grant():
     assert out["schema"] == "EMS_PI_DYNAMIC_HEATING_GRANT_V0.1"
     assert out["mode"] == "PRODUCTION_PLANNER_GRANT"
     assert out["allocationAuthority"] == "DYNAMIC_PI_PLANNER"
-    assert out["realtimeAuthority"] == "P1"
+    assert out["realtimeAuthority"] == "P1_AT_HOMEY_EXECUTION_EDGE"
     assert out["baselineAuthority"] == "HONEYWELL"
     assert out["heating"]["grant"] == "PRODUCTION_GRANT"
     assert out["heating"]["readyRooms"] == ["woonkamer"]
     assert out["heating"]["reason"] == "PRODUCTION_GRANT_PLANNED_SHARED_PV_OPPORTUNITY"
+    assert out["executionGuard"]["required"] is True
+    assert out["executionGuard"]["evaluatedByPiGrant"] is False
+    assert out["executionGuard"]["authority"] == "P1_AT_HOMEY_EXECUTION_EDGE"
     assert out["physicalWriteAllowed"] is False
     assert out["controlWrites"] is False
 
@@ -128,28 +131,30 @@ def test_shared_planner_opportunity_is_before_ev_residual_consumption():
     assert f["powerReservationW"] == 0
 
 
-def test_forecast_alone_never_grants_without_current_p1_export():
+def test_planner_grant_is_independent_of_pi_p1_observation():
     out = build(e=energy_state(export_w=0, import_w=0))
     assert out["forecastOpportunity"]["plannedOpportunityPresent"] is True
-    assert out["realtimePermission"]["allowed"] is False
-    assert out["heating"]["grant"] == "HOLD"
-    assert out["heating"]["reason"] == "NO_P1_EXPORT"
+    assert out["p1Observation"]["wouldAllowAtObservedSample"] is False
+    assert out["p1Observation"]["advisoryOnly"] is True
+    assert out["heating"]["grant"] == "PRODUCTION_GRANT"
+    assert out["heating"]["reason"] == "PRODUCTION_GRANT_PLANNED_SHARED_PV_OPPORTUNITY"
 
 
-def test_fresh_unforecast_p1_export_may_still_grant():
+def test_heating_priority_can_grant_without_planned_residual_but_requires_execution_guard():
     out = build(d=dynamic_plan(residual=0, after=0, ev_w=0))
     assert out["forecastOpportunity"]["plannedOpportunityPresent"] is False
-    assert out["realtimePermission"]["allowed"] is True
     assert out["heating"]["grant"] == "PRODUCTION_GRANT"
-    assert out["heating"]["reason"] == "PRODUCTION_GRANT_UNPLANNED_P1_EXPORT"
-    assert out["policy"]["freshP1MayAuthorizeUnforecastExport"] is True
+    assert out["heating"]["reason"] == "PRODUCTION_GRANT_HEATING_PRIORITY_REALTIME_P1_REQUIRED"
+    assert out["executionGuard"]["freshRealtimeP1Required"] is True
+    assert out["policy"]["realtimeP1MustAuthorizeAtExecutionEdge"] is True
 
 
-def test_any_p1_import_blocks_heating_grant():
+def test_pi_p1_import_is_advisory_and_does_not_mutate_planner_grant():
     out = build(e=energy_state(export_w=0, import_w=250))
-    assert out["realtimePermission"]["allowed"] is False
-    assert out["heating"]["grant"] == "HOLD"
-    assert out["heating"]["reason"] == "P1_IMPORT_PRESENT"
+    assert out["p1Observation"]["wouldAllowAtObservedSample"] is False
+    assert out["p1Observation"]["p1ImportW"] == 250
+    assert out["heating"]["grant"] == "PRODUCTION_GRANT"
+    assert out["executionGuard"]["mustShowNoImport"] is True
 
 
 def test_ev_priority_blocks_heating_even_with_export():
@@ -164,11 +169,12 @@ def test_ev_priority_blocks_heating_even_with_export():
     assert out["heating"]["reason"] == "EV_DEADLINE_MUST"
 
 
-def test_stale_p1_fails_closed():
+def test_stale_pi_p1_is_advisory_and_execution_edge_must_recheck():
     out = build(e=energy_state(generated="2026-10-06T12:04:00Z"))
     assert out["sourceFreshness"]["p1"]["status"] == "STALE"
-    assert out["heating"]["grant"] == "HOLD"
-    assert out["heating"]["reason"] == "P1_STATE_STALE"
+    assert out["p1Observation"]["freshness"]["status"] == "STALE"
+    assert out["heating"]["grant"] == "PRODUCTION_GRANT"
+    assert out["executionGuard"]["freshRealtimeP1Required"] is True
 
 
 def test_priority_must_not_pre_date_heating_state():
@@ -195,13 +201,16 @@ def test_grant_validity_is_bounded_by_current_slot_and_source_freshness():
     assert out["validUntil"] == "2026-10-06T12:07:10Z"
 
 
-def test_revision_is_stable_for_identical_semantics():
+def test_revision_tracks_planner_semantics_not_advisory_p1_observation():
     first = build()
     second = build()
     assert first["grantRevision"] == second["grantRevision"]
 
-    changed = build(e=energy_state(export_w=901))
-    assert changed["grantRevision"] != first["grantRevision"]
+    changed_p1 = build(e=energy_state(export_w=901))
+    assert changed_p1["grantRevision"] == first["grantRevision"]
+
+    changed_priority = build(p=priority(owner="EV", grant="HOLD", reason="EV_DEADLINE_MUST"))
+    assert changed_priority["grantRevision"] != first["grantRevision"]
 
 
 def test_no_ready_heating_candidate_holds():
