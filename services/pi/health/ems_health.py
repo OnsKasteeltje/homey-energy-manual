@@ -70,10 +70,6 @@ FUNCTION_UNITS = {
         "unit": "ems-ev-deadline-state.timer",
         "service": "ems-ev-deadline-state.service",
     },
-    "weatherForecast": {
-        "unit": "ems-weather-forecast.timer",
-        "service": "ems-weather-forecast.service",
-    },
     "quattCurrent": {
         "unit": "ems-quatt-current.timer",
         "service": "ems-quatt-current.service",
