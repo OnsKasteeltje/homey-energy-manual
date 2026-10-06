@@ -30,6 +30,10 @@ HEALTH_COMMAND="/usr/local/bin/ems-health"
 SYSTEMD="$REPO/deploy/systemd"
 BACKUP_ROOT="/home/jeroen/ems/backup"
 DEPLOY_MARKER="/home/jeroen/ems/data/deployed-git-commit"
+PARKED_FORECAST_TIMERS=(
+    "ems-weather-forecast.timer"
+    "ems-pv-forecast.timer"
+)
 
 if [[ "$(id -u)" -ne 0 ]]; then
     echo "ERROR: run with sudo"
@@ -387,6 +391,24 @@ echo
 echo "=== SYSTEMD RELOAD ==="
 systemctl daemon-reload
 
+echo
+echo "=== PARK LEGACY FORECAST TIMERS ==="
+for unit in "${PARKED_FORECAST_TIMERS[@]}"; do
+    systemctl disable --now "$unit"
+
+    if systemctl is-active --quiet "$unit"; then
+        echo "ERROR: legacy forecast timer still active: $unit"
+        exit 1
+    fi
+
+    if systemctl is-enabled --quiet "$unit"; then
+        echo "ERROR: legacy forecast timer still enabled: $unit"
+        exit 1
+    fi
+
+    echo "PASS: $unit disabled and inactive"
+done
+
 COMMIT="$(git -C "$REPO" rev-parse HEAD)"
 printf '%s\n' "$COMMIT" > "$DEPLOY_MARKER"
 
@@ -397,4 +419,4 @@ echo "Backup: $BACKUP"
 echo "Deployment marker: $COMMIT"
 echo "Performance command: $PERFORMANCE_COMMAND"
 echo "Health command: $HEALTH_COMMAND"
-echo "NOTE: Services were NOT restarted by this script."
+echo "NOTE: Long-running services were NOT restarted; legacy standalone forecast timers were explicitly parked."
