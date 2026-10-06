@@ -3,12 +3,14 @@
 
 This module does not create a second planner or a separate PV pot. It projects
 one explicit Heating grant from the already-existing Dynamic Pi Planner slot,
-Heating V0.3 eligibility, Flex Priority arbitration and fresh P1 state.
+Heating V0.3 eligibility and Flex Priority arbitration.
 
 Forecast and realtime truth deliberately remain separate:
 - planner slot / evResidualExportW describes shared forward-looking opportunity
   after non-EV planned flex (WW/Quooker) and before EV residual consumption;
-- P1 import/export is the realtime permission authority;
+- canonical Pi P1 state is retained only as advisory observation in this artifact;
+- fresh P1 import/export must be re-evaluated at the Homey execution edge before
+  any physical Heating start or progression increment;
 - Honeywell remains comfort/schedule authority.
 
 The result is a planner grant only. It cannot write Homey or Honeywell and
@@ -240,12 +242,12 @@ def build_heating_grant(
         planner_current
         and heating_freshness["status"] == "OK"
         and priority_freshness["status"] == "OK"
-        and p1_freshness["status"] == "OK"
         and source_order
         and current_slot is not None
     )
 
-    grant = sources_safe and priority_grants_heating and realtime_allowed
+    # Planner/Flex authority only. Realtime P1 is enforced at the Homey execution edge.
+    grant = sources_safe and priority_grants_heating
 
     if not planner_current:
         reason = "DYNAMIC_PLAN_STALE_OR_NOT_CURRENT"
@@ -257,26 +259,19 @@ def build_heating_grant(
         reason = priority_freshness["reason"]
     elif not source_order:
         reason = "FLEX_PRIORITY_PRE_DATES_HEATING"
-    elif p1_freshness["status"] != "OK":
-        reason = p1_freshness["reason"]
     elif not ready_rooms:
         reason = "NO_HEATING_PREHEAT_CANDIDATE"
     elif not priority_grants_heating:
         reason = str(decision.get("reason") or "FLEX_PRIORITY_DID_NOT_GRANT_HEATING")
-    elif p1_import_w > 0.0:
-        reason = "P1_IMPORT_PRESENT"
-    elif p1_export_w <= 0.0:
-        reason = "NO_P1_EXPORT"
     elif shared_residual_w > 0.0:
         reason = "PRODUCTION_GRANT_PLANNED_SHARED_PV_OPPORTUNITY"
     else:
-        reason = "PRODUCTION_GRANT_UNPLANNED_P1_EXPORT"
+        reason = "PRODUCTION_GRANT_HEATING_PRIORITY_REALTIME_P1_REQUIRED"
 
     validity_candidates = [
         plan_valid_until,
         heating_generated + timedelta(seconds=MAX_HEATING_AGE_SECONDS),
         priority_generated + timedelta(seconds=MAX_PRIORITY_AGE_SECONDS),
-        p1_generated + timedelta(seconds=MAX_P1_AGE_SECONDS),
     ]
     if slot_end is not None:
         validity_candidates.append(slot_end)
@@ -288,13 +283,10 @@ def build_heating_grant(
         "slotStart": _iso(slot_start) if slot_start else None,
         "heatingGeneratedAt": _iso(heating_generated),
         "priorityGeneratedAt": _iso(priority_generated),
-        "p1GeneratedAt": _iso(p1_generated),
         "readyRooms": ready_rooms,
         "priorityOwner": decision.get("priorityOwner"),
         "priorityReason": decision.get("reason"),
         "sharedResidualBeforeEvW": round(shared_residual_w),
-        "p1ExportW": round(p1_export_w),
-        "p1ImportW": round(p1_import_w),
         "grant": grant,
     }
 
@@ -307,7 +299,7 @@ def build_heating_grant(
         "controlWrites": False,
         "physicalWriteAllowed": False,
         "allocationAuthority": "DYNAMIC_PI_PLANNER",
-        "realtimeAuthority": "P1",
+        "realtimeAuthority": "P1_AT_HOMEY_EXECUTION_EDGE",
         "baselineAuthority": "HONEYWELL",
         "sourceSchemas": {
             "dynamicPlan": DYNAMIC_SCHEMA,
@@ -335,20 +327,21 @@ def build_heating_grant(
             "roleOfEvWhenHeatingFirst": "RESIDUAL_OPPORTUNITY",
             "powerReservationW": 0,
         },
-        "realtimePermission": {
-            "allowed": realtime_allowed,
+        "p1Observation": {
+            "advisoryOnly": True,
+            "freshness": p1_freshness,
             "p1ExportW": round(p1_export_w),
             "p1ImportW": round(p1_import_w),
+            "wouldAllowAtObservedSample": realtime_allowed,
+        },
+        "executionGuard": {
+            "required": True,
+            "authority": "P1_AT_HOMEY_EXECUTION_EDGE",
+            "evaluatedByPiGrant": False,
+            "freshRealtimeP1Required": True,
+            "mustShowExport": True,
+            "mustShowNoImport": True,
             "intentionalGridImportAllowed": False,
-            "reason": (
-                "P1_FRESH_EXPORT_NO_IMPORT"
-                if realtime_allowed
-                else (
-                    p1_freshness["reason"]
-                    if p1_freshness["status"] != "OK"
-                    else "P1_IMPORT_PRESENT" if p1_import_w > 0.0 else "NO_P1_EXPORT"
-                )
-            ),
         },
         "heating": {
             "readyRooms": ready_rooms,
@@ -358,8 +351,8 @@ def build_heating_grant(
             "priorityOwner": decision.get("priorityOwner"),
         },
         "policy": {
-            "forecastAloneNeverAuthorizesHeating": True,
-            "freshP1MayAuthorizeUnforecastExport": True,
+            "plannerGrantDoesNotAuthorizePhysicalExecution": True,
+            "realtimeP1MustAuthorizeAtExecutionEdge": True,
             "heatingGetsFirstClaimOnlyWhenFlexPriorityGrants": True,
             "evUsesResidualWhenHeatingFirst": True,
             "noSeparatePvPot": True,
