@@ -3,7 +3,7 @@
 
 V0.4 is downstream of:
 - Heating Preheat V0.3 eligibility/safety;
-- Flex Priority Shadow V0.1 cross-domain grant.
+- Production Dynamic Pi Planner Heating Grant V0.1.
 
 It persists only a shadow "would-command" step state. It never writes Honeywell,
 Homey, Quatt, CV, Power Intent or another physical/control surface.
@@ -15,12 +15,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 HEATING_SCHEMA = "EMS_HEATING_PREHEAT_SHADOW_V0.3"
-PRIORITY_SCHEMA = "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1"
+GRANT_SCHEMA = "EMS_PI_DYNAMIC_HEATING_GRANT_V0.1"
 PREVIOUS_SCHEMA = "EMS_HEATING_PREHEAT_PROGRESSION_SHADOW_V0.4"
 OUTPUT_SCHEMA = PREVIOUS_SCHEMA
 
 MAX_HEATING_AGE_SECONDS = 420
-MAX_PRIORITY_AGE_SECONDS = 120
+MAX_GRANT_AGE_SECONDS = 120
 MAX_FUTURE_SKEW_SECONDS = 30
 STEP_REACHED_TOLERANCE_C = 0.0
 MAX_STEP_C = 0.5
@@ -345,7 +345,7 @@ def build_source_fail_closed(
         "generatedAt": _iso(now),
         "baselineAuthority": "HONEYWELL",
         "eligibilityAuthority": HEATING_SCHEMA,
-        "allocationAuthority": PRIORITY_SCHEMA,
+        "allocationAuthority": GRANT_SCHEMA,
         "sourceFreshness": {
             "heating": {
                 "status": "INVALID",
@@ -379,7 +379,7 @@ def build_source_fail_closed(
 
 def build_progression(
     heating_shadow: dict[str, Any],
-    flex_priority: dict[str, Any],
+    planner_grant: dict[str, Any],
     previous: dict[str, Any] | None = None,
     *,
     generated_at: datetime | None = None,
@@ -402,12 +402,14 @@ def build_progression(
             generated_at=generated_at,
         )
 
-    if flex_priority.get("schema") != PRIORITY_SCHEMA:
-        raise ProgressionError(f"unexpected priority schema: {flex_priority.get('schema')}")
-    if flex_priority.get("mode") != "READ_ONLY" or flex_priority.get("controlMode") != "SHADOW":
-        raise ProgressionError("priority source must be READ_ONLY / SHADOW")
-    if flex_priority.get("controlWrites") is not False:
-        raise ProgressionError("priority source must disallow writes")
+    if planner_grant.get("schema") != GRANT_SCHEMA:
+        raise ProgressionError(f"unexpected planner grant schema: {planner_grant.get('schema')}")
+    if planner_grant.get("mode") != "PRODUCTION_PLANNER_GRANT":
+        raise ProgressionError("planner grant must be PRODUCTION_PLANNER_GRANT")
+    if planner_grant.get("controlWrites") is not False or planner_grant.get("physicalWriteAllowed") is not False:
+        raise ProgressionError("planner grant must disallow physical writes")
+    if planner_grant.get("allocationAuthority") != "DYNAMIC_PI_PLANNER":
+        raise ProgressionError("planner grant must retain Dynamic Pi Planner authority")
 
     now = generated_at or datetime.now(timezone.utc)
     if now.tzinfo is None or now.utcoffset() is None:
@@ -415,29 +417,34 @@ def build_progression(
     now = now.astimezone(timezone.utc)
 
     heating_generated = _aware(heating_shadow.get("generatedAt"), "heating.generatedAt")
-    priority_generated = _aware(flex_priority.get("generatedAt"), "priority.generatedAt")
+    grant_generated = _aware(planner_grant.get("generatedAt"), "plannerGrant.generatedAt")
+    grant_valid_until = _aware(planner_grant.get("validUntil"), "plannerGrant.validUntil")
     heating_freshness = _freshness(heating_generated, now, MAX_HEATING_AGE_SECONDS, "HEATING_SHADOW")
-    priority_freshness = _freshness(priority_generated, now, MAX_PRIORITY_AGE_SECONDS, "FLEX_PRIORITY")
+    grant_freshness = _freshness(grant_generated, now, MAX_GRANT_AGE_SECONDS, "PRODUCTION_HEATING_GRANT")
+    if now >= grant_valid_until:
+        grant_freshness = {
+            "status": "STALE",
+            "reason": "PRODUCTION_HEATING_GRANT_EXPIRED",
+            "ageSeconds": grant_freshness.get("ageSeconds"),
+        }
 
-    priority_consistent = priority_generated >= heating_generated
+    priority_consistent = grant_generated >= heating_generated
     priority_safe = (
         heating_freshness["status"] == "OK"
-        and priority_freshness["status"] == "OK"
+        and grant_freshness["status"] == "OK"
         and priority_consistent
     )
 
-    decision = _dict(flex_priority.get("decision"), "priority.decision")
-    heating_priority = _dict(flex_priority.get("heating"), "priority.heating")
-    ready_rooms_raw = heating_priority.get("readyRooms")
+    grant_heating = _dict(planner_grant.get("heating"), "plannerGrant.heating")
+    ready_rooms_raw = grant_heating.get("readyRooms")
     if not isinstance(ready_rooms_raw, list) or any(not isinstance(v, str) for v in ready_rooms_raw):
-        raise ProgressionError("priority.heating.readyRooms must be a string array")
+        raise ProgressionError("plannerGrant.heating.readyRooms must be a string array")
     ready_rooms = set(ready_rooms_raw)
 
     domain_grant = (
         priority_safe
-        and decision.get("priorityOwner") == "HEATING"
-        and decision.get("heatingShadowGrant") == "SHADOW_GRANT"
-        and decision.get("physicalWriteAllowed") is False
+        and grant_heating.get("grant") == "PRODUCTION_GRANT"
+        and planner_grant.get("physicalWriteAllowed") is False
     )
 
     previous_rooms = _previous_room_map(previous)
@@ -593,18 +600,18 @@ def build_progression(
         elif not priority_safe:
             state = "STEP_HOLD_PRIORITY_UNKNOWN" if active is not None else "WAITING_FOR_FRESH_PRIORITY"
             reason = (
-                "PRIORITY_PRE_DATES_HEATING_STATE"
-                if priority_freshness["status"] == "OK"
+                "PRODUCTION_GRANT_PRE_DATES_HEATING_STATE"
+                if grant_freshness["status"] == "OK"
                 and heating_freshness["status"] == "OK"
                 and not priority_consistent
-                else priority_freshness["reason"]
-                if priority_freshness["status"] != "OK"
+                else grant_freshness["reason"]
+                if grant_freshness["status"] != "OK"
                 else heating_freshness["reason"]
             )
             transition = "HOLD"
         elif not c["canReceiveGrant"]:
             state = "STEP_HOLD_NO_GRANT" if active is not None else "WAITING_FOR_GRANT"
-            reason = decision.get("reason") or "HEATING_NOT_GRANTED"
+            reason = grant_heating.get("reason") or "HEATING_NOT_GRANTED"
             transition = "HOLD"
         elif active is None:
             candidate_next = c["candidateNext"]
@@ -717,7 +724,7 @@ def build_progression(
             },
             "planner": {
                 "domainGrant": "SHADOW_GRANT" if c["canReceiveGrant"] else "HOLD",
-                "priorityReason": decision.get("reason"),
+                "priorityReason": grant_heating.get("priorityReason"),
             },
             "opportunityHistory": opportunity_history,
             "stepHistory": step_history,
@@ -744,10 +751,10 @@ def build_progression(
         "generatedAt": _iso(now),
         "baselineAuthority": "HONEYWELL",
         "eligibilityAuthority": HEATING_SCHEMA,
-        "allocationAuthority": PRIORITY_SCHEMA,
+        "allocationAuthority": GRANT_SCHEMA,
         "sourceFreshness": {
             "heating": heating_freshness,
-            "priority": priority_freshness,
+            "priority": grant_freshness,
             "priorityConsistentWithHeating": priority_consistent,
         },
         "policy": {
