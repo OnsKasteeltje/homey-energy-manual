@@ -384,7 +384,7 @@ def _system_status():
 
 
 EMS_UNIT_RE = re.compile(
-    r"\\b(ems-[A-Za-z0-9_.@:-]+\\.(?:service|timer))\\b"
+    r"\b(ems-[A-Za-z0-9_.@:-]+\.(?:service|timer))\b"
 )
 SYSTEMD_FAILURE_DEDUPE_US = 10 * 1_000_000
 
