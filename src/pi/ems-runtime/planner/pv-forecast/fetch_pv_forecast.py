@@ -9,9 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-PLANNER_DIR = Path(__file__).resolve().parents[1]
-if str(PLANNER_DIR) not in sys.path:
-    sys.path.insert(0, str(PLANNER_DIR))
+FORECAST_LIB_DIR = Path("/home/jeroen/ems/runtime/forecast")
+if str(FORECAST_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(FORECAST_LIB_DIR))
 
 from open_meteo_transport import fetch_json_with_retry
 
