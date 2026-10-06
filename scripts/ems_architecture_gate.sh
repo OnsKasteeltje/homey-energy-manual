@@ -243,7 +243,14 @@ pass "PV Forecast V2 target-structure deploy/drift mapping present"
 
 python3 "$FORECAST_TRANSPORT_TEST" || fail "bounded Open-Meteo transport retry contract failed"
 python3 "$FORECAST_CADENCE_TEST" || fail "atomic forecast single-cadence contract failed"
-pass "forecast transport is bounded and legacy standalone cadences are parked"
+for retired in \
+  deploy/systemd/ems-weather-forecast.timer \
+  deploy/systemd/ems-weather-forecast.service \
+  deploy/systemd/ems-pv-forecast.timer \
+  deploy/systemd/ems-pv-forecast.service; do
+  [[ ! -e "$retired" ]] || fail "retired forecast unit returned to canonical deploy set: $retired"
+done
+pass "forecast transport is bounded and legacy standalone units are retired"
 
 grep -q 'EMS_PI_DAY_PERFORMANCE_V0.1' "$PERFORMANCE" || fail "standard EMS performance report schema missing"
 grep -q 'ems-history.sqlite' "$PERFORMANCE" || fail "EMS performance command does not use canonical measurement history"

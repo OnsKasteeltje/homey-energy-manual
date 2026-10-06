@@ -30,9 +30,17 @@ HEALTH_COMMAND="/usr/local/bin/ems-health"
 SYSTEMD="$REPO/deploy/systemd"
 BACKUP_ROOT="/home/jeroen/ems/backup"
 DEPLOY_MARKER="/home/jeroen/ems/data/deployed-git-commit"
-PARKED_FORECAST_TIMERS=(
+RETIRED_FORECAST_TIMERS=(
     "ems-weather-forecast.timer"
     "ems-pv-forecast.timer"
+)
+RETIRED_FORECAST_SERVICES=(
+    "ems-weather-forecast.service"
+    "ems-pv-forecast.service"
+)
+RETIRED_FORECAST_UNITS=(
+    "${RETIRED_FORECAST_TIMERS[@]}"
+    "${RETIRED_FORECAST_SERVICES[@]}"
 )
 
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -77,6 +85,11 @@ echo "Creating: $BACKUP"
 cp -a "$RUNTIME" "$BACKUP/runtime"
 for f in "$SYSTEMD"/*; do
     cp -a "/etc/systemd/system/$(basename "$f")" "$BACKUP/" 2>/dev/null || true
+done
+# Retiring units are no longer in Git, so preserve any still-installed copies
+# explicitly in this deployment backup before removing them from the host.
+for unit in "${RETIRED_FORECAST_UNITS[@]}"; do
+    cp -a "/etc/systemd/system/$unit" "$BACKUP/" 2>/dev/null || true
 done
 
 echo
@@ -384,30 +397,32 @@ for f in "$SYSTEMD"/*; do
 done
 
 echo
-echo "=== VALIDATE ==="
-bash "$REPO/scripts/ems_pi_drift_check.sh"
+echo "=== RETIRE LEGACY FORECAST UNITS ==="
+for unit in "${RETIRED_FORECAST_TIMERS[@]}"; do
+    systemctl disable --now "$unit" >/dev/null 2>&1 || true
+done
+for unit in "${RETIRED_FORECAST_SERVICES[@]}"; do
+    systemctl stop "$unit" >/dev/null 2>&1 || true
+done
+for unit in "${RETIRED_FORECAST_UNITS[@]}"; do
+    rm -f "/etc/systemd/system/$unit"
+done
 
 echo
 echo "=== SYSTEMD RELOAD ==="
 systemctl daemon-reload
 
-echo
-echo "=== PARK LEGACY FORECAST TIMERS ==="
-for unit in "${PARKED_FORECAST_TIMERS[@]}"; do
-    systemctl disable --now "$unit"
-
-    if systemctl is-active --quiet "$unit"; then
-        echo "ERROR: legacy forecast timer still active: $unit"
+for unit in "${RETIRED_FORECAST_UNITS[@]}"; do
+    if [[ -e "/etc/systemd/system/$unit" ]]; then
+        echo "ERROR: retired forecast unit still installed: $unit"
         exit 1
     fi
-
-    if systemctl is-enabled --quiet "$unit"; then
-        echo "ERROR: legacy forecast timer still enabled: $unit"
-        exit 1
-    fi
-
-    echo "PASS: $unit disabled and inactive"
+    echo "PASS: retired unit absent: $unit"
 done
+
+echo
+echo "=== VALIDATE ==="
+bash "$REPO/scripts/ems_pi_drift_check.sh"
 
 COMMIT="$(git -C "$REPO" rev-parse HEAD)"
 printf '%s\n' "$COMMIT" > "$DEPLOY_MARKER"
@@ -419,4 +434,4 @@ echo "Backup: $BACKUP"
 echo "Deployment marker: $COMMIT"
 echo "Performance command: $PERFORMANCE_COMMAND"
 echo "Health command: $HEALTH_COMMAND"
-echo "NOTE: Long-running services were NOT restarted; legacy standalone forecast timers were explicitly parked."
+echo "NOTE: Long-running services were NOT restarted; legacy standalone forecast services/timers were retired from systemd."
