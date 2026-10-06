@@ -272,6 +272,111 @@ def _next_increment(active: float, future_target: float) -> float | None:
     return round(min(future_target, active + MAX_STEP_C), 3)
 
 
+def build_source_fail_closed(
+    previous: dict[str, Any] | None,
+    *,
+    reason: str,
+    generated_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Reset shadow progression without consuming stale/invalid room values."""
+    now = generated_at or datetime.now(timezone.utc)
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ProgressionError("generated_at must be offset-aware")
+    now = now.astimezone(timezone.utc)
+
+    output_rooms: list[dict[str, Any]] = []
+    for key, previous_room in sorted(_previous_room_map(previous).items()):
+        prev_prog = previous_room.get("progression")
+        prev_prog = prev_prog if isinstance(prev_prog, dict) else {}
+        step_history = _step_history(previous_room, now)
+        opportunity_history = _opportunity_history(previous_room, now)
+
+        previous_target = prev_prog.get("activeStepTarget_C")
+        previous_started = prev_prog.get("activeStepStartedAt")
+        _close_step_interval(
+            step_history,
+            opportunity_id=previous_room.get("opportunityId"),
+            target=previous_target,
+            started_at=previous_started,
+            ended_at=now,
+            outcome="SOURCE_INVALID",
+            reason=reason,
+        )
+
+        output_rooms.append({
+            "key": key,
+            "displayName": previous_room.get("displayName") or key,
+            "preheatScope": previous_room.get("preheatScope") is True,
+            "group": previous_room.get("group"),
+            "opportunityId": previous_room.get("opportunityId"),
+            "currentTemperature_C": None,
+            "futureHoneywellTarget_C": None,
+            "opportunityClosesAt": None,
+            "heatingEligibility": {
+                "state": "SOURCE_INVALID",
+                "reason": reason,
+            },
+            "planner": {
+                "domainGrant": "HOLD",
+                "priorityReason": reason,
+            },
+            "opportunityHistory": opportunity_history,
+            "stepHistory": step_history,
+            "progression": {
+                "state": "BLOCKED_SOURCE_INVALID",
+                "reason": reason,
+                "activeStepTarget_C": None,
+                "activeStepReached": None,
+                "activeStepStartedAt": None,
+                "nextStepTarget_C": None,
+                "completedSteps_C": _completed(prev_prog),
+                "lastTransition": "RESET_SOURCE_INVALID",
+                "lastTransitionAt": _iso(now),
+                "physicalWritePerformed": False,
+            },
+        })
+
+    return {
+        "schema": OUTPUT_SCHEMA,
+        "mode": "READ_ONLY",
+        "controlMode": "SHADOW",
+        "controlWrites": False,
+        "physicalWriteAllowed": False,
+        "generatedAt": _iso(now),
+        "baselineAuthority": "HONEYWELL",
+        "eligibilityAuthority": HEATING_SCHEMA,
+        "allocationAuthority": PRIORITY_SCHEMA,
+        "sourceFreshness": {
+            "heating": {
+                "status": "INVALID",
+                "reason": reason,
+                "ageSeconds": None,
+            },
+            "priority": {
+                "status": "UNKNOWN",
+                "reason": "UPSTREAM_HEATING_SOURCE_INVALID",
+                "ageSeconds": None,
+            },
+            "priorityConsistentWithHeating": False,
+        },
+        "policy": {
+            "maxStep_C": MAX_STEP_C,
+            "stepReachedTolerance_C": STEP_REACHED_TOLERANCE_C,
+            "advanceOnlyAfterMeasuredStepReached": True,
+            "groupAdvanceRequiresAllSelectedRoomsReached": True,
+            "plannerGrantRequiredForStartAndAdvance": True,
+            "cvGuardInheritedEveryIterationFromV03": True,
+            "baselineDemandGuardInheritedFromV03": True,
+            "intentionalGridImportAllowed": False,
+            "rollbackBehavior": "NOT_DEFINED_SHADOW_ONLY",
+            "statePersistence": "LOCAL_SHADOW_ARTIFACT",
+            "stepHistoryRetentionHours": STEP_HISTORY_RETENTION_HOURS,
+            "opportunityHistoryRetentionHours": OPPORTUNITY_HISTORY_RETENTION_HOURS,
+        },
+        "rooms": output_rooms,
+    }
+
+
 def build_progression(
     heating_shadow: dict[str, Any],
     flex_priority: dict[str, Any],
@@ -287,6 +392,15 @@ def build_progression(
         raise ProgressionError("heating source must disallow writes")
     if heating_shadow.get("baselineAuthority") != "HONEYWELL":
         raise ProgressionError("Honeywell must remain baseline authority")
+
+    source_status = heating_shadow.get("sourceStatus")
+    if isinstance(source_status, dict) and source_status.get("status") != "OK":
+        reason = source_status.get("reason") or "HEATING_SOURCE_INVALID"
+        return build_source_fail_closed(
+            previous,
+            reason=reason,
+            generated_at=generated_at,
+        )
 
     if flex_priority.get("schema") != PRIORITY_SCHEMA:
         raise ProgressionError(f"unexpected priority schema: {flex_priority.get('schema')}")
