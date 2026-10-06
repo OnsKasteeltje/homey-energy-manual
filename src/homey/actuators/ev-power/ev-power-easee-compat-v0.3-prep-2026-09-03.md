@@ -46,7 +46,7 @@ The adapter remains floor-quantized: it may never request more executable EV pow
 
 ## Adapter patch — prepared delta
 
-Historical adapter baseline: the superseded `ev-power-v0.1-shadow.runtime.md` source remains available in Git history; the standalone file was removed during repository cleanup.
+Historical adapter baseline: the superseded pre-production adapter source remains available in Git history; its standalone legacy file was removed during repository cleanup.
 
 Required semantic changes for the next deployable adapter revision:
 
