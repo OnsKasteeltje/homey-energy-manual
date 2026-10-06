@@ -1,6 +1,6 @@
 # EMS Software Architecture - Live As-Is
 
-**Datum:** 4 oktober 2026
+**Datum:** 6 oktober 2026
 **Status:** Live-code synopsis  
 **Scope:** Raspberry Pi runtime + actieve Homey flows + actuele GitHub-architectuur  
 **Doel:** Vastleggen van de actuele softwarearchitectuur na cross-check van live Homey, Pi-controlarchitectuur en GitHub `main`.
@@ -88,6 +88,10 @@ UI/PUBLISH   -> website / GitHub artifacts
 ## 4. Raspberry Pi is de rolling-horizon optimization engine
 
 De Pi combineert runtime-state, forecasts en historie en optimaliseert flexibele verbruikers in kwartieren.
+
+De production forecast-keten heeft exact één cadence-owner: `ems-forecast-chain.timer` op `:03/:18/:33/:48`. De oude standalone `ems-weather-forecast.timer` en `ems-pv-forecast.timer` zijn geparkeerde rollback/diagnostic units en worden bij deployment expliciet disabled + stopped. Weather-, PV- en Quatt-artifactfreshness blijft afzonderlijk zichtbaar in `ems-health`; functionele uitvoering wordt via de atomische `forecastChain` bewaakt.
+
+Weather en PV gebruiken één gedeelde bounded Open-Meteo transportpolicy: 20 s timeout per poging, maximaal één retry na 2 s bij transient transport/TLS/DNS/connectivity-fouten of HTTP 429/5xx, en daarna fail-closed. Niet-transient 4xx/certificaatfouten worden niet herhaald. Er is geen stale-data fallback die een oude forecast als nieuw markeert. Deze hardening volgt uit de incidenten van 5/6 oktober 2026, waarin respectievelijk de PV-call binnen de forecast-chain en de eerste weather-call van de legacy service met een TLS-handshake-timeout faalden en later automatisch herstelden.
 
 De canonical operationele historie staat in `/home/jeroen/ems/data/ems-history.sqlite`. Geaccepteerde Homey Core pushes schrijven de raw `measurements`; automatische Homey Insights/day-history polling is geen production transport. Afgeleide historie wordt uitsluitend lokaal op de Pi opgebouwd: `services/pi/history/build_15m_history.py` schrijft `measurements_15m`, `services/pi/history/build_house_energy_history.py` schrijft `house_energy_intervals` uit de vijf cumulatieve P1/PV-counters en `services/pi/history/build_daily_energy_history.py` schrijft `daily_energy_history`. `ems-history-15m.service` voert de 15-minuten- en huishoudhistoriebuilder samen uit op de bestaande kwartiercadans; de daily builder behoudt zijn eigen timer. Deze afgeleide builders zijn failure-isolated van realtime state ingest en control. Frontend V2 leest huishoudhistorie uitsluitend via de read-only Web Data API (`EMS_WEB_HISTORY_V1`), niet rechtstreeks uit SQLite of GitHub.
 

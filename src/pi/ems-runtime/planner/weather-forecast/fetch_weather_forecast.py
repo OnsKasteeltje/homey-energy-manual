@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 
 import json
+import sys
 import urllib.parse
 import urllib.request
 
 from datetime import datetime, timezone
 from pathlib import Path
+
+FORECAST_LIB_DIR = Path("/home/jeroen/ems/runtime/forecast")
+if str(FORECAST_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(FORECAST_LIB_DIR))
+
+from open_meteo_transport import fetch_json_with_retry
 
 LAT = 52.70808
 LON = 5.10003
@@ -49,8 +56,10 @@ def fetch_weather():
         headers={"User-Agent": "EMS-Pi-Weather-Forecast/0.2"},
     )
 
-    with urllib.request.urlopen(req, timeout=20) as response:
-        return json.load(response)
+    return fetch_json_with_retry(
+        req,
+        label="weather-main",
+    )
 
 
 def fetch_gti(azimuth, tilt):
@@ -75,8 +84,10 @@ def fetch_gti(azimuth, tilt):
         headers={"User-Agent": "EMS-Pi-GTI/0.2"},
     )
 
-    with urllib.request.urlopen(req, timeout=20) as response:
-        data = json.load(response)
+    data = fetch_json_with_retry(
+        req,
+        label=f"weather-gti azimuth={azimuth} tilt={tilt}",
+    )
 
     q = data.get("minutely_15", {})
     times = q.get("time", [])
