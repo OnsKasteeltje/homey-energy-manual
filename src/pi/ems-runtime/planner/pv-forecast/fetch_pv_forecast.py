@@ -2,11 +2,18 @@
 
 import json
 import math
+import sys
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+PLANNER_DIR = Path(__file__).resolve().parents[1]
+if str(PLANNER_DIR) not in sys.path:
+    sys.path.insert(0, str(PLANNER_DIR))
+
+from open_meteo_transport import fetch_json_with_retry
 
 LAT = 52.70808
 LON = 5.10003
@@ -62,8 +69,10 @@ request = urllib.request.Request(
     headers={"User-Agent": "ems-pi-pv-forecast/0.3"},
 )
 
-with urllib.request.urlopen(request, timeout=20) as response:
-    weather = json.load(response)
+weather = fetch_json_with_retry(
+    request,
+    label="pv-forecast",
+)
 
 quarter = weather.get("minutely_15", {})
 times = quarter.get("time", [])
