@@ -13,7 +13,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[4]
 DATA = Path("/home/jeroen/ems/data")
 HEATING_V03_FILE = DATA / "heating-preheat-shadow-v0.3.json"
-FLEX_PRIORITY_FILE = DATA / "flex-priority-shadow-v0.1.json"
+PLANNER_GRANT_FILE = DATA / "heating-production-grant-v0.1.json"
 OUTPUT = DATA / "heating-preheat-progression-shadow-v0.4.json"
 
 
@@ -62,7 +62,7 @@ def main() -> int:
     previous = load_optional_json(OUTPUT)
     out = module.build_progression(
         load_json(HEATING_V03_FILE),
-        load_json(FLEX_PRIORITY_FILE),
+        load_json(PLANNER_GRANT_FILE),
         previous,
         generated_at=datetime.now(timezone.utc),
     )
