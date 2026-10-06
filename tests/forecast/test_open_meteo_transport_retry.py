@@ -7,7 +7,7 @@ import urllib.error
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-HELPER = ROOT / "src/pi/ems-runtime/planner/open_meteo_transport.py"
+HELPER = ROOT / "services/pi/forecast/open_meteo_transport.py"
 WEATHER = ROOT / "src/pi/ems-runtime/planner/weather-forecast/fetch_weather_forecast.py"
 PV = ROOT / "src/pi/ems-runtime/planner/pv-forecast/fetch_pv_forecast.py"
 
