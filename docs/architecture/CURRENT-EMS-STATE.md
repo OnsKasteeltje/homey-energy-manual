@@ -75,7 +75,7 @@ Production Dynamic Pi Planner Heating Grant V0.1 is introduced under `services/p
 
 Planner authority and realtime execution permission remain deliberately separate. `PRODUCTION_GRANT` is a Dynamic Pi Planner/Flex authority decision only: it requires current planner validity, fresh and correctly ordered Heating/Flex inputs and Flex ownership for Heating. The Pi-local P1 snapshot is retained as advisory evidence but does not authorize physical execution and does not affect grant revision or validity. Immediately before any physical Heating start or progression increment, the downstream Homey execution edge must re-evaluate fresh realtime P1 and fail closed unless export is present and import is absent. Honeywell remains baseline/comfort authority; `controlWrites=false` and `physicalWriteAllowed=false` are hard invariants, and the one-shot runner performs no network or device call.
 
-This V0.1 release does **not** yet switch Heating V0.4 progression from the existing Flex `SHADOW_GRANT` to `EMS_PI_DYNAMIC_HEATING_GRANT_V0.1`, does not resume the parked Pi→Homey Heating SHADOW publisher, and does not create a Honeywell actuator. The grant artifact is therefore a validated planner boundary for the next gated integration step, while the current V0.3 → Flex → V0.4 → V0.5 execution chain remains SHADOW-only.
+Heating V0.4 now consumes `EMS_PI_DYNAMIC_HEATING_GRANT_V0.1` instead of interpreting the Flex `SHADOW_GRANT` directly. The existing V0.4 `:20` service builds the production grant immediately before progression, so no new timer or parallel planner path is introduced. V0.4 and V0.5 remain SHADOW-only, the Pi→Homey Heating publisher remains parked, and no Honeywell actuator or realtime execution edge is enabled.
 
 The Heating SHADOW cadence is deterministic. A production observation on 2026-10-04 showed that the former relative Flex timer (`OnUnitActiveSec=60s`) could drift into the V0.4 phase: on a V0.3 refresh minute V0.4 could run milliseconds before the new Flex snapshot, making `priorityGenerated < heatingGenerated` and correctly but unnecessarily forcing one fail-closed minute. The canonical active timer phases are therefore: V0.3 at second `:00` on its five-minute refresh minute, Flex Priority at `:10` every minute, V0.4 at `:20`, and V0.5 at `:30`. The historical Homey SHADOW publisher slot remains `:35` but its timer is parked. These local control-chain timers use `AccuracySec=1s`; relative Flex scheduling is forbidden. Freshness/order guards remain unchanged and continue to fail closed if an upstream service actually misses its phase.
 
@@ -101,13 +101,13 @@ a SHADOW path that has no production consumer.
 The active local cadence is V0.3 `:00` (when due) -> Flex `:10` -> V0.4
 `:20` -> V0.5 `:30`. A historical Homey publisher slot remains defined at
 `:35` for controlled commissioning only, but its timer is disabled. LIVE
-promotion remains blocked until both a production Dynamic Pi Planner Heating
-grant and exactly one guarded Honeywell actuator with acknowledgement/readback
-and rollback semantics are implemented.
+promotion remains blocked until the new production-grant-fed SHADOW chain has
+been observed in operation and exactly one guarded Honeywell actuator with
+acknowledgement/readback and rollback semantics is deliberately implemented.
 
-**Heating continuation checkpoint:** `NEXT_HEATING_STEP_PRODUCTION_DYNAMIC_PI_PLANNER_GRANT`.
-When Heating work resumes, the first task is the authoritative production
-Dynamic Pi Planner Heating grant, not another Pi -> Homey transport iteration.
+**Heating continuation checkpoint:** `NEXT_HEATING_STEP_SHADOW_OBSERVATION_BEFORE_EXECUTION_EDGE`.
+The next step is observation of the production-grant-fed SHADOW chain; do not
+start the Homey execution edge or Honeywell writer before that evidence is reviewed.
 The completed/parked SHADOW boundary and exact re-entry sequence are recorded in
 `docs/commissioning/heating-homey-shadow-chain-v0.1.md` under
 “Continuation checkpoint — 2026-10-04”. That checkpoint is the canonical
