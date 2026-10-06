@@ -4,8 +4,8 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-10-04
-**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning  
+**Status date:** 2026-10-06
+**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
 
@@ -215,6 +215,12 @@ Ordering rule:
 ## 4. Pi planning chain
 
 The active general planner remains the hardened rolling 24-hour Pi planner with 96 quarter-hour slots. It owns joint strategic allocation of flexible demand while preserving hard comfort/safety feasibility. The term **dynamic planner** refers to rolling optimization, not a dynamic electricity contract.
+
+Production forecast generation has one cadence owner: `ems-forecast-chain.timer` at minutes `:03/:18/:33/:48`. The former standalone `ems-weather-forecast.timer` and `ems-pv-forecast.timer` are retained only as parked rollback/diagnostic units and are explicitly disabled/stopped by `scripts/deploy_ems_pi.sh`; they are not production producers. `ems-health` therefore monitors forecast execution through `forecastChain`, while weather/PV/Quatt artifacts remain independently freshness-checked under EMS DATA.
+
+Open-Meteo transport is shared by the production weather and PV fetchers through `planner/open_meteo_transport.py`. Each request keeps the existing 20-second timeout and may perform exactly one retry after 2 seconds only for transient transport failures (including timeout/TLS/connectivity/DNS-class `URLError`) or HTTP 429/5xx. Certificate-verification failures and other non-transient HTTP 4xx fail immediately. A failed second attempt propagates and aborts the atomic chain; no stale forecast is relabelled as fresh and no fallback bypasses the normal freshness guards.
+
+This policy was introduced after the 2026-10-05/06 incident analysis proved two separate `_ssl.c:1012` handshake timeouts: the 23:33 forecast-chain run had already completed planner-axis, weather import and Quatt forecast before `fetch_pv_forecast.py` timed out on its Open-Meteo HTTPS handshake; the 04:46 legacy standalone weather run timed out on the first `fetch_weather_forecast.py` Open-Meteo handshake. Both later recovered without intervention. The failure class is therefore treated as transient external connectivity, not planner/data corruption.
 
 EV opportunity forecasting is phase-aware from 2026-10-01. The strategic 15-minute planner mirrors the production realtime phase-entry bands: OFF→1P at 1500 W residual PV and OFF/1P→3P at 4400 W. Within 1P it plans 6–16 A as 230 W/A (1380–3680 W); within 3P it plans 6–16 A as 690 W/A (4140–11040 W). Opportunity targets never intentionally exceed forecast residual PV. The realtime stop/downshift hysteresis (1P stop below 1100 W on the rolling 2-minute signal, 3P leave below 3600 W) and the 120-second minimum mode dwell remain Homey executor responsibilities and are not simulated as sub-slot state by the 15-minute planner. EV deadline charging remains a separate hard-constraint path and is forced to 3P. This removes the former planner-only 3P abstraction in which 6 A was always treated as 4140 W.
 
