@@ -104,7 +104,17 @@ def build_priority(
         MAX_HEATING_AGE_SECONDS,
         "HEATING_SHADOW",
     )
-    heating_current = heating_freshness["status"] == "OK"
+    source_status = heating_shadow.get("sourceStatus")
+    source_valid = (
+        not isinstance(source_status, dict)
+        or source_status.get("status") == "OK"
+    )
+    source_reason = (
+        source_status.get("reason")
+        if isinstance(source_status, dict)
+        else "LEGACY_V03_WITHOUT_SOURCE_STATUS"
+    )
+    heating_current = heating_freshness["status"] == "OK" and source_valid
 
     ready = _ready_heating(heating_shadow) if heating_current else []
     ready.sort(key=lambda item: item["opportunityClosesAt"])
@@ -145,6 +155,11 @@ def build_priority(
         heating_grant = "HOLD"
         ev_role = "MUST"
         reason = "EV_DEADLINE_MUST"
+    elif not source_valid:
+        owner = "HOLD_UNKNOWN"
+        heating_grant = "HOLD"
+        ev_role = "PRIMARY_OPPORTUNITY"
+        reason = source_reason or "HEATING_SOURCE_INVALID"
     elif not heating_current:
         owner = "HOLD_UNKNOWN"
         heating_grant = "HOLD"
@@ -180,6 +195,10 @@ def build_priority(
         "authority": "DYNAMIC_PI_PLANNER_SHADOW",
         "sourceFreshness": {
             "heating": heating_freshness,
+            "heatingSourceStatus": {
+                "status": "OK" if source_valid else "INVALID",
+                "reason": source_reason,
+            },
         },
         "policy": {
             "strategy": "CONSTRAINT_FIRST_THEN_EARLIEST_CLOSING_FLEX",

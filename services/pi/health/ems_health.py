@@ -155,6 +155,17 @@ def _data_status():
         generated = _parse_ts(raw)
         age = None if generated is None else max(0, int((now - generated).total_seconds()))
         status = "OK" if age is not None and age <= stale_after else "STALE"
+        source_status = None
+        if name == "heatingPreheatV03":
+            candidate = payload.get("sourceStatus")
+            if isinstance(candidate, dict):
+                source_status = {
+                    "status": candidate.get("status"),
+                    "reason": candidate.get("reason"),
+                }
+                if candidate.get("status") != "OK":
+                    status = "SOURCE_INVALID"
+
         if status != "OK":
             degraded = True
         result[name] = {
@@ -164,6 +175,8 @@ def _data_status():
             "generatedAt": raw,
             "staleAfterSec": stale_after,
         }
+        if source_status is not None:
+            result[name]["sourceStatus"] = source_status
 
     for name, path in {
         "historyDb": DATA / "ems-history.sqlite",

@@ -88,18 +88,41 @@ def main() -> int:
     )
 
     now = datetime.now(timezone.utc)
-    room_model = room_mod.build_model(
-        load_json(SCHEDULE_FILE),
-        load_json(STATE_FILE),
-        generated_at=now,
-    )
-    candidate = candidate_mod.build_plan(room_model, generated_at=now)
-    shadow = shadow_mod.build_shadow(
-        room_model,
-        candidate,
-        load_optional_json(QUATT_FILE, label="Quatt current"),
-        generated_at=now,
-    )
+    try:
+        room_model = room_mod.build_model(
+            load_json(SCHEDULE_FILE),
+            load_json(STATE_FILE),
+            generated_at=now,
+        )
+        candidate = candidate_mod.build_plan(room_model, generated_at=now)
+        shadow = shadow_mod.build_shadow(
+            room_model,
+            candidate,
+            load_optional_json(QUATT_FILE, label="Quatt current"),
+            generated_at=now,
+        )
+    except (
+        OSError,
+        json.JSONDecodeError,
+        room_mod.ModelError,
+        candidate_mod.PlanError,
+        shadow_mod.ShadowError,
+    ) as exc:
+        reason = f"HONEYWELL_SOURCE_OR_CONTRACT_ERROR_{type(exc).__name__}"
+        shadow = shadow_mod.build_source_fail_closed(
+            reason=reason,
+            detail=str(exc),
+            generated_at=now,
+        )
+        atomic_write(V03_FILE, shadow)
+        print(f"WARN: {reason}: {exc}")
+        print(
+            f"PASS_FAIL_CLOSED: {shadow['schema']} "
+            f"controlWrites={shadow['controlWrites']}"
+        )
+        print("sourceStatus:", shadow["sourceStatus"])
+        print("output:", V03_FILE)
+        return 0
 
     atomic_write(ROOM_MODEL_FILE, room_model)
     atomic_write(V02_FILE, candidate)
@@ -108,6 +131,7 @@ def main() -> int:
     scoped = [r for r in shadow["rooms"] if r["preheatScope"]]
     states = {r["key"]: r["shadow"]["state"] for r in scoped}
     print(f"PASS: {shadow['schema']} controlWrites={shadow['controlWrites']}")
+    print("sourceStatus:", shadow["sourceStatus"])
     print("baselineHeatingDemandPresent:", shadow["house"]["baselineHeatingDemandPresent"])
     print("cvGuard:", shadow["cvGuard"])
     print("scopedStates:", states)

@@ -95,6 +95,40 @@ def main():
         m._systemctl_show = original_systemctl
         m.FUNCTION_UNITS = original_units
 
+    original_data_sources = m.DATA_SOURCES
+    original_read_json = m._read_json
+    original_now = m._now
+    try:
+        m.DATA_SOURCES = {
+            "heatingPreheatV03": (
+                Path("/tmp/heating-preheat-shadow-v0.3.json"),
+                ("generatedAt",),
+                420,
+            ),
+        }
+        m._now = lambda: __import__("datetime").datetime(
+            2026, 10, 6, 14, 14, 30,
+            tzinfo=__import__("datetime").timezone.utc,
+        )
+        m._read_json = lambda path: {
+            "generatedAt": "2026-10-06T14:14:00Z",
+            "sourceStatus": {
+                "status": "INVALID",
+                "reason": "HONEYWELL_SOURCE_OR_CONTRACT_ERROR_ModelError",
+            },
+        }
+        data, degraded = m._data_status()
+        assert degraded is True
+        assert data["heatingPreheatV03"]["status"] == "SOURCE_INVALID"
+        assert data["heatingPreheatV03"]["ageSec"] == 30
+        assert data["heatingPreheatV03"]["sourceStatus"]["reason"] == (
+            "HONEYWELL_SOURCE_OR_CONTRACT_ERROR_ModelError"
+        )
+    finally:
+        m.DATA_SOURCES = original_data_sources
+        m._read_json = original_read_json
+        m._now = original_now
+
     print("PASS: Heating V0.3 -> Flex -> V0.4 -> V0.5 health contract")
 
 
