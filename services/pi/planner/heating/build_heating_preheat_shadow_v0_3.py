@@ -159,6 +159,58 @@ def _cv_guard(quatt_current: dict[str, Any], now: datetime) -> dict[str, Any]:
     }
 
 
+def build_source_fail_closed(
+    *,
+    reason: str,
+    detail: str | None = None,
+    generated_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Publish a fresh control-safe V0.3 artifact without reusing stale room data."""
+    now = generated_at or datetime.now(timezone.utc)
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ShadowError("generated_at must be offset-aware")
+
+    return {
+        "schema": OUTPUT_SCHEMA,
+        "mode": "READ_ONLY",
+        "controlMode": "SHADOW",
+        "controlWrites": False,
+        "generatedAt": now.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "timezone": "Europe/Amsterdam",
+        "baselineAuthority": "HONEYWELL",
+        "allocationAuthority": "DYNAMIC_PI_PLANNER",
+        "sourceStatus": {
+            "status": "INVALID",
+            "reason": reason,
+            "detail": detail,
+            "reusedPreviousRoomData": False,
+        },
+        "house": {
+            "baselineHeatingDemandPresent": None,
+            "baselineDemandRooms": [],
+        },
+        "cvGuard": {
+            "status": "UNKNOWN",
+            "reason": "HONEYWELL_SOURCE_INVALID",
+            "cvActive": None,
+            "ageSeconds": None,
+        },
+        "policy": {
+            "maxAdvanceMinutes": 180,
+            "maxStep_C": 0.5,
+            "baselineTolerance_C": BASELINE_TOLERANCE_C,
+            "stepReachedTolerance_C": STEP_REACHED_TOLERANCE_C,
+            "cvCheckedEveryIteration": True,
+            "advanceOnlyAfterCurrentStepReached": True,
+            "normalBaselineCvIsNotPreheatFault": True,
+            "purePreheatCvAssistBlocksFurtherSteps": True,
+            "plannerGrantRequiredBeforeAnyFutureWrite": True,
+            "intentionalGridImportAllowed": False,
+        },
+        "rooms": [],
+    }
+
+
 def build_shadow(
     room_model: dict[str, Any],
     candidate_plan: dict[str, Any],
@@ -284,6 +336,12 @@ def build_shadow(
         "timezone": "Europe/Amsterdam",
         "baselineAuthority": "HONEYWELL",
         "allocationAuthority": "DYNAMIC_PI_PLANNER",
+        "sourceStatus": {
+            "status": "OK",
+            "reason": "HONEYWELL_INPUT_VALID",
+            "detail": None,
+            "reusedPreviousRoomData": False,
+        },
         "house": {
             "baselineHeatingDemandPresent": baseline_demand_present,
             "baselineDemandRooms": sorted(baseline_demand_rooms),
