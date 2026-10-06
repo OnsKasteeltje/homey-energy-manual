@@ -190,7 +190,9 @@ def test_expired_dynamic_plan_fails_closed():
 
 def test_grant_validity_is_bounded_by_current_slot_and_source_freshness():
     out = build()
-    assert out["validUntil"] == "2026-10-06T12:08:30Z"
+    # Earliest expiry wins: Flex Priority at 12:05:10 + 120 s = 12:07:10,
+    # before P1 (12:08:30), Heating (12:12:00), slot end (12:15) and plan TTL.
+    assert out["validUntil"] == "2026-10-06T12:07:10Z"
 
 
 def test_revision_is_stable_for_identical_semantics():
