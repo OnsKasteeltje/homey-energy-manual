@@ -567,8 +567,14 @@ INCIDENT SIGNALS, with overall state `HEALTHY`,
 active service state are explicit. Timer-driven functions must report both an
 active timer and the last triggered `.service` execution/result; an active
 timer by itself is not functional-health proof. Recent incidents are a best-effort
-24-hour journal view, not yet durable incident history. Current health may
-provide context but is not proof of health at a historical decision timestamp.
+24-hour journal view, not yet durable incident history. The collector includes
+both warnings attributed directly to `ems-*` units and systemd-manager failure
+messages that explicitly name an `ems-*.service` or `ems-*.timer`. Duplicate
+systemd failure messages for the same unit within 10 seconds are collapsed.
+A recovered recent incident therefore yields `HEALTHY_WITH_RECENT_INCIDENTS`
+when current data/functions are healthy; current degradation always remains
+`DEGRADED`. Current health may provide context but is not proof of health at a
+historical decision timestamp.
 
 Richer EV telemetry and event history exists only from V0.2 commissioning
 forward. Missing earlier evidence must remain missing; it must not be backfilled
