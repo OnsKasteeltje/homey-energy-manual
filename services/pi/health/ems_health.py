@@ -7,6 +7,7 @@ No device writes, Homey calls, planner writes or remediation actions.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from datetime import datetime, timezone
@@ -382,11 +383,60 @@ def _system_status():
     }
 
 
+EMS_UNIT_RE = re.compile(
+    r"\\b(ems-[A-Za-z0-9_.@:-]+\\.(?:service|timer))\\b"
+)
+SYSTEMD_FAILURE_DEDUPE_US = 10 * 1_000_000
+
+
+def _journal_incident_unit(item):
+    """Resolve an EMS unit from service-originated or systemd-manager journal rows."""
+    for key in (
+        "_SYSTEMD_UNIT",
+        "_SYSTEMD_USER_UNIT",
+        "UNIT",
+        "OBJECT_SYSTEMD_UNIT",
+    ):
+        unit = str(item.get(key) or "")
+        if unit.startswith("ems-"):
+            return unit
+
+    manager_row = (
+        str(item.get("SYSLOG_IDENTIFIER") or "") == "systemd"
+        or str(item.get("_COMM") or "") == "systemd"
+        or str(item.get("_PID") or "") == "1"
+    )
+    if not manager_row:
+        return ""
+
+    match = EMS_UNIT_RE.search(str(item.get("MESSAGE") or ""))
+    return match.group(1) if match else ""
+
+
+def _journal_incident_kind(item):
+    message = str(item.get("MESSAGE") or "").lower()
+    manager_row = (
+        str(item.get("SYSLOG_IDENTIFIER") or "") == "systemd"
+        or str(item.get("_COMM") or "") == "systemd"
+        or str(item.get("_PID") or "") == "1"
+    )
+    if manager_row and (
+        "failed with result" in message
+        or "failed to start" in message
+        or "entered failed state" in message
+    ):
+        return "SYSTEMD_FAILURE"
+    return "JOURNAL_WARNING"
+
+
 def _recent_incidents():
     """Best-effort last-24h warning/error evidence.
 
-    Lack of journal permission is reported explicitly. This is not a complete
-    incident history; persistent incident archiving remains a later capability.
+    Service-originated EMS warnings and systemd-manager failures that name an
+    EMS unit are included. Duplicate manager messages for the same failure are
+    collapsed within a short window. Lack of journal permission is reported
+    explicitly. This is not a complete incident history; persistent incident
+    archiving remains a later capability.
     """
     try:
         proc = subprocess.run(
@@ -412,29 +462,48 @@ def _recent_incidents():
             "error": proc.stderr.strip()[:240],
             "events": [],
         }
+
     events = []
+    last_systemd_failure_us = {}
     for line in proc.stdout.splitlines():
         try:
             item = json.loads(line)
         except json.JSONDecodeError:
             continue
-        unit = str(item.get("_SYSTEMD_UNIT") or "")
-        if not unit.startswith("ems-"):
+
+        unit = _journal_incident_unit(item)
+        if not unit:
             continue
+
         realtime = item.get("__REALTIME_TIMESTAMP")
+        realtime_us = None
         at = None
         try:
+            realtime_us = int(realtime)
             at = datetime.fromtimestamp(
-                int(realtime) / 1_000_000, tz=timezone.utc
+                realtime_us / 1_000_000, tz=timezone.utc
             ).isoformat().replace("+00:00", "Z")
         except Exception:
             pass
+
+        kind = _journal_incident_kind(item)
+        if kind == "SYSTEMD_FAILURE" and realtime_us is not None:
+            previous_us = last_systemd_failure_us.get(unit)
+            if (
+                previous_us is not None
+                and realtime_us - previous_us <= SYSTEMD_FAILURE_DEDUPE_US
+            ):
+                continue
+            last_systemd_failure_us[unit] = realtime_us
+
         events.append({
             "at": at,
             "unit": unit,
+            "kind": kind,
             "priority": item.get("PRIORITY"),
             "message": str(item.get("MESSAGE") or "")[:300],
         })
+
     partial = bool(proc.stderr.strip())
     return {
         "coverage": (
