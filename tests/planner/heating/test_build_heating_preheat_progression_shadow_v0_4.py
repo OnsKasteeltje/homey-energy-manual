@@ -58,27 +58,25 @@ def heating(*rooms, generated="2026-09-26T11:59:00Z"):
     }
 
 
-def priority(*, grant=True, ready=None, generated="2026-09-26T11:59:30Z",
-             reason="HEATING_WINDOW_CLOSES_FIRST"):
+def planner_grant(*, grant=True, ready=None, generated="2026-09-26T11:59:30Z",
+                  reason="HEATING_WINDOW_CLOSES_FIRST"):
     if ready is None:
         ready = ["woonkamer"]
     return {
-        "schema": "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1",
-        "mode": "READ_ONLY",
-        "controlMode": "SHADOW",
-        "controlWrites": False,
+        "schema": "EMS_PI_DYNAMIC_HEATING_GRANT_V0.1",
         "generatedAt": generated,
+        "validUntil": "2026-09-26T12:05:00Z",
+        "mode": "PRODUCTION_PLANNER_GRANT",
+        "controlWrites": False,
+        "physicalWriteAllowed": False,
+        "allocationAuthority": "DYNAMIC_PI_PLANNER",
+        "baselineAuthority": "HONEYWELL",
         "heating": {
             "readyRooms": ready,
-            "earliestOpportunityClosesAt": "2026-09-26T15:00:00Z",
-        },
-        "decision": {
-            "priorityOwner": "HEATING" if grant else "EV",
-            "heatingShadowGrant": "SHADOW_GRANT" if grant else "HOLD",
-            "evRole": "RESIDUAL_OPPORTUNITY" if grant else "PRIMARY_OPPORTUNITY",
+            "grant": "PRODUCTION_GRANT" if grant else "HOLD",
             "reason": reason,
-            "appliesOnlyWhenPvOpportunityExists": True,
-            "physicalWriteAllowed": False,
+            "priorityReason": reason,
+            "priorityOwner": "HEATING" if grant else "EV",
         },
     }
 
@@ -118,10 +116,10 @@ def previous(*rooms):
     }
 
 
-def build(h=None, p=None, prev=None):
+def build(h=None, g=None, prev=None):
     return m.build_progression(
         h or heating(),
-        p or priority(),
+        g or planner_grant(),
         prev,
         generated_at=NOW,
     )
@@ -144,7 +142,7 @@ def test_grant_starts_first_shadow_step_without_physical_write():
 
 
 def test_without_grant_no_step_is_started():
-    out = build(p=priority(grant=False, reason="EV_SLACK_CLOSES_BEFORE_HEATING_WINDOW"))
+    out = build(g=planner_grant(grant=False, reason="EV_SLACK_CLOSES_BEFORE_HEATING_WINDOW"))
     p = progression(out)
     assert p["state"] == "WAITING_FOR_GRANT"
     assert p["activeStepTarget_C"] is None
@@ -172,7 +170,7 @@ def test_reached_step_advances_by_at_most_half_degree():
 
 
 def test_up_opportunity_window_is_persisted_even_without_planner_grant():
-    out = build(p=priority(grant=False, reason="EV_SLACK_CLOSES_BEFORE_HEATING_WINDOW"))
+    out = build(g=planner_grant(grant=False, reason="EV_SLACK_CLOSES_BEFORE_HEATING_WINDOW"))
     r = next(r for r in out["rooms"] if r["key"] == "woonkamer")
 
     assert r["opportunityHistory"] == [{
@@ -198,7 +196,7 @@ def test_opportunity_window_survives_after_honeywell_moves_to_next_transition():
 
     second = m.build_progression(
         heating(later_room, generated="2026-09-26T12:00:30Z"),
-        priority(
+        planner_grant(
             grant=False,
             ready=[],
             generated="2026-09-26T12:00:45Z",
@@ -293,7 +291,7 @@ def test_grant_loss_holds_existing_step_and_never_advances():
     prev = previous(previous_room(target=17.5))
     out = build(
         h=heating(room(actual=17.6, next_step=18.0)),
-        p=priority(grant=False, reason="EV_DEADLINE_MUST"),
+        g=planner_grant(grant=False, reason="EV_DEADLINE_MUST"),
         prev=prev,
     )
     p = progression(out)
@@ -334,12 +332,12 @@ def test_baseline_heating_ends_preheat_progression():
 def test_stale_or_pre_dating_priority_fails_closed_for_new_step():
     out = build(
         h=heating(generated="2026-09-26T11:59:45Z"),
-        p=priority(generated="2026-09-26T11:59:30Z"),
+        g=planner_grant(generated="2026-09-26T11:59:30Z"),
     )
     p = progression(out)
     assert p["state"] == "WAITING_FOR_FRESH_PRIORITY"
     assert p["activeStepTarget_C"] is None
-    assert p["reason"] == "PRIORITY_PRE_DATES_HEATING_STATE"
+    assert p["reason"] == "PRODUCTION_GRANT_PRE_DATES_HEATING_STATE"
 
 
 def test_living_group_waits_until_both_selected_rooms_reach_active_step():
@@ -351,7 +349,7 @@ def test_living_group_waits_until_both_selected_rooms_reach_active_step():
     )
     out = build(
         h=heating(w, e),
-        p=priority(ready=["woonkamer", "eetkamer"]),
+        g=planner_grant(ready=["woonkamer", "eetkamer"]),
         prev=prev,
     )
     wp = progression(out, "woonkamer")
@@ -371,7 +369,7 @@ def test_living_group_advances_together_after_both_reach():
     )
     out = build(
         h=heating(w, e),
-        p=priority(ready=["woonkamer", "eetkamer"]),
+        g=planner_grant(ready=["woonkamer", "eetkamer"]),
         prev=prev,
     )
     assert progression(out, "woonkamer")["activeStepTarget_C"] == 18.0
@@ -384,7 +382,7 @@ def test_living_group_advances_together_after_both_reach():
 def test_unchanged_inactive_state_preserves_last_transition_event_time():
     first = build(
         h=heating(room(state="NOT_ELIGIBLE", reason="OUTSIDE_MAX_ADVANCE_WINDOW", next_step=None)),
-        p=priority(grant=False, ready=[]),
+        g=planner_grant(grant=False, ready=[]),
     )
     first_room = next(r for r in first["rooms"] if r["key"] == "woonkamer")
     assert first_room["progression"]["lastTransition"] == "RESET"
@@ -392,7 +390,7 @@ def test_unchanged_inactive_state_preserves_last_transition_event_time():
 
     second = m.build_progression(
         heating(room(state="NOT_ELIGIBLE", reason="OUTSIDE_MAX_ADVANCE_WINDOW", next_step=None)),
-        priority(grant=False, ready=[]),
+        planner_grant(grant=False, ready=[]),
         first,
         generated_at=datetime(2026, 9, 26, 12, 1, tzinfo=timezone.utc),
     )
