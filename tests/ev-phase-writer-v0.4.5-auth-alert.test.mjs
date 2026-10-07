@@ -222,10 +222,10 @@ test('v0.4.5 classifies refresh and phase retry authentication failures separate
   assert.match(src,/EASEE_REFRESH/);
   assert.match(src,/EASEE_PHASE_COMMAND_RETRY/);
   assert.match(src,/EASEE_PHASE_OBSERVATION_RETRY/);
-  assert.match(src,/operation+'_HTTP_'+r\.status/);
+  assert.ok(src.includes("operation+'_HTTP_'+r.status"));
   assert.match(src,/terminalEaseeAuthCode/);
-  assert.match(src,/EASEE_REFRESH_HTTP_\\(400\\|401\\|403\\)/);
-  assert.match(src,/EASEE_PHASE_\(COMMAND\|OBSERVATION\)_RETRY_HTTP_\(401\|403\)/);
+  assert.ok(src.includes('EASEE_REFRESH_HTTP_(400|401|403)'));
+  assert.ok(src.includes('EASEE_PHASE_(COMMAND|OBSERVATION)_RETRY_HTTP_(401|403)'));
 });
 
 test('recovered primary 401 remains silent and retry is bounded to one refresh',()=>{
