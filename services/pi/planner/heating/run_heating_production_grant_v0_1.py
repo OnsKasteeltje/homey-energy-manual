@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Publish local stateful Heating Preheat V0.4 progression SHADOW."""
+"""Build and persist the Pi-local production Heating grant V0.1 artifact.
+
+This runner is intentionally one-shot. It reads only existing local planner /
+Heating / Flex / P1 artifacts and performs no network or device call. P1 is
+retained as advisory observation only; no timer
+or Homey publisher is enabled by this file.
+"""
 
 from __future__ import annotations
 
@@ -12,9 +18,12 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[4]
 DATA = Path("/home/jeroen/ems/data")
-HEATING_V03_FILE = DATA / "heating-preheat-shadow-v0.3.json"
-PLANNER_GRANT_FILE = DATA / "heating-production-grant-v0.1.json"
-OUTPUT = DATA / "heating-preheat-progression-shadow-v0.4.json"
+
+DYNAMIC_PLAN_FILE = DATA / "dynamic-shadow-plan.json"
+HEATING_FILE = DATA / "heating-preheat-shadow-v0.3.json"
+FLEX_FILE = DATA / "flex-priority-shadow-v0.1.json"
+ENERGY_STATE_FILE = DATA / "energy-state-v2.json"
+OUTPUT = DATA / "heating-production-grant-v0.1.json"
 
 
 def load_json(path: Path):
@@ -22,17 +31,8 @@ def load_json(path: Path):
         return json.load(handle)
 
 
-def load_optional_json(path: Path):
-    if not path.exists():
-        return None
-    try:
-        return load_json(path)
-    except (OSError, json.JSONDecodeError):
-        return None
-
-
 def load_module(path: Path):
-    spec = importlib.util.spec_from_file_location("heating_preheat_progression_v04", path)
+    spec = importlib.util.spec_from_file_location("heating_production_grant_v01", path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot import {path}")
     module = importlib.util.module_from_spec(spec)
@@ -56,30 +56,24 @@ def atomic_write(path: Path, payload):
 
 
 def main() -> int:
-    module = load_module(
-        REPO / "services/pi/planner/heating/build_heating_preheat_progression_shadow_v0_4.py"
-    )
-    previous = load_optional_json(OUTPUT)
-    out = module.build_progression(
-        load_json(HEATING_V03_FILE),
-        load_json(PLANNER_GRANT_FILE),
-        previous,
+    module = load_module(REPO / "services/pi/planner/heating/build_heating_production_grant_v0_1.py")
+    out = module.build_heating_grant(
+        load_json(DYNAMIC_PLAN_FILE),
+        load_json(HEATING_FILE),
+        load_json(FLEX_FILE),
+        load_json(ENERGY_STATE_FILE),
         generated_at=datetime.now(timezone.utc),
     )
     atomic_write(OUTPUT, out)
 
-    print(f"PASS: {out['schema']} controlWrites={out['controlWrites']}")
+    print(f"PASS: {out['schema']}")
+    print("grantRevision:", out["grantRevision"])
+    print("validUntil:", out["validUntil"])
+    print("heating:", out["heating"])
+    print("forecastOpportunity:", out["forecastOpportunity"])
+    print("p1Observation:", out["p1Observation"])
+    print("executionGuard:", out["executionGuard"])
     print("physicalWriteAllowed:", out["physicalWriteAllowed"])
-    print("sourceFreshness:", out["sourceFreshness"])
-    for room in out["rooms"]:
-        p = room["progression"]
-        print(room["key"], {
-            "state": p["state"],
-            "activeStepTarget_C": p["activeStepTarget_C"],
-            "activeStepReached": p["activeStepReached"],
-            "nextStepTarget_C": p["nextStepTarget_C"],
-            "lastTransition": p["lastTransition"],
-        })
     print("output:", OUTPUT)
     return 0
 
