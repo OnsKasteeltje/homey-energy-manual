@@ -109,15 +109,14 @@ without changing enabled state or issuing a Homey/device command.
 
 ## Continuation checkpoint — 2026-10-04
 
-Stable handoff marker: `NEXT_HEATING_STEP_PRODUCTION_DYNAMIC_PI_PLANNER_GRANT`.
+Stable handoff marker: `NEXT_HEATING_STEP_SHADOW_OBSERVATION_BEFORE_EXECUTION_EDGE`.
 
 Do **not** restart Heating work by rebuilding the Pi -> Homey SHADOW transport.
 That proof is complete. The installed Intent -> Adapter -> Gate objects, pinned
 room IDs, no-write guards and one-shot `--resume` path are retained as
 commissioning evidence. The recurring publisher is deliberately parked.
 
-The next implementation step is the production Dynamic Pi Planner Heating grant.
-Start there and preserve these already-proven boundaries:
+The production Dynamic Pi Planner Heating grant now feeds V0.4 in SHADOW. The next step is to observe that chain in normal operation before any execution-edge or Honeywell-writer work. Preserve these already-proven boundaries:
 
 - P1/current grid exchange remains the realtime authority for actual Heating
   permission; forecast opportunity alone is never a realtime grant.

@@ -2,6 +2,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 INSTALLER = ROOT / "deploy/install/install_heating_preheat_progression_shadow_v0_4.sh"
+SERVICE = ROOT / "deploy/systemd/ems-heating-preheat-progression-shadow.service"
 
 
 def test_v04_installer_validates_step_history_contract():
@@ -23,3 +24,18 @@ def test_v04_installer_keeps_shadow_write_guards():
     assert 'd.get("physicalWriteAllowed") is False' in source
     assert 'progression.get("physicalWritePerformed") is False' in source
     assert 'rollbackBehavior")=="NOT_DEFINED_SHADOW_ONLY"' in source
+
+
+def test_v04_service_builds_production_grant_before_progression():
+    source = SERVICE.read_text()
+
+    lines = source.splitlines()
+    pre = [line for line in lines if line.startswith("ExecStartPre=")]
+    start = [line for line in lines if line.startswith("ExecStart=")]
+
+    assert len(pre) == 1
+    assert len(start) == 1
+    assert "run_heating_production_grant_v0_1.py" in pre[0]
+    assert "run_heating_preheat_progression_shadow_v0_4.py" in start[0]
+    assert "\\nExecStart=" not in source
+    assert "Homey" not in source
