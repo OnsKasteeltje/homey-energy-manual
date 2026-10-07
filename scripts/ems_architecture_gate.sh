@@ -232,6 +232,13 @@ grep -q 'publisher/publish_dynamic_planner_shadow.py' "$PI_DEPLOY" || fail "Pi d
 grep -q 'RETIRE LEGACY PLANNER GITHUB RUNTIME FILES' "$PI_DEPLOY" || fail "Pi deploy must remove retired planner publisher runtime files after backup"
 pass "Pi deploy explicitly retires legacy planner publisher runtime files before drift validation"
 
+[[ ! -e src/pi/ems-runtime/publisher/publish_pv_capture_validation.py ]] || fail "legacy PV capture GitHub publisher source must remain retired"
+if grep -q 'runtime/publisher/publish_pv_capture_validation.py' deploy/systemd/ems-pv-capture-validation.service; then
+  fail "PV capture validation service must remain Pi-local and must not publish to GitHub"
+fi
+grep -q 'publisher/publish_pv_capture_validation.py' "$PI_DEPLOY" || fail "Pi deploy must retire legacy PV capture publisher runtime file"
+pass "PV capture validation remains Pi-local and GitHub publication is retired"
+
 grep -q 'EMS_PI_FLEX_CONTEXT_SNAPSHOT_V0.1' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history schema missing"
 grep -q 'planner-history.sqlite' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history must use planner-history SQLite"
 if grep -Eq 'Homey\.|urllib|requests|urlopen|http://' "$FLEX_CONTEXT_ARCHIVE"; then fail "flex context archive must remain Pi-local with no Homey/network calls"; fi
