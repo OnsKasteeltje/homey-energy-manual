@@ -217,9 +217,31 @@ def mobile_overview_resource():
     seasonal = _optional_mobile_resource(seasonal_advice_resource)
     flex = _optional_mobile_resource(flex_priority_shadow_resource)
 
+    state_generated = parse_timestamp(meta.get("generated_at"))
     flex_data = flex.get("data") if isinstance(flex.get("data"), dict) else {}
+    flex_generated = parse_timestamp(flex_data.get("generatedAt")) if flex_data else None
+    flex_age_sec = None
+    if state_generated is not None and flex_generated is not None:
+        flex_age_sec = max(0, int(round((state_generated - flex_generated).total_seconds())))
+
+    flex_ev = flex_data.get("ev") if isinstance(flex_data.get("ev"), dict) else {}
     heating = flex_data.get("heating") if isinstance(flex_data.get("heating"), dict) else {}
     flex_decision = flex_data.get("decision") if isinstance(flex_data.get("decision"), dict) else {}
+
+    deadline_active = tesla.get("deadline_active") is True
+    flex_status = flex.get("status")
+    flex_consistent = None
+    if flex_status == "OK":
+        flex_consistent = flex_ev.get("deadlineActive") is deadline_active
+        if flex_age_sec is None or flex_age_sec > 4500:
+            flex_status = "STALE"
+        elif not flex_consistent:
+            flex_status = "INCONSISTENT"
+
+    expose_flex_decision = flex_status == "OK"
+    hot_water_mode = hot_water.get("mode")
+    if hot_water_mode not in ALLOWED_MODES:
+        hot_water_mode = None
 
     return {
         "schema": MOBILE_OVERVIEW_API_SCHEMA,
@@ -240,13 +262,13 @@ def mobile_overview_resource():
             "charging": tesla.get("charging"),
             "powerW": tesla.get("power_w"),
             "requestedA": tesla.get("requested_a"),
-            "deadlineAt": tesla.get("deadline_at"),
-            "deadlineActive": tesla.get("deadline_active"),
+            "deadlineAt": tesla.get("deadline_at") if deadline_active else None,
+            "deadlineActive": deadline_active,
             "need": tesla.get("need"),
-            "remainingKWh": tesla.get("remaining_kwh"),
+            "remainingKWh": tesla.get("remaining_kwh") if deadline_active else None,
         },
         "hotWater": {
-            "mode": hot_water.get("mode"),
+            "mode": hot_water_mode,
             "boilerOn": hot_water.get("boiler_on"),
             "boilerPowerW": hot_water.get("boiler_power_w"),
             "action": (
@@ -256,15 +278,24 @@ def mobile_overview_resource():
             "seasonalAdvice": seasonal,
         },
         "heating": {
-            "readyRooms": heating.get("readyRooms") if isinstance(heating.get("readyRooms"), list) else [],
-            "earliestOpportunityClosesAt": heating.get("earliestOpportunityClosesAt"),
-            "shadowGrant": flex_decision.get("heatingShadowGrant"),
+            "readyRooms": (
+                heating.get("readyRooms")
+                if expose_flex_decision and isinstance(heating.get("readyRooms"), list)
+                else []
+            ),
+            "earliestOpportunityClosesAt": (
+                heating.get("earliestOpportunityClosesAt") if expose_flex_decision else None
+            ),
+            "shadowGrant": flex_decision.get("heatingShadowGrant") if expose_flex_decision else None,
         },
         "flex": {
-            "status": flex.get("status"),
-            "priorityOwner": flex_decision.get("priorityOwner"),
-            "evRole": flex_decision.get("evRole"),
-            "reason": flex_decision.get("reason"),
+            "status": flex_status,
+            "sourceGeneratedAt": flex_data.get("generatedAt") if flex_data else None,
+            "ageSec": flex_age_sec,
+            "consistentWithLiveEvDeadline": flex_consistent,
+            "priorityOwner": flex_decision.get("priorityOwner") if expose_flex_decision else None,
+            "evRole": flex_decision.get("evRole") if expose_flex_decision else None,
+            "reason": flex_decision.get("reason") if expose_flex_decision else None,
         },
         "manager": {
             "decision": manager.get("decision"),
