@@ -204,6 +204,13 @@ grep -q 'services/pi/history' scripts/deploy_ems_pi.sh || fail "target-structure
 grep -q 'TARGET-STRUCTURE HISTORY FILES' scripts/ems_pi_drift_check.sh || fail "target-structure Pi history source is not drift-checked"
 pass "planner decision history uses atomic planner-owned context"
 
+grep -q '/home/jeroen/ems/runtime/planner/quarter-hour-plan/build_website_shadow.py' "$FORECAST_CHAIN" || fail "forecast chain must retain Pi-local planner website projection"
+grep -q '/home/jeroen/ems/runtime/planner/dynamic-plan/build_dynamic_website_shadow.py' "$FORECAST_CHAIN" || fail "forecast chain must retain Pi-local dynamic planner website projection"
+if grep -Eq 'runtime/publisher/publish_(dynamic_)?planner_shadow\.py' "$FORECAST_CHAIN"; then
+  fail "forecast chain must not publish planner runtime snapshots to GitHub"
+fi
+pass "forecast chain terminates in Pi-local planner projections with no GitHub runtime publication dependency"
+
 grep -q 'EMS_PI_FLEX_CONTEXT_SNAPSHOT_V0.1' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history schema missing"
 grep -q 'planner-history.sqlite' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history must use planner-history SQLite"
 if grep -Eq 'Homey\.|urllib|requests|urlopen|http://' "$FLEX_CONTEXT_ARCHIVE"; then fail "flex context archive must remain Pi-local with no Homey/network calls"; fi

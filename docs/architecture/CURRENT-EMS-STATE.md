@@ -26,6 +26,8 @@ Canonical diagnostic source-of-truth and mandatory root-cause documentation rule
 - Homey Logic variable `EM2_Planner_Authority` is the sole runtime selector between Homey and Pi planner authority.
 - Electrical warm-water flex in every Pi planner, including the active Dynamic Pi Planner, is gated by canonical `energy-state-v2.json -> hot_water.mode`: `true` = BOILER and eligible; `false` = CV and ineligible; missing/ambiguous = UNKNOWN and fail closed. CV/UNKNOWN must produce `wwPlanW = 0` and must not reduce residual PV available to other flexloads.
 - GitHub is **not** a runtime transport dependency for live Homey ↔ Pi state or control.
+- Forecast/planner generation is Pi-local end to end. `ems-forecast-chain.service` may build local planner/history/presentation artifacts, but it must not invoke GitHub planner-runtime publishers. The former `publish_planner_shadow.py` and `publish_dynamic_planner_shadow.py` steps are retired from the production forecast chain; GitHub remains source authority, not a rolling planner-state store.
+- The Homey Advanced Flow `EM v2 | 46 Publish | Planner Shadow v0.4 event-driven LOW-LOAD` is disabled as of 2026-10-07. Its cards/source are retained temporarily only as rollback evidence during phase 1; it is not an active runtime writer to GitHub.
 
 Operational energy history follows the canonical Homey → Pi state direction. Accepted Core state pushes are archived locally on the Pi; automatic Pi polling of Homey Insights is not a production history transport.
 
