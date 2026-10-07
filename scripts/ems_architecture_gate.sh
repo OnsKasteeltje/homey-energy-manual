@@ -226,6 +226,12 @@ pass "legacy planner GitHub publication source and rolling snapshot artifacts ar
 [[ ! -e docs/data/energy-day-v2.json ]] || fail "legacy Homey Day Series GitHub runtime artifact must remain retired: docs/data/energy-day-v2.json"
 pass "legacy Homey Day Series GitHub runtime publication artifact is absent"
 
+grep -q 'RETIRED_RUNTIME_FILES=' "$PI_DEPLOY" || fail "Pi deploy must declare retired planner publisher runtime files"
+grep -q 'publisher/publish_planner_shadow.py' "$PI_DEPLOY" || fail "Pi deploy must retire legacy planner publisher runtime file"
+grep -q 'publisher/publish_dynamic_planner_shadow.py' "$PI_DEPLOY" || fail "Pi deploy must retire legacy dynamic planner publisher runtime file"
+grep -q 'RETIRE LEGACY PLANNER GITHUB RUNTIME FILES' "$PI_DEPLOY" || fail "Pi deploy must remove retired planner publisher runtime files after backup"
+pass "Pi deploy explicitly retires legacy planner publisher runtime files before drift validation"
+
 grep -q 'EMS_PI_FLEX_CONTEXT_SNAPSHOT_V0.1' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history schema missing"
 grep -q 'planner-history.sqlite' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history must use planner-history SQLite"
 if grep -Eq 'Homey\.|urllib|requests|urlopen|http://' "$FLEX_CONTEXT_ARCHIVE"; then fail "flex context archive must remain Pi-local with no Homey/network calls"; fi
