@@ -239,6 +239,29 @@ fi
 grep -q 'publisher/publish_pv_capture_validation.py' "$PI_DEPLOY" || fail "Pi deploy must retire legacy PV capture publisher runtime file"
 pass "PV capture validation remains Pi-local and GitHub publication is retired"
 
+for retired_energy_state_publisher_artifact in \
+  src/homey/publication/publisher-v1.0.13.live-homey.js \
+  src/homey/publisher/publisher-v1.0.13-control-evidence.js \
+  src/homey/publisher/publisher-v1.0.9-hard-gate-low-load.js \
+  src/homey/publisher/publisher-v1.0.7-managed-writer.js \
+  src/homey/publisher/publisher-v1.0.4-homey-baseline.md \
+  src/homey/publisher/publisher-control-evidence-v1.0.13-prep.md \
+  src/homey/publisher/control-evidence-contract-v0.1.mjs \
+  src/homey/publisher/smoke-publisher-v1.0.9-2026-08-29.md \
+  tests/integrations/test_github_energy_state_publication.py \
+  docs/data/publisher-diagnostic.json \
+  docs/software-architecture/components/publisher-public-state.md \
+  docs/software-architecture/flows/publisher-public-state-flow.md
+do
+  [[ ! -e "$retired_energy_state_publisher_artifact" ]] || fail "retired energy-state GitHub publisher artifact must remain absent: $retired_energy_state_publisher_artifact"
+done
+pass "retired energy-state GitHub publisher source, stale test, diagnostic snapshot and active-architecture docs are absent"
+
+if grep -Eq 'components/publisher-public-state\.md|flows/publisher-public-state-flow\.md' docs/software-architecture/manifest.yaml; then
+  fail "software architecture manifest must not include retired energy-state publisher"
+fi
+pass "software architecture manifest excludes retired energy-state publisher"
+
 grep -q 'EMS_PI_FLEX_CONTEXT_SNAPSHOT_V0.1' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history schema missing"
 grep -q 'planner-history.sqlite' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history must use planner-history SQLite"
 if grep -Eq 'Homey\.|urllib|requests|urlopen|http://' "$FLEX_CONTEXT_ARCHIVE"; then fail "flex context archive must remain Pi-local with no Homey/network calls"; fi

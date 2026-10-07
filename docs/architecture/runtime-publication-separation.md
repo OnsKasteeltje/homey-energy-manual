@@ -1,6 +1,6 @@
 # Runtime publication separation
 
-**Status:** Canonical target architecture / migration plan  
+**Status:** Implemented canonical architecture; historical migration evidence retained  
 **Date:** 18 September 2026  
 **Scope:** GitHub runtime publishers, website observability data and separation of canonical source from operational data  
 **Governance:** `ems-architecture-governance.md`, `ems-software-architecture-live.md`, `architectuur-guardrails.md`
@@ -170,7 +170,7 @@ Additional acceptance criteria:
 **ENERGY-STATE GITHUB PUBLISHER: DISABLED / RETIRED FROM PRODUCTION**
 **EV CONTROL-STATUS GITHUB PUBLISHER: DISABLED / RETIRED FROM PRODUCTION**
 
-**LEGACY REPOSITORY CLEANUP: PENDING**
+**LEGACY REPOSITORY CLEANUP: IN PROGRESS — ENERGY-STATE PUBLISHER ARTIFACTS RETIRED**
 
 On 19 September 2026 the Homey flow `EM v2 | 81 Observability | EV Control Status v0.4 CONTROL-REVISION` was disabled. Repository-wide consumer inventory found no runtime or frontend consumer of `docs/data/ev-control-status.json`; remaining references are documentation or historical evidence. Post-disable validation confirmed the Pi control endpoint remained `READY`, with Pi as planner owner, Homey as executor, fixed contract `ENGIE_3Y_2026_2029`, deadline control active and all control safety gates intact. The JSON artifact is retained temporarily as a frozen rollback/evidence snapshot and is no longer an allowed production dependency.
 
@@ -180,7 +180,7 @@ Runtime validation confirmed fresh canonical Pi state through both the localhost
 
 The MkDocs/GitHub Pages Live view is retired from production. Planner, History and Groups/Phases remain temporary legacy functions until equivalent production-frontend resources are migrated.
 
-`docs/data/energy-state-v2.json` and its publisher implementation are retained temporarily as rollback/repository-cleanup artifacts. They are no longer an allowed production Live dependency.
+`docs/data/energy-state-v2.json` and the former energy-state GitHub publisher implementation have been removed from canonical source. Git history remains the rollback/evidence record; reintroducing this runtime publication path is forbidden.
 
 ## 11. Completed prerequisite — planner state-source separation
 
@@ -217,18 +217,14 @@ The resulting boundary is:
             +--> quarter-hour shadow-load planner
             +--> other Pi runtime consumers
             |
-            +--> transitional website publisher
+            +--> private read-only Web Data API
                        |
                        v
-              GitHub docs/data/energy-state-v2.json
-                       |
-                       v
-                  legacy website
+                private Frontend V2
 
 Therefore `docs/data/energy-state-v2.json` is no longer an input to these
-planner components. Its remaining publication must not be retired until the
-website consumer has been migrated and the retirement conditions in section 7
-have passed.
+planner components and the former publication path has been retired. GitHub is
+not an allowed runtime-state transport for this data.
 
 **PREREQUISITE STATE-SOURCE SEPARATION: PASS**
 ## 12. Mandatory Web Data API security baseline
