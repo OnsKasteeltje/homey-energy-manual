@@ -42,6 +42,10 @@ RETIRED_FORECAST_UNITS=(
     "${RETIRED_FORECAST_TIMERS[@]}"
     "${RETIRED_FORECAST_SERVICES[@]}"
 )
+RETIRED_RUNTIME_FILES=(
+    "publisher/publish_planner_shadow.py"
+    "publisher/publish_dynamic_planner_shadow.py"
+)
 
 if [[ "$(id -u)" -ne 0 ]]; then
     echo "ERROR: run with sudo"
@@ -90,6 +94,18 @@ done
 # explicitly in this deployment backup before removing them from the host.
 for unit in "${RETIRED_FORECAST_UNITS[@]}"; do
     cp -a "/etc/systemd/system/$unit" "$BACKUP/" 2>/dev/null || true
+done
+
+echo
+echo "=== RETIRE LEGACY PLANNER GITHUB RUNTIME FILES ==="
+for rel in "${RETIRED_RUNTIME_FILES[@]}"; do
+    runtime_file="$RUNTIME/$rel"
+    if [[ -e "$runtime_file" ]]; then
+        rm -f "$runtime_file"
+        echo "REMOVED: $runtime_file"
+    else
+        echo "PASS: retired runtime file absent: $runtime_file"
+    fi
 done
 
 echo
