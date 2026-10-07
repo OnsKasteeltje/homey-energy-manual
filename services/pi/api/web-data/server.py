@@ -49,6 +49,7 @@ HEATING_TEMPERATURE_HISTORY_API_SCHEMA = "EMS_WEB_HEATING_TEMPERATURE_HISTORY_V1
 HEATING_PREHEAT_SHADOW_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_SHADOW_V1"
 HEATING_PREHEAT_PROGRESSION_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1"
 FLEX_PRIORITY_SHADOW_API_SCHEMA = "EMS_WEB_FLEX_PRIORITY_SHADOW_V1"
+MOBILE_OVERVIEW_API_SCHEMA = "EMS_MOBILE_OVERVIEW_V1"
 HONEYWELL_SCHEDULE_FILE = os.environ.get("EMS_HONEYWELL_SCHEDULE_FILE", "/home/jeroen/ems/runtime/tools/honeywell/output/honeywell-schedule.json")
 HEATING_PREHEAT_SHADOW_FILE = os.environ.get(
     "EMS_HEATING_PREHEAT_SHADOW_FILE",
@@ -177,6 +178,104 @@ def state_current_resource():
         "action": control.get("action") if isinstance(control, dict) else None
     }
     return result
+
+
+
+def _optional_mobile_resource(builder):
+    """Read an optional presentation resource without making Mobile V1 brittle."""
+    try:
+        return {"status": "OK", "data": builder()}
+    except (OSError, json.JSONDecodeError, ValueError, sqlite3.Error):
+        return {"status": "UNAVAILABLE", "data": None}
+
+
+def mobile_overview_resource():
+    """Aggregate existing read-only projections for a native mobile client.
+
+    Mobile V1 adds no EMS policy and no write capability. The canonical live
+    energy state is mandatory; secondary presentation resources degrade to an
+    explicit UNAVAILABLE status.
+    """
+    state = state_current_resource()
+    meta = state.get("meta") if isinstance(state.get("meta"), dict) else {}
+    grid = state.get("grid") if isinstance(state.get("grid"), dict) else {}
+    pv = state.get("pv") if isinstance(state.get("pv"), dict) else {}
+    budget = state.get("energy_budget") if isinstance(state.get("energy_budget"), dict) else {}
+    tesla = state.get("tesla") if isinstance(state.get("tesla"), dict) else {}
+    hot_water = state.get("hot_water") if isinstance(state.get("hot_water"), dict) else {}
+    manager = state.get("manager") if isinstance(state.get("manager"), dict) else {}
+    balance = state.get("balance") if isinstance(state.get("balance"), dict) else {}
+    gate = balance.get("control_gate") if isinstance(balance.get("control_gate"), dict) else {}
+
+    grid_w = grid.get("power_w")
+    grid_import_w = None
+    grid_export_w = None
+    if isinstance(grid_w, (int, float)) and not isinstance(grid_w, bool):
+        grid_import_w = max(0, float(grid_w))
+        grid_export_w = max(0, -float(grid_w))
+
+    seasonal = _optional_mobile_resource(seasonal_advice_resource)
+    flex = _optional_mobile_resource(flex_priority_shadow_resource)
+
+    flex_data = flex.get("data") if isinstance(flex.get("data"), dict) else {}
+    heating = flex_data.get("heating") if isinstance(flex_data.get("heating"), dict) else {}
+    flex_decision = flex_data.get("decision") if isinstance(flex_data.get("decision"), dict) else {}
+
+    return {
+        "schema": MOBILE_OVERVIEW_API_SCHEMA,
+        "generatedAt": meta.get("generated_at"),
+        "readOnly": True,
+        "presentationOnly": True,
+        "energy": {
+            "gridPowerW": grid_w,
+            "gridImportW": grid_import_w,
+            "gridExportW": grid_export_w,
+            "pvPowerW": pv.get("total_w"),
+            "otherHouseLoadW": budget.get("other_house_load_w"),
+            "stateAgeSec": meta.get("state_age_sec"),
+            "gridMeasurementValid": gate.get("grid_measurement_valid"),
+        },
+        "ev": {
+            "connected": tesla.get("connected"),
+            "charging": tesla.get("charging"),
+            "powerW": tesla.get("power_w"),
+            "requestedA": tesla.get("requested_a"),
+            "deadlineAt": tesla.get("deadline_at"),
+            "deadlineActive": tesla.get("deadline_active"),
+            "need": tesla.get("need"),
+            "remainingKWh": tesla.get("remaining_kwh"),
+        },
+        "hotWater": {
+            "mode": hot_water.get("mode"),
+            "boilerOn": hot_water.get("boiler_on"),
+            "boilerPowerW": hot_water.get("boiler_power_w"),
+            "action": (
+                hot_water.get("control", {}).get("action")
+                if isinstance(hot_water.get("control"), dict) else None
+            ),
+            "seasonalAdvice": seasonal,
+        },
+        "heating": {
+            "readyRooms": heating.get("readyRooms") if isinstance(heating.get("readyRooms"), list) else [],
+            "earliestOpportunityClosesAt": heating.get("earliestOpportunityClosesAt"),
+            "shadowGrant": flex_decision.get("heatingShadowGrant"),
+        },
+        "flex": {
+            "status": flex.get("status"),
+            "priorityOwner": flex_decision.get("priorityOwner"),
+            "evRole": flex_decision.get("evRole"),
+            "reason": flex_decision.get("reason"),
+        },
+        "manager": {
+            "decision": manager.get("decision"),
+            "reason": manager.get("reason"),
+            "priority": manager.get("priority"),
+        },
+        "capabilities": {
+            "controlWrites": False,
+            "physicalWrites": False,
+        },
+    }
 
 
 def commands_current_resource():
@@ -1424,6 +1523,17 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 200, pv_forecast_resource())
             except (OSError, json.JSONDecodeError, ValueError):
                 send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
+            return
+
+        if path.path == "/api/mobile/v1/overview":
+            try:
+                send_json(self, 200, mobile_overview_resource())
+            except (OSError, json.JSONDecodeError, ValueError, sqlite3.Error):
+                send_json(self, 503, {
+                    "schema": "EMS_WEB_ERROR_V1",
+                    "status": "UNAVAILABLE",
+                    "reason": "RESOURCE_UNAVAILABLE",
+                })
             return
 
         if path.path == "/web/state/current":
