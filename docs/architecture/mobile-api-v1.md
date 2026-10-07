@@ -56,16 +56,25 @@ If a secondary resource is unavailable, the mobile endpoint remains available an
 marks that section `UNAVAILABLE`. Failure of the canonical live energy state fails
 the endpoint closed with HTTP 503.
 
+Flex Priority SHADOW is presentation evidence, not live authority. Mobile V1 compares
+its EV deadline-active state with the canonical Live V2 EV state and exposes its
+decision only when they agree. A Flex source older than 75 minutes is marked `STALE`;
+a semantic mismatch is marked `INCONSISTENT`. In both cases current Flex/Heating
+decision fields are suppressed rather than shown as current facts.
+
 ## Initial response surface
 
 Mobile V1 contains only fields required for a first native dashboard:
 
 - grid power plus explicit import/export projection;
 - PV power, other-house load and state freshness;
-- EV connected/charging/power/current/deadline state;
-- hot-water mode, boiler state/action and seasonal advice availability;
+- EV connected/charging/power/current/deadline state; inactive deadlines do not expose
+  old deadline timestamps or remaining-kWh values;
+- hot-water mode, boiler state/action and seasonal advice availability; hot-water mode
+  is limited to `CV` or `BOILER` and otherwise returned as null;
 - Heating ready rooms and current SHADOW grant;
-- Flex priority owner, EV role and reason;
+- Flex source timestamp, age, Live-V2 deadline consistency and, only while current
+  and consistent, priority owner / EV role / reason;
 - current EMS manager decision.
 
 No command endpoint is part of Mobile V1.
