@@ -451,7 +451,7 @@ grep -q 'NEXT_HEATING_STEP_SHADOW_OBSERVATION_BEFORE_EXECUTION_EDGE' "$HEATING_H
 grep -q 'Do \*\*not\*\* restart Heating work by rebuilding the Pi -> Homey SHADOW transport' "$HEATING_HOMEY_COMMISSION_DOC" || fail "Heating continuation checkpoint must prevent SHADOW transport rebuild"
 grep -q 'NEXT_HEATING_STEP_SHADOW_OBSERVATION_BEFORE_EXECUTION_EDGE' "$DOC" || fail "Canonical current state missing Heating continuation marker"
 grep -q 'next step is observation of the production-grant-fed SHADOW chain' "$DOC" || fail "Canonical current state must require shadow observation before execution edge"
-grep -q 'literal `\\n` between `ExecStartPre=` and `ExecStart=`' "$DOC" || fail "Canonical current state must record V0.4 malformed-systemd incident"
+grep -q 'A deployment incident on 2026-10-06 is now part of the canonical regression boundary' "$DOC" || fail "Canonical current state must record V0.4 malformed-systemd incident"
 pass "Heating V0.5 -> Homey Adapter/Gate SHADOW proof remains parked, explicit and physical-write-free"
 pass "Heating continuation checkpoint pins SHADOW observation before execution edge"
 
