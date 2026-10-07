@@ -526,16 +526,20 @@ outside planner/Gate/actuator authority.
 
 ## EV energy accounting semantics
 
-EV energy evidence now distinguishes measured authority from analysis
-derivations. `metrics.tesla_kwh` in the day-performance report is explicitly a
+EV energy evidence distinguishes measured authority from analysis
+derivations. `metrics.tesla_kwh` in the day-performance report remains a
 `DERIVED_POWER_INTEGRAL` of sampled Tesla power. Combined-flex PV/grid capture
-metrics are explicitly `DERIVED_ALLOCATION`. Exact charged EV energy is
-reserved for a delta of the Easee cumulative `meter_power` meter; that source
-is not yet durably archived in the day-performance report, so the report marks
-the authoritative value unavailable instead of silently substituting the power
-integral. AI V0.4 is instructed to keep derived PV/grid coverage under
-Afleiding and never present it as directly measured EV energy. Constrained
-Replay V0.1.1 is unchanged.
+metrics remain `DERIVED_ALLOCATION`. The canonical Homey → Pi state archive now
+persists Tesla/Easee `meter_kwh` as cumulative `energy_delivered_kwh` in
+`ems-history.sqlite`. `ems-performance` exposes its bounded day-boundary delta
+as `evEnergyAccounting.authoritativeChargedEnergy` only when cumulative-meter
+coverage is complete enough for that interval; otherwise the authoritative
+charged-kWh value remains unavailable rather than falling back to the sampled
+power integral. EV PV/grid coverage is exposed separately as
+`derivedSourceAllocation` and remains an **Afleiding**, never a directly
+metered source-energy fact. This changes evidence/accounting semantics only:
+EV planning, Gate, actuator, Homey control and Constrained Replay V0.1.1 are
+unchanged.
 
 ## Read-only AI analysis layer — V0.4
 
