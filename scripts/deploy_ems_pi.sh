@@ -45,6 +45,7 @@ RETIRED_FORECAST_UNITS=(
 RETIRED_RUNTIME_FILES=(
     "publisher/publish_planner_shadow.py"
     "publisher/publish_dynamic_planner_shadow.py"
+    "publisher/publish_pv_capture_validation.py"
 )
 
 if [[ "$(id -u)" -ne 0 ]]; then
