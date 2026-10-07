@@ -1,10 +1,10 @@
 # Pi Planner — current shadow policy
 
-> **Current-state scope:** this document describes the Raspberry Pi 24h shadow planner that is published separately from the Homey planner. It is observability/planning only and performs no physical device writes.
+> **Current-state scope:** this document describes the Raspberry Pi 24h shadow planner. Planner runtime state remains Pi-local; it is not published to GitHub. The planner is observability/planning only and performs no physical device writes.
 
 ## 1. Role
 
-The Pi planner builds a 96 × 15-minute horizon from PV forecast, Quatt forecast, base-load forecast, warm-water plan and price context. The combined plan is written to `/home/jeroen/ems/data/shadow-load-plan.json` and translated for the website to `/home/jeroen/ems/data/energy-planner-shadow-pi.json`.
+The Pi planner builds a 96 × 15-minute horizon from PV forecast, Quatt forecast, base-load forecast, warm-water plan and price context. The combined plan is written to `/home/jeroen/ems/data/shadow-load-plan.json`; local presentation projections such as `/home/jeroen/ems/data/energy-planner-shadow-pi.json` remain on the Pi. They are not rolling GitHub publication artifacts.
 
 Current implementation:
 
@@ -101,20 +101,11 @@ On 2026-09-07 the warm-water forecast for 2026-09-08 showed 0.47 kWh of forecast
 
 The Homey planner may temporarily show different warm-water or Tesla windows because Homey and Pi do not yet use identical future-planning semantics. This difference is expected while Pi functionality is being validated in shadow mode.
 
-## 6. Website forecast presentation — 2026-09-07
+## 6. Private Planner V2 presentation — 2026-10-07
 
-The Planner page adds a frontend-only interactive presentation layer through `docs/javascripts/planner-forecast-interactive-v1.0.0.js`. The planner JSON, allocation logic and physical-control behaviour are not changed.
+The production Planner UI is served from the private Pi-hosted Frontend V2 boundary. It reads same-origin, read-only Web Data API resources such as `GET /web/planner/pv-forecast` and `GET /web/planner/ev-requirement`.
 
-Presentation rules:
-
-- every Homey/Pi planner renders its **own** 96-slot / 24-hour axis, derived from that planner's first forecast slot; the UI no longer stretches both forecasts onto one shared min/max axis when their generation times differ;
-- base load is rendered as a continuous grey line with a subtle filled area so low overnight loads remain visible next to multi-kW PV peaks;
-- PV remains yellow, expected import is blue and expected export is green below the zero line;
-- one genuine power scale is used for the whole chart; 0.5 kW and 1.0 kW reference lines are visual aids only and do not alter values;
-- desktop pointer hover shows a vertical selection marker and exact quarter-hour values; touch devices use tap to pin/unpin the same detail card;
-- the detail card reports local timestamp, base load, PV, import, export and net import/export from the published planner fields. Visual minimum sizes never replace the numeric source values.
-
-The existing `Geplande tijdsvakken` section remains unchanged.
+Local website-shadow builders remain part of the forecast chain because they provide Pi-local observability/compatibility projections. The production forecast chain stops after those local projections. It does **not** call `publish_planner_shadow.py` or `publish_dynamic_planner_shadow.py`, and GitHub Pages is not planner runtime transport.
 
 ## 7. Open items
 
