@@ -223,6 +223,9 @@ do
 done
 pass "legacy planner GitHub publication source and rolling snapshot artifacts are absent"
 
+[[ ! -e docs/data/energy-day-v2.json ]] || fail "legacy Homey Day Series GitHub runtime artifact must remain retired: docs/data/energy-day-v2.json"
+pass "legacy Homey Day Series GitHub runtime publication artifact is absent"
+
 grep -q 'EMS_PI_FLEX_CONTEXT_SNAPSHOT_V0.1' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history schema missing"
 grep -q 'planner-history.sqlite' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history must use planner-history SQLite"
 if grep -Eq 'Homey\.|urllib|requests|urlopen|http://' "$FLEX_CONTEXT_ARCHIVE"; then fail "flex context archive must remain Pi-local with no Homey/network calls"; fi
