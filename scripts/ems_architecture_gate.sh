@@ -211,6 +211,18 @@ if grep -Eq 'runtime/publisher/publish_(dynamic_)?planner_shadow\.py' "$FORECAST
 fi
 pass "forecast chain terminates in Pi-local planner projections with no GitHub runtime publication dependency"
 
+for legacy_planner_github_artifact in \
+  src/pi/ems-runtime/publisher/publish_planner_shadow.py \
+  src/pi/ems-runtime/publisher/publish_dynamic_planner_shadow.py \
+  src/homey/publisher/planner-shadow-publisher-v0.4.js \
+  docs/data/energy-planner-shadow.json \
+  docs/data/energy-planner-shadow-pi.json \
+  docs/data/energy-planner-shadow-dynamic.json
+do
+  [[ ! -e "$legacy_planner_github_artifact" ]] || fail "legacy planner GitHub publication artifact must remain retired: $legacy_planner_github_artifact"
+done
+pass "legacy planner GitHub publication source and rolling snapshot artifacts are absent"
+
 grep -q 'EMS_PI_FLEX_CONTEXT_SNAPSHOT_V0.1' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history schema missing"
 grep -q 'planner-history.sqlite' "$FLEX_CONTEXT_ARCHIVE" || fail "flex context history must use planner-history SQLite"
 if grep -Eq 'Homey\.|urllib|requests|urlopen|http://' "$FLEX_CONTEXT_ARCHIVE"; then fail "flex context archive must remain Pi-local with no Homey/network calls"; fi
