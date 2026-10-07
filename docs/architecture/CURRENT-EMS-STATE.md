@@ -4,8 +4,8 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-10-06
-**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening  
+**Status date:** 2026-10-07
+**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-07 Mobile API V1 read-only commissioning/freshness hardening  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
 
@@ -28,6 +28,18 @@ Canonical diagnostic source-of-truth and mandatory root-cause documentation rule
 - GitHub is **not** a runtime transport dependency for live Homey ↔ Pi state or control.
 
 Operational energy history follows the canonical Homey → Pi state direction. Accepted Core state pushes are archived locally on the Pi; automatic Pi polling of Homey Insights is not a production history transport.
+
+
+### 1.1 Mobile API V1 — native presentation boundary
+
+The native-mobile presentation boundary is served by the existing Pi Web Data API at `GET /api/mobile/v1/overview`, schema `EMS_MOBILE_OVERVIEW_V1`. It is a read-only aggregation layer only: `readOnly=true`, `presentationOnly=true`, `controlWrites=false` and `physicalWrites=false` are part of the contract. It makes no planner decision, creates no Homey/device write path and does not reintroduce GitHub as a runtime transport dependency.
+
+The canonical Live V2 Pi energy-state projection is mandatory for Mobile V1. Secondary presentation evidence such as WW seasonal advice and Flex Priority SHADOW is best-effort and must never be promoted to live authority merely because it can be read. Failure of the canonical live energy state fails the endpoint closed; failure of a secondary resource degrades only that section.
+
+Mobile V1 applies explicit presentation freshness/consistency semantics to Flex Priority SHADOW. Its `generatedAt` is compared with the canonical Live V2 state time, and the Flex EV `deadlineActive` flag is compared with the canonical live EV deadline state. A Flex source older than 75 minutes is exposed as `STALE`; a semantic deadline-state mismatch is exposed as `INCONSISTENT`. In either case Flex priority owner / EV role / reason and Heating grant fields are suppressed rather than presented as current facts. These checks are presentation guards only and do not alter planner, Gate, actuator or physical-control behavior.
+
+Inactive EV deadline state must not expose an old deadline timestamp or stale remaining-kWh value through Mobile V1. Warm-water mode is normalized at the mobile boundary to `CV`, `BOILER` or `null`; the underlying canonical runtime boolean/source contract is unchanged. The Web Data API remains loopback-bound by default on `127.0.0.1:3200`; direct internet exposure of port 3200 is forbidden. Remote iPhone access must terminate at the separate hardened private HTTPS/authentication boundary.
+
 
 EV downstream execution observability now extends beyond the EMS control target.
 Homey EV Device Health v0.4 performs targeted read-only reads of the Easee
