@@ -115,10 +115,74 @@ class MobileOverviewResourceTest(unittest.TestCase):
         self.assertEqual(result["hotWater"]["seasonalAdvice"]["status"], "OK")
         self.assertEqual(result["heating"]["readyRooms"], ["serre"])
         self.assertEqual(result["heating"]["shadowGrant"], "SHADOW_GRANT")
+        self.assertEqual(result["flex"]["status"], "OK")
         self.assertEqual(result["flex"]["priorityOwner"], "HEATING")
+        self.assertEqual(result["flex"]["sourceGeneratedAt"], "2026-10-07T17:50:00Z")
+        self.assertEqual(result["flex"]["ageSec"], 300)
+        self.assertTrue(result["flex"]["consistentWithLiveEvDeadline"])
 
         self.assertNotIn("secret", json.dumps(result))
         self.assertNotIn("internal", json.dumps(result))
+
+    def test_inactive_deadline_hides_old_deadline_values_and_normalizes_hot_water_mode(self):
+        state = self.live_state()
+        state["tesla"]["deadline_active"] = False
+        state["tesla"]["deadline_at"] = "2026-09-20T07:00:00Z"
+        state["tesla"]["remaining_kwh"] = 3.85
+        state["hot_water"]["mode"] = False
+        flex = self.flex()
+        flex["ev"]["deadlineActive"] = False
+
+        server.ENERGY_STATE_FILE = self.write_source(state)
+        server.WW_SEASONAL_FILE = self.write_source(self.seasonal())
+        server.FLEX_PRIORITY_SHADOW_FILE = self.write_source(flex)
+
+        result = server.mobile_overview_resource()
+
+        self.assertFalse(result["ev"]["deadlineActive"])
+        self.assertIsNone(result["ev"]["deadlineAt"])
+        self.assertIsNone(result["ev"]["remainingKWh"])
+        self.assertIsNone(result["hotWater"]["mode"])
+        self.assertEqual(result["flex"]["status"], "OK")
+
+    def test_inconsistent_flex_ev_deadline_is_not_presented_as_current_decision(self):
+        state = self.live_state()
+        state["tesla"]["deadline_active"] = False
+        flex = self.flex()
+        flex["ev"]["deadlineActive"] = True
+        flex["decision"]["priorityOwner"] = "EV"
+        flex["decision"]["evRole"] = "MUST"
+        flex["decision"]["reason"] = "EV_DEADLINE_MUST"
+
+        server.ENERGY_STATE_FILE = self.write_source(state)
+        server.WW_SEASONAL_FILE = self.write_source(self.seasonal())
+        server.FLEX_PRIORITY_SHADOW_FILE = self.write_source(flex)
+
+        result = server.mobile_overview_resource()
+
+        self.assertEqual(result["flex"]["status"], "INCONSISTENT")
+        self.assertFalse(result["flex"]["consistentWithLiveEvDeadline"])
+        self.assertIsNone(result["flex"]["priorityOwner"])
+        self.assertIsNone(result["flex"]["evRole"])
+        self.assertIsNone(result["flex"]["reason"])
+        self.assertEqual(result["heating"]["readyRooms"], [])
+        self.assertIsNone(result["heating"]["shadowGrant"])
+
+    def test_stale_flex_is_not_presented_as_current_decision(self):
+        flex = self.flex()
+        flex["generatedAt"] = "2026-10-07T16:00:00Z"
+
+        server.ENERGY_STATE_FILE = self.write_source(self.live_state())
+        server.WW_SEASONAL_FILE = self.write_source(self.seasonal())
+        server.FLEX_PRIORITY_SHADOW_FILE = self.write_source(flex)
+
+        result = server.mobile_overview_resource()
+
+        self.assertEqual(result["flex"]["status"], "STALE")
+        self.assertGreater(result["flex"]["ageSec"], 4500)
+        self.assertIsNone(result["flex"]["priorityOwner"])
+        self.assertIsNone(result["flex"]["evRole"])
+        self.assertIsNone(result["flex"]["reason"])
 
     def test_optional_resources_degrade_without_breaking_live_overview(self):
         server.ENERGY_STATE_FILE = self.write_source(self.live_state())
