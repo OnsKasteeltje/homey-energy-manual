@@ -36,4 +36,4 @@ No physical Easee write was caused by the promotion itself. The next natural val
 
 ## Prior physical evidence
 
-STOP ownership had already passed before this promotion: a coherent `0 W -> 0 A -> PASS` chain physically set Easee dynamic charger current to `0 A`, and charging stopped. See `smoke-ev-actuator-stop-ownership-2026-08-29.md`.
+STOP ownership had already passed before this promotion: a coherent `0 W -> 0 A -> PASS` chain physically set Easee dynamic charger current to `0 A`, and charging stopped. The original smoke evidence remains available in Git history; its standalone evidence file was removed during repository cleanup.

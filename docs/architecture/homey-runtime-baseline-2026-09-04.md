@@ -29,7 +29,7 @@ This baseline supersedes `homey-runtime-baseline-2026-08-30.md` for all current-
 | Classification | Homey flow | Flow ID | Current source / role |
 |---|---|---|---|
 | LIVE | `EM v2 | 20 Power Intent | P1 v0.2.4 DUAL-SEMANTIC LOW-LOAD` | `19d9d8a6-ec32-4639-be5e-71e9f034d31b` | current P1-authoritative Power Intent producer |
-| LIVE | `EM v2 | 60 Actuator | EV Power v0.2.3 MIN7 TARGETED-READ LIVE OWNERSHIP` | `fea23193-a03f-49dd-9780-7e72ee48747d` | enabled, not broken; exact embedded source captured as `src/homey/actuators/ev-power-v0.2.3.live-homey.js`; gate-driven physical writer; accepts 0 A or 7–16 A |
+| LIVE | `EM v2 | 60 Actuator | EV Power v0.2.3 MIN7 TARGETED-READ LIVE OWNERSHIP` | `fea23193-a03f-49dd-9780-7e72ee48747d` | enabled, not broken; exact embedded source captured in Git history (the superseded standalone source file was removed during repository cleanup); gate-driven physical writer; accepts 0 A or 7–16 A |
 | ACTIVE SHADOW | `EM v2 | 60 Adapter | EV Power v0.1.2 MIN7 TARGETED-READ SHADOW` | `953e9b18-3576-4557-b940-ed4a64eb2516` | enabled, not broken; exact embedded source captured as `src/homey/adapters/ev-power-v0.1.2.live-homey.js`; fixed 3×230 V, floor mapping, fail-closed, no device writes |
 | VALIDATION | `EM v2 | 80 Validation | EV Power Adapter Gate v0.2.2 MIN7 TARGETED-READ` | `ec5e5d34-8205-4cf0-a661-7bf744feb6e0` | enabled, not broken; exact embedded source captured as `src/homey/validation/ev-power-adapter-gate-v0.2.2.live-homey.js`; requires MIN7 mapping and revision alignment |
 | VALIDATION | `EM v2 | 80 Validation | P1 Pre-EV Gate v0.2.1 TARGETED-READ` | `557ed7e8-9efe-4173-bc06-8e629214e172` | current validation gate |
