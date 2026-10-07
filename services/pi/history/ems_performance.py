@@ -114,6 +114,75 @@ def load_measurements(day, db_path=MEASUREMENTS_DB):
     return out, quality
 
 
+def load_easee_meter_window(day, db_path=MEASUREMENTS_DB, now_utc=None):
+    """Read the cumulative Easee delivered-energy counter without inventing coverage."""
+    start, end = bounds(day)
+    now_utc = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    effective_end = min(end, now_utc) if now_utc > start else start
+
+    if not db_path.exists():
+        return {"available": False, "coverageStatus": "UNAVAILABLE", "reason": "HISTORY_DB_MISSING"}
+
+    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    con.execute("PRAGMA query_only=ON")
+    try:
+        device = con.execute("SELECT id FROM devices WHERE device_key='tesla'").fetchone()
+        metric = con.execute("SELECT id FROM metrics WHERE metric_key='energy_delivered_kwh'").fetchone()
+        if not device or not metric:
+            return {"available": False, "coverageStatus": "UNAVAILABLE", "reason": "EASEE_CUMULATIVE_METER_NOT_ARCHIVED"}
+        baseline = con.execute(
+            """SELECT ts_utc,value_real FROM measurements
+               WHERE device_id=? AND metric_id=? AND value_real IS NOT NULL AND ts_utc<=?
+               ORDER BY ts_utc DESC LIMIT 1""",
+            (device[0], metric[0], iso_z(start)),
+        ).fetchone()
+        latest = con.execute(
+            """SELECT ts_utc,value_real FROM measurements
+               WHERE device_id=? AND metric_id=? AND value_real IS NOT NULL
+                 AND ts_utc>=? AND ts_utc<?
+               ORDER BY ts_utc DESC LIMIT 1""",
+            (device[0], metric[0], iso_z(start), iso_z(effective_end)),
+        ).fetchone()
+    finally:
+        con.close()
+
+    if not baseline or not latest:
+        return {"available": False, "coverageStatus": "UNAVAILABLE", "reason": "EASEE_CUMULATIVE_METER_BOUNDARY_MISSING"}
+
+    baseline_at = datetime.fromisoformat(baseline[0].replace("Z", "+00:00"))
+    latest_at = datetime.fromisoformat(latest[0].replace("Z", "+00:00"))
+    baseline_age_s = max(0.0, (start - baseline_at).total_seconds())
+    end_gap_s = max(0.0, (effective_end - latest_at).total_seconds())
+    delta = float(latest[1]) - float(baseline[1])
+
+    if delta < -0.01:
+        return {
+            "available": False,
+            "coverageStatus": "INVALID_COUNTER_RESET",
+            "reason": "EASEE_CUMULATIVE_METER_DECREASED",
+            "baselineAt": iso_z(baseline_at),
+            "latestAt": iso_z(latest_at),
+        }
+
+    full = baseline_age_s <= MAX_INTERVAL_S and end_gap_s <= MAX_INTERVAL_S
+    return {
+        "available": full,
+        "coverageStatus": (
+            "FULL_ELAPSED_DAY" if full and day == now_utc.astimezone(TZ).date()
+            else "FULL_DAY" if full else "PARTIAL_BOUNDARY_COVERAGE"
+        ),
+        "reason": None if full else "EASEE_CUMULATIVE_METER_BOUNDARY_GAP",
+        "chargedKWh": round(max(0.0, delta), 3) if full else None,
+        "observedDeltaKWh": round(max(0.0, delta), 3),
+        "baselineAt": iso_z(baseline_at),
+        "latestAt": iso_z(latest_at),
+        "baselineAgeSec": round(baseline_age_s, 1),
+        "endGapSec": round(end_gap_s, 1),
+        "source": "Easee meter_power cumulative delivered energy",
+        "metric": "energy_delivered_kwh",
+    }
+
+
 def integrate(rows):
     totals = {
         "pv_kwh": 0.0,
@@ -123,6 +192,8 @@ def integrate(rows):
         "direct_pv_self_use_kwh": 0.0,
         "boiler_kwh": 0.0,
         "tesla_kwh": 0.0,
+        "ev_pv_allocated_kwh": 0.0,
+        "ev_grid_allocated_kwh": 0.0,
         "quatt_kwh": 0.0,
         "flex_load_kwh": 0.0,
         "flex_pv_capture_kwh": 0.0,
@@ -157,6 +228,9 @@ def integrate(rows):
         direct = min(pv, house)
         available_for_flex = max(0.0, pv - base)
         flex_pv = min(flex, available_for_flex)
+        # Derived allocation only; this is not a directly metered PV->EV flow.
+        ev_pv_allocated = min(tesla, available_for_flex)
+        ev_grid_allocated = max(0.0, tesla - ev_pv_allocated)
         preflex = export + flex_pv
 
         totals["pv_kwh"] += pv / 1000 * h
@@ -166,6 +240,8 @@ def integrate(rows):
         totals["direct_pv_self_use_kwh"] += direct / 1000 * h
         totals["boiler_kwh"] += boiler / 1000 * h
         totals["tesla_kwh"] += tesla / 1000 * h
+        totals["ev_pv_allocated_kwh"] += ev_pv_allocated / 1000 * h
+        totals["ev_grid_allocated_kwh"] += ev_grid_allocated / 1000 * h
         totals["quatt_kwh"] += quatt / 1000 * h
         totals["flex_load_kwh"] += flex / 1000 * h
         totals["flex_pv_capture_kwh"] += flex_pv / 1000 * h
@@ -296,6 +372,7 @@ def build_report(
 
     start_utc, end_utc = bounds(day)
     now_utc = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    easee_meter = load_easee_meter_window(day, measurement_db, now_utc=now_utc)
     now_local = now_utc.astimezone(TZ)
     today = now_local.date()
 
@@ -369,6 +446,40 @@ def build_report(
     metrics["pv_self_consumption_rate"] = None if pv <= 0 else round(direct / pv, 4)
     metrics["flex_pv_capture_rate_of_preflex_surplus"] = None if surplus <= 0 else round(captured / surplus, 4)
 
+    ev_energy_accounting = {
+        "authoritativeChargedEnergy": {
+            "available": bool(easee_meter.get("available")),
+            "chargedKWh": easee_meter.get("chargedKWh"),
+            "coverageStatus": easee_meter.get("coverageStatus"),
+            "reason": easee_meter.get("reason"),
+            "source": easee_meter.get("source"),
+            "metric": easee_meter.get("metric"),
+            "baselineAt": easee_meter.get("baselineAt"),
+            "latestAt": easee_meter.get("latestAt"),
+            "observedDeltaKWh": easee_meter.get("observedDeltaKWh"),
+        },
+        "powerIntegratedEnergy": {
+            "kWh": metrics["tesla_kwh"],
+            "source": "ems-history.sqlite electrical_power_w samples",
+            "semantics": "DERIVED_FROM_SAMPLED_POWER_INTEGRATION",
+            "authoritativeChargedEnergy": False,
+        },
+        "derivedSourceAllocation": {
+            "pvCoveredKWh": metrics["ev_pv_allocated_kwh"],
+            "gridCoveredKWh": metrics["ev_grid_allocated_kwh"],
+            "allocationBasisKWh": round(
+                metrics["ev_pv_allocated_kwh"] + metrics["ev_grid_allocated_kwh"], 3
+            ),
+            "method": "SIMULTANEOUS_POWER_ALLOCATION_EV_FIRST_V0.1",
+            "measuredDirectly": False,
+            "authoritativeChargedEnergy": False,
+            "interpretation": (
+                "Derived allocation from sampled P1/PV/EV power; it is not a directly "
+                "measured PV-to-EV or grid-to-EV energy flow."
+            ),
+        },
+    }
+
     benchmark = {
         "mode": "SAME_FLEX_ENERGY_UNCONSTRAINED_UPPER_BOUND_V0.1",
         "actualFlexPvCaptureKWh": round(captured, 3),
@@ -422,6 +533,7 @@ def build_report(
             ),
         },
         "metrics": metrics,
+        "evEnergyAccounting": ev_energy_accounting,
         "metricSemantics": {
             "tesla_kwh": {
                 "provenanceClass": "DERIVED_POWER_INTEGRAL",
@@ -453,12 +565,11 @@ def build_report(
             "authoritativeEvChargedEnergy": {
                 "provenanceClass": "MEASURED_CUMULATIVE_METER_DELTA",
                 "preferredSource": "Easee meter_power cumulative kWh",
-                "available": False,
-                "reason": "NOT_ARCHIVED_IN_EMS_PI_DAY_PERFORMANCE_V0.1",
+                "available": bool(easee_meter.get("available")),
+                "reason": easee_meter.get("reason"),
                 "interpretation": (
-                    "Exact daily charged energy requires the Easee cumulative energy-meter "
-                    "delta. Until that meter is durably archived here, no performance field "
-                    "may be promoted to authoritative charged kWh."
+                    "Authoritative daily charged energy is exposed only when the archived "
+                    "Easee cumulative meter has bounded day-boundary coverage."
                 ),
             },
         },

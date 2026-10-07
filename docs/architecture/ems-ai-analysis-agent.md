@@ -205,6 +205,24 @@ Easee cumulative-meter delta may be stated as actual charged kWh. Sampled-power
 integration and PV/grid allocation are derivations and belong under
 **Afleiding**, not **Feit**.
 
+### EV energy accounting provenance
+
+EV daily-energy semantics are explicit:
+
+- `evEnergyAccounting.authoritativeChargedEnergy` comes from the cumulative
+  Easee meter archived as `energy_delivered_kwh`, and is authoritative only
+  when day-boundary coverage is bounded.
+- `metrics.tesla_kwh` / `powerIntegratedEnergy` is sampled-power integration,
+  not authoritative charged energy.
+- `derivedSourceAllocation.pvCoveredKWh` and `gridCoveredKWh` are derived
+  simultaneous-power allocations, not directly metered source-energy flows.
+- If authoritative Easee coverage is unavailable, the AI must say so and must
+  not silently substitute the sampled-power integral.
+- PV/grid allocation belongs under **Afleiding**, not observed **Feit**.
+
+This is evidence semantics only. EV planning, Gate, actuator and Constrained
+Replay V0.1.1 are unchanged.
+
 ### Performance and electrical timeline
 
 V0.3 retains `EMS_PI_DAY_PERFORMANCE_V0.1` and expands the bounded 5-minute
