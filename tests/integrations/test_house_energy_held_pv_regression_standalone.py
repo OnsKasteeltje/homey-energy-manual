@@ -47,7 +47,7 @@ class HeldPvTests(unittest.TestCase):
         self.db.commit()
         house.build(self.path)
         return self.db.execute("""
-          SELECT pv_solaredge_kwh,pv_total_kwh,import_kwh,quality
+          SELECT pv_solaredge_kwh,pv_total_kwh,import_kwh,quality,p1_quality,pv_quality
           FROM house_energy_intervals ORDER BY end_ts_utc
         """).fetchall()
 
@@ -86,9 +86,21 @@ class HeldPvTests(unittest.TestCase):
         self.sample("07:05",1,1000,"held")
         self.sample("11:00",2,1002,"observed")
         rows=self.build_rows()
-        self.assertEqual(rows[-1][3],"gap")
+        self.assertEqual(rows[-1][4],"observed")
+        self.assertEqual(rows[-1][5],"gap")
         self.assertAlmostEqual(rows[-1][2],0.05)
-        self.assertAlmostEqual(rows[-1][0],2.0)
+        self.assertIsNone(rows[-1][0])
+        self.assertIsNone(rows[-1][1])
+
+    def test_p1_independent_of_unknown_pv(self):
+        self.sample("07:00",0,1000,"observed")
+        self.sample("07:05",1,1000,"held")
+        self.sample("11:00",2,1002,"observed")
+        rows=self.build_rows()
+        self.assertEqual(rows[-1][4],"observed")
+        self.assertEqual(rows[-1][5],"gap")
+        self.assertGreater(rows[-1][2],0)
+        self.assertIsNone(rows[-1][1])
 
     def test_no_spurious_pv_for_held_zero_generation(self):
         self.sample("18:00",0,1000,"observed")
