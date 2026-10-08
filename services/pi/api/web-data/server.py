@@ -580,7 +580,7 @@ def pv_flex_analysis_resource(value):
             "actual": {
                 "pvKWh": 0.0, "houseKWh": 0.0, "importKWh": 0.0,
                 "exportKWh": 0.0, "pvSelfConsumedKWh": 0.0,
-                "coverage": 0.0,
+                "coverage": 0.0, "p1Coverage": 0.0, "pvCoverage": 0.0,
             },
             "devices": {"evPowerW": None, "boilerPowerW": None},
             "heatingFlex": {
@@ -597,7 +597,7 @@ def pv_flex_analysis_resource(value):
         actual_rows = db.execute(
             """
             SELECT start_ts_utc,end_ts_utc,duration_seconds,import_kwh,export_kwh,
-                   pv_total_kwh,house_kwh,quality
+                   pv_total_kwh,house_kwh,quality,p1_quality,pv_quality
             FROM house_energy_intervals
             WHERE end_ts_utc > ? AND start_ts_utc < ?
             ORDER BY end_ts_utc
@@ -641,22 +641,23 @@ def pv_flex_analysis_resource(value):
             (start_utc, end_utc),
         ).fetchall()
 
-    covered_seconds = {key: 0.0 for key in slots}
+    p1_covered_seconds = {key: 0.0 for key in slots}
+    pv_covered_seconds = {key: 0.0 for key in slots}
     gap_count = 0
     discontinuity_count = 0
     for row in actual_rows:
         row_start, row_end = parse_timestamp(row[0]), parse_timestamp(row[1])
         if row_start is None or row_end is None:
             continue
-        quality = row[7]
-        if quality == "gap":
+        quality, p1_quality, pv_quality = row[7:10]
+        if p1_quality == "gap" or pv_quality == "gap":
             gap_count += 1
-            continue
         if quality == "discontinuity":
             discontinuity_count += 1
             continue
-        if quality not in {"observed", "held"}:
-            discontinuity_count += 1
+        p1_valid = p1_quality in {"observed", "held"}
+        pv_valid = pv_quality in {"observed", "estimated", "held"}
+        if not p1_valid and not pv_valid:
             continue
         row_seconds = max(1.0, (row_end - row_start).total_seconds())
         segment_start = max(row_start, start_utc_dt)
@@ -671,13 +672,16 @@ def pv_flex_analysis_resource(value):
             item = slots.get(key)
             if item is not None and seconds > 0:
                 fraction = seconds / row_seconds
-                for name, index in (
-                    ("importKWh", 3), ("exportKWh", 4),
-                    ("pvKWh", 5), ("houseKWh", 6),
-                ):
-                    if row[index] is not None:
-                        item["actual"][name] += float(row[index]) * fraction
-                covered_seconds[key] += seconds
+                if p1_valid:
+                    for name, index in (("importKWh", 3), ("exportKWh", 4)):
+                        if row[index] is not None:
+                            item["actual"][name] += float(row[index]) * fraction
+                    p1_covered_seconds[key] += seconds
+                if pv_valid and row[5] is not None:
+                    item["actual"]["pvKWh"] += float(row[5]) * fraction
+                    pv_covered_seconds[key] += seconds
+                if p1_valid and pv_valid and row[6] is not None:
+                    item["actual"]["houseKWh"] += float(row[6]) * fraction
             segment_start = segment_end
 
     for key, item in slots.items():
@@ -685,10 +689,13 @@ def pv_flex_analysis_resource(value):
         # Energy-balance definition: PV production not exported in this slot.
         # Keep the signed balance here; clamp only the reported daily direct-use
         # KPI after aggregation so interval-level metering noise cannot inflate it.
-        actual["pvSelfConsumedKWh"] = actual["pvKWh"] - actual["exportKWh"]
-        actual["coverage"] = min(1.0, covered_seconds[key] / 900.0)
-        for name in ("pvKWh", "houseKWh", "importKWh", "exportKWh", "pvSelfConsumedKWh", "coverage"):
-            actual[name] = round(actual[name], 6)
+        actual["pvSelfConsumedKWh"] = actual["pvKWh"] - actual["exportKWh"] if pv_covered_seconds[key] >= 899.0 and p1_covered_seconds[key] >= 899.0 else None
+        actual["p1Coverage"] = min(1.0, p1_covered_seconds[key] / 900.0)
+        actual["pvCoverage"] = min(1.0, pv_covered_seconds[key] / 900.0)
+        actual["coverage"] = min(actual["p1Coverage"], actual["pvCoverage"])
+        for name in ("pvKWh", "houseKWh", "importKWh", "exportKWh", "pvSelfConsumedKWh", "coverage", "p1Coverage", "pvCoverage"):
+            if actual[name] is not None:
+                actual[name] = round(actual[name], 6)
 
     for slot_start, device_key, metric_key, value_avg, energy_wh, quality in device_rows:
         dt = parse_timestamp(slot_start)
