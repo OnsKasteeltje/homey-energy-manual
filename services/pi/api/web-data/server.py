@@ -827,7 +827,16 @@ def pv_flex_analysis_resource(value):
         name: round(sum(slot["actual"][name] for slot in series), 6)
         for name in ("pvKWh", "houseKWh", "importKWh", "exportKWh")
     }
-    totals["pvSelfConsumedKWh"] = round(max(0.0, totals["pvKWh"] - totals["exportKWh"]), 6)
+    # Direct-use totals require complete, simultaneous P1 and PV evidence.
+    # A partial day must never masquerade as a full-day self-use result.
+    required_seconds = max(1.0, (end_utc_dt-start_utc_dt).total_seconds())
+    p1_day_complete = sum(p1_covered_seconds.values()) >= required_seconds - 1.0
+    pv_day_complete = sum(pv_covered_seconds.values()) >= required_seconds - 1.0
+    self_use_complete = p1_day_complete and pv_day_complete
+    totals["pvSelfConsumedKWh"] = (
+        round(max(0.0, totals["pvKWh"] - totals["exportKWh"]), 6)
+        if self_use_complete else None
+    )
     forecast_energy = sum(
         slot["forecast"]["pvForecastW"] * 0.25 / 1000.0
         for slot in series if slot["forecast"] is not None
@@ -848,6 +857,7 @@ def pv_flex_analysis_resource(value):
             **totals,
             "forecastKWh": round(forecast_energy, 6),
             "forecastSlots": forecast_slots,
+            "pvSelfConsumptionStatus": "COMPLETE" if self_use_complete else "INCOMPLETE_COVERAGE",
         },
         "forecastSelection": {
             "kind": "FIXED_LEAD_12H",
