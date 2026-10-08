@@ -427,7 +427,7 @@ def history_resource(kind, value):
     start_local, end_local, bucket_kind = _history_period(kind, value)
     start_utc, end_utc = _utc_text(start_local), _utc_text(end_local)
 
-    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro&immutable=1", uri=True) as db:
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
         rows = db.execute(
             """
             SELECT start_ts_utc,end_ts_utc,duration_seconds,import_kwh,export_kwh,
@@ -593,7 +593,7 @@ def pv_flex_analysis_resource(value):
         }
         cursor = nxt
 
-    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro&immutable=1", uri=True) as db:
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
         actual_rows = db.execute(
             """
             SELECT start_ts_utc,end_ts_utc,duration_seconds,import_kwh,export_kwh,
@@ -990,7 +990,7 @@ def heating_temperature_history_resource(*, generated_at=None):
     device_keys = tuple(f"honeywell_{key}" for key in allowed_rooms)
     placeholders = ",".join("?" for _ in device_keys)
 
-    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro&immutable=1", uri=True) as db:
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
         rows = db.execute(
             f"""
             SELECT m.slot_start_utc,d.device_key,m.value_avg,m.value_min,m.value_max,

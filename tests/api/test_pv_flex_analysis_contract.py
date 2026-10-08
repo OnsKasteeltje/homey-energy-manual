@@ -39,4 +39,6 @@ assert 'pv_valid = pv_quality in {"observed", "estimated", "held"}' in s, "PV sh
 assert '"p1Coverage"' in s and '"pvCoverage"' in s, "source coverage must be distinct"
 assert 'pv_total_kwh,house_kwh,quality,p1_quality,pv_quality' in s, "query must fetch separate quality"
 assert 'quality not in {"complete", "partial"}' in s, "15-minute device aggregates must accept canonical complete/partial quality"
+assert 'file:{HISTORY_DB}?mode=ro&immutable=1' not in s, "history readers must honor SQLite WAL"
+assert s.count('sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True)') == 3, "history SQLite connections must stay read-only"
 print("PASS: PV & Flex Analysis V2 read-only contract")
