@@ -63,19 +63,27 @@ def _parse_utc(value):
 
 
 def _reconcile_held_pv(rows):
-    """Interpolate cumulative PV between two genuinely observed endpoints.
+    """Time-attribute sparse cumulative PV changes without shifting P1 data.
 
-    Each inverter has its own observed baseline. Held endpoints never imply
-    zero generation; they also must not cause the accumulated energy to appear
-    in one five-minute interval. P1 values are never modified.
+    Even 'observed' cumulative readings can repeat a cached inverter value.
+    A positive increase is distributed between the last distinct observed
+    reading and the next distinct observed reading; held values are never
+    used as anchors. Unknown gaps stay gaps, not synthetic power spikes.
     """
     projected = [list(row) for row in rows]
     invalid_ends = set()
+    reconstructed_ends = set()
     for value_index, quality_index in ((5, 8), (6, 9), (7, 10)):
-        anchors = [
-            i for i, row in enumerate(rows)
-            if row[value_index] is not None and row[quality_index] == 1
-        ]
+        anchors = []
+        last_value = None
+        for i, row in enumerate(rows):
+            value = row[value_index]
+            if value is None or row[quality_index] != 1:
+                continue
+            value = float(value)
+            if last_value is None or abs(value - last_value) > COUNTER_DECREASE_EPSILON_KWH:
+                anchors.append(i)
+                last_value = value
         for left, right in zip(anchors, anchors[1:]):
             a, b = rows[left], rows[right]
             duration = (_parse_utc(b[0]) - _parse_utc(a[0])).total_seconds()
@@ -83,15 +91,16 @@ def _reconcile_held_pv(rows):
             if duration <= 0 or delta < -COUNTER_DECREASE_EPSILON_KWH:
                 continue
             if duration > MAX_PV_INTERPOLATION_SECONDS and delta > 0:
-                # Unknown production interval: preserve P1 in raw history,
-                # reject affected derived intervals rather than invent PV.
                 invalid_ends.update(range(left + 1, right + 1))
                 continue
+            # All covered intermediate endpoints are estimates, including
+            # repeated 'observed' counter values. Preserve the total energy.
             for i in range(left + 1, right):
                 elapsed = (_parse_utc(rows[i][0]) - _parse_utc(a[0])).total_seconds()
                 projected[i][value_index] = float(a[value_index]) + delta * elapsed / duration
-        # Never let unverified held data masquerade as a fresh observed PV delta.
-    return projected, invalid_ends
+            if right > left + 1:
+                reconstructed_ends.update(range(left + 1, right + 1))
+    return projected, invalid_ends, reconstructed_ends
 
 def build(db_path=DB):
     con = sqlite3.connect(str(db_path), timeout=2.0)
@@ -119,7 +128,7 @@ def build(db_path=DB):
             ON house_energy_intervals(start_ts_utc)
         """)
 
-        rows, invalid_pv_ends = _reconcile_held_pv(_counter_rows(con))
+        rows, invalid_pv_ends, reconstructed_pv_ends = _reconcile_held_pv(_counter_rows(con))
         # Fully derived: rebuild transactionally so obsolete intervals from
         # older derivation semantics cannot survive a corrected rebuild.
         con.execute("DELETE FROM house_energy_intervals")
@@ -165,7 +174,7 @@ def build(db_path=DB):
                 expected_resolution = max(MAX_NORMAL_GAP_SECONDS, int(source_resolution_seconds or prev_resolution or MAX_NORMAL_GAP_SECONDS))
                 if elapsed_seconds > expected_resolution * GAP_MULTIPLIER:
                     quality = "gap"
-                elif prev_has_held_input or bool(has_held_input):
+                elif prev_has_held_input or bool(has_held_input) or row_index in reconstructed_pv_ends:
                     # Cumulative counters are monotonic state. A sleeping/stale
                     # inverter may keep exposing an unchanged total as "held".
                     # Keep the household interval instead of truncating history,
