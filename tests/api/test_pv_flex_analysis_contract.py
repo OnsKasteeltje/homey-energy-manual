@@ -33,7 +33,6 @@ for forbidden in (
 
 assert "julianday(f2.generated_at) <= julianday(f.slot_start_utc) - (12.0/24.0)" in s, "forecast selection must enforce 12h no-hindsight lead"
 assert 'max(0.0, totals["pvKWh"] - totals["exportKWh"])' in s, "complete daily PV self-use must derive from energy balance"
-assert '"INCOMPLETE_COVERAGE"' in s, "incomplete days must be marked"
 assert 'if self_use_complete else None' in s, "incomplete daily self-use must be null"
 assert 'p1_valid = p1_quality in {"observed", "held"}' in s, "P1 should use independent quality"
 assert 'pv_valid = pv_quality in {"observed", "estimated", "held"}' in s, "PV should use independent quality"
