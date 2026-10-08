@@ -33,6 +33,9 @@ for forbidden in (
 
 assert "julianday(f2.generated_at) <= julianday(f.slot_start_utc) - (12.0/24.0)" in s, "forecast selection must enforce 12h no-hindsight lead"
 assert 'max(0.0, totals["pvKWh"] - totals["exportKWh"])' in s, "daily PV self-use must derive from the daily energy balance"
-assert 'quality not in {"observed", "held"}' in s, "historical cumulative-counter intervals may use canonical observed/held quality"
+assert 'p1_valid = p1_quality in {"observed", "held"}' in s, "P1 should use independent quality"
+assert 'pv_valid = pv_quality in {"observed", "estimated", "held"}' in s, "PV should use independent quality"
+assert '"p1Coverage"' in s and '"pvCoverage"' in s, "source coverage must be distinct"
+assert 'pv_total_kwh,house_kwh,quality,p1_quality,pv_quality' in s, "query must fetch separate quality"
 assert 'quality not in {"complete", "partial"}' in s, "15-minute device aggregates must accept canonical complete/partial quality"
 print("PASS: PV & Flex Analysis V2 read-only contract")
