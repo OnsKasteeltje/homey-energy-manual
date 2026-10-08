@@ -83,8 +83,11 @@ class HeldPvTests(unittest.TestCase):
 
     def test_long_unknown_interval_fails_closed(self):
         self.sample("07:00",0,1000,"observed")
-        self.sample("07:05",1,1000,"held")
-        self.sample("11:00",2,1002,"observed")
+        for i in range(1,49):
+            minutes=7*60+5*i
+            hhmm=f"{minutes//60:02d}:{minutes%60:02d}"
+            self.sample(hhmm,i,1000 if i<48 else 1002,
+                        "held" if i<48 else "observed")
         rows=self.build_rows()
         self.assertEqual(rows[-1][4],"observed")
         self.assertEqual(rows[-1][5],"gap")
