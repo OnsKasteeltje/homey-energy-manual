@@ -866,7 +866,9 @@ def pv_flex_analysis_resource(value):
             },
         },
         "quality": {
-            "actualCoverage": round(sum(covered_seconds.values()) / max(1.0, (end_utc_dt-start_utc_dt).total_seconds()), 6),
+            "actualCoverage": round(sum(min(p1_covered_seconds[k], pv_covered_seconds[k]) for k in slots) / max(1.0, (end_utc_dt-start_utc_dt).total_seconds()), 6),
+            "p1Coverage": round(sum(p1_covered_seconds.values()) / max(1.0, (end_utc_dt-start_utc_dt).total_seconds()), 6),
+            "pvCoverage": round(sum(pv_covered_seconds.values()) / max(1.0, (end_utc_dt-start_utc_dt).total_seconds()), 6),
             "gapCount": gap_count,
             "discontinuityCount": discontinuity_count,
         },
