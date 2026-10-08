@@ -161,6 +161,8 @@ De planner:
 
 Bij een actieve deadline zonder geldige `deadline_max_a` van 6..16 A hoort de planner fail-closed te werken.
 
+Deadline-lifecycle is Pi-owned. Alleen een Pi-state met `status=TRACKING` en resterende energie kan als actieve deadlineconstraint deelnemen aan planner/arbitrage en, zodra `latest_start_at` is bereikt, `MUST` worden. `status=EXPIRED` is terminal: een verlopen request mag voor command-provenance nog `active=true` bevatten, maar Flex Priority moet die toestand als niet-actieve deadline behandelen, mag hem nooit opnieuw als `MUST` classificeren en mag daardoor geen Heating-window blokkeren. Een inconsistente `TRACKING` state waarvan `deadlineAt <= now` failt closed in plaats van `MUST` te worden. `/control/current` hanteert dezelfde effectieve-active semantiek: alleen `TRACKING` met `remainingKWh > 0` wordt als deadline `active=true` gepubliceerd.
+
 De Pi is de canonical deadline allocator; Homey behoudt uitsluitend een executor-side hard deadline guard als laatste safetylaag.
 
 ## 7. Hardened validator en contractgovernance
