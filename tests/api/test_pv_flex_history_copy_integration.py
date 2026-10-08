@@ -48,6 +48,10 @@ def main():
             f"{field}: API={actual}, SQLite={value}")
         print(f"PASS {field}: API={actual:.3f} SQLite={value:.3f}")
 
+    assert summary["pvSelfConsumedKWh"] is None, "partial day must not report self-use total"
+    assert summary["pvSelfConsumptionStatus"] == "INCOMPLETE_COVERAGE"
+    print("PASS incomplete PV self-use: null with explicit status")
+
     quality = result["quality"]
     assert quality["p1Coverage"] >= quality["pvCoverage"], quality
     assert 0 <= quality["actualCoverage"] <= quality["pvCoverage"] <= 1
