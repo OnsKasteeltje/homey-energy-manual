@@ -4,6 +4,7 @@
 import argparse
 import sqlite3
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 DB = Path("/home/jeroen/ems/data/ems-history.sqlite")
@@ -11,6 +12,10 @@ MAX_NORMAL_GAP_SECONDS = 900
 COUNTER_DECREASE_EPSILON_KWH = 1e-6
 GAP_MULTIPLIER = 1.5
 MAX_PV_INTERPOLATION_SECONDS = 3 * 3600
+LOCAL_TZ = ZoneInfo('Europe/Amsterdam')
+# Conservative daylight envelope; solar energy outside is not fabricated.
+DAYLIGHT_START_HOUR = 8
+DAYLIGHT_END_HOUR = 19
 
 COUNTERS = (
     ("grid_p1", "energy_import_kwh", "import_kwh"),
@@ -73,6 +78,7 @@ def _reconcile_held_pv(rows):
     projected = [list(row) for row in rows]
     invalid_ends = set()
     reconstructed_ends = set()
+    withheld_pv_ends = set()
     for value_index, quality_index in ((5, 8), (6, 9), (7, 10)):
         anchors = []
         last_value = None
@@ -91,7 +97,10 @@ def _reconcile_held_pv(rows):
             if duration <= 0 or delta < -COUNTER_DECREASE_EPSILON_KWH:
                 continue
             if duration > MAX_PV_INTERPOLATION_SECONDS and delta > 0:
+                # A PV reading resuming after a long sleep cannot time-locate
+                # production. Do not attribute energy into arbitrary night slots.
                 invalid_ends.update(range(left + 1, right + 1))
+                withheld_pv_ends.update(range(left + 1, right + 1))
                 continue
             # All covered intermediate endpoints are estimates, including
             # repeated 'observed' counter values. Preserve the total energy.
@@ -100,7 +109,7 @@ def _reconcile_held_pv(rows):
                 projected[i][value_index] = float(a[value_index]) + delta * elapsed / duration
             if right > left + 1:
                 reconstructed_ends.update(range(left + 1, right + 1))
-    return projected, invalid_ends, reconstructed_ends
+    return projected, invalid_ends, reconstructed_ends, withheld_pv_ends
 
 def build(db_path=DB):
     con = sqlite3.connect(str(db_path), timeout=2.0)
@@ -119,16 +128,24 @@ def build(db_path=DB):
                 pv_total_kwh REAL,
                 house_kwh REAL,
                 quality TEXT NOT NULL,
+                p1_quality TEXT NOT NULL DEFAULT 'unknown',
+                pv_quality TEXT NOT NULL DEFAULT 'unknown',
                 discontinuity_reason TEXT,
                 updated_at_utc TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        existing_columns = {x[1] for x in con.execute("PRAGMA table_info(house_energy_intervals)")}
+        for column in ("p1_quality", "pv_quality"):
+            if column not in existing_columns:
+                con.execute(
+                    f"ALTER TABLE house_energy_intervals ADD COLUMN {column} TEXT NOT NULL DEFAULT 'unknown'"
+                )
         con.execute("""
             CREATE INDEX IF NOT EXISTS idx_house_energy_intervals_start
             ON house_energy_intervals(start_ts_utc)
         """)
 
-        rows, invalid_pv_ends, reconstructed_pv_ends = _reconcile_held_pv(_counter_rows(con))
+        rows, invalid_pv_ends, reconstructed_pv_ends, withheld_pv_ends = _reconcile_held_pv(_counter_rows(con))
         # Fully derived: rebuild transactionally so obsolete intervals from
         # older derivation semantics cannot survive a corrected rebuild.
         con.execute("DELETE FROM house_energy_intervals")
@@ -168,8 +185,6 @@ def build(db_path=DB):
 
             if reason is None and any(delta < -COUNTER_DECREASE_EPSILON_KWH for delta in deltas):
                 reason = "COUNTER_DECREASE"
-            elif reason is None and row_index in invalid_pv_ends:
-                quality = "gap"
             elif reason is None:
                 expected_resolution = max(MAX_NORMAL_GAP_SECONDS, int(source_resolution_seconds or prev_resolution or MAX_NORMAL_GAP_SECONDS))
                 if elapsed_seconds > expected_resolution * GAP_MULTIPLIER:
@@ -186,17 +201,28 @@ def build(db_path=DB):
                 output = (None,) * len(deltas)
 
             imp, exp, se, gw42, gw20 = output
-            pv_total = None if se is None else se + gw42 + gw20
-            house = None if imp is None else imp + pv_total - exp
+            p1_quality = "gap" if quality == "gap" else ("discontinuity" if reason else "observed")
+            pv_quality = (
+                "gap" if row_index in invalid_pv_ends or quality == "gap"
+                else "discontinuity" if reason
+                else "estimated" if row_index in reconstructed_pv_ends or quality == "held"
+                else "observed"
+            )
+            # Preserve the raw P1 energy even where PV is not time-locatable.
+            # No house energy is invented from an unknown PV allocation.
+            if row_index in withheld_pv_ends:
+                se, gw42, gw20 = None, None, None
+            pv_total = None if any(v is None for v in (se, gw42, gw20)) else se + gw42 + gw20
+            house = None if imp is None or pv_total is None else imp + pv_total - exp
 
             con.execute("""
                 INSERT INTO house_energy_intervals (
                     start_ts_utc, end_ts_utc, duration_seconds,
                     import_kwh, export_kwh,
                     pv_solaredge_kwh, pv_goodwe4200_kwh, pv_goodwe2000_kwh,
-                    pv_total_kwh, house_kwh, quality, discontinuity_reason
+                    pv_total_kwh, house_kwh, quality, p1_quality, pv_quality, discontinuity_reason
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(end_ts_utc) DO UPDATE SET
                     start_ts_utc=excluded.start_ts_utc,
                     duration_seconds=excluded.duration_seconds,
@@ -208,10 +234,12 @@ def build(db_path=DB):
                     pv_total_kwh=excluded.pv_total_kwh,
                     house_kwh=excluded.house_kwh,
                     quality=excluded.quality,
+                    p1_quality=excluded.p1_quality,
+                    pv_quality=excluded.pv_quality,
                     discontinuity_reason=excluded.discontinuity_reason,
                     updated_at_utc=CURRENT_TIMESTAMP
             """, (prev_ts, ts, seconds, imp, exp, se, gw42, gw20,
-                  pv_total, house, quality, reason))
+                  pv_total, house, quality, p1_quality, pv_quality, reason))
             written += 1
             previous = (ts, source_resolution_seconds, bool(has_held_input), values)
 
