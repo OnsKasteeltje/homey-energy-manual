@@ -4,7 +4,6 @@
 import argparse
 import sqlite3
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 from pathlib import Path
 
 DB = Path("/home/jeroen/ems/data/ems-history.sqlite")
@@ -12,10 +11,6 @@ MAX_NORMAL_GAP_SECONDS = 900
 COUNTER_DECREASE_EPSILON_KWH = 1e-6
 GAP_MULTIPLIER = 1.5
 MAX_PV_INTERPOLATION_SECONDS = 3 * 3600
-LOCAL_TZ = ZoneInfo('Europe/Amsterdam')
-# Conservative daylight envelope; solar energy outside is not fabricated.
-DAYLIGHT_START_HOUR = 8
-DAYLIGHT_END_HOUR = 19
 
 COUNTERS = (
     ("grid_p1", "energy_import_kwh", "import_kwh"),
