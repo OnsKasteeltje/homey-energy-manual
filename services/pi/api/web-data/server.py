@@ -857,7 +857,6 @@ def pv_flex_analysis_resource(value):
             **totals,
             "forecastKWh": round(forecast_energy, 6),
             "forecastSlots": forecast_slots,
-            "pvSelfConsumptionStatus": "COMPLETE" if self_use_complete else "INCOMPLETE_COVERAGE",
         },
         "forecastSelection": {
             "kind": "FIXED_LEAD_12H",
