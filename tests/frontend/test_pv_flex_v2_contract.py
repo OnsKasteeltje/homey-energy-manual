@@ -20,6 +20,10 @@ assert 'FLEX_PRIORITY_ROOT="/web/planner/flex-priority-shadow"' in state
 assert 'PREHEAT_PROGRESSION_ROOT="/web/planner/heating-preheat-progression-shadow"' in state
 assert 'EMS_WEB_FLEX_PRIORITY_SHADOW_V1' in state
 assert 'EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1' in state
+assert 'id="kpi-self-note"' in index
+assert 'const visibleSelfKWh=d.series.reduce' in render
+assert 'a.actualKnown?a.directPvW/4000:0' in render
+assert 'Geregistreerd · onvolledige dekking' in render
 assert 'const kwh=v=>v==null?"—":' in render, "missing daily kWh must not display as zero"
 assert "forecast?.confidence" in render
 assert 'function lane(' not in render

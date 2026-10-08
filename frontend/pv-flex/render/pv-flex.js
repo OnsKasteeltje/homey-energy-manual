@@ -6,7 +6,14 @@ const time=x=>new Date(x).toLocaleTimeString("nl-NL",{timeZone:"Europe/Amsterdam
 function summary(d){
  $("day-title").textContent=new Date(d.period.start).toLocaleDateString("nl-NL",{timeZone:"Europe/Amsterdam",weekday:"long",day:"numeric",month:"long",year:"numeric"});
  $("kpi-forecast").textContent=kwh(d.summary.forecastKWh); $("kpi-slots").textContent=`${d.summary.forecastSlots}/${d.series.length} forecastkwartieren`;
- $("kpi-pv").textContent=kwh(d.summary.pvKWh); $("kpi-self").textContent=kwh(d.summary.pvSelfConsumedKWh); $("kpi-export").textContent=kwh(d.summary.exportKWh);
+ $("kpi-pv").textContent=kwh(d.summary.pvKWh);
+ const visibleSelfKWh=d.series.reduce((sum,x)=>{
+  const a=slotAllocation(x);
+  return sum+(a.actualKnown?a.directPvW/4000:0);
+ },0);
+ $("kpi-self").textContent=d.series.some(x=>x.actual.coverage>0)?kwh(visibleSelfKWh):"—";
+ $("kpi-self-note").textContent=d.quality.actualCoverage<0.999?"Geregistreerd · onvolledige dekking":"PV − teruglevering";
+ $("kpi-export").textContent=kwh(d.summary.exportKWh);
  $("quality").textContent=`Dekking ${pct(d.quality.actualCoverage)}`; $("next").disabled=day>=todayAmsterdam();
 }
 function slotAllocation(x){
