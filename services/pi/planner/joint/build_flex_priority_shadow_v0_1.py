@@ -129,9 +129,14 @@ def build_priority(
     latest_start = None
     ev_state = "NONE"
 
+    status = ev_deadline.get("status")
     if ev_has_requirement:
-        status = ev_deadline.get("status")
-        if status not in {"TRACKING", "EXPIRED"}:
+        if status == "EXPIRED":
+            # Pi deadline state owns lifecycle semantics. An expired request may
+            # retain command.active=true as immutable user-command provenance,
+            # but it is no longer an executable deadline constraint.
+            ev_state = "EXPIRED"
+        elif status != "TRACKING":
             ev_state = "INVALID_OR_UNCERTAIN"
         else:
             try:
@@ -140,7 +145,11 @@ def build_priority(
             except PriorityError:
                 ev_state = "INVALID_OR_UNCERTAIN"
             else:
-                if status == "EXPIRED" or deadline_at <= now or latest_start <= now:
+                if deadline_at <= now:
+                    # TRACKING beyond its own deadline contradicts the Pi
+                    # lifecycle contract and must fail closed, not become MUST.
+                    ev_state = "INVALID_OR_UNCERTAIN"
+                elif latest_start <= now:
                     ev_state = "MUST"
                 else:
                     ev_state = "AVAILABLE_LATER"
@@ -216,7 +225,7 @@ def build_priority(
             ),
         },
         "ev": {
-            "deadlineActive": ev_active,
+            "deadlineActive": ev_has_requirement and ev_state in {"MUST", "AVAILABLE_LATER"},
             "remainingKWh": round(max(0.0, remaining), 6),
             "urgency": ev_state,
             "deadlineAt": deadline_at.isoformat().replace("+00:00", "Z") if deadline_at else ev_deadline.get("deadlineAt"),

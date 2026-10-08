@@ -67,6 +67,24 @@ def test_ev_must_overrides_heating():
     assert out["decision"]["evRole"] == "MUST"
 
 
+def test_expired_deadline_never_becomes_must_or_blocks_heating():
+    out = build(
+        e=ev(
+            active=True,
+            remaining=4.0,
+            status="EXPIRED",
+            latest="2026-09-26T11:00:00Z",
+            deadline="2026-09-26T11:30:00Z",
+        )
+    )
+    assert out["ev"]["urgency"] == "EXPIRED"
+    assert out["ev"]["deadlineActive"] is False
+    assert out["decision"]["priorityOwner"] == "HEATING"
+    assert out["decision"]["heatingShadowGrant"] == "SHADOW_GRANT"
+    assert out["decision"]["evRole"] == "RESIDUAL_OPPORTUNITY"
+    assert out["decision"]["reason"] == "HEATING_SCARCE_WINDOW_WITH_NO_EV_DEADLINE_PRESSURE"
+
+
 def test_heating_first_when_its_window_closes_before_ev_latest_start():
     out = build(e=ev(active=True, remaining=4.0, status="TRACKING", latest="2026-09-26T16:00:00Z"))
     assert out["heating"]["earliestOpportunityClosesAt"] == "2026-09-26T15:00:00Z"
