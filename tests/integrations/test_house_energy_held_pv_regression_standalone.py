@@ -64,6 +64,23 @@ class HeldPvTests(unittest.TestCase):
         self.assertTrue(all(abs(x[2]-0.05)<1e-7 for x in rows))
         self.assertEqual([r[3] for r in rows],["held","held","held","held"])
 
+    def test_observed_plateau_reallocates_energy_without_spike(self):
+        # Regression based on SolarEdge 14:40-15:40: identical 'observed'
+        # readings precede multi-interval delayed counter increments.
+        self.sample("14:40",0,1000.000,"observed")
+        self.sample("14:45",1,1000.000,"observed")
+        self.sample("14:50",2,1000.000,"observed")
+        self.sample("14:55",3,1000.556,"observed")
+        self.sample("15:00",4,1000.556,"observed")
+        self.sample("15:05",5,1000.556,"observed")
+        self.sample("15:10",6,1001.018,"observed")
+        rows=self.build_rows()
+        self.assertEqual(len(rows),6)
+        self.assertTrue(all(abs(x[0]-0.556/3)<1e-7 for x in rows[:3]))
+        self.assertTrue(all(abs(x[0]-0.462/3)<1e-7 for x in rows[3:]))
+        self.assertAlmostEqual(sum(x[0] for x in rows),1.018,places=6)
+        self.assertTrue(all(x[3]=="held" for x in rows))
+
     def test_long_unknown_interval_fails_closed(self):
         self.sample("07:00",0,1000,"observed")
         self.sample("07:05",1,1000,"held")
