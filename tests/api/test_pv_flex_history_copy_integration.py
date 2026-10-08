@@ -22,14 +22,25 @@ def main():
     slots = result["series"]
     assert len(slots) == 96, f"unexpected slot count: {len(slots)}"
 
+    # Mirror the API's fractional overlap at Amsterdam calendar boundaries.
+    from datetime import datetime, timezone
+    period_start = datetime.fromisoformat(result["period"]["start"]).astimezone(timezone.utc)
+    period_end = datetime.fromisoformat(result["period"]["end"]).astimezone(timezone.utc)
+    expected = [0.0, 0.0]
     with sqlite3.connect(f"file:{DB}?mode=ro", uri=True) as con:
-        expected = con.execute("""
-            SELECT COALESCE(SUM(import_kwh),0), COALESCE(SUM(export_kwh),0)
+        rows = con.execute("""
+            SELECT start_ts_utc,end_ts_utc,import_kwh,export_kwh
             FROM house_energy_intervals
-            WHERE start_ts_utc >= '2026-10-07T22:00:00Z'
-              AND end_ts_utc <= '2026-10-08T22:00:00Z'
+            WHERE end_ts_utc > ? AND start_ts_utc < ?
               AND p1_quality IN ('observed','held')
-        """).fetchone()
+        """, (period_start.isoformat().replace("+00:00", "Z"),
+              period_end.isoformat().replace("+00:00", "Z"))).fetchall()
+    for start, end, imp, exp in rows:
+        a = datetime.fromisoformat(start.replace("Z","+00:00"))
+        b = datetime.fromisoformat(end.replace("Z","+00:00"))
+        fraction = max(0.0, (min(b, period_end)-max(a, period_start)).total_seconds()) / max(1.0,(b-a).total_seconds())
+        expected[0] += (imp or 0.0) * fraction
+        expected[1] += (exp or 0.0) * fraction
     summary = result["summary"]
     for field, value in zip(("importKWh", "exportKWh"), expected):
         actual = summary[field]
