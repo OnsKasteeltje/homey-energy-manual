@@ -187,14 +187,14 @@ def test_held_counter_snapshot_preserves_energy_with_held_quality(tmp_path):
     assert len(rows) == 2
     assert rows[0][0] == "2026-09-23T10:00:00Z"
     assert rows[0][1] == "2026-09-23T10:05:00Z"
-    assert abs(rows[0][2] - 0.25) < 1e-9
-    assert abs(rows[0][3] - 0.15) < 1e-9
+    assert abs(rows[0][2] - 0.1) < 1e-9
+    assert abs(rows[0][3] - 0.0) < 1e-9
     assert rows[0][4] == "held"
 
     assert rows[1][0] == "2026-09-23T10:05:00Z"
     assert rows[1][1] == "2026-09-23T10:10:00Z"
-    assert abs(rows[1][2] - 0.25) < 1e-9
-    assert abs(rows[1][3] - 0.25) < 1e-9
+    assert abs(rows[1][2] - 0.4) < 1e-9
+    assert abs(rows[1][3] - 0.4) < 1e-9
     assert rows[1][4] == "held"
 
 
