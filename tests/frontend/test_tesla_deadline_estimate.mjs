@@ -29,4 +29,14 @@ assert.equal(deadlineFeedback(ex,"",submitted).level,"none");
 assert.equal(availableMinutesInAmsterdam("2026-03-29T02:30",submitted),null); // spring gap
 assert.equal(availableMinutesInAmsterdam("2026-10-25T02:30",submitted),null); // autumn fold
 assert.equal(availableMinutesInAmsterdam("2026-02-31T10:00",submitted),null); // invalid
+
+const html=readFileSync(new URL("../../frontend/settings/index.html",import.meta.url),"utf8");
+const controller=readFileSync(new URL("../../frontend/settings/control/tesla-deadline.js",import.meta.url),"utf8");
+for(const id of ["tesla-estimate-duration","tesla-estimate-details","tesla-estimate-feasibility"]){
+  assert.ok(html.includes('id="'+id+'"'),id+" markup missing");
+  assert.ok(controller.includes('"'+id+'"'),id+" controller missing");
+}
+assert.match(controller,/maxA:\$\("max-a"\)\?\.value\?\.trim\(\)===""\?NaN/);
+assert.ok(controller.includes('renderEstimate();'));
+assert.ok(controller.includes('"target-soc","deadline","max-a"'));
 console.log("PASS: Tesla deadline duration, maxA, calibration and Amsterdam DST");

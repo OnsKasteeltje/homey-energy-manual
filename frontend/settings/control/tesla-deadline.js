@@ -11,7 +11,7 @@ function values(){
     currentSoc:$("current-soc")?.value?.trim()===""?NaN:Number($("current-soc")?.value),
     targetSoc:$("target-soc")?.value?.trim()===""?NaN:Number($("target-soc")?.value),
     deadline:String($("deadline")?.value||"").trim(),
-    maxA:Number($("max-a")?.value)
+    maxA:$("max-a")?.value?.trim()===""?NaN:Number($("max-a")?.value)
   };
 }
 function validate(v){
