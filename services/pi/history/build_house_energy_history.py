@@ -11,6 +11,8 @@ MAX_NORMAL_GAP_SECONDS = 900
 COUNTER_DECREASE_EPSILON_KWH = 1e-6
 GAP_MULTIPLIER = 1.5
 MAX_PV_INTERPOLATION_SECONDS = 3 * 3600
+# Close-in-time duplicate samples are not material interpolation anchors.
+MIN_MATERIAL_PV_INTERIOR_SECONDS = 5.0
 
 COUNTERS = (
     ("grid_p1", "energy_import_kwh", "import_kwh"),
@@ -102,7 +104,17 @@ def _reconcile_held_pv(rows):
             for i in range(left + 1, right):
                 elapsed = (_parse_utc(rows[i][0]) - _parse_utc(a[0])).total_seconds()
                 projected[i][value_index] = float(a[value_index]) + delta * elapsed / duration
-            if right > left + 1:
+            # A duplicate <5s from an anchor must not relabel an otherwise
+            # fully observed 5-minute interval as reconstructed/held. Genuine
+            # intermediate observations (e.g. 5-minute stale readings between
+            # a 10-minute delta) still require estimated quality.
+            if any(
+                (_parse_utc(rows[i][0]) - _parse_utc(a[0])).total_seconds()
+                >= MIN_MATERIAL_PV_INTERIOR_SECONDS
+                and (_parse_utc(b[0]) - _parse_utc(rows[i][0])).total_seconds()
+                >= MIN_MATERIAL_PV_INTERIOR_SECONDS
+                for i in range(left + 1, right)
+            ):
                 reconstructed_ends.update(range(left + 1, right + 1))
     return projected, invalid_ends, reconstructed_ends, withheld_pv_ends
 

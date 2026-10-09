@@ -818,3 +818,28 @@ the live operational history.
 PR #213 merged to `main` at `6b2a2de8da64d542232c1cb42c0658e6eb50fc07`. Pi runtime deployed: only the Tailscale-hosted website on `100.127.130.0:80`; restricted-PIN local Pi Tesla command ingress; a common runtime command file now used by `/web/commands/current` and Pi deadline derivation. Runtime backup `/home/jeroen/ems/backup/ev-ingress-v11-20261009-222745`. Preflight 18/18 PASS, architecture gate PASS, `caddy validate` valid; API negative auth/deadline tests HTTP 401/400 and no command mutation. GitHub fetch timer disabled, fetch service stopped, and existing derived-state timer/API services remain active. One physical Homey Easee writer and Pi plan authority unchanged. The old GitHub/Worker path must never be reintroduced as a concurrent command source.
 
 **First live validation 2026-10-09:** request `e7f60e72-526f-49b6-b89a-12eb4544dbd6`, user 40%→60%, 12.4kWh, maxA10. Pi request persisted at `20:38:47.502Z`, derived-state same ID and `TRACKING` at `20:38:47.595Z` (93ms); `/control/current` `READY/PLANNER` with `deadline.valid=true`, `active=true`. Homey Insights Easee `evcharger_charging` changed to true at `20:39:16.701Z` (29.199s from request), Homey device showed Charging at 5,467 W with 10 A target/offered. This is strong end-to-end timing evidence, though individual Bridge/Gate requestId correlation is still pending. Compared with prior 4m39s, response improved ~89.5%. Submitted deadline 23:15 CEST was not physically feasible: 12.4kWh at 3×10A needs ~108min with only ~36min available. Open validation: cancellation, exact Homey Bridge/Gate trace, iPhone/mobile-data access and SwiftUI ATS/PWA behavior. Private HTTP is carried inside Tailscale WireGuard, not HTTPS.
+
+
+### History / PV-source quality and CI compatibility (PR #215 — prepared, not deployed)
+
+The 2026-10-09 investigation showed **29.08 kWh P1 net import**
+06:00–12:00 CEST, when Homey Easee Insights independently indicated
+substantial EV charging, while historical `house_kwh` was NULL for
+all six hours due to unlocatable slow inverter counter increases.
+History V2 incorrectly plotted NULL as zero and showed the partial
+12.73 kWh house sum as a complete day total. The read-only fix keeps
+P1 import/export independent, retains known PV source values when
+another inverter's late counter change is unlocatable, and adds
+per-metric known coverage to the API. The frontend marks unknown or
+partial house/PV hours explicitly instead of silently treating them
+as zero; no fabricated inverter production or EV energy is added.
+
+The PR also reconciles four previously red CI integration checks:
+very short (<5s) duplicate inverter samples no longer downgrade
+fully observed intervals to reconstructed quality; the held GoodWe
+test checks conserved time-distributed energy instead of a stale
+single-slot spike; the Web Data API test database now contains the
+existing canonical `p1_quality` and `pv_quality` fields. All tests
+operate on temporary SQLite fixtures; raw production history, Pi
+planner and Homey writer remain unchanged until a separate guarded
+runtime promotion.

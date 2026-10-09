@@ -16,6 +16,40 @@ builder=load("services/pi/history/build_house_energy_history.py", "history_build
 api=load("services/pi/api/web-data/server.py", "web_history_api")
 
 class P1PvRegression(unittest.TestCase):
+    def test_near_duplicate_snapshot_does_not_downgrade_pv_quality(self):
+        # Regression of the two older pytest failures: extra <1 s records
+        # do not make the later ordinary 5-min observation an estimate.
+        for duplicate_delta in (0.481, 0.982):
+            with self.subTest(delta=duplicate_delta), tempfile.TemporaryDirectory() as d:
+                path=Path(d)/"dup.sqlite"
+                con=sqlite3.connect(path)
+                con.executescript("""
+                  CREATE TABLE devices(id INTEGER PRIMARY KEY,device_key TEXT);
+                  CREATE TABLE metrics(id INTEGER PRIMARY KEY,metric_key TEXT);
+                  CREATE TABLE measurements(ts_utc TEXT,device_id INTEGER,metric_id INTEGER,
+                     value_real REAL,source_resolution_seconds INTEGER,quality TEXT);
+                """)
+                for n,name in enumerate(("grid_p1","pv_solaredge","pv_goodwe4200","pv_goodwe2000"),1):
+                    con.execute("INSERT INTO devices VALUES (?,?)",(n,name))
+                for n,name in enumerate(("energy_import_kwh","energy_export_kwh","energy_produced_kwh"),1):
+                    con.execute("INSERT INTO metrics VALUES (?,?)",(n,name))
+                start=datetime(2026,9,19,20,0,tzinfo=timezone.utc)
+                for delta,imp,se,gw42,gw20 in (
+                    (0,100,1000,2000,3000),
+                    (duplicate_delta,100,1000,2000,3000),
+                    (300,100.4,1000.2,2000.3,3000.1)
+                ):
+                    stamp=(start+timedelta(seconds=delta)).isoformat().replace("+00:00","Z")
+                    vals=((1,1,imp),(1,2,50.0),(2,3,se),(3,3,gw42),(4,3,gw20))
+                    con.executemany("INSERT INTO measurements VALUES (?,?,?,?,?,?)",
+                      [(stamp,dev,metric,value,300,"observed") for dev,metric,value in vals])
+                con.commit()
+                con.close()
+                builder.build(path)
+                with sqlite3.connect(path) as db:
+                    quality=db.execute("SELECT quality FROM house_energy_intervals").fetchone()
+                self.assertEqual(quality,("observed",))
+
     def test_oct9_long_solar_edge_delay_does_not_erase_other_sources(self):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/"h.sqlite"
