@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from state_ingest import handle_state_ingest
 from ev_control_ingest import handle_ev_control_ingest
 from quooker_evidence_ingest import handle_quooker_evidence_ingest
+from tesla_command_ingest import handle_tesla_command
 
 HOST = "0.0.0.0"
 PORT = 3100
@@ -549,6 +550,9 @@ def send_json(handler, status, payload):
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
+        if self.path == "/commands/tesla":
+            handle_tesla_command(self, send_json)
+            return
         if self.path == "/state/energy":
             handle_state_ingest(self, send_json)
             return

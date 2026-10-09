@@ -811,3 +811,13 @@ hardened AI systemd sandbox grants the bounded filesystem carve-out
 `ReadWritePaths=/home/jeroen/ems/data` for WAL/SHM coordination. This does not
 make the SQL connections writable. `immutable=1` is forbidden for AI reads of
 the live operational history.
+
+
+### EV Deadline Local Ingress V1.1 — PREPARED (not LIVE)
+
+Branch `feat/ev-deadline-local-command-ingress-v1-1` prepares authenticated Tailscale-only website → Pi writes. Production still uses GitHub Worker/raw fetch until controlled cutover. This is an ingress-only change, not a second planner or Homey actuator. See `docs/architecture/tesla-deadline-end-to-end.md` section 12.
+
+
+### PR #213: one Tailscale-only website origin (PREPARED; not live)
+
+After controlled cutover, the private EMS website for home/away, plus future SwiftUI clients, uses `http://100.127.130.0/` exclusively. The old LAN web address `http://192.168.1.42` is retired **for Caddy web presentation only**. Internal Homey ↔ Pi port 3100 remains on the existing LAN. The PIN-protected Pi Tesla command route remains separate from read-only Web Data API. Caddy only binds to the Tailscale interface. Before any production changes, verify Tailscale on Mac and iPhone on Wi-Fi and cellular, run `caddy validate`, and maintain a tested rollback. HTTPS secure-origin/iOS ATS support is explicitly a later check; do not equate WireGuard encryption with HTTPS.

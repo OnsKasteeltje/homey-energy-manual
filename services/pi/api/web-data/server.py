@@ -28,7 +28,7 @@ ENERGY_STATE_FILE = os.environ.get(
 )
 TESLA_COMMAND_FILE = os.environ.get(
     "EMS_TESLA_COMMAND_FILE",
-    "/home/jeroen/ems/repo/homey-energy-manual/docs/data/tesla-deadline-command.json",
+    "/home/jeroen/ems/data/tesla-deadline-command.json",
 )
 EMS_SETTINGS_COMMAND_FILE = os.environ.get(
     "EMS_SETTINGS_COMMAND_FILE",
@@ -323,18 +323,22 @@ def commands_current_resource():
 
     if not isinstance(active, bool):
         raise ValueError("TESLA_ACTIVE_INVALID")
-    if not isinstance(current_soc, (int, float)) or isinstance(current_soc, bool) or not 0 <= current_soc <= 99:
-        raise ValueError("TESLA_CURRENT_SOC_INVALID")
-    if not isinstance(target_soc, (int, float)) or isinstance(target_soc, bool) or not 1 <= target_soc <= 100:
-        raise ValueError("TESLA_TARGET_SOC_INVALID")
-    if target_soc <= current_soc:
-        raise ValueError("TESLA_TARGET_SOC_INVALID")
-    if not isinstance(max_a, (int, float)) or isinstance(max_a, bool) or not 6 <= max_a <= 16:
-        raise ValueError("TESLA_MAX_A_INVALID")
-    if not isinstance(deadline, str) or not deadline:
-        raise ValueError("TESLA_DEADLINE_INVALID")
     if not isinstance(request_id, str) or not request_id:
         raise ValueError("TESLA_REQUEST_ID_INVALID")
+    if active:
+        if not isinstance(current_soc, (int, float)) or isinstance(current_soc, bool) or not 0 <= current_soc <= 99:
+            raise ValueError("TESLA_CURRENT_SOC_INVALID")
+        if not isinstance(target_soc, (int, float)) or isinstance(target_soc, bool) or not 1 <= target_soc <= 100 or target_soc <= current_soc:
+            raise ValueError("TESLA_TARGET_SOC_INVALID")
+        if not isinstance(max_a, (int, float)) or isinstance(max_a, bool) or not 6 <= max_a <= 16:
+            raise ValueError("TESLA_MAX_A_INVALID")
+        if not isinstance(deadline, str) or not deadline:
+            raise ValueError("TESLA_DEADLINE_INVALID")
+    else:
+        current_soc = None
+        target_soc = None
+        deadline = ""
+        max_a = None
 
     contract_type = settings.get("contractType")
     hot_water_source = settings.get("hotWaterSource")
