@@ -28,7 +28,7 @@ function command(changes={}){
     validUntil:iso(now+90000),
     targets:{
       ev:{target_W:0,target_A:0},
-      ww:{target_W:0,target_on:false},
+      ww:{target_W:0,target_on:null},
       quooker:{mode:'OFF',target_on:false,opportunity_allowed:false},
       battery:{target_W:0}
     },
@@ -74,7 +74,7 @@ assert.equal(urgent.targets.ev.status,'NUMERIC_DEADLINE_TARGET');
 assert.equal(urgent.targets.ev.phase_mode,'3P');
 assert.equal(urgent.targets.ev.phase_requested_A,10);
 assert.equal(urgent.targets.ev.target_W,6900);
-assert.equal(urgent.targets.ww.target_on,false);
+assert.equal(urgent.targets.ww.target_on,null);
 assert.equal(urgent.targets.quooker.mode,'OFF');
 console.log('PASS: urgent deadline makes a 3P/10A intent despite stale planner');
 
