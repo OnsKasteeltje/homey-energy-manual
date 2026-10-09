@@ -297,6 +297,17 @@ before the replay is exposed as AI evidence.
 
 The Pi exposes `GET /control/current`. A valid production response uses schema `EMS_PI_CONTROL_COMMAND_V0.1`, is bounded to the current quarter-hour slot and planner validity, and fails closed on stale or invalid planner input. The endpoint is a readiness/command endpoint, not a second authority selector.
 
+### 5.1 EV deadline independence — PR #212 (PREPARED; not live until Pi + Homey cutover)
+
+A deadline is explicit user intent, independent from PV opportunity planning. The prepared Pi contract retains the **single** `GET /control/current` endpoint and existing `EMS_PI_CONTROL_COMMAND_V0.1` command schema, and evaluates the global execution policy before planner/deadline selection. The healthy-plan response preserves the current 15-minute planner semantics with additive `executionMode=PLANNER`, `planner.valid=true`. A failed/missing/stale dynamic plan **does not** make the entire command unavailable when the Pi deadline contract is independently valid, active, `TRACKING`, unexpired and based on fresh Homey Core telemetry. Instead, only in that case Pi returns a bounded `executionMode=DEADLINE_ONLY` response (`validUntil <= now + 90s`) with `planner.valid=false` and the explicit planner error.
+
+The fallback contains no planner PV targets: EV PV/realtime disabled (deadline guard only); WW `HOLD` (`target_on=null`, physical WW actuator makes no write); Quooker `OFF`; battery 0 W. Homey PI Bridge validates the isolated command before producing a canonical `EM2_Power_Intent`; for eligible urgent deadlines it requests 3P charging at the Pi-owned bounded `maxA`. The EV Adapter, Gate and sole EV Actuator retain existing safety, revision, connectivity, 3P and freshness gates. No extra Homey publisher, second authority, or direct Pi physical device writer is introduced. Without a valid deadline, or when global execution authority/contract checks fail, the command remains fail-closed.
+
+The prepared `GET /health` projection reports control availability **separately** from planner readiness: `control_endpoint_status=ready` together with `control_execution_mode=DEADLINE_ONLY`, `control_planner_status=degraded`, and `control_planner_reason=PLAN_STALE` is intentional. These are additive fields and must not be interpreted as a healthy PV planner. `control_deadline_active` and `control_deadline_valid` provide explicit deadline evidence.
+
+This is a **prepared change, not yet live** on 2026-10-09; PR #212 is the source for staged Pi API, then Homey Bridge promotion. The isolated-worktree evidence is 14 Python contract tests, 5 HomeyScript simulations and architecture gate PASS. The active Homey v1.5.9 Bridge, downstream Gate and EV Actuator remain unchanged until separate production validation and cutover.
+
+
 ## 6. Current state ingest and history endpoint
 
 The Pi exposes `POST /state/energy` for authenticated Homey→Pi state ingestion. Missing/incorrect authentication, malformed state, stale state, replayed state and non-approved schema versions fail closed for current-state acceptance. Exact schema-version compatibility is owned here rather than in the transport layer; the current approved set is `{2.12, 2.13}`. Operational history insertion is idempotent; a local history-archive failure must not invalidate otherwise fresh accepted live state.
