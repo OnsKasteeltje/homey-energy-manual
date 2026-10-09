@@ -578,6 +578,8 @@ grep -q '/home/jeroen/ems/data/tesla-deadline-command.json' "$AI_ANALYSIS" || fa
 python3 "$AI_CURRENT_DEADLINE_TEST" || fail "AI current EV deadline command contract failed"
 python3 "$EV_LOCAL_INGRESS_TEST" || fail "EV local deadline ingress regression failed"
 node --check frontend/settings/control/tesla-deadline.js || fail "EV local deadline frontend syntax failed"
+node --check frontend/settings/control/tesla-deadline-estimate.mjs || fail "EV deadline estimate syntax failed"
+node tests/frontend/test_tesla_deadline_estimate.mjs || fail "EV deadline estimate contract failed"
 grep -q 'analysis_jobs' "$AI_ANALYSIS" || fail "AI resumable request cache missing"
 grep -q '/agent/result' "$AI_ANALYSIS" || fail "AI resumable result endpoint missing"
 python3 "$AI_RESUME_TEST" || fail "AI resumable request contract failed"

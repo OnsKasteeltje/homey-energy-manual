@@ -313,3 +313,24 @@ and the Tesla POST stays PIN-protected and localhost-proxied through Caddy.
 The internal Homey-to-Pi `192.168.1.42:3100` control path stays unchanged.
 The Pi cutover is complete, but an end-to-end new valid deadline and the mobile/iPhone client experience remain to be verified. Later SwiftUI App Transport Security
 support and any PWA secure-origin requirement must be checked explicitly.
+
+### 17.3 Tesla deadline charging-duration preview (frontend-only)
+
+Invoer V2 displays an **indicative minimum charging duration** immediately
+after valid manually-entered current/target SOC values are available. The
+display uses the same 0.62 kWh/SOC-% command calibration as Pi and assumes a
+constant three-phase current (`3 × 230 V × maxA`). The entered `maxA`
+immediately updates the preview; if the current field is empty, **10 A is
+explicitly labelled a temporary preview assumption**, never silently
+submitted as a user command. The estimated kWh, kW and rounded-up minutes
+are presentation only; true duration may be longer because of vehicle
+behaviour and charging overhead.
+
+When a deadline is supplied, the page shows available time versus ideal
+duration and warns if it cannot fit. Deadline interpretation is
+`Europe/Amsterdam` independent of browser timezone; nonexistent/ambiguous
+DST values are not considered feasible. This is a nonblocking hint, **not**
+planner policy, a new eligibility gate, Tesla telemetry, or evidence that
+a target is achievable. The Pi still performs its authoritative command
+validation; Homey continues all existing safety/actuator duties. Nothing
+is sent to the Pi merely by editing an input field.
