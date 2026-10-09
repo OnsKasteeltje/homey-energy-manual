@@ -1,16 +1,16 @@
 # EMS Frontend V2 private ingress
 #
 # Canonical deployment intent:
-# - bind explicitly to the Raspberry Pi wired LAN and Tailscale addresses;
-# - do not bind wildcard, Wi-Fi, Docker, or public interfaces;
+# - serve exactly one website address on the Pi Tailscale interface;
+# - no LAN, wildcard, Wi-Fi, Docker, or public website listener;
 # - serve the Pi-local V2 build;
 # - proxy read-only /web/* requests to the localhost Web Data API.
 #
-# Private remote access is provided directly over the Tailscale tailnet.
+# The same tailnet URL is used at home and away, by browser and SwiftUI app.
 # No public ingress, router port-forward, Tailscale Serve, or Tailscale Funnel is permitted.
 
-http://192.168.1.42, http://100.127.130.0 {
-    bind 192.168.1.42 100.127.130.0
+http://100.127.130.0 {
+    bind 100.127.130.0
     root * /var/www/ems-frontend-v2
 
     # Restrict command writes to encrypted Tailscale transport.

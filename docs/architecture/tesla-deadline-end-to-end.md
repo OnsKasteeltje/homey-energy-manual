@@ -378,9 +378,16 @@ Tailscale-only EMS Invoer V2 (http://100.127.130.0/settings/)
 
 Credential must be manually provisioned to `/etc/ems/tesla-control.pin`,
 owned by jeroen and mode 0600, minimum 8 characters. No PIN is stored in Git.
-LAN HTTP can still READ UI but cannot POST the secret: only tailnet traffic,
-encrypted by Tailscale WireGuard, is permitted through Caddy. No public port
-is opened. Server validates intent, schema, future deadline, request-specific
+The entire V2 website is available at **one** Tailscale-only address,
+`http://100.127.130.0/`, both at home and away. Caddy binds exclusively to
+the Pi tailnet interface; **ordinary LAN `http://192.168.1.42` website
+access is deliberately removed** after cutover. The single site hosts Live,
+Invoer, History and the future SwiftUI-app API calls. HTTP application
+traffic is protected within Tailscale's encrypted WireGuard tunnel; this
+is not a public HTTP listener. A user device must join the authorized
+tailnet before it can access the site. The PIN still independently protects
+command POST; read-only pages require only Tailscale membership. No public
+port is opened. Server validates intent, schema, future deadline, request-specific
 maxA, SoC and goal energy; generates server-side requestId. A clientRequestId
 prevents a retry of the same request from creating a new baseline.
 Invalid requests fail closed without changing the current command.
@@ -397,8 +404,11 @@ the existing 60-second deadline-state timer remains as recovery.
 **Controlled promotion, NOT EXECUTED:**
 1. Install/test PIN file, run unittest/architecture gate, check Tailscale,
    backup current Caddy, runtime and systemd; run `caddy validate`.
-2. Stage latest code; restart only status/web-data services; validate
-   and reload Caddy. **Do not provision the PIN yet**: POST remains
+2. Confirm Tailscale works on both Mac and iPhone, on home Wi-Fi and
+   on cellular (Tailscale connected), before switching the single ingress.
+   Stage latest code; restart only status/web-data services; validate
+   and reload Caddy. From this point the old LAN website URL intentionally
+   stops serving V2. Keep Caddy backup for rollback. **Do not provision the PIN yet**: POST remains
    fail-closed with PIN_NOT_CONFIGURED, so the old GitHub poller cannot race
    a successfully accepted local request.
 3. Disable/stop the old GitHub-fetch timer + service. Only after confirming
@@ -408,7 +418,18 @@ the existing 60-second deadline-state timer remains as recovery.
    must not be used after cutover.
 4. Submit fresh authenticated command from Tailscale, verify same requestId
    in local command/state, Pi /control/current, Homey Gate and Easee telemetry.
-   Also test cancellation and wrong PIN/LAN denial.
+   Also test cancellation, wrong PIN, and denial of LAN-only website access.
+   Do not mistake a missing tailnet connection for an EMS outage.
 5. Rollback must NOT blindly re-enable old GitHub poller or overwrite a newer
    local command with stale GitHub data.
 6. Compare end-to-end latency with 2026-10-09 baseline of 4m39s.
+
+One-URL note: do not create a separate LAN-write or LAN-read experience.
+The existing Homey → Pi control connection on 192.168.1.42:3100 is a
+separate internal service and is NOT moved to Tailscale. A browser on the
+LAN must use the Tailscale website URL; all devices must have Tailscale
+installed and connected. SwiftUI/iOS HTTP App Transport Security and secure
+browser/PWA contexts must be verified separately before native/PWA cutover:
+WireGuard transport encryption does not by itself make an HTTP URL an
+HTTPS secure origin. An eventual HTTPS-on-tailnet improvement must retain
+one private origin and must not expose the website publicly.

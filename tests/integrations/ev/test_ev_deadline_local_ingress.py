@@ -28,6 +28,16 @@ INTENT = dict(active=True, deadline="2026-10-09T13:00", currentSoc=90,
 
 
 class Validation(unittest.TestCase):
+    def test_one_tailnet_website_listener(self):
+        cfg=(ROOT / "deploy/caddy/ems-frontend-v2.Caddyfile").read_text()
+        self.assertIn("http://100.127.130.0 {", cfg)
+        self.assertIn("    bind 100.127.130.0", cfg)
+        self.assertNotIn("http://192.168.1.42", cfg)
+        self.assertNotIn("bind 192.168.1.42", cfg)
+        self.assertNotIn("0.0.0.0", cfg)
+        self.assertIn("reverse_proxy 127.0.0.1:3200", cfg)
+        self.assertIn("reverse_proxy 127.0.0.1:3100", cfg)
+
     def test_valid_intent(self):
         d = ingress.validate_intent(INTENT, NOW)
         self.assertEqual((d["goalKWh"], d["maxA"]), (6.2, 10))
