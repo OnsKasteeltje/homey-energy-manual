@@ -433,7 +433,7 @@ def _deadline_only_control_command(now, policy, deadline, planner_reason):
         "slot": None,
         "targets": {
             "ev": {"target_W": 0, "target_A": 0, "reason": "DEADLINE_ONLY_NO_PV_PLAN"},
-            "ww": {"target_W": 0, "target_on": False, "reason": "PLANNER_UNAVAILABLE"},
+            "ww": {"target_W": 0, "target_on": None, "reason": "PLANNER_UNAVAILABLE_HOLD"},
             "quooker": {
                 "mode": "OFF", "target_on": False, "opportunity_allowed": False,
                 "modeled_power_W": 1580, "start_export_W": 1250,
