@@ -503,6 +503,40 @@ def current_control_command():
         )
 
 
+def control_health_snapshot():
+    """Report planner health independently of command availability.
+
+    A usable EV deadline can keep /control/current READY while PV planning is
+    degraded. Keep the existing control_endpoint_status contract unchanged.
+    """
+    try:
+        control = current_control_command()
+    except Exception as exc:
+        return {
+            "control_endpoint_status": f"blocked:{exc}",
+            "control_valid_until": None,
+            "control_execution_mode": None,
+            "control_planner_status": "blocked",
+            "control_planner_reason": str(exc),
+            "control_deadline_active": False,
+            "control_deadline_valid": False,
+        }
+
+    mode = control.get("executionMode") or "PLANNER"
+    planner = control.get("planner") or {}
+    planner_valid = planner.get("valid") is True if planner else mode == "PLANNER"
+    deadline = control.get("deadline") or {}
+    return {
+        "control_endpoint_status": "ready",
+        "control_valid_until": control.get("validUntil"),
+        "control_execution_mode": mode,
+        "control_planner_status": "ready" if planner_valid else "degraded",
+        "control_planner_reason": planner.get("reason"),
+        "control_deadline_active": deadline.get("active") is True,
+        "control_deadline_valid": deadline.get("valid") is True,
+    }
+
+
 def send_json(handler, status, payload):
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     handler.send_response(status)
@@ -572,13 +606,7 @@ class Handler(BaseHTTPRequestHandler):
         quatt = forecast_status(QUATT_FILE, "EMS_PI_QUATT_FORECAST_V0.2")
         ww = ww_plan_status(WW_FILE)
         overall_status = "ok" if all(x["status"] == "ok" for x in (pv, weather, quatt, ww)) else "degraded"
-        try:
-            control = current_control_command()
-            control_status = "ready"
-            control_valid_until = control.get("validUntil")
-        except Exception as exc:
-            control_status = f"blocked:{exc}"
-            control_valid_until = None
+        control_health = control_health_snapshot()
 
         send_json(self, 200, {
             "status": overall_status,
@@ -605,8 +633,7 @@ class Handler(BaseHTTPRequestHandler):
             "ww_plan_slot_count": ww["slot_count"],
             "ww_planned_kwh": ww["planned_kwh"],
             "control_authority_gate": "HOMEY_SELECTOR",
-            "control_endpoint_status": control_status,
-            "control_valid_until": control_valid_until
+            **control_health
         })
 
     def log_message(self, format, *args):
