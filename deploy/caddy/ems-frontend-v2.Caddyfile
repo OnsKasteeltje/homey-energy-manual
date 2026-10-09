@@ -13,6 +13,18 @@ http://192.168.1.42, http://100.127.130.0 {
     bind 192.168.1.42 100.127.130.0
     root * /var/www/ems-frontend-v2
 
+    # Restrict command writes to encrypted Tailscale transport.
+    @tailnet remote_ip 100.64.0.0/10
+    handle /web/commands/tesla {
+        handle @tailnet {
+            rewrite * /commands/tesla
+            reverse_proxy 127.0.0.1:3100
+        }
+        handle {
+            respond "Tailscale required for command writes" 403
+        }
+    }
+
     handle /web/* {
         reverse_proxy 127.0.0.1:3200
     }

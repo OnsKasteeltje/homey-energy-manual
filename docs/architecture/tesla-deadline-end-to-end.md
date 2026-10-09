@@ -357,3 +357,53 @@ Health/observability blijft onderscheid maken tussen API-beschikbaarheid en plan
 `control_endpoint_status=ready` zegt alleen dat Homey een bruikbaar controlcommando kan ontvangen; het zegt **niet** dat de PV-planner gezond is. Bij een gezonde planner rapporteert `control_planner_status=ready`. De bestaande `control_endpoint_status` en `control_valid_until` blijven compatibel.
 
 Regressiebewijs: `tests/control/test_ev_deadline_planner_independence.py`, `tests/homey/ev-deadline-planner-independent-bridge.test.mjs` en `scripts/ems_architecture_gate.sh`. Voor promotie opnieuw op de geïsoleerde Pi-worktree uitvoeren. Dit is uitgevoerd in afzonderlijke stappen: Pi API deployment met backup `/home/jeroen/ems/backup/runtime-20261009-122100`, daarna gerichte Homey Bridge update en byte-identieke GitHub readback. Productie `/health` en `/control/current` waren gezond (`PLANNER`, `planner.valid=true`, geen actieve deadline). De live Bridge bleef ingeschakeld en niet defect; Easee stond na cutover op 0 A / 0 W. Oude bridgecode voor rollback: GitHub-commit `a378702fa404df6732a5f0490d37e88656db1edf`. Een werkelijk planner-down + urgente deadline is nog niet in productie voorgekomen en is alleen offline getest.
+
+
+## 12. Local Pi EV Deadline Command Ingress V1.1 — PREPARED, NOT LIVE
+
+Code is staged on branch \`feat/ev-deadline-local-command-ingress-v1-1\`.
+**The production chain remains GitHub/Worker until guarded cutover.**
+
+Private command chain:
+
+\`\`\`text
+Tailscale-only EMS Invoer V2 (http://100.127.130.0/settings/)
+  -> Caddy POST /web/commands/tesla (remote_ip Tailnet only)
+  -> 127.0.0.1:3100/commands/tesla (loopback-only + control PIN)
+  -> /home/jeroen/ems/data/tesla-deadline-command.json (atomic)
+  -> existing derived-state builder (immediately, under file lock)
+  -> existing /control/current
+  -> unchanged Homey Bridge/Adapter/Gate/sole Actuator/Easee
+\`\`\`
+
+Credential must be manually provisioned to \`/etc/ems/tesla-control.pin\`,
+owned by jeroen and mode 0600, minimum 8 characters. No PIN is stored in Git.
+LAN HTTP can still READ UI but cannot POST the secret: only tailnet traffic,
+encrypted by Tailscale WireGuard, is permitted through Caddy. No public port
+is opened. Server validates intent, schema, future deadline, request-specific
+maxA, SoC and goal energy; generates server-side requestId. A clientRequestId
+prevents a retry of the same request from creating a new baseline.
+Invalid requests fail closed without changing the current command.
+
+The read-only \`GET /web/commands/current\` reads the same runtime command
+file and accepts \`active=false\` with null SoC. The worker's settings
+functionality is outside this migration.
+
+The existing derived-state builder is serialized between API and systemd
+invocations using a host-local file lock, and writes output atomically.
+If immediate derivation fails, the API returns accepted + PENDING_WATCHDOG;
+the existing 60-second deadline-state timer remains as recovery.
+
+**Controlled promotion, NOT EXECUTED:**
+1. Install/test PIN file, run unittest/architecture gate, check Tailscale,
+   backup current Caddy, runtime and systemd; run \`caddy validate\`.
+2. Stage latest code; restart only status/web-data services and reload Caddy.
+   Verify old read paths and new private route before cutover.
+3. Disable/stop old GitHub-fetch timer + service. The old Worker must not
+   remain an alternative producer that the Pi consumes.
+4. Submit fresh authenticated command from Tailscale, verify same requestId
+   in local command/state, Pi /control/current, Homey Gate and Easee telemetry.
+   Also test cancellation and wrong PIN/LAN denial.
+5. Rollback must NOT blindly re-enable old GitHub poller or overwrite a newer
+   local command with stale GitHub data.
+6. Compare end-to-end latency with 2026-10-09 baseline of 4m39s.

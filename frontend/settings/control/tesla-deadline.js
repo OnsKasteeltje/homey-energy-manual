@@ -11,8 +11,8 @@ async function loadConfig(){
 }
 function values(){
   return {
-    currentSoc:Number($("current-soc")?.value),
-    targetSoc:Number($("target-soc")?.value),
+    currentSoc:$("current-soc")?.value?.trim()===""?NaN:Number($("current-soc")?.value),
+    targetSoc:$("target-soc")?.value?.trim()===""?NaN:Number($("target-soc")?.value),
     deadline:String($("deadline")?.value||"").trim(),
     maxA:Number($("max-a")?.value)
   };
@@ -51,29 +51,47 @@ function accepted(cmd){
   $("tesla-command-state").textContent=cmd.active===true?"ACTIEF":"INACTIEF";
   $("tesla-summary").textContent=cmd.active===true?`${cmd.currentSoc}% → ${cmd.targetSoc}% · uiterlijk ${String(cmd.deadline).replace("T"," ")} · max ${cmd.maxA} A`:"Geen actieve deadline-opdracht";
 }
-async function save(){
+function clientRequestId(){
+  // Idempotency only, not authentication.
+  return window.crypto?.randomUUID?.() || "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
+    const r=Math.floor(Math.random()*16);return(c==="x"?r:(r&3|8)).toString(16);
+  });
+}
+async function submit(active){
   if(saving)return;
-  const v=values(),problem=validate(v);
+  const v=values(),problem=active?validate(v):"";
   if(problem){message(problem,"error");return;}
-  let cfg;
-  try{cfg=await loadConfig();}catch(e){message(`Write-route niet beschikbaar: ${e.message}`,"error");return;}
-  const worker=String(cfg?.worker_url||"").trim();
-  if(cfg?.status!=="ready"||!worker){message("Write-route niet gereed.","error");return;}
   const pin=window.prompt("Voer de Tesla-control PIN in:");
   if(pin===null)return;
-  setBusy(true);message("Opdracht verzenden…","pending");
+  setBusy(true);
+  message(active?"Deadline lokaal opslaan…":"Deadline lokaal uitschakelen…","pending");
   try{
-    const r=await fetch(worker,{method:"POST",headers:{"Content-Type":"application/json","X-Tesla-Control-Pin":pin},body:JSON.stringify({active:true,currentSoc:v.currentSoc,targetSoc:v.targetSoc,deadline:v.deadline,maxA:v.maxA})});
+    const r=await fetch("/web/commands/tesla",{
+      method:"POST",cache:"no-store",
+      headers:{"Content-Type":"application/json","X-Tesla-Control-Pin":pin},
+      body:JSON.stringify({active,deadline:active?v.deadline:"",currentSoc:active?v.currentSoc:null,
+        targetSoc:active?v.targetSoc:null,maxA:active?v.maxA:11,clientRequestId:clientRequestId()})
+    });
     const j=await r.json().catch(()=>({}));
-    if(!r.ok||j?.ok!==true)throw new Error(j?.error||`HTTP ${r.status}`);
+    if(!r.ok||j?.ok!==true){
+      throw new Error(r.status===403?"Gebruik de Tailscale-website voor opdrachten.":
+        r.status===503?"Pi-commandservice niet geconfigureerd of beschikbaar.":
+        j?.error||"HTTP "+r.status);
+    }
     accepted(j.command);
     savedValues=values();
     updateSaveButton();
-    message("Opgeslagen · opdracht geaccepteerd door write-route.","ok");
-  }catch(e){message(`Opslaan mislukt: ${e.message||e}`,"error");}
+    message(j.derivedState==="UPDATED"?"Pi heeft opdracht opgeslagen en verwerkt.":
+      "Pi heeft opdracht opgeslagen; verwerking nog niet bevestigd.","ok");
+    window.dispatchEvent(new Event("ems:tesla-command-saved"));
+  }catch(e){message("Opslaan mislukt: "+(e.message||e),"error");}
   finally{setBusy(false);}
 }
+async function save(){return submit(true);}
+async function cancel(){return submit(false);}
+
 $("tesla-save")?.addEventListener("click",save);
+$("tesla-cancel")?.addEventListener("click",cancel);
 window.addEventListener("ems:tesla-command-rendered",()=>{
   savedValues=values();
   updateSaveButton();

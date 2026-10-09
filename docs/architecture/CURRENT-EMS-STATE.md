@@ -811,3 +811,8 @@ hardened AI systemd sandbox grants the bounded filesystem carve-out
 `ReadWritePaths=/home/jeroen/ems/data` for WAL/SHM coordination. This does not
 make the SQL connections writable. `immutable=1` is forbidden for AI reads of
 the live operational history.
+
+
+### EV Deadline Local Ingress V1.1 — PREPARED (not LIVE)
+
+Branch `feat/ev-deadline-local-command-ingress-v1-1` prepares authenticated Tailscale-only website → Pi writes. Production still uses GitHub Worker/raw fetch until controlled cutover. This is an ingress-only change, not a second planner or Homey actuator. See `docs/architecture/tesla-deadline-end-to-end.md` section 12.
