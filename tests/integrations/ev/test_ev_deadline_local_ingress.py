@@ -126,7 +126,7 @@ class Handler(unittest.TestCase):
         self.assertEqual(result[0][1]["derivedState"],"UPDATED")
 
     def test_retry_is_idempotent(self):
-        req=dict(INTENT,clientRequestId="a900fe6c-6552-40ba-9be4-c74445ef795e")
+        req=dict(self.future(),clientRequestId="a900fe6c-6552-40ba-9be4-c74445ef795e")
         old=ingress.build_command(ingress.validate_intent(req,NOW),
                                   req["clientRequestId"], NOW)
         result,writes,runs=self.collect(self.handler(req), old)
@@ -135,7 +135,7 @@ class Handler(unittest.TestCase):
 
     def test_idempotency_conflict_is_rejected(self):
         req=dict(self.future(),currentSoc=80,clientRequestId="a900fe6c-6552-40ba-9be4-c74445ef795e")
-        old=ingress.build_command(ingress.validate_intent(INTENT,NOW),
+        old=ingress.build_command(ingress.validate_intent(dict(req,currentSoc=90),NOW),
                                   req["clientRequestId"], NOW)
         result,writes,runs=self.collect(self.handler(req),old)
         self.assertEqual((result[0][0],writes,runs),(409,0,0))
