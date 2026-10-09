@@ -21,7 +21,7 @@ Pi deadline derived-state builder
   ↓
 Pi /control/current
   ↓
-Homey PI Dynamic Planner Bridge v1.5.3
+Homey PI Dynamic Planner Bridge v1.5.9
   ↓
 EM2_Power_Intent
   ↓
@@ -29,7 +29,7 @@ EV Power Adapter v0.2.0
   ↓
 EV Gate v0.3.0
   ↓
-EV Power writer v0.4.4 [LIVE]
+EV Power writer v0.4.5 [LIVE]
   ↓
 Easee / Tesla
 ```
@@ -184,7 +184,7 @@ De Dynamic Pi Planner behandelt deadline charging als harde constraint. Opportun
 
 Actieve flow:
 
-`EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.3 PHASE-AUTHORITY [READY]`
+`EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.9 PHASE-AUTHORITY [READY]`
 
 Flow-ID:
 
@@ -230,7 +230,7 @@ EV Power Adapter v0.2.0
   ↓
 EV Gate v0.3.0
   ↓
-EV Power writer v0.4.4 [LIVE]
+EV Power writer v0.4.5 [LIVE]
   ↓
 Easee
 ```
@@ -328,3 +328,32 @@ Easee/Equalizer  = lokale elektrische safety
 ```
 
 Er is één planner/deadline authority (Pi) en één automatische fysieke writer (Homey EV writer). Dual ownership is verboden.
+
+
+## 11. Planner-onafhankelijke deadline-uitvoering — PR #212 (DRAFT, niet LIVE)
+
+Deze aanpassing is voorbereid op `feat/ev-deadline-planner-independent-v1`. De huidige productieketen blijft ongewijzigd tot de gecontroleerde cutover is uitgevoerd.
+
+De Pi behandelt een deadline als eigen gebruikersintentie. Een falende PV-planner mag een geldige, actieve deadline niet blokkeren. Er blijft **één** `GET /control/current`, **één** Homey PI Bridge en **één** EV Adapter → Gate → Actuator → Easee-keten; er komt geen tweede charger-controller of Homey publisher.
+
+- **PLANNER:** bestaand gedrag en bestaande targets bij een geldig plan; `executionMode=PLANNER` en `planner.valid=true`.
+- **DEADLINE_ONLY:** uitsluitend bij een onbruikbaar PV-plan én een geldig, actief, toekomstig Pi-deadlinecontract met verse canonical telemetrie. `planner.valid=false` met de echte foutreden. Het controlcommando verloopt uiterlijk na 90 seconden of op de deadline.
+- In `DEADLINE_ONLY` staan PV-opportunity en batterij uit, WW op `HOLD`, Quooker op `OFF`. Er volgt **geen** extra fysieke EV-write uit de Pi; Homey bevestigt verbinding, 3P-modus, `maxA`, revisies, freshness en bestaande hardwarelimieten.
+- Zonder geldige deadline of met ongeldige globale autorisatie blijft het complete controlcommando **fail-closed**.
+
+Health/observability blijft onderscheid maken tussen API-beschikbaarheid en plannergezondheid. Bij een uitvoerbare deadline-only fallback geeft `GET /health`:
+
+```json
+{
+  "control_endpoint_status": "ready",
+  "control_execution_mode": "DEADLINE_ONLY",
+  "control_planner_status": "degraded",
+  "control_planner_reason": "PLAN_STALE",
+  "control_deadline_active": true,
+  "control_deadline_valid": true
+}
+```
+
+`control_endpoint_status=ready` zegt alleen dat Homey een bruikbaar controlcommando kan ontvangen; het zegt **niet** dat de PV-planner gezond is. Bij een gezonde planner rapporteert `control_planner_status=ready`. De bestaande `control_endpoint_status` en `control_valid_until` blijven compatibel.
+
+Regressiebewijs: `tests/control/test_ev_deadline_planner_independence.py`, `tests/homey/ev-deadline-planner-independent-bridge.test.mjs` en `scripts/ems_architecture_gate.sh`. Voor promotie opnieuw op de geïsoleerde Pi-worktree uitvoeren. Daarna in afzonderlijke stappen Pi API en vervolgens Homey-bridge deployen, telkens met rollback, terwijl EV Adapter/Gate/Actuator ongewijzigd blijven.
