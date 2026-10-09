@@ -317,6 +317,7 @@ try{
       num(t.ww?.target_W)===0 && t.ww?.target_on===false &&
       t.quooker?.mode==='OFF' && t.quooker?.target_on===false &&
       t.quooker?.opportunity_allowed===false &&
+      num(t.battery?.target_W)===0 &&
       rt.schema===RT_SCHEMA && rt.allowed===false &&
       rt.productionConsumerAllowed===false && rt.mode==='DISABLED';
     if(!safelyIsolated)throw new Error('DEADLINE_ONLY_CONTRACT_INVALID');
