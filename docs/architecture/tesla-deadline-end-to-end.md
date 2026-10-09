@@ -408,7 +408,35 @@ the existing 60-second deadline-state timer remains as recovery.
 5. `ems-ev-deadline-command.timer` disabled/stopped and `ems-ev-deadline-command.service` stopped; both inactive in shell validation. `ems-ev-deadline-state.timer`, `ems-status-api.service` and `ems-web-data-api.service` active. Website readback of legacy requestId `483bb445-b434-47f8-91ac-318c11060e24` succeeded.
 6. The Cloudflare Worker may still exist for legacy `ems_settings`; its Tesla GitHub write route is **not** a Pi command source anymore. Do not re-enable legacy fetch without reconciling newer local commands.
 
-**Pending acceptance:** submit a new *deliberate* authenticated deadline via the Tailscale website; check requestId in runtime command and derived state, `/control/current`, Homey Bridge/Gate, Easee target/offered A and the time to actual charging when applicable. Test cancellation. Device access from Mac/iPhone via Tailscale on home Wi-Fi and mobile data, plus SwiftUI ATS/PWA secure-origin behavior, require separate client verification.
+**Initial live E2E evidence — 2026-10-09 22:38–22:39 CEST:** User submitted
+40% → 60%, `maxA=10`, `goalKWh=12.4`, deadline 23:15 CEST.
+- Request `e7f60e72-526f-49b6-b89a-12eb4544dbd6` persisted at
+  `2026-10-09T20:38:47.502Z`.
+- Existing derived-state builder produced `TRACKING` for the **same requestId**
+  at `2026-10-09T20:38:47.595006Z` (~93 ms). Pi `/control/current`
+  returned `READY`, `PLANNER`, `deadline.valid=true`,
+  `active=true`, `maxA=10` and that same requestId.
+- Homey Insights `evcharger_charging` switched `false → true` at
+  `2026-10-09T20:39:16.701Z`. Charge-start signal appeared **29.199 s**
+  after the server-side request timestamp. Homey device readback showed
+  Easee `Charging`, `evcharger_charging=true`, `target_charger_current=10`,
+  `measure_current.offered=10`, `measure_power=5467 W`.
+  Historic offered-current/power buckets were zero through 20:38 UTC,
+  positive in 20:39 UTC. This is strong temporal end-to-end correlation;
+  the individual Homey Bridge/Gate events have **not** been correlated to
+  this requestId, so full internal provenance remains unverified.
+- Compared with the earlier measured 4m39s (~279s) website→charge event,
+  observed time is ~89.5% shorter. Clock differences and the use of
+  request-created time as the start of timing are explicit measurement limits.
+- **Deadline feasibility WARNING:** Pi computed
+  `latestStartAt=2026-10-09T19:27:10.434783Z`, i.e. >71 min before the
+  new command. At 3×10 A 12.4 kWh requires about 108 min; only ~36 min
+  remained at submission. `valid=true` means structurally/execution-valid,
+  **not achievable by 23:15**.
+
+**Remaining acceptance:** explicitly correlate the Homey Bridge/Gate events
+with the requestId, test cancellation, and independently verify iPhone/cellular
+and native SwiftUI ATS/PWA secure-origin behavior.
 
 One-URL note: do not create a separate LAN-write or LAN-read experience.
 The existing Homey → Pi control connection on 192.168.1.42:3100 is a
