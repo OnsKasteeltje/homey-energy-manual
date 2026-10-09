@@ -144,6 +144,7 @@ const buildPhaseControl=()=>{
   }
   return {schema:'EM2_EV_PHASE_CONTROL_V0.1',authoritative:true,mode:'OFF',requestedA:0,requestedW:0,source:'IDLE'};
 };
+let executionMode='PLANNER';
 const selectorV=await Homey.logic.getVariable({id:SELECTOR_ID});
 if(!selectorV||selectorV.value!=='PI') return true;
 const writeIntent=async()=>{
@@ -185,6 +186,8 @@ const writeIntent=async()=>{
     inputRevisions:{state:stateRev,planner:plannerGeneratedAt},
     policyProjection:{
       plannerOwner:'PI',
+      plannerValid:executionMode==='PLANNER',
+      executionMode,
       executor:'HOMEY',
       authoritySelector:'PI',
       contractMode:'FIXED',
@@ -291,6 +294,35 @@ try{
   if(!ownerOK)throw new Error('OWNER_MISMATCH');
   if(!contractOK)throw new Error('CONTRACT_MISMATCH');
   if(!fresh)throw new Error('STALE_PI_COMMAND');
+
+  // A planner failure is allowed only for a strictly bounded, Pi-owned
+  // deadline-only command. It must never enable PV, WW or Quooker targets.
+  executionMode=String(cmd.executionMode||'PLANNER');
+  if(!['PLANNER','DEADLINE_ONLY'].includes(executionMode))throw new Error('UNKNOWN_EXECUTION_MODE');
+  const deadlineOnly=executionMode==='DEADLINE_ONLY';
+  if(deadlineOnly){
+    const dl=cmd.deadline||{},rt=cmd.realtime?.ev||{};
+    const deadlineMs=Date.parse(String(dl.deadlineAt||''));
+    const latestMs=Date.parse(String(dl.latestStartAt||''));
+    const cap=num(dl.maxA),remaining=num(dl.remainingKWh);
+    const safelyIsolated=
+      cmd.planner?.valid===false &&
+      dl.schema==='EMS_PI_EV_DEADLINE_EXECUTION_V0.1' &&
+      dl.authority==='PI' && dl.valid===true && dl.active===true &&
+      dl.status==='TRACKING' && !!dl.requestId &&
+      Number.isFinite(deadlineMs) && deadlineMs>Date.now() &&
+      Number.isFinite(latestMs) &&
+      Number.isInteger(cap) && cap>=MIN_A && cap<=MAX_A &&
+      remaining!==null && remaining>0 &&
+      num(t.ev?.target_W)===0 && num(t.ev?.target_A)===0 &&
+      num(t.ww?.target_W)===0 && t.ww?.target_on===null &&
+      t.quooker?.mode==='OFF' && t.quooker?.target_on===false &&
+      t.quooker?.opportunity_allowed===false &&
+      num(t.battery?.target_W)===0 &&
+      rt.schema===RT_SCHEMA && rt.allowed===false &&
+      rt.productionConsumerAllowed===false && rt.mode==='DISABLED';
+    if(!safelyIsolated)throw new Error('DEADLINE_ONLY_CONTRACT_INVALID');
+  }
   stage='VALIDATION_OK';
   const plannerEvW=Math.max(0,Math.round(num(t?.ev?.target_W)||0));
   const plannerEvA=Math.max(0,Math.round(num(t?.ev?.target_A)||0));
@@ -307,7 +339,10 @@ try{
     stop_import_W:Math.max(0,Math.round(num(q.stop_import_W)||600)),
     reason:String(q.reason||('TIME_ENVELOPE_'+qMode))
   };
-  valid=true;status='OK';source='PI_DYNAMIC_PLANNER_V0.3';reason=t?.ev?.reason||t?.ww?.reason||t?.quooker?.reason||'PI_DYNAMIC_SLOT';
+  valid=true;status='OK';
+  source=deadlineOnly?'PI_DEADLINE_ONLY':'PI_DYNAMIC_PLANNER_V0.3';
+  reason=deadlineOnly?'PLANNER_UNAVAILABLE_'+String(cmd.planner?.reason||'UNKNOWN'):
+    (t?.ev?.reason||t?.ww?.reason||t?.quooker?.reason||'PI_DYNAMIC_SLOT');
   realtime.plannerTargetA=plannerEvA;realtime.plannerTargetW=plannerEvW;
 
   // Bounded realtime PV execution. Invalid live inputs fall back to the exact Pi slot target.
