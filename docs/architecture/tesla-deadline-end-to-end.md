@@ -397,10 +397,15 @@ the existing 60-second deadline-state timer remains as recovery.
 **Controlled promotion, NOT EXECUTED:**
 1. Install/test PIN file, run unittest/architecture gate, check Tailscale,
    backup current Caddy, runtime and systemd; run `caddy validate`.
-2. Stage latest code; restart only status/web-data services and reload Caddy.
-   Verify old read paths and new private route before cutover.
-3. Disable/stop old GitHub-fetch timer + service. The old Worker must not
-   remain an alternative producer that the Pi consumes.
+2. Stage latest code; restart only status/web-data services; validate
+   and reload Caddy. **Do not provision the PIN yet**: POST remains
+   fail-closed with PIN_NOT_CONFIGURED, so the old GitHub poller cannot race
+   a successfully accepted local request.
+3. Disable/stop the old GitHub-fetch timer + service. Only after confirming
+   the timer is inactive, provision the new Pi PIN (minimum eight characters).
+   The handler reads the file per request, so no extra API restart is needed.
+   The old Worker may still serve unrelated EMS settings; its Tesla writes
+   must not be used after cutover.
 4. Submit fresh authenticated command from Tailscale, verify same requestId
    in local command/state, Pi /control/current, Homey Gate and Easee telemetry.
    Also test cancellation and wrong PIN/LAN denial.

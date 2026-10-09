@@ -1,14 +1,10 @@
-const CONFIG="/settings/config/tesla-control-config.json";
 
 const $=id=>document.getElementById(id);
 let saving=false;
 let savedValues=null;
+let retryFingerprint=null;
+let retryRequestId=null;
 
-async function loadConfig(){
-  const r=await fetch(`${CONFIG}?t=${Date.now()}`,{cache:"no-store"});
-  if(!r.ok)throw new Error(`config HTTP ${r.status}`);
-  return r.json();
-}
 function values(){
   return {
     currentSoc:$("current-soc")?.value?.trim()===""?NaN:Number($("current-soc")?.value),
@@ -26,7 +22,7 @@ function validate(v){
   return "";
 }
 function sameValues(a,b){
-  return Boolean(a&&b)&&a.currentSoc===b.currentSoc&&a.targetSoc===b.targetSoc&&a.deadline===b.deadline&&a.maxA===b.maxA;
+  return Boolean(a&&b)&&["currentSoc","targetSoc","deadline","maxA"].every(k=>Object.is(a[k],b[k]));
 }
 function updateSaveButton(){
   const b=$("tesla-save");if(!b)return;
@@ -57,6 +53,14 @@ function clientRequestId(){
     const r=Math.floor(Math.random()*16);return(c==="x"?r:(r&3|8)).toString(16);
   });
 }
+function idempotencyKey(active,v){
+  const fingerprint=JSON.stringify({active,...v});
+  if(retryFingerprint!==fingerprint||!retryRequestId){
+    retryFingerprint=fingerprint;
+    retryRequestId=clientRequestId();
+  }
+  return retryRequestId;
+}
 async function submit(active){
   if(saving)return;
   const v=values(),problem=active?validate(v):"";
@@ -70,7 +74,7 @@ async function submit(active){
       method:"POST",cache:"no-store",
       headers:{"Content-Type":"application/json","X-Tesla-Control-Pin":pin},
       body:JSON.stringify({active,deadline:active?v.deadline:"",currentSoc:active?v.currentSoc:null,
-        targetSoc:active?v.targetSoc:null,maxA:active?v.maxA:11,clientRequestId:clientRequestId()})
+        targetSoc:active?v.targetSoc:null,maxA:active?v.maxA:11,clientRequestId:idempotencyKey(active,v)})
     });
     const j=await r.json().catch(()=>({}));
     if(!r.ok||j?.ok!==true){
@@ -79,6 +83,8 @@ async function submit(active){
         j?.error||"HTTP "+r.status);
     }
     accepted(j.command);
+    retryFingerprint=null;
+    retryRequestId=null;
     savedValues=values();
     updateSaveButton();
     message(j.derivedState==="UPDATED"?"Pi heeft opdracht opgeslagen en verwerkt.":
