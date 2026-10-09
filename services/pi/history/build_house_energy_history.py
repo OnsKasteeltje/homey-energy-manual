@@ -73,7 +73,7 @@ def _reconcile_held_pv(rows):
     projected = [list(row) for row in rows]
     invalid_ends = set()
     reconstructed_ends = set()
-    withheld_pv_ends = set()
+    withheld_pv_ends = {5: set(), 6: set(), 7: set()}  # per inverter
     for value_index, quality_index in ((5, 8), (6, 9), (7, 10)):
         anchors = []
         last_value = None
@@ -95,7 +95,7 @@ def _reconcile_held_pv(rows):
                 # A PV reading resuming after a long sleep cannot time-locate
                 # production. Do not attribute energy into arbitrary night slots.
                 invalid_ends.update(range(left + 1, right + 1))
-                withheld_pv_ends.update(range(left + 1, right + 1))
+                withheld_pv_ends[value_index].update(range(left + 1, right + 1))
                 continue
             # All covered intermediate endpoints are estimates, including
             # repeated 'observed' counter values. Preserve the total energy.
@@ -205,8 +205,12 @@ def build(db_path=DB):
             )
             # Preserve the raw P1 energy even where PV is not time-locatable.
             # No house energy is invented from an unknown PV allocation.
-            if row_index in withheld_pv_ends:
-                se, gw42, gw20 = None, None, None
+            if row_index in withheld_pv_ends[5]:
+                se = None
+            if row_index in withheld_pv_ends[6]:
+                gw42 = None
+            if row_index in withheld_pv_ends[7]:
+                gw20 = None
             pv_total = None if any(v is None for v in (se, gw42, gw20)) else se + gw42 + gw20
             house = None if imp is None or pv_total is None else imp + pv_total - exp
 

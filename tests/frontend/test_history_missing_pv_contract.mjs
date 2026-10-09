@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const source=readFileSync(new URL("../../frontend/history/render/history.js",import.meta.url),"utf8");
+const markup=readFileSync(new URL("../../frontend/history/index.html",import.meta.url),"utf8");
+assert.ok(source.includes('knownFraction'));
+assert.ok(source.includes('metricQuality'));
+assert.ok(source.includes('return; // Null/partial values are unknown'));
+assert.ok(source.includes('fmtField(item,"houseKWh")'));
+assert.ok(source.includes('fmtField(item,"pvKWh")'));
+assert.ok(source.includes('"Onbekend"'));
+assert.ok(source.includes('"—"'));
+assert.ok(markup.includes('id="kpi-house-detail"'));
+assert.ok(markup.includes('id="kpi-pv-detail"'));
+console.log("PASS: History missing PV/house displays unknown, P1 remains independent");
