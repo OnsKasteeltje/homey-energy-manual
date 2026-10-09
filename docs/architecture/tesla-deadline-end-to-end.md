@@ -184,7 +184,7 @@ De Dynamic Pi Planner behandelt deadline charging als harde constraint. Opportun
 
 Actieve flow:
 
-`EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.9 PHASE-AUTHORITY [READY]`
+`EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.9 ADAPTIVE UPSCALE [READY]`
 
 Flow-ID:
 
