@@ -71,6 +71,8 @@ const urgent=await scenario(command());
 assert.equal(urgent.valid,true);
 assert.equal(urgent.status,'OK');
 assert.equal(urgent.targets.ev.status,'NUMERIC_DEADLINE_TARGET');
+assert.equal(urgent.policyProjection.executionMode,'DEADLINE_ONLY');
+assert.equal(urgent.policyProjection.plannerValid,false);
 assert.equal(urgent.targets.ev.phase_mode,'3P');
 assert.equal(urgent.targets.ev.phase_requested_A,10);
 assert.equal(urgent.targets.ev.target_W,6900);
