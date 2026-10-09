@@ -24,6 +24,12 @@ function updateNavigation() {
 function kwh(value) { return value==null?"—":`${Number(value).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:2})} kWh`; }
 function known(item,key){return typeof item?.knownFraction?.[key]==="number" && item.knownFraction[key]>=0.999999;}
 function fmtField(item,key){const f=item?.knownFraction?.[key];if(f===undefined||f===0)return "Onbekend";return f<0.999999?`${kwh(item[key])} bekend (onvolledig)`:kwh(item[key]);}
+function houseMinimumAvailable(item){return !known(item,"houseKWh") && Number.isFinite(item?.houseMinimumKWh) && item.houseMinimumCoverage>0;}
+function fmtHouse(item){
+  if(known(item,"houseKWh"))return kwh(item.houseKWh);
+  if(houseMinimumAvailable(item))return `Minimaal ${kwh(item.houseMinimumKWh)} (P1; PV onbekend)`;
+  return "Onbekend";
+}
 function pct(value) { return `${Math.round(Number(value || 0) * 100)}%`; }
 function dateLabel(data) {
   const start = new Date(data.period.start);
@@ -41,14 +47,16 @@ function bucketLabel(item) {
   return d.toLocaleDateString("nl-NL",{...opts,month:"short"});
 }
 function renderSummary(data) {
-  for(const [key,label,detail,normal] of [
-    ["houseKWh","kpi-house","kpi-house-detail","import + PV − export"],
-    ["pvKWh","kpi-pv","kpi-pv-detail","3 omvormers"]
-  ]){
-    const complete=data.quality?.metricQuality?.[key]?.completeWithinMeasuredIntervals===true;
-    $(label).textContent=complete?kwh(data.summary[key]):"—";
-    $(detail).textContent=complete?normal:`Onvolledig · ${kwh(data.summary[key])} bekend`;
-  }
+  const houseComplete=data.quality?.metricQuality?.houseKWh?.completeWithinMeasuredIntervals===true;
+  const minimumAvailable=data.quality?.houseMinimumFraction>0;
+  $("kpi-house").textContent=houseComplete?kwh(data.summary.houseKWh):
+    minimumAvailable?`≥ ${kwh(data.summary.houseMinimumKWh)}`:"—";
+  $("kpi-house-detail").textContent=houseComplete?"import + PV − export":
+    minimumAvailable?"Minimum uit P1; PV onvolledig":"Huisverbruik onbekend";
+  const pvComplete=data.quality?.metricQuality?.pvKWh?.completeWithinMeasuredIntervals===true;
+  $("kpi-pv").textContent=pvComplete?kwh(data.summary.pvKWh):"—";
+  $("kpi-pv-detail").textContent=pvComplete?"3 omvormers":
+    `Onvolledig · ${kwh(data.summary.pvKWh)} bekend`;
   $("kpi-import").textContent=kwh(data.summary.importKWh);
   $("kpi-export").textContent=kwh(data.summary.exportKWh);
   $("period-title").textContent=dateLabel(data);
@@ -59,7 +67,7 @@ function renderSummary(data) {
   const houseQ=data.quality?.metricQuality?.houseKWh;
   $("history-quality").textContent=houseQ?.completeWithinMeasuredIntervals===true?
     `Dekking ${pct(data.quality.coverage)}`:
-    "Huisverbruik onvolledig · P1 apart beschikbaar";
+    "Huisverbruik: minimaal volgens P1 · PV onvolledig";
 }
 function renderChart(data) {
   const svg=$("history-chart"), tooltip=$("chart-tooltip");
@@ -69,7 +77,10 @@ function renderChart(data) {
   $("chart-empty").hidden=hasData; svg.hidden=!hasData;
   if(!hasData) return;
   const W=1000,H=360,p={l:52,r:18,t:20,b:48}, iw=W-p.l-p.r, ih=H-p.t-p.b;
-  const max=Math.max(0.1,...series.flatMap(x=>[x.houseKWh,x.pvKWh,x.importKWh,x.exportKWh].filter((v,j)=>known(x,["houseKWh","pvKWh","importKWh","exportKWh"][j])).map(v=>Math.max(0,Number(v)||0))));
+  const max=Math.max(0.1,...series.flatMap(x=>[
+    known(x,"houseKWh")?x.houseKWh:(houseMinimumAvailable(x)?x.houseMinimumKWh:0),
+    known(x,"pvKWh")?x.pvKWh:0, x.importKWh, x.exportKWh
+  ].map(v=>Math.max(0,Number(v)||0))));
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const ns="http://www.w3.org/2000/svg";
   const add=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v));if(text!=null)el.textContent=text;svg.appendChild(el);return el;};
@@ -80,16 +91,18 @@ function renderChart(data) {
     const gx=p.l+i*step;
     keys.forEach(([key,cls],j)=>{
       const x=gx+step*.08+j*bar;
-      if(item.coverage>0&&!known(item,key)){
-        add("text",{x:x+bar*.3,y:p.t+ih-7,class:"missing-energy","text-anchor":"middle"},"?");
-        return; // Null/partial values are unknown, never a zero-height bar.
-      }
-      const value=Math.max(0,Number(item[key])||0),h=value/max*ih;
-      add("rect",{x,y:p.t+ih-h,width:bar*.82,height:h,class:cls,rx:2});
+      const isMinimum=key==="houseKWh" && houseMinimumAvailable(item);
+      // Unknown PV has no bar; unknown house gets its proven P1
+      // lower-bound (dashed styling) instead of false zero or question marks.
+      if(item.coverage>0&&!known(item,key)&&!isMinimum)return;
+      const value=Math.max(0,Number(isMinimum?item.houseMinimumKWh:item[key])||0);
+      const h=value/max*ih;
+      add("rect",{x,y:p.t+ih-h,width:bar*.82,height:h,
+        class:isMinimum?"bar-house-minimum":cls,rx:2});
     });
     if(series.length<=31 || i%Math.ceil(series.length/12)===0)add("text",{x:gx+step/2,y:H-20,class:"axis-label","text-anchor":"middle"},bucketLabel(item));
     const hit=add("rect",{x:gx,y:p.t,width:step,height:ih,class:"hit"});
-    hit.addEventListener("mousemove",e=>{tooltip.hidden=false;tooltip.innerHTML=`<strong>${bucketLabel(item)}</strong><span>Huis ${fmtField(item,"houseKWh")}</span><span>PV ${fmtField(item,"pvKWh")}</span><span>SolarEdge ${fmtField(item,"pvSolarEdgeKWh")}</span><span>GoodWe 4200 ${fmtField(item,"pvGoodWe4200KWh")}</span><span>GoodWe 2000 ${fmtField(item,"pvGoodWe2000KWh")}</span><span>Netafname ${fmtField(item,"importKWh")}</span><span>Teruglevering ${fmtField(item,"exportKWh")}</span><em>Dekking ${pct(item.coverage)}</em>`;const r=$("chart-wrap").getBoundingClientRect();tooltip.style.left=`${Math.min(r.width-190,Math.max(8,e.clientX-r.left+12))}px`;tooltip.style.top=`${Math.max(8,e.clientY-r.top-90)}px`;});
+    hit.addEventListener("mousemove",e=>{tooltip.hidden=false;tooltip.innerHTML=`<strong>${bucketLabel(item)}</strong><span>Huis ${fmtHouse(item)}</span><span>PV ${fmtField(item,"pvKWh")}</span><span>SolarEdge ${fmtField(item,"pvSolarEdgeKWh")}</span><span>GoodWe 4200 ${fmtField(item,"pvGoodWe4200KWh")}</span><span>GoodWe 2000 ${fmtField(item,"pvGoodWe2000KWh")}</span><span>Netafname ${fmtField(item,"importKWh")}</span><span>Teruglevering ${fmtField(item,"exportKWh")}</span><em>Dekking ${pct(item.coverage)}</em>`;const r=$("chart-wrap").getBoundingClientRect();tooltip.style.left=`${Math.min(r.width-190,Math.max(8,e.clientX-r.left+12))}px`;tooltip.style.top=`${Math.max(8,e.clientY-r.top-90)}px`;});
     hit.addEventListener("mouseleave",()=>tooltip.hidden=true);
   });
 }

@@ -4,11 +4,13 @@ const source=readFileSync(new URL("../../frontend/history/render/history.js",imp
 const markup=readFileSync(new URL("../../frontend/history/index.html",import.meta.url),"utf8");
 assert.ok(source.includes('knownFraction'));
 assert.ok(source.includes('metricQuality'));
-assert.ok(source.includes('return; // Null/partial values are unknown'));
-assert.ok(source.includes('fmtField(item,"houseKWh")'));
+assert.ok(source.includes('bar-house-minimum'));
+assert.ok(source.includes('houseMinimumKWh'));
+assert.ok(!source.includes('class:"missing-energy"'));
+assert.ok(source.includes('fmtHouse(item)'));
 assert.ok(source.includes('fmtField(item,"pvKWh")'));
 assert.ok(source.includes('"Onbekend"'));
 assert.ok(source.includes('"—"'));
 assert.ok(markup.includes('id="kpi-house-detail"'));
 assert.ok(markup.includes('id="kpi-pv-detail"'));
-console.log("PASS: History missing PV/house displays unknown, P1 remains independent");
+console.log("PASS: House draws P1 lower-bound, never fakes PV or hides P1 import");

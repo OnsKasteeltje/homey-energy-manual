@@ -364,3 +364,16 @@ that the whole calendar day (or a partially elapsed day) is covered; global
 `quality.coverage` still describes period coverage. Derived history is rebuilt
 only by a separately controlled Pi promotion after backup; historical raw
 measurements are never edited. This frontend/API change is **not** control policy.
+
+### 17.5 P1 lower-bound house visualisation (2026-10-09)
+
+Where inverter cumulative counters cannot time-attribute PV, the
+Historical House chart must still expose physically proven P1 import.
+The API separately provides `houseMinimumKWh`, a sum of exact known
+house values and lower bounds `max(0, import - export)` in missing-PV
+intervals; a separate `houseMinimumCoverage` describes available
+meter support. This is **not** a reconstruction of PV production and
+must never be displayed as exact `houseKWh`. The frontend uses dashed
+blue minimum bars and a `≥`-prefixed total with visible provenance;
+unknown PV remains unknown. Never use held/uncertified 15-minute inverter
+power as an unguarded PV substitute.

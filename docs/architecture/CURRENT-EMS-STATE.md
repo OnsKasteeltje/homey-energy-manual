@@ -851,3 +851,21 @@ SQLite `julianday(ts_utc)` before the original text as a tie breaker;
 sub-second duplicate samples are coalesced and do not produce false
 `NON_FORWARD_TIME` discontinuities. The standalone regression retains
 mixed-precision inputs specifically to prove this case.
+
+### History P1 lower-bound chart repair (2026-10-09; pending Pi deployment)
+
+The prior History V2 question-mark chart was technically explicit but
+operationally unusable: 29.078 kWh measured P1 import 06:00–12:00 local
+disappeared from the *house* series when the three inverter production
+counters could not be time-attributed. History API now adds read-only
+`houseMinimumKWh` at bucket and summary level plus
+`houseMinimumCoverage` / `quality.houseMinimumFraction`. Per interval,
+a valid exact house measurement wins; otherwise, when both P1 counters
+are available, `max(0, importKWh - exportKWh)` provides a **lower bound**,
+not an estimate of total PV or exact house use.
+The frontend renders the bound as a visually distinct dashed blue bar
+and shows `≥ ... kWh` in the KPI, explicitly "minimum uit P1"; known
+house values remain exact. Unknown PV is absent with explanatory tooltip,
+not fabricated as 0 and not represented by walls of question marks.
+A regression covers full unknown, exact, and import-with-export buckets.
+No control write paths or raw production measurements change.

@@ -92,6 +92,41 @@ class P1PvRegression(unittest.TestCase):
             self.assertIsNone(row[5])
             self.assertEqual(row[6],"observed")
             self.assertEqual(row[7],"gap")
+
+    def test_oct9_minimum_house_uses_p1_without_inventing_pv(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)/"h.sqlite"
+            with sqlite3.connect(path) as db:
+                db.execute("""CREATE TABLE house_energy_intervals(
+                  start_ts_utc TEXT,end_ts_utc TEXT,duration_seconds INTEGER,
+                  import_kwh REAL,export_kwh REAL,pv_solaredge_kwh REAL,
+                  pv_goodwe4200_kwh REAL,pv_goodwe2000_kwh REAL,
+                  pv_total_kwh REAL,house_kwh REAL,quality TEXT,discontinuity_reason TEXT)""")
+                # 08:00 PV unknown: not zero! Full P1 import is a house lower bound.
+                db.executemany("INSERT INTO house_energy_intervals VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",[
+                  ("2026-10-09T06:00:00Z","2026-10-09T07:00:00Z",3600,7.93,0.0,
+                   None,0.0,0.0,None,None,"gap",None),
+                  ("2026-10-09T07:00:00Z","2026-10-09T08:00:00Z",3600,3.79,0.0,
+                   0.1,0.1,0.1,0.3,4.09,"observed",None),
+                  ("2026-10-09T08:00:00Z","2026-10-09T09:00:00Z",3600,2.0,0.5,
+                   None,0.0,0.0,None,None,"gap",None),
+                ])
+            api.HISTORY_DB=str(path)
+            data=api.history_resource("day","2026-10-09")
+            h8=[x for x in data["series"] if x["start"].startswith("2026-10-09T08:00")][0]
+            h9=[x for x in data["series"] if x["start"].startswith("2026-10-09T09:00")][0]
+            h10=[x for x in data["series"] if x["start"].startswith("2026-10-09T10:00")][0]
+            self.assertEqual(h8["knownFraction"]["houseKWh"],0.0)
+            self.assertAlmostEqual(h8["houseMinimumKWh"],7.93)
+            self.assertEqual(h8["houseMinimumCoverage"],1.0)
+            self.assertAlmostEqual(h9["houseMinimumKWh"],4.09) # exact known house
+            self.assertAlmostEqual(h10["houseMinimumKWh"],1.5) # import - export
+            self.assertAlmostEqual(data["summary"]["houseMinimumKWh"],13.52)
+            self.assertAlmostEqual(data["summary"]["houseKWh"],4.09)
+            self.assertAlmostEqual(data["summary"]["importKWh"],13.72)
+            self.assertAlmostEqual(data["quality"]["houseMinimumFraction"],1.0)
+            self.assertFalse(data["quality"]["metricQuality"]["houseKWh"]["completeWithinMeasuredIntervals"])
+
     def test_oct9_p1_wins_even_when_house_unknown(self):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/"h.sqlite"
