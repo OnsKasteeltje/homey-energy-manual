@@ -843,3 +843,11 @@ existing canonical `p1_quality` and `pv_quality` fields. All tests
 operate on temporary SQLite fixtures; raw production history, Pi
 planner and Homey writer remain unchanged until a separate guarded
 runtime promotion.
+
+The CI regression also detected mixed-precision UTC timestamp ordering:
+SQL string sort placed `T20:00:00.481Z` before `T20:00:00Z`.
+Canonical counter-history ingestion now sorts source snapshots by parsed
+SQLite `julianday(ts_utc)` before the original text as a tie breaker;
+sub-second duplicate samples are coalesced and do not produce false
+`NON_FORWARD_TIME` discontinuities. The standalone regression retains
+mixed-precision inputs specifically to prove this case.

@@ -17,7 +17,7 @@ api=load("services/pi/api/web-data/server.py", "web_history_api")
 
 class P1PvRegression(unittest.TestCase):
     def test_near_duplicate_snapshot_does_not_downgrade_pv_quality(self):
-        # Regression of the two older pytest failures: extra <1 s records
+        # Regression: mixed precision timestamps must be ordered chronologically.\n        # The older tests also require extra <1 s records
         # do not make the later ordinary 5-min observation an estimate.
         for duplicate_delta in (0.481, 0.982):
             with self.subTest(delta=duplicate_delta), tempfile.TemporaryDirectory() as d:

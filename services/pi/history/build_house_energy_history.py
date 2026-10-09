@@ -52,7 +52,10 @@ def _counter_rows(con):
             {" OR ".join("(d.device_key=? AND m.metric_key=?)" for _ in COUNTERS)}
           )
         GROUP BY x.ts_utc
-        ORDER BY x.ts_utc
+        -- Source timestamps can mix ISO precision (Z vs .481Z).
+        -- Lexicographic ordering incorrectly places .481Z before Z,
+        -- creating a false non-forward-time discontinuity.
+        ORDER BY julianday(x.ts_utc), x.ts_utc
     """
     for device_key, metric_key, _ in COUNTERS:
         args.extend((device_key, metric_key))
