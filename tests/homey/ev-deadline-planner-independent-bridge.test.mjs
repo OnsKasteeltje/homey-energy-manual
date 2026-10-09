@@ -29,7 +29,8 @@ function command(changes={}){
     targets:{
       ev:{target_W:0,target_A:0},
       ww:{target_W:0,target_on:false},
-      quooker:{mode:'OFF',target_on:false,opportunity_allowed:false}
+      quooker:{mode:'OFF',target_on:false,opportunity_allowed:false},
+      battery:{target_W:0}
     },
     realtime:{ev:{
       schema:'EMS_PI_EV_REALTIME_ENVELOPE_V0.4',
