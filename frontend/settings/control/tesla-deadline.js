@@ -1,3 +1,4 @@
+import {estimateCharge,formatDuration,deadlineFeedback} from "./tesla-deadline-estimate.mjs";
 
 const $=id=>document.getElementById(id);
 let saving=false;
@@ -21,6 +22,27 @@ function validate(v){
   if(!Number.isFinite(v.maxA)||v.maxA<6||v.maxA>16)return "Maximale laadstroom moet 6–16 A zijn.";
   return "";
 }
+function renderEstimate(){
+  const v=values();
+  const duration=$("tesla-estimate-duration"),details=$("tesla-estimate-details"),feedback=$("tesla-estimate-feasibility");
+  if(!duration||!details||!feedback)return;
+  const estimate=estimateCharge(v.currentSoc,v.targetSoc,v.maxA);
+  if(!estimate){
+    duration.textContent="—";
+    details.textContent="Vul geldige huidige en doel-SOC in (en maximaal 6–16 A) voor de indicatie.";
+    feedback.textContent="";
+    feedback.dataset.level="none";
+    return;
+  }
+  duration.textContent=formatDuration(estimate.minutes);
+  const amperage=estimate.assumedAmps?"voorlopig 3×10 A":"3×"+estimate.amps+" A";
+  details.textContent=estimate.kwh.toFixed(1).replace(".",",")+" kWh · "+amperage+" · circa "+
+    estimate.kw.toFixed(1).replace(".",",")+" kW";
+  const verdict=deadlineFeedback(estimate,v.deadline,Date.now());
+  feedback.textContent=verdict.text;
+  feedback.dataset.level=verdict.level;
+}
+
 function sameValues(a,b){
   return Boolean(a&&b)&&["currentSoc","targetSoc","deadline","maxA"].every(k=>Object.is(a[k],b[k]));
 }
@@ -87,6 +109,7 @@ async function submit(active){
     retryRequestId=null;
     savedValues=values();
     updateSaveButton();
+    renderEstimate();
     message(j.derivedState==="UPDATED"?"Pi heeft opdracht opgeslagen en verwerkt.":
       "Pi heeft opdracht opgeslagen; verwerking nog niet bevestigd.","ok");
     window.dispatchEvent(new Event("ems:tesla-command-saved"));
@@ -101,11 +124,15 @@ $("tesla-cancel")?.addEventListener("click",cancel);
 window.addEventListener("ems:tesla-command-rendered",()=>{
   savedValues=values();
   updateSaveButton();
+  renderEstimate();
 });
 
 ["current-soc","target-soc","deadline","max-a"].forEach(id=>{
   $(id)?.addEventListener("input",()=>{
     updateSaveButton();
+    renderEstimate();
     if(savedValues&&!sameValues(values(),savedValues))message("Wijzigingen nog niet opgeslagen.","pending");
   });
 });
+
+renderEstimate();

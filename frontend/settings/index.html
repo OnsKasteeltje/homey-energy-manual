@@ -5,6 +5,12 @@
 <section class="settings-grid">
 <article class="panel"><header><div><small>TESLA</small><h2>Deadline-opdracht</h2></div><span id="tesla-command-state" class="badge">—</span></header>
 <div class="fields four"><label>Huidige SOC<input id="current-soc" type="number" min="0" max="100" inputmode="numeric"><span>% · handmatig</span></label><label>Doel-SOC<input id="target-soc" type="number" min="1" max="100" inputmode="numeric"><span>% · handmatig</span></label><label>Deadline<input id="deadline" type="datetime-local"><span>Europe/Amsterdam · handmatig</span></label><label>Max. laadstroom<input id="max-a" type="number" min="6" max="16" inputmode="numeric"><span>A · handmatig</span></label></div>
+<div class="tesla-estimate" aria-live="polite" aria-label="Schatting Tesla-laadtijd">
+  <div class="tesla-estimate-heading"><span>Geschatte laadtijd (3 fasen)</span><strong id="tesla-estimate-duration">—</strong></div>
+  <p id="tesla-estimate-details" class="tesla-estimate-details">Vul huidige en doel-SOC in voor een tijdsindicatie.</p>
+  <p id="tesla-estimate-feasibility" class="tesla-estimate-feasibility" data-level="none"></p>
+  <p class="tesla-estimate-note">Indicatieve minimumtijd bij constante laadstroom; laden kan langer duren. Huidige SOC is handmatig, niet live uitgelezen.</p>
+</div>
 <div class="command-actions"><button id="tesla-save" class="primary-action" type="button">Opslaan</button> <button id="tesla-cancel" type="button">Deadline uitschakelen</button><span id="tesla-message" class="command-message" aria-live="polite"></span></div><p id="tesla-summary" class="summary">—</p><p class="validation-note">De deadline-opdracht gaat rechtstreeks naar de Pi. Opslaan en uitschakelen alleen via de private Tailscale-website.</p></article>
 <article class="panel compact"><header><div><small>WARM WATER</small><h2>Warmtebron</h2></div><strong id="ww-current">—</strong></header><div class="choice"><button disabled>CV</button><button disabled>Boiler</button></div><p id="ww-command" class="summary">—</p></article>
 <article class="panel compact"><header><div><small>ENERGIECONTRACT</small><h2>Contractmodus</h2></div><strong id="contract-current">—</strong></header><div class="choice"><button disabled>Vast</button><button disabled>Dynamisch</button></div><p id="contract-command" class="summary">—</p></article>
