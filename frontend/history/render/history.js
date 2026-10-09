@@ -93,7 +93,7 @@ function renderChart(data) {
       const x=gx+step*.08+j*bar;
       const isMinimum=key==="houseKWh" && houseMinimumAvailable(item);
       // Unknown PV has no bar; unknown house gets its proven P1
-      // lower-bound (hatched) instead of a false zero or question marks.
+      // lower-bound (dashed styling) instead of false zero or question marks.
       if(item.coverage>0&&!known(item,key)&&!isMinimum)return;
       const value=Math.max(0,Number(isMinimum?item.houseMinimumKWh:item[key])||0);
       const h=value/max*ih;

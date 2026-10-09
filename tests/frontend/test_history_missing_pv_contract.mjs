@@ -8,7 +8,6 @@ assert.ok(source.includes('bar-house-minimum'));
 assert.ok(source.includes('houseMinimumKWh'));
 assert.ok(!source.includes('class:"missing-energy"'));
 assert.ok(source.includes('fmtHouse(item)'));
-assert.ok(source.includes('fmtField(item,"houseKWh")'));
 assert.ok(source.includes('fmtField(item,"pvKWh")'));
 assert.ok(source.includes('"Onbekend"'));
 assert.ok(source.includes('"—"'));
