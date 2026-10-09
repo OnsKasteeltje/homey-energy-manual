@@ -11,6 +11,8 @@ MAX_NORMAL_GAP_SECONDS = 900
 COUNTER_DECREASE_EPSILON_KWH = 1e-6
 GAP_MULTIPLIER = 1.5
 MAX_PV_INTERPOLATION_SECONDS = 3 * 3600
+# Close-in-time duplicate samples are not material interpolation anchors.
+MIN_MATERIAL_PV_INTERIOR_SECONDS = 5.0
 
 COUNTERS = (
     ("grid_p1", "energy_import_kwh", "import_kwh"),
@@ -50,7 +52,10 @@ def _counter_rows(con):
             {" OR ".join("(d.device_key=? AND m.metric_key=?)" for _ in COUNTERS)}
           )
         GROUP BY x.ts_utc
-        ORDER BY x.ts_utc
+        -- Source timestamps can mix ISO precision (Z vs .481Z).
+        -- Lexicographic ordering incorrectly places .481Z before Z,
+        -- creating a false non-forward-time discontinuity.
+        ORDER BY julianday(x.ts_utc), x.ts_utc
     """
     for device_key, metric_key, _ in COUNTERS:
         args.extend((device_key, metric_key))
@@ -73,7 +78,7 @@ def _reconcile_held_pv(rows):
     projected = [list(row) for row in rows]
     invalid_ends = set()
     reconstructed_ends = set()
-    withheld_pv_ends = set()
+    withheld_pv_ends = {5: set(), 6: set(), 7: set()}  # per inverter
     for value_index, quality_index in ((5, 8), (6, 9), (7, 10)):
         anchors = []
         last_value = None
@@ -95,14 +100,24 @@ def _reconcile_held_pv(rows):
                 # A PV reading resuming after a long sleep cannot time-locate
                 # production. Do not attribute energy into arbitrary night slots.
                 invalid_ends.update(range(left + 1, right + 1))
-                withheld_pv_ends.update(range(left + 1, right + 1))
+                withheld_pv_ends[value_index].update(range(left + 1, right + 1))
                 continue
             # All covered intermediate endpoints are estimates, including
             # repeated 'observed' counter values. Preserve the total energy.
             for i in range(left + 1, right):
                 elapsed = (_parse_utc(rows[i][0]) - _parse_utc(a[0])).total_seconds()
                 projected[i][value_index] = float(a[value_index]) + delta * elapsed / duration
-            if right > left + 1:
+            # A duplicate <5s from an anchor must not relabel an otherwise
+            # fully observed 5-minute interval as reconstructed/held. Genuine
+            # intermediate observations (e.g. 5-minute stale readings between
+            # a 10-minute delta) still require estimated quality.
+            if any(
+                (_parse_utc(rows[i][0]) - _parse_utc(a[0])).total_seconds()
+                >= MIN_MATERIAL_PV_INTERIOR_SECONDS
+                and (_parse_utc(b[0]) - _parse_utc(rows[i][0])).total_seconds()
+                >= MIN_MATERIAL_PV_INTERIOR_SECONDS
+                for i in range(left + 1, right)
+            ):
                 reconstructed_ends.update(range(left + 1, right + 1))
     return projected, invalid_ends, reconstructed_ends, withheld_pv_ends
 
@@ -205,8 +220,12 @@ def build(db_path=DB):
             )
             # Preserve the raw P1 energy even where PV is not time-locatable.
             # No house energy is invented from an unknown PV allocation.
-            if row_index in withheld_pv_ends:
-                se, gw42, gw20 = None, None, None
+            if row_index in withheld_pv_ends[5]:
+                se = None
+            if row_index in withheld_pv_ends[6]:
+                gw42 = None
+            if row_index in withheld_pv_ends[7]:
+                gw20 = None
             pv_total = None if any(v is None for v in (se, gw42, gw20)) else se + gw42 + gw20
             house = None if imp is None or pv_total is None else imp + pv_total - exp
 

@@ -143,7 +143,10 @@ class HistoryResourceTest(unittest.TestCase):
                     import_kwh REAL, export_kwh REAL,
                     pv_solaredge_kwh REAL, pv_goodwe4200_kwh REAL, pv_goodwe2000_kwh REAL,
                     pv_total_kwh REAL, house_kwh REAL,
-                    quality TEXT NOT NULL, discontinuity_reason TEXT,
+                    quality TEXT NOT NULL,
+                    p1_quality TEXT NOT NULL DEFAULT 'unknown',
+                    pv_quality TEXT NOT NULL DEFAULT 'unknown',
+                    discontinuity_reason TEXT,
                     updated_at_utc TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -232,7 +235,10 @@ class PvFlexDeviceActualsTest(unittest.TestCase):
                     duration_seconds INTEGER NOT NULL,
                     import_kwh REAL, export_kwh REAL,
                     pv_total_kwh REAL, house_kwh REAL,
-                    quality TEXT NOT NULL, discontinuity_reason TEXT
+                    quality TEXT NOT NULL,
+                    p1_quality TEXT NOT NULL DEFAULT 'unknown',
+                    pv_quality TEXT NOT NULL DEFAULT 'unknown',
+                    discontinuity_reason TEXT
                 );
                 CREATE TABLE devices (
                     id INTEGER PRIMARY KEY,

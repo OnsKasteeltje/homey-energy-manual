@@ -334,3 +334,33 @@ planner policy, a new eligibility gate, Tesla telemetry, or evidence that
 a target is achievable. The Pi still performs its authoritative command
 validation; Homey continues all existing safety/actuator duties. Nothing
 is sent to the Pi merely by editing an input field.
+
+### 17.4 History unknown-PV / P1 authority regression (9 October 2026)
+
+Production incident: the local P1 archive measured **29.08 kWh** grid import
+06:00–12:00 CEST on 9 October, dominated by Easee EV charging (the separately
+observed Homey five-minute Easee power supports substantial charging across
+07:00–12:00; it is not exact metered EV energy attribution). Concurrent three
+PV inverter cumulative counters were dormant/slow to advance, so intervals
+were marked unknown and `house_kwh` became NULL. Prior History UI/API
+rendered incomplete house energy as **0**, and presented the partial 12.73 kWh
+as the complete daily house total, contradicting the P1 record.
+
+In the corrected read-only `EMS_WEB_HISTORY_V1` projection:
+- each `series` bucket has `knownFraction` per energy field; `quality.metricQuality`
+  exposes seconds known and completeness *within measured intervals*;
+- partial/unknown house or PV columns are marked `?` / `Onbekend` in the chart,
+  not zero; their KPI shows `—` with the known partial amount explicitly labelled
+  `Onvolledig`; P1 import/export remain independent and visible;
+- the existing numeric `summary` partial sums remain for API compatibility
+  **but are never labelled full totals unless metric completeness is true**;
+- long >3-hour non-time-locatable PV counter increases remain withheld,
+  **per inverter** rather than erasing known values from unrelated PV sources.
+  No nighttime PV production, energy, or Tesla charging is fabricated.
+  House remains unknown where even one required PV component is unknown.
+
+The quality ratio is relative to currently measured intervals, not a claim
+that the whole calendar day (or a partially elapsed day) is covered; global
+`quality.coverage` still describes period coverage. Derived history is rebuilt
+only by a separately controlled Pi promotion after backup; historical raw
+measurements are never edited. This frontend/API change is **not** control policy.
