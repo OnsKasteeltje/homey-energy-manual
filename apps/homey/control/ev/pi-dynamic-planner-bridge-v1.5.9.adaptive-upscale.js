@@ -144,6 +144,7 @@ const buildPhaseControl=()=>{
   }
   return {schema:'EM2_EV_PHASE_CONTROL_V0.1',authoritative:true,mode:'OFF',requestedA:0,requestedW:0,source:'IDLE'};
 };
+let executionMode='PLANNER';
 const selectorV=await Homey.logic.getVariable({id:SELECTOR_ID});
 if(!selectorV||selectorV.value!=='PI') return true;
 const writeIntent=async()=>{
@@ -185,8 +186,8 @@ const writeIntent=async()=>{
     inputRevisions:{state:stateRev,planner:plannerGeneratedAt},
     policyProjection:{
       plannerOwner:'PI',
-      plannerValid:source!=='PI_DEADLINE_ONLY',
-      executionMode:source==='PI_DEADLINE_ONLY'?'DEADLINE_ONLY':'PLANNER',
+      plannerValid:executionMode==='PLANNER',
+      executionMode,
       executor:'HOMEY',
       authoritySelector:'PI',
       contractMode:'FIXED',
@@ -296,7 +297,7 @@ try{
 
   // A planner failure is allowed only for a strictly bounded, Pi-owned
   // deadline-only command. It must never enable PV, WW or Quooker targets.
-  const executionMode=String(cmd.executionMode||'PLANNER');
+  executionMode=String(cmd.executionMode||'PLANNER');
   if(!['PLANNER','DEADLINE_ONLY'].includes(executionMode))throw new Error('UNKNOWN_EXECUTION_MODE');
   const deadlineOnly=executionMode==='DEADLINE_ONLY';
   if(deadlineOnly){
