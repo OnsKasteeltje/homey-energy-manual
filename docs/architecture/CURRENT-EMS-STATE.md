@@ -297,7 +297,7 @@ before the replay is exposed as AI evidence.
 
 The Pi exposes `GET /control/current`. A valid production response uses schema `EMS_PI_CONTROL_COMMAND_V0.1`, is bounded to the current quarter-hour slot and planner validity, and fails closed on stale or invalid planner input. The endpoint is a readiness/command endpoint, not a second authority selector.
 
-### 5.1 EV deadline independence — PR #212 (PREPARED; not live until Pi + Homey cutover)
+### 5.1 EV deadline independence — PR #212 (LIVE since 2026-10-09)
 
 A deadline is explicit user intent, independent from PV opportunity planning. The prepared Pi contract retains the **single** `GET /control/current` endpoint and existing `EMS_PI_CONTROL_COMMAND_V0.1` command schema, and evaluates the global execution policy before planner/deadline selection. The healthy-plan response preserves the current 15-minute planner semantics with additive `executionMode=PLANNER`, `planner.valid=true`. A failed/missing/stale dynamic plan **does not** make the entire command unavailable when the Pi deadline contract is independently valid, active, `TRACKING`, unexpired and based on fresh Homey Core telemetry. Instead, only in that case Pi returns a bounded `executionMode=DEADLINE_ONLY` response (`validUntil <= now + 90s`) with `planner.valid=false` and the explicit planner error.
 
@@ -305,7 +305,7 @@ The fallback contains no planner PV targets: EV PV/realtime disabled (deadline g
 
 The prepared `GET /health` projection reports control availability **separately** from planner readiness: `control_endpoint_status=ready` together with `control_execution_mode=DEADLINE_ONLY`, `control_planner_status=degraded`, and `control_planner_reason=PLAN_STALE` is intentional. These are additive fields and must not be interpreted as a healthy PV planner. `control_deadline_active` and `control_deadline_valid` provide explicit deadline evidence.
 
-This is a **prepared change, not yet live** on 2026-10-09; PR #212 is the source for staged Pi API, then Homey Bridge promotion. The isolated-worktree evidence is 14 Python contract tests, 5 HomeyScript simulations and architecture gate PASS. The active Homey v1.5.9 Bridge, downstream Gate and EV Actuator remain unchanged until separate production validation and cutover.
+**LIVE since 2026-10-09 after the 12:00 EV deadline.** PR #212 was merged as `7c3eb3121ad04f5380e906a812364080954adbe7`. Pi API source was deployed with runtime backup `/home/jeroen/ems/backup/runtime-20261009-122100`; `ems-status-api.service` was restarted and verified active. Production `/health` reported `control_endpoint_status=ready`, `control_execution_mode=PLANNER`, `control_planner_status=ready`, and `/control/current` reported `status=READY`, `planner.valid=true`, `deadline.active=false`. The stable Homey v1.5.9 Bridge Flow ID `8bf53fdb-76f4-47db-8ccb-773ac515f06e` was then updated in place; the live script was read back byte-identical to merged GitHub main, `enabled=true`, `broken=false`. Its non-script cards were preserved, and the EV Adapter, Gate, and sole Actuator remain unchanged. Easee readback after cutover showed paused, 0 A, 0 W. Rollback source is the previous GitHub script at `a378702fa404df6732a5f0490d37e88656db1edf`. The 14 Python contract tests, 5 HomeyScript simulations, and architecture gate passed on Pi. A real planner-down urgent deadline has not yet been encountered live; this exact scenario remains backed by offline simulation.
 
 
 ## 6. Current state ingest and history endpoint
