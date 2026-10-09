@@ -9,6 +9,9 @@ writes or control writes.
 """
 
 import json
+import fcntl
+import os
+import tempfile
 import math
 from datetime import datetime, timezone
 from pathlib import Path
@@ -215,16 +218,28 @@ def build(command, energy_state, previous, now_utc=None):
 
 
 def main():
-    command = load(COMMAND_FILE, {})
-    energy_state = load(ENERGY_STATE_FILE, {})
-    previous = load(STATE_FILE, {})
-    payload = build(command, energy_state, previous)
-
+    # The live command API and systemd watcher/timer must serialize derivation.
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = STATE_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(payload, separators=(",", ":")) + "\n")
-    tmp.replace(STATE_FILE)
-    print(json.dumps(payload, indent=2))
+    lock_file = STATE_FILE.parent / ".ev-deadline-state.lock"
+    with open(lock_file, "a", encoding="utf-8") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        command = load(COMMAND_FILE, {})
+        energy_state = load(ENERGY_STATE_FILE, {})
+        previous = load(STATE_FILE, {})
+        payload = build(command, energy_state, previous)
+        fd, temp = tempfile.mkstemp(prefix=STATE_FILE.name + ".", suffix=".tmp",
+                                    dir=STATE_FILE.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as output:
+                json.dump(payload, output, separators=(",", ":"))
+                output.write("\n")
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temp, STATE_FILE)
+        finally:
+            if os.path.exists(temp):
+                os.unlink(temp)
+        print(json.dumps(payload, indent=2))
 
 
 if __name__ == "__main__":
