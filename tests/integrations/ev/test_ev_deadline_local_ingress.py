@@ -47,7 +47,7 @@ class Validation(unittest.TestCase):
 
     def test_soc_equal_denied(self):
         with self.assertRaisesRegex(ValueError, "TARGET_SOC_INVALID"):
-            ingress.validate_intent(dict(INTENT, currentSoc=100), NOW)
+            ingress.validate_intent(dict(INTENT, targetSoc=90), NOW)
 
     def test_invalid_max_a_denied(self):
         for amps in (0, 5, 17, 8.2, True):
@@ -83,6 +83,9 @@ class Validation(unittest.TestCase):
 
 
 class Handler(unittest.TestCase):
+    def future(self):
+        return dict(INTENT, deadline=(datetime.now(ingress.LOCAL_TZ) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M"))
+
     def handler(self, obj, peer="127.0.0.1", pin="long-secret"):
         data = json.dumps(obj).encode()
         h = SimpleNamespace(
@@ -105,7 +108,7 @@ class Handler(unittest.TestCase):
             return result, persist.call_count, runner.call_count
 
     def test_reject_non_loopback(self):
-        result, writes, runs = self.collect(self.handler({**INTENT},peer="192.168.1.50"))
+        result, writes, runs = self.collect(self.handler(self.future(),peer="192.168.1.50"))
         self.assertEqual((result[0][0], writes, runs), (403,0,0))
 
     def test_reject_wrong_pin(self):
@@ -113,25 +116,25 @@ class Handler(unittest.TestCase):
         self.assertEqual((result[0][0], writes, runs), (401,0,0))
 
     def test_missing_idempotency_key(self):
-        result, writes, runs = self.collect(self.handler({**INTENT}))
+        result, writes, runs = self.collect(self.handler(self.future()))
         self.assertEqual((result[0][0], writes, runs), (400,0,0))
 
     def test_accept_and_immediate_derive(self):
-        req=dict(INTENT,clientRequestId="a900fe6c-6552-40ba-9be4-c74445ef795e")
+        req=dict(self.future(),clientRequestId="a900fe6c-6552-40ba-9be4-c74445ef795e")
         result,writes,runs=self.collect(self.handler(req))
         self.assertEqual((result[0][0],writes,runs),(200,1,1))
         self.assertEqual(result[0][1]["derivedState"],"UPDATED")
 
     def test_retry_is_idempotent(self):
         req=dict(INTENT,clientRequestId="a900fe6c-6552-40ba-9be4-c74445ef795e")
-        old=ingress.build_command(ingress.validate_intent(INTENT,NOW),
+        old=ingress.build_command(ingress.validate_intent(req,NOW),
                                   req["clientRequestId"], NOW)
         result,writes,runs=self.collect(self.handler(req), old)
         self.assertEqual((result[0][0],writes,runs),(200,0,0))
         self.assertTrue(result[0][1]["duplicate"])
 
     def test_idempotency_conflict_is_rejected(self):
-        req=dict(INTENT,currentSoc=80,clientRequestId="a900fe6c-6552-40ba-9be4-c74445ef795e")
+        req=dict(self.future(),currentSoc=80,clientRequestId="a900fe6c-6552-40ba-9be4-c74445ef795e")
         old=ingress.build_command(ingress.validate_intent(INTENT,NOW),
                                   req["clientRequestId"], NOW)
         result,writes,runs=self.collect(self.handler(req),old)
