@@ -17,7 +17,7 @@ function validate(v){
   if(!Number.isFinite(v.currentSoc)||v.currentSoc<0||v.currentSoc>99)return "Controleer huidige SOC.";
   if(!Number.isFinite(v.targetSoc)||v.targetSoc<1||v.targetSoc>100||v.targetSoc<=v.currentSoc)return "Doel-SOC moet hoger zijn dan huidige SOC.";
   if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v.deadline))return "Controleer de deadline.";
-  if(new Date(v.deadline).getTime()<=Date.now())return "Deadline moet in de toekomst liggen.";
+  // Pi validates future time in Europe/Amsterdam; browser time zones can differ.
   if(!Number.isFinite(v.maxA)||v.maxA<6||v.maxA>16)return "Maximale laadstroom moet 6–16 A zijn.";
   return "";
 }

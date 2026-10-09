@@ -28,6 +28,13 @@ INTENT = dict(active=True, deadline="2026-10-09T13:00", currentSoc=90,
 
 
 class Validation(unittest.TestCase):
+    def test_deadline_browser_timezone_is_not_reinterpreted(self):
+        state_js=(ROOT / "frontend/settings/state/settings-state.js").read_text()
+        ctrl_js=(ROOT / "frontend/settings/control/tesla-deadline.js").read_text()
+        self.assertIn('if(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$/.test(v))return v;', state_js)
+        self.assertNotIn('new Date(v.deadline)', ctrl_js)
+        self.assertIn('browser time zones can differ', ctrl_js)
+
     def test_one_tailnet_website_listener(self):
         cfg=(ROOT / "deploy/caddy/ems-frontend-v2.Caddyfile").read_text()
         self.assertIn("http://100.127.130.0 {", cfg)

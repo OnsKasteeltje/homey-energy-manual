@@ -433,3 +433,9 @@ browser/PWA contexts must be verified separately before native/PWA cutover:
 WireGuard transport encryption does not by itself make an HTTP URL an
 HTTPS secure origin. An eventual HTTPS-on-tailnet improvement must retain
 one private origin and must not expose the website publicly.
+
+All manual deadline inputs are interpreted as Europe/Amsterdam. The form
+never reinterprets the unzoned command timestamp using the visiting browser's
+local timezone; the Pi is authoritative for future-deadline validation. This
+is especially important when entering a deadline while travelling abroad via
+Tailscale.
