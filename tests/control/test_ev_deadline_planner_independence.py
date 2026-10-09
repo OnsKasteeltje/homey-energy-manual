@@ -125,7 +125,7 @@ class TestDeadlinePlannerIndependence(unittest.TestCase):
         self.assertEqual(result["deadline"]["requestId"], "req-test")
         self.assertEqual(result["targets"]["ev"]["target_W"], 0)
         self.assertEqual(result["targets"]["ev"]["target_A"], 0)
-        self.assertFalse(result["targets"]["ww"]["target_on"])
+        self.assertIsNone(result["targets"]["ww"]["target_on"])
         self.assertEqual(result["targets"]["ww"]["target_W"], 0)
         self.assertEqual(result["targets"]["quooker"]["mode"], "OFF")
         self.assertFalse(result["targets"]["quooker"]["opportunity_allowed"])
