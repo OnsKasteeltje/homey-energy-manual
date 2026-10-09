@@ -182,5 +182,59 @@ class TestDeadlinePlannerIndependence(unittest.TestCase):
             self.command(p=plan(valid=False), pol=denied)
 
 
+class TestControlHealthObservability(unittest.TestCase):
+    def test_healthy_planner_reports_ready(self):
+        healthy = {
+            "executionMode": "PLANNER",
+            "planner": {"valid": True, "reason": None},
+            "deadline": {"valid": True, "active": True},
+            "validUntil": iso(NOW + timedelta(minutes=5)),
+        }
+        with patch.object(server, "current_control_command", return_value=healthy):
+            snapshot = server.control_health_snapshot()
+        self.assertEqual(snapshot["control_endpoint_status"], "ready")
+        self.assertEqual(snapshot["control_execution_mode"], "PLANNER")
+        self.assertEqual(snapshot["control_planner_status"], "ready")
+        self.assertIsNone(snapshot["control_planner_reason"])
+        self.assertTrue(snapshot["control_deadline_valid"])
+        self.assertTrue(snapshot["control_deadline_active"])
+
+    def test_deadline_only_is_available_while_planner_degraded(self):
+        fallback = {
+            "executionMode": "DEADLINE_ONLY",
+            "planner": {"valid": False, "reason": "PLAN_STALE"},
+            "deadline": {"valid": True, "active": True},
+            "validUntil": iso(NOW + timedelta(seconds=90)),
+        }
+        with patch.object(server, "current_control_command", return_value=fallback):
+            snapshot = server.control_health_snapshot()
+        self.assertEqual(snapshot["control_endpoint_status"], "ready")
+        self.assertEqual(snapshot["control_execution_mode"], "DEADLINE_ONLY")
+        self.assertEqual(snapshot["control_planner_status"], "degraded")
+        self.assertEqual(snapshot["control_planner_reason"], "PLAN_STALE")
+        self.assertTrue(snapshot["control_deadline_valid"])
+        self.assertTrue(snapshot["control_deadline_active"])
+
+    def test_no_eligible_deadline_still_reports_blocked(self):
+        with patch.object(
+            server, "current_control_command", side_effect=ValueError("PLAN_STALE")
+        ):
+            snapshot = server.control_health_snapshot()
+        self.assertEqual(snapshot["control_endpoint_status"], "blocked:PLAN_STALE")
+        self.assertEqual(snapshot["control_planner_status"], "blocked")
+        self.assertIsNone(snapshot["control_execution_mode"])
+        self.assertFalse(snapshot["control_deadline_active"])
+        self.assertFalse(snapshot["control_deadline_valid"])
+
+    def test_health_supports_old_planner_contract_without_mode(self):
+        with patch.object(
+            server, "current_control_command",
+            return_value={"validUntil": iso(NOW + timedelta(minutes=2))}
+        ):
+            snapshot = server.control_health_snapshot()
+        self.assertEqual(snapshot["control_planner_status"], "ready")
+        self.assertEqual(snapshot["control_execution_mode"], "PLANNER")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
