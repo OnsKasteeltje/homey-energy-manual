@@ -289,25 +289,9 @@ def ev_deadline_execution_contract(now):
     }
 
 
-def current_control_command():
-    """Return a valid Pi planner command when the planner is technically ready.
-
-    Runtime authority is deliberately not enforced here. Homey's
-    EM2_Planner_Authority selector is the single cutover gate. This endpoint
-    only answers whether the Pi planner can safely supply a fresh command.
-    """
-    now = datetime.now(timezone.utc)
-    policy = load_json(CONTROL_POLICY_FILE)
+def _planner_control_command(now, policy, deadline):
+    """Build the existing planner command without changing healthy-plan semantics."""
     plan = load_json(DYNAMIC_PLAN_FILE)
-
-    if policy.get("schema") != CONTROL_POLICY_SCHEMA:
-        raise ValueError("CONTROL_POLICY_SCHEMA")
-    if policy.get("executor") != "HOMEY":
-        raise ValueError("CONTROL_EXECUTOR_MISMATCH")
-    if policy.get("executionEnabled") is not True:
-        raise ValueError("CONTROL_EXECUTION_DISABLED")
-    if policy.get("contractMode") != "FIXED" or policy.get("contractId") != "ENGIE_3Y_2026_2029":
-        raise ValueError("CONTROL_POLICY_CONTRACT_MISMATCH")
 
     if plan.get("schema") != PI_PLAN_SCHEMA:
         raise ValueError("PLAN_SCHEMA_MISMATCH")
@@ -346,10 +330,10 @@ def current_control_command():
     quooker_power_w = max(0, int(round(float(current.get("quookerModeledPowerW") or 1580))))
     quooker_start_export_w = max(0, int(round(float(current.get("quookerOpportunityStartExportW") or 1250))))
     quooker_stop_import_w = max(0, int(round(float(current.get("quookerOpportunityStopImportW") or 600))))
-    deadline = ev_deadline_execution_contract(now)
-
     return {
         "schema": "EMS_PI_CONTROL_COMMAND_V0.1",
+        "executionMode": "PLANNER",
+        "planner": {"valid": True, "reason": None},
         "status": "READY",
         "readyForCutover": True,
         "generatedAt": now.isoformat().replace("+00:00", "Z"),
@@ -401,6 +385,122 @@ def current_control_command():
             "singleAuthorityGate": "EM2_Planner_Authority"
         }
     }
+
+
+def _deadline_only_control_command(now, policy, deadline, planner_reason):
+    """Serve a fresh, Pi-authorized deadline when only the PV planner is unhealthy.
+
+    This is a control-command fallback, not a second executor. Every non-EV
+    target and realtime PV permission remains fail-closed.
+    """
+    deadline_at = parse_utc_timestamp(deadline.get("deadlineAt"))
+    latest_start = parse_utc_timestamp(deadline.get("latestStartAt"))
+    try:
+        max_a = int(deadline.get("maxA"))
+        remaining = float(deadline.get("remainingKWh"))
+    except (TypeError, ValueError):
+        raise ValueError("DEADLINE_ONLY_INVALID_DATA")
+
+    if not (
+        deadline.get("schema") == "EMS_PI_EV_DEADLINE_EXECUTION_V0.1"
+        and deadline.get("authority") == "PI"
+        and deadline.get("valid") is True
+        and deadline.get("active") is True
+        and deadline.get("status") == "TRACKING"
+        and deadline_at is not None
+        and deadline_at > now
+        and latest_start is not None
+        and EV_MIN_A <= max_a <= EV_MAX_A
+        and remaining > 0
+    ):
+        raise ValueError("DEADLINE_ONLY_NOT_ELIGIBLE")
+
+    valid_until = min(now + timedelta(seconds=90), deadline_at)
+    iso = lambda t: t.isoformat().replace("+00:00", "Z")
+    return {
+        "schema": "EMS_PI_CONTROL_COMMAND_V0.1",
+        "executionMode": "DEADLINE_ONLY",
+        "planner": {"valid": False, "reason": planner_reason},
+        "status": "READY",
+        "readyForCutover": True,
+        "generatedAt": iso(now),
+        "validUntil": iso(valid_until),
+        "plannerOwner": "PI",
+        "plannerSchema": None,
+        "plannerGeneratedAt": None,
+        "executor": "HOMEY",
+        "contract": {"mode": "FIXED", "id": "ENGIE_3Y_2026_2029"},
+        "slot": None,
+        "targets": {
+            "ev": {"target_W": 0, "target_A": 0, "reason": "DEADLINE_ONLY_NO_PV_PLAN"},
+            "ww": {"target_W": 0, "target_on": False, "reason": "PLANNER_UNAVAILABLE"},
+            "quooker": {
+                "mode": "OFF", "target_on": False, "opportunity_allowed": False,
+                "modeled_power_W": 1580, "start_export_W": 1250,
+                "stop_import_W": 600, "reason": "PLANNER_UNAVAILABLE"
+            },
+            "battery": {"target_W": 0}
+        },
+        "realtime": {
+            "ev": {
+                "schema": "EMS_PI_EV_REALTIME_ENVELOPE_V0.4",
+                "shadowOnly": False,
+                "productionConsumerAllowed": False,
+                "allowed": False,
+                "mode": "DISABLED",
+                "min_A": 0,
+                "max_A": 0,
+                "deadlineActive": True,
+                "deadlineMax_A": max_a,
+                "deadlineRequiredSlot": True,
+                "blockReason": "PLANNER_UNAVAILABLE_DEADLINE_ONLY",
+                "failClosed": True,
+            }
+        },
+        "deadline": deadline,
+        "authority": {
+            "enforcedBy": "HOMEY_SELECTOR",
+            "piPolicyPlannerOwner": policy.get("plannerOwner"),
+            "piPolicyCutoverState": policy.get("cutoverState"),
+        },
+        "safety": {
+            "failClosed": True,
+            "stalePlanRejected": True,
+            "plannerDoesNotWriteDevices": True,
+            "singleAuthorityGate": "EM2_Planner_Authority"
+        }
+    }
+
+
+def current_control_command():
+    """One control endpoint, independently validated planner and EV deadline.
+
+    A planner failure can only yield an executable EV intent when the Pi's
+    current deadline state is valid, active and unexpired. Global authority
+    and contract policy remain unconditional fail-closed gates.
+    """
+    now = datetime.now(timezone.utc)
+    policy = load_json(CONTROL_POLICY_FILE)
+    if policy.get("schema") != CONTROL_POLICY_SCHEMA:
+        raise ValueError("CONTROL_POLICY_SCHEMA")
+    if policy.get("executor") != "HOMEY":
+        raise ValueError("CONTROL_EXECUTOR_MISMATCH")
+    if policy.get("executionEnabled") is not True:
+        raise ValueError("CONTROL_EXECUTION_DISABLED")
+    if policy.get("contractMode") != "FIXED" or policy.get("contractId") != "ENGIE_3Y_2026_2029":
+        raise ValueError("CONTROL_POLICY_CONTRACT_MISMATCH")
+
+    deadline = ev_deadline_execution_contract(now)
+    try:
+        return _planner_control_command(now, policy, deadline)
+    except (ValueError, TypeError, AttributeError, OSError) as planner_error:
+        # Do not let a stale/missing/corrupt PV plan veto a valid deadline.
+        # Never turn global authority failures into this fallback.
+        if deadline.get("valid") is not True or deadline.get("active") is not True:
+            raise
+        return _deadline_only_control_command(
+            now, policy, deadline, str(planner_error)
+        )
 
 
 def send_json(handler, status, payload):
