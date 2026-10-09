@@ -118,20 +118,23 @@ def build(command, energy_state, previous, now_utc=None):
         "diagnostics": [],
     }
 
+    if not request_id:
+        out["status"] = "INVALID_COMMAND"
+        out["diagnostics"].append("REQUEST_ID_MISSING")
+        return out
+    # Cancellation has no deadline/SoC; do not misclassify it as invalid.
+    if not out["active"]:
+        out["status"] = "INACTIVE"
+        out["remainingKWh"] = 0.0
+        out["latestStartAt"] = None
+        return out
+
     deadline = parse_deadline_local(command.get("deadline"))
     if deadline:
         out["deadlineAt"] = deadline.isoformat().replace("+00:00", "Z")
     else:
         out["status"] = "INVALID_DEADLINE"
         out["diagnostics"].append("DEADLINE_PARSE_FAILED")
-        return out
-
-    if not request_id:
-        out["status"] = "INVALID_COMMAND"
-        out["diagnostics"].append("REQUEST_ID_MISSING")
-        return out
-    if not out["active"]:
-        out["status"] = "INACTIVE"
         return out
     if out["goalKWh"] is None or out["goalKWh"] < 0:
         out["status"] = "INVALID_COMMAND"
