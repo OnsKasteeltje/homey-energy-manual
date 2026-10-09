@@ -16,8 +16,9 @@ assert.equal(ex.assumedAmps,false);
 assert.equal(estimateCharge(40,60,6).minutes,180);
 assert.equal(estimateCharge(40,60,16).minutes,68);
 assert.equal(estimateCharge(40,60,NaN).amps,10);
+assert.equal(estimateCharge(0,100,10).kwh,62);
 assert.equal(estimateCharge(40,60,NaN).assumedAmps,true);
-for(const args of [[40,40,10],[50,40,10],[99,100,10],[0,100,10],[40,60,17],[40,60,5],[40,60,10.5],[NaN,60,10]]){
+for(const args of [[40,40,10],[50,40,10],[99,100,10],[40,60,17],[40,60,5],[40,60,10.5],[NaN,60,10]]){
   assert.equal(estimateCharge(...args),null,JSON.stringify(args));
 }
 const submitted=Date.parse("2026-10-09T20:43:45.483Z");
