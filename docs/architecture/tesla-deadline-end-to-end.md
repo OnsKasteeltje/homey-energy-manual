@@ -361,12 +361,12 @@ Regressiebewijs: `tests/control/test_ev_deadline_planner_independence.py`, `test
 
 ## 12. Local Pi EV Deadline Command Ingress V1.1 — PREPARED, NOT LIVE
 
-Code is staged on branch \`feat/ev-deadline-local-command-ingress-v1-1\`.
+Code is staged on branch `feat/ev-deadline-local-command-ingress-v1-1`.
 **The production chain remains GitHub/Worker until guarded cutover.**
 
 Private command chain:
 
-\`\`\`text
+```text
 Tailscale-only EMS Invoer V2 (http://100.127.130.0/settings/)
   -> Caddy POST /web/commands/tesla (remote_ip Tailnet only)
   -> 127.0.0.1:3100/commands/tesla (loopback-only + control PIN)
@@ -374,9 +374,9 @@ Tailscale-only EMS Invoer V2 (http://100.127.130.0/settings/)
   -> existing derived-state builder (immediately, under file lock)
   -> existing /control/current
   -> unchanged Homey Bridge/Adapter/Gate/sole Actuator/Easee
-\`\`\`
+```
 
-Credential must be manually provisioned to \`/etc/ems/tesla-control.pin\`,
+Credential must be manually provisioned to `/etc/ems/tesla-control.pin`,
 owned by jeroen and mode 0600, minimum 8 characters. No PIN is stored in Git.
 LAN HTTP can still READ UI but cannot POST the secret: only tailnet traffic,
 encrypted by Tailscale WireGuard, is permitted through Caddy. No public port
@@ -385,8 +385,8 @@ maxA, SoC and goal energy; generates server-side requestId. A clientRequestId
 prevents a retry of the same request from creating a new baseline.
 Invalid requests fail closed without changing the current command.
 
-The read-only \`GET /web/commands/current\` reads the same runtime command
-file and accepts \`active=false\` with null SoC. The worker's settings
+The read-only `GET /web/commands/current` reads the same runtime command
+file and accepts `active=false` with null SoC. The worker's settings
 functionality is outside this migration.
 
 The existing derived-state builder is serialized between API and systemd
@@ -396,7 +396,7 @@ the existing 60-second deadline-state timer remains as recovery.
 
 **Controlled promotion, NOT EXECUTED:**
 1. Install/test PIN file, run unittest/architecture gate, check Tailscale,
-   backup current Caddy, runtime and systemd; run \`caddy validate\`.
+   backup current Caddy, runtime and systemd; run `caddy validate`.
 2. Stage latest code; restart only status/web-data services and reload Caddy.
    Verify old read paths and new private route before cutover.
 3. Disable/stop old GitHub-fetch timer + service. The old Worker must not
