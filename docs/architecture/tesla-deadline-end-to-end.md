@@ -359,10 +359,9 @@ Health/observability blijft onderscheid maken tussen API-beschikbaarheid en plan
 Regressiebewijs: `tests/control/test_ev_deadline_planner_independence.py`, `tests/homey/ev-deadline-planner-independent-bridge.test.mjs` en `scripts/ems_architecture_gate.sh`. Voor promotie opnieuw op de geïsoleerde Pi-worktree uitvoeren. Dit is uitgevoerd in afzonderlijke stappen: Pi API deployment met backup `/home/jeroen/ems/backup/runtime-20261009-122100`, daarna gerichte Homey Bridge update en byte-identieke GitHub readback. Productie `/health` en `/control/current` waren gezond (`PLANNER`, `planner.valid=true`, geen actieve deadline). De live Bridge bleef ingeschakeld en niet defect; Easee stond na cutover op 0 A / 0 W. Oude bridgecode voor rollback: GitHub-commit `a378702fa404df6732a5f0490d37e88656db1edf`. Een werkelijk planner-down + urgente deadline is nog niet in productie voorgekomen en is alleen offline getest.
 
 
-## 12. Local Pi EV Deadline Command Ingress V1.1 — PREPARED, NOT LIVE
+## 12. Local Pi EV Deadline Command Ingress V1.1 — LIVE (2026-10-09)
 
-Code is staged on branch `feat/ev-deadline-local-command-ingress-v1-1`.
-**The production chain remains GitHub/Worker until guarded cutover.**
+Source: merged PR #213, `6b2a2de8da64d542232c1cb42c0658e6eb50fc07`. On 2026-10-09 the Pi deployed the V1.1 Status API, Web Data API, website and private Caddy configuration. The old `ems-ev-deadline-command.timer` and command fetch service were explicitly disabled/stopped. The Pi command file is now the sole runtime source; the existing Homey Bridge/Gate/Actuator are untouched. A **new valid website command and resulting Easee physical behavior have not yet been tested end to end**.
 
 Private command chain:
 
@@ -401,28 +400,15 @@ invocations using a host-local file lock, and writes output atomically.
 If immediate derivation fails, the API returns accepted + PENDING_WATCHDOG;
 the existing 60-second deadline-state timer remains as recovery.
 
-**Controlled promotion, NOT EXECUTED:**
-1. Install/test PIN file, run unittest/architecture gate, check Tailscale,
-   backup current Caddy, runtime and systemd; run `caddy validate`.
-2. Confirm Tailscale works on both Mac and iPhone, on home Wi-Fi and
-   on cellular (Tailscale connected), before switching the single ingress.
-   Stage latest code; restart only status/web-data services; validate
-   and reload Caddy. From this point the old LAN website URL intentionally
-   stops serving V2. Keep Caddy backup for rollback. **Do not provision the PIN yet**: POST remains
-   fail-closed with PIN_NOT_CONFIGURED, so the old GitHub poller cannot race
-   a successfully accepted local request.
-3. Disable/stop the old GitHub-fetch timer + service. Only after confirming
-   the timer is inactive, provision the new Pi PIN (minimum eight characters).
-   The handler reads the file per request, so no extra API restart is needed.
-   The old Worker may still serve unrelated EMS settings; its Tesla writes
-   must not be used after cutover.
-4. Submit fresh authenticated command from Tailscale, verify same requestId
-   in local command/state, Pi /control/current, Homey Gate and Easee telemetry.
-   Also test cancellation, wrong PIN, and denial of LAN-only website access.
-   Do not mistake a missing tailnet connection for an EMS outage.
-5. Rollback must NOT blindly re-enable old GitHub poller or overwrite a newer
-   local command with stale GitHub data.
-6. Compare end-to-end latency with 2026-10-09 baseline of 4m39s.
+**Production cutover evidence, 2026-10-09:**
+1. Pi read-only worktree preflight at `671b4086d`: 18/18 new tests PASS, architecture gate PASS, Caddy validation "Valid configuration", Tailscale `100.127.130.0` present.
+2. Source merged via PR #213; Pi `main` fast-forwarded to `6b2a2de8d`.
+3. Runtime backup at `/home/jeroen/ems/backup/ev-ingress-v11-20261009-222745`. The status/web-data API and private frontend/Caddy were updated and restarted/reloaded. `GET /web/commands/current` and `GET /web/state/current` passed. HTTP listener showed **only** `100.127.130.0:80`.
+4. PIN stored in `/etc/ems/tesla-control.pin` with restricted access. Negative POSTs: wrong PIN HTTP 401, expired deadline HTTP 400. SHA-256 of canonical runtime command file remained unchanged.
+5. `ems-ev-deadline-command.timer` disabled/stopped and `ems-ev-deadline-command.service` stopped; both inactive in shell validation. `ems-ev-deadline-state.timer`, `ems-status-api.service` and `ems-web-data-api.service` active. Website readback of legacy requestId `483bb445-b434-47f8-91ac-318c11060e24` succeeded.
+6. The Cloudflare Worker may still exist for legacy `ems_settings`; its Tesla GitHub write route is **not** a Pi command source anymore. Do not re-enable legacy fetch without reconciling newer local commands.
+
+**Pending acceptance:** submit a new *deliberate* authenticated deadline via the Tailscale website; check requestId in runtime command and derived state, `/control/current`, Homey Bridge/Gate, Easee target/offered A and the time to actual charging when applicable. Test cancellation. Device access from Mac/iPhone via Tailscale on home Wi-Fi and mobile data, plus SwiftUI ATS/PWA secure-origin behavior, require separate client verification.
 
 One-URL note: do not create a separate LAN-write or LAN-read experience.
 The existing Homey → Pi control connection on 192.168.1.42:3100 is a

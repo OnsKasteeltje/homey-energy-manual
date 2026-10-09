@@ -441,11 +441,11 @@ ARCHITECTURE DOCUMENTATION PASS
 Security is therefore a release gate, not a post-implementation hardening task.
 
 
-## Unified tailnet-only V2 website (PR #213 target, NOT LIVE)
+## Unified tailnet-only V2 website (PR #213 LIVE, 2026-10-09)
 
-The planned EV Command Ingress V1.1 cutover standardizes **all** website
+The deployed EV Command Ingress V1.1 cutover standardizes **all** website
 access, not just writes, on the single Tailscale IP and same origin:
-`http://100.127.130.0/`. Caddy will listen only on the Pi's Tailscale
+`http://100.127.130.0/`. Caddy listens only on the Pi's Tailscale
 interface. A trusted home LAN client does not get a separate website route.
 Mac, iPhone and future native app use this URL after joining the authorized
 tailnet. Website requests, including PIN-bearing POSTs, travel inside the
@@ -456,5 +456,4 @@ The read-only Web Data API still binds to localhost `127.0.0.1:3200`.
 The Pi status/control API and Homey LAN control path remain unchanged,
 and the command handler refuses non-loopback direct callers. Never open a
 public listener, port forwarding, Funnel, or second LAN browser entrypoint.
-This is a **proposed** replacement of the historical dual-ingress deployment
-contract above, not a claim that production is already switched.
+Pi preflight and runtime listener checks confirmed the single tailnet-only Caddy binding. Historical LAN-plus-tailnet rules above describe the previous deployment and are superseded for the V2 frontend. Mobile client functionality and a successful new authenticated deadline to physical Easee charging remain separate outstanding runtime validations.

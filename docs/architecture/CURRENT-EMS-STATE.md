@@ -813,11 +813,8 @@ make the SQL connections writable. `immutable=1` is forbidden for AI reads of
 the live operational history.
 
 
-### EV Deadline Local Ingress V1.1 — PREPARED (not LIVE)
+### EV Deadline Local Ingress V1.1 — LIVE (2026-10-09)
 
-Branch `feat/ev-deadline-local-command-ingress-v1-1` prepares authenticated Tailscale-only website → Pi writes. Production still uses GitHub Worker/raw fetch until controlled cutover. This is an ingress-only change, not a second planner or Homey actuator. See `docs/architecture/tesla-deadline-end-to-end.md` section 12.
+PR #213 merged to `main` at `6b2a2de8da64d542232c1cb42c0658e6eb50fc07`. Pi runtime deployed: only the Tailscale-hosted website on `100.127.130.0:80`; restricted-PIN local Pi Tesla command ingress; a common runtime command file now used by `/web/commands/current` and Pi deadline derivation. Runtime backup `/home/jeroen/ems/backup/ev-ingress-v11-20261009-222745`. Preflight 18/18 PASS, architecture gate PASS, `caddy validate` valid; API negative auth/deadline tests HTTP 401/400 and no command mutation. GitHub fetch timer disabled, fetch service stopped, and existing derived-state timer/API services remain active. One physical Homey Easee writer and Pi plan authority unchanged. The old GitHub/Worker path must never be reintroduced as a concurrent command source.
 
-
-### PR #213: one Tailscale-only website origin (PREPARED; not live)
-
-After controlled cutover, the private EMS website for home/away, plus future SwiftUI clients, uses `http://100.127.130.0/` exclusively. The old LAN web address `http://192.168.1.42` is retired **for Caddy web presentation only**. Internal Homey ↔ Pi port 3100 remains on the existing LAN. The PIN-protected Pi Tesla command route remains separate from read-only Web Data API. Caddy only binds to the Tailscale interface. Before any production changes, verify Tailscale on Mac and iPhone on Wi-Fi and cellular, run `caddy validate`, and maintain a tested rollback. HTTPS secure-origin/iOS ATS support is explicitly a later check; do not equate WireGuard encryption with HTTPS.
+**Open verification:** no new valid user command has yet been observed end-to-end through the new Tailscale frontend/Pi/Homey/Easee chain, and no actual charge-latency improvement is yet measured. iPhone/cellular and native SwiftUI ATS/PWA behavior are not yet verified. No public website ingress; private HTTP is carried inside Tailscale WireGuard, not HTTPS.

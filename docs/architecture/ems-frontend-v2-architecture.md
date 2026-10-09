@@ -234,9 +234,9 @@ The legacy Tesla input is intentionally not modified solely to correct this usab
 
 
 
-### 13.1 Invoer V2 read-state separation
+### 13.1 Invoer V2 read-state separation (Tesla cutover LIVE 2026-10-09)
 
-Invoer V2 keeps operational runtime state separate from command state. Current runtime timestamp and WW source are read from the private same-origin `GET /web/state/current` resource. Last accepted Tesla deadline and EMS settings command values are read from the private same-origin read-only `GET /web/commands/current` resource; that resource projects the existing canonical command-transfer files and does not accept writes. The existing authenticated Worker remains the Tesla command write boundary. Its canonical source lives under `apps/cloudflare/`. The Worker uses an explicit CORS origin allowlist; private LAN V2 at `http://192.168.1.42` is allowed alongside the transitional GitHub Pages origin, while wildcard CORS remains prohibited. Cloudflare Git builds must be scoped to `apps/cloudflare/**` and must not be triggered by runtime/publication changes elsewhere in the repository. Its non-secret browser configuration is staged as a static deployment asset for private V2. The Tesla controller reads that asset from the same-origin absolute `/settings/config/tesla-control-config.json` URL; relative browser fetch paths must not assume resolution against the module file location. The frontend MUST NOT infer a runtime contract mode from command state, and MUST NOT invent a `contract.mode` field when the canonical energy-state contract does not provide one.
+Runtime state remains distinct from user command state. The private same-origin `GET /web/state/current` provides operational state; read-only `GET /web/commands/current` projects the current Tesla command from `/home/jeroen/ems/data/tesla-deadline-command.json`. The V2 controller submits explicitly entered Tesla deadlines or cancellations through `POST /web/commands/tesla` on the single Tailscale website, via a PIN-protected localhost handler in the existing Pi Status API. The Web Data API **remains read-only**. The legacy Cloudflare Worker still has unrelated EMS settings functionality and may be present, but its Tesla/GitHub write path is not consumed by Pi after the cutover. No GitHub token or PIN is embedded in browser JS. The frontend must not infer observed Tesla SoC or contract mode from command state. Accepted command values are distinct from execution confirmation by Homey/Easee.
 
 ## 14. Shared V2 visual language
 
@@ -255,7 +255,7 @@ The current visual baseline is a light Tesla/Victron-inspired interface:
 A V2 page migration MUST reuse this visual baseline rather than introducing its own dark/light theme. Future implementation SHOULD move these shared visual tokens and shell styles into `frontend/shared/` so there is one technical source of truth; this consolidation MUST NOT create an additional render layer or change page ownership.
 ## 15. Web Data API security boundary
 
-Frontend V2 operational read data migrates to the single secured Web Data API boundary defined by `docs/architecture/web-data-api-security.md`. The proposed post-cutover V2 website uses one private Tailscale-only origin, `http://100.127.130.0/`, for the browser at home, the browser away from home and the future SwiftUI app; the earlier trusted-LAN browser ingress is retired at cutover. It is not a public website target. The preferred browser/API deployment is same-origin through the Pi private web ingress while the API itself remains localhost-scoped. GitHub Pages may remain transitional during migration but is not the target V2 runtime host. This contract applies across Live, Invoer read-state/advice, Energiehistorie, Planner and future V2 observability. Frontend code MUST NOT contain API secrets, bypass the approved API resource contracts, or turn the read-only boundary into a command path. Explicit user commands remain on their separate authenticated command interface.
+Frontend V2 operational read data migrates to the single secured Web Data API boundary defined by `docs/architecture/web-data-api-security.md`. The production V2 website uses one private Tailscale-only origin, `http://100.127.130.0/`, for the browser at home, the browser away from home and the future SwiftUI app; the earlier trusted-LAN browser ingress was retired on 2026-10-09. It is not a public website target. The preferred browser/API deployment is same-origin through the Pi private web ingress while the API itself remains localhost-scoped. GitHub Pages may remain transitional during migration but is not the target V2 runtime host. This contract applies across Live, Invoer read-state/advice, Energiehistorie, Planner and future V2 observability. Frontend code MUST NOT contain API secrets, bypass the approved API resource contracts, or turn the read-only boundary into a command path. Explicit user commands remain on their separate authenticated command interface.
 
 
 
@@ -304,14 +304,12 @@ Cumulative-counter history has an explicit source boundary between Homey Insight
 This precedence prevents downsampled Homey Insights values from being treated as exact point-in-time readings inside the live observed archive.
 
 
-### 17.2 Unified browser/app access (PR #213, prepared, not live)
+### 17.2 Unified browser/app access (PR #213 LIVE, 2026-10-09)
 
 One EMS frontend origin over the existing Tailscale network: `http://100.127.130.0/`.
-Tailscale is required on the Mac/iPhone both at home and away. Pi Caddy will
-bind only to the tailnet address. No separate LAN website, public URL,
+Tailscale is required on the Mac/iPhone both at home and away. Pi Caddy binds only to the tailnet address. No separate LAN website, public URL,
 Tailscale Serve or Funnel. The read-only Web Data API stays bound to localhost,
 and the Tesla POST stays PIN-protected and localhost-proxied through Caddy.
 The internal Homey-to-Pi `192.168.1.42:3100` control path stays unchanged.
-This is a **target state only** until Pi cutover; no live URL changes have
-been made by PR source preparation. Later SwiftUI App Transport Security
+The Pi cutover is complete, but an end-to-end new valid deadline and the mobile/iPhone client experience remain to be verified. Later SwiftUI App Transport Security
 support and any PWA secure-origin requirement must be checked explicitly.
