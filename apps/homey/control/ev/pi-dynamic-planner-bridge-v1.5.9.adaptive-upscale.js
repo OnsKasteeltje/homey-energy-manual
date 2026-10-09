@@ -314,7 +314,7 @@ try{
       Number.isInteger(cap) && cap>=MIN_A && cap<=MAX_A &&
       remaining!==null && remaining>0 &&
       num(t.ev?.target_W)===0 && num(t.ev?.target_A)===0 &&
-      num(t.ww?.target_W)===0 && t.ww?.target_on===false &&
+      num(t.ww?.target_W)===0 && t.ww?.target_on===null &&
       t.quooker?.mode==='OFF' && t.quooker?.target_on===false &&
       t.quooker?.opportunity_allowed===false &&
       num(t.battery?.target_W)===0 &&
