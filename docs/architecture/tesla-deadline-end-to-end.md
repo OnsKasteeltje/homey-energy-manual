@@ -330,9 +330,9 @@ Easee/Equalizer  = lokale elektrische safety
 Er is één planner/deadline authority (Pi) en één automatische fysieke writer (Homey EV writer). Dual ownership is verboden.
 
 
-## 11. Planner-onafhankelijke deadline-uitvoering — PR #212 (DRAFT, niet LIVE)
+## 11. Planner-onafhankelijke deadline-uitvoering — PR #212 (LIVE sinds 2026-10-09)
 
-Deze aanpassing is voorbereid op `feat/ev-deadline-planner-independent-v1`. De huidige productieketen blijft ongewijzigd tot de gecontroleerde cutover is uitgevoerd.
+Deze aanpassing is via PR #212 geïntegreerd op `main` als commit `7c3eb3121ad04f5380e906a812364080954adbe7`. De Pi API en de bestaande Homey Bridge v1.5.9 zijn op 9 oktober 2026 gecontroleerd naar productie gepromoveerd, na afloop van de 12:00-deadline. De Homey EV Adapter, Gate en enige fysieke Actuator blijven ongewijzigd.
 
 De Pi behandelt een deadline als eigen gebruikersintentie. Een falende PV-planner mag een geldige, actieve deadline niet blokkeren. Er blijft **één** `GET /control/current`, **één** Homey PI Bridge en **één** EV Adapter → Gate → Actuator → Easee-keten; er komt geen tweede charger-controller of Homey publisher.
 
@@ -356,4 +356,4 @@ Health/observability blijft onderscheid maken tussen API-beschikbaarheid en plan
 
 `control_endpoint_status=ready` zegt alleen dat Homey een bruikbaar controlcommando kan ontvangen; het zegt **niet** dat de PV-planner gezond is. Bij een gezonde planner rapporteert `control_planner_status=ready`. De bestaande `control_endpoint_status` en `control_valid_until` blijven compatibel.
 
-Regressiebewijs: `tests/control/test_ev_deadline_planner_independence.py`, `tests/homey/ev-deadline-planner-independent-bridge.test.mjs` en `scripts/ems_architecture_gate.sh`. Voor promotie opnieuw op de geïsoleerde Pi-worktree uitvoeren. Daarna in afzonderlijke stappen Pi API en vervolgens Homey-bridge deployen, telkens met rollback, terwijl EV Adapter/Gate/Actuator ongewijzigd blijven.
+Regressiebewijs: `tests/control/test_ev_deadline_planner_independence.py`, `tests/homey/ev-deadline-planner-independent-bridge.test.mjs` en `scripts/ems_architecture_gate.sh`. Voor promotie opnieuw op de geïsoleerde Pi-worktree uitvoeren. Dit is uitgevoerd in afzonderlijke stappen: Pi API deployment met backup `/home/jeroen/ems/backup/runtime-20261009-122100`, daarna gerichte Homey Bridge update en byte-identieke GitHub readback. Productie `/health` en `/control/current` waren gezond (`PLANNER`, `planner.valid=true`, geen actieve deadline). De live Bridge bleef ingeschakeld en niet defect; Easee stond na cutover op 0 A / 0 W. Oude bridgecode voor rollback: GitHub-commit `a378702fa404df6732a5f0490d37e88656db1edf`. Een werkelijk planner-down + urgente deadline is nog niet in productie voorgekomen en is alleen offline getest.
