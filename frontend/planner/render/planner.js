@@ -47,7 +47,7 @@ function render({plan, ev}) {
   const W = 1100, H = 390, p = {l:55,r:18,t:24,b:48};
   const iw = W-p.l-p.r, ih = H-p.t-p.b;
   const fields = [
-    ["pvForecastW","pvline"],["evPlanW","evline"],["wwPlanW","wwline"],
+    ["pvForecastW","pvline"],["evPlanW","evline"],["wwPlanW","wwline"],["quookerPlanW","quookerline"],
     ["gridExportAfterFlexW","exportline"],["gridImportAfterFlexW","importline"]
   ];
   const rawMax = Math.max(1000, ...slots.flatMap(s=>fields.map(([key])=>number(s[key]))));
@@ -113,6 +113,9 @@ function render({plan, ev}) {
         ["PV voorspeld",fmtW(slot.pvForecastW)],
         ["Tesla gepland",fmtW(slot.evPlanW)],
         ["Warm water gepland",fmtW(slot.wwPlanW)],
+        ["Quooker gepland",slot.quookerPlanW==null?"—":fmtW(slot.quookerPlanW)],
+        ["Quooker modus",slot.quookerMode||"—"],
+        ["Quooker PV-kans",slot.quookerOpportunityAllowed===true?"toegestaan":slot.quookerOpportunityAllowed===false?"niet toegestaan":"—"],
         ["Export verwacht",fmtW(slot.gridExportAfterFlexW)],
         ["Import verwacht",fmtW(slot.gridImportAfterFlexW)],
         ["EV reden",slot.evReason || "—"],

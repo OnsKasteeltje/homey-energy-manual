@@ -7,7 +7,7 @@ state=Path("frontend/pv-flex/state/pv-flex-state.js").read_text()
 render=Path("frontend/pv-flex/render/pv-flex.js").read_text()
 css=Path("frontend/pv-flex/styles/pv-flex.css").read_text()
 
-for token in ("PV & Flex Evaluatie","Wat verwachtten we 12 uur vooraf","Forecast versus werkelijk PV-gebruik","EV uit PV","Overig eigen gebruik","Export","Heating opportunity","Heating intent","HEATING PREHEAT V0.3 · SHADOW","Voorverwarming"):
+for token in ("PV & Flex Evaluatie","PV BIJ BESLISSING","Besloten versus gemeten energie","EV uit PV","Overig eigen gebruik","Export","Heating opportunity","Heating intent","HEATING PREHEAT V0.3 · SHADOW","Voorverwarming"):
     assert token in index, token
 for removed in ("flex-panel","ww-lane","evlane","EV laden","heating-note","WW boiler","Heating Flex"):
     assert removed not in index, f"duplicate/legacy render surface remains: {removed}"

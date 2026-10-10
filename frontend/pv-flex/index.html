@@ -16,29 +16,30 @@
 </header>
 <main>
   <section class="intro">
-    <div><small>PV V1 · HISTORISCHE EMS-EVALUATIE</small><h1>PV & Flex Evaluatie</h1>
-      <p>Wat verwachtten we 12 uur vooraf, hoeveel PV hebben we daadwerkelijk opgewekt en hoe goed hebben we die energie benut?</p></div>
+    <div><small>CANONIEKE V1 · BESLISSING EN UITVOERING</small><h1>PV & Flex Evaluatie</h1>
+      <p>Wat wist en besloot het EMS op dat moment? Wat gebeurde werkelijk, en wat kunnen we daarvan aantoonbaar beoordelen?</p></div>
   </section>
   <section class="period-nav">
     <button id="prev" aria-label="Vorige dag">‹</button>
-    <div><strong id="day-title">—</strong><span>Europe/Amsterdam · forecast op vaste 12-uurs lead</span></div>
+    <div><strong id="day-title">—</strong><span>Europe/Amsterdam · vastgelegd plan vlak vóór elk kwartier</span></div>
     <button id="next" aria-label="Volgende dag">›</button>
   </section>
   <section class="kpis">
-    <article><small>PV-FORECAST V1</small><strong id="kpi-forecast">—</strong><span id="kpi-slots">—</span></article>
+    <article><small>PV BIJ BESLISSING</small><strong id="kpi-forecast">—</strong><span id="kpi-slots">—</span></article>
     <article><small>PV WERKELIJK</small><strong id="kpi-pv">—</strong><span>P1 + omvormerhistorie</span></article>
     <article><small>EIGEN PV-GEBRUIK</small><strong id="kpi-self">—</strong><span id="kpi-self-note">Geregistreerd eigen PV-verbruik</span></article>
     <article><small>TERUGLEVERING</small><strong id="kpi-export">—</strong><span>naar het net</span></article>
   </section>
   <section class="panel">
-    <header><div><small>15-MINUTEN</small><h2>Forecast versus werkelijk PV-gebruik</h2></div>
-      <div class="legend"><span class="forecast">V1 · 12 uur vooraf</span><span class="planned-ev">Tesla gepland</span><span class="planned-ww">Warm water gepland</span><span class="ev">EV uit PV</span><span class="self">Overig eigen gebruik</span><span class="export">Export</span><span class="heating-opportunity">Heating opportunity</span><span class="heating-intent">Heating intent</span></div></header>
-    <div class="chart-wrap"><svg id="pv-chart" role="img" aria-label="PV forecast en verdeling van werkelijk opgewekte PV over EV, overig eigen gebruik en export"></svg><div id="tooltip" class="tooltip" hidden></div></div>
+    <header><div><small>15-MINUTEN · CANONIEKE PLANNER</small><h2>Besloten versus gemeten energie</h2></div>
+      <div class="legend"><span class="forecast">PV-forecast bij besluit</span><span class="planned-ev">Tesla gepland</span><span class="planned-ww">Warm water gepland</span><span class="planned-quooker">Quooker gepland</span><span class="ev">EV uit PV</span><span class="self">Overig eigen gebruik</span><span class="export">Export</span><span class="heating-opportunity">Heating opportunity</span><span class="heating-intent">Heating intent</span></div></header>
+    <div class="chart-wrap"><svg id="pv-chart" role="img" aria-label="PV uit oorspronkelijk plannerbesluit naast daadwerkelijk gemeten PV, gepland EV, boiler, Quooker en export"></svg><div id="tooltip" class="tooltip" hidden></div></div>
     <p class="allocation-note" id="archive-status">V1-plannerarchief laden…</p>
-    <p class="allocation-note">Gepland EV/WW is de laatst geldige beslissing vóór het kwartier; PV-forecast V1 komt uit een afzonderlijk snapshot van minimaal 12 uur eerder.</p>
+    <p class="allocation-note">PV-forecast, Tesla, boiler, Quooker en verwachte netbalans komen uit hetzelfde laatste geldige plannerbesluit vóór het kwartier. Onbekende waarden blijven onbekend.</p>
     <p class="allocation-note">EV uit PV is conservatief toegerekend: alleen gemeten EV-verbruik dat door PV kan zijn gedekt nadat overig huisverbruik is afgetrokken.</p>
     <p class="allocation-note">Heating opportunity en intent komen uitsluitend uit de persistente V0.4 opportunity-/step-history; ontbrekende historie wordt niet gereconstrueerd.</p>
-    <p id="empty" class="empty" hidden>Geen meetdata voor deze dag.</p>
+    <p id="empty" class="empty" hidden>Geen meetdata of plannerbesluiten voor deze dag.</p>
+    <section class="evidence-panel" aria-labelledby="evidence-title"><h3 id="evidence-title">Beslissing per kwartier <span id="evidence-time">—</span></h3><div id="decision-evidence" class="evidence-grid" aria-live="polite">Selecteer een kwartier in de grafiek.</div><p class="allocation-note">Een afwijking bewijst geen slechte beslissing. Een gemiste PV-kans vereist een toetsbaar, haalbaar alternatief; een Quooker-aansturing is hier nog niet als werkelijk gemeten bevestigd.</p></section>
   </section>
   <section id="preheat-panel" class="panel preheat-panel">
     <header>

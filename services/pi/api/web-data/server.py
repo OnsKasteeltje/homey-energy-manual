@@ -48,7 +48,7 @@ STATE_API_SCHEMA = "EMS_WEB_STATE_CURRENT_V1"
 COMMANDS_API_SCHEMA = "EMS_WEB_COMMANDS_CURRENT_V1"
 HISTORY_API_SCHEMA = "EMS_WEB_HISTORY_V1"
 PV_FLEX_API_SCHEMA = "EMS_WEB_PV_FLEX_ANALYSIS_V1"
-PLANNER_EVALUATION_API_SCHEMA = "EMS_WEB_PLANNER_EVALUATION_V1"
+PLANNER_EVALUATION_API_SCHEMA = "EMS_WEB_PLANNER_EVALUATION_V2"
 PV_FORECAST_API_SCHEMA = "EMS_WEB_PV_FORECAST_V2"
 DYNAMIC_PLAN_API_SCHEMA = "EMS_WEB_DYNAMIC_PLAN_V1"
 EV_REQUIREMENT_API_SCHEMA = "EMS_WEB_EV_REQUIREMENT_V1"
@@ -573,11 +573,11 @@ def history_resource(kind, value):
 
 
 def planner_evaluation_resource(value):
-    """Archived V1 PV forecast (12h lead) and near-term EV/WW plan, never reconstructed.
+    """Replay only evidence frozen into the last valid decision before each slot.
 
-    A forecast selected 12 hours before a slot is different evidence from the
-    latest valid plan before that slot. Return both with their original generation
-    timestamps. No historical V2 forecasts are read or substituted.
+    Forecast, EV/WW/Quooker planning and net consequences always come from the
+    SAME archived Pi plan. No fixed-lead weather score or reconstructed actions.
+    Actual P1/PV/device observations are served by pv_flex_analysis_resource.
     """
     start_local, end_local, _ = _history_period("day", value)
     start = start_local.astimezone(timezone.utc)
@@ -603,86 +603,107 @@ def planner_evaluation_resource(value):
             (_utc_text(start - timedelta(hours=36)), _utc_text(end)),
         ).fetchall()
 
+    def watts(item, key, *, optional=False):
+        value = item.get(key)
+        if optional and value is None:
+            return None
+        if (not isinstance(value, (int, float)) or isinstance(value, bool)
+                or not 0 <= value <= 50000):
+            raise ValueError("PLANNER_EVALUATION_POWER_INVALID")
+        return value
+
     for generated_value, valid_until_value, payload in snapshots:
         generated = parse_timestamp(generated_value)
         valid_until = parse_timestamp(valid_until_value)
-        if generated is None:
+        if generated is None or valid_until is None or valid_until <= generated:
             continue
         try:
             document = json.loads(zlib.decompress(payload))
             plan = document.get("plan") or {}
-        except (zlib.error, ValueError, TypeError):
+        except (zlib.error, ValueError, TypeError, AttributeError):
             continue
         if (plan.get("schema") != "EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3"
                 or plan.get("mode") != "PURE_SHADOW"
                 or plan.get("readOnly") is not True
-                or plan.get("control_writes") is not False):
+                or plan.get("control_writes") is not False
+                or parse_timestamp(plan.get("generated_at")) != generated):
             continue
-        if parse_timestamp(plan.get("generated_at")) != generated:
-            continue
+        guardrails = plan.get("guardrails") or {}
+        ww_mode = guardrails.get("wwSourceMode")
+        if ww_mode not in {"CV", "BOILER", "UNKNOWN"}:
+            ww_mode = None
         for item in plan.get("slots") or []:
             if not isinstance(item, dict):
                 continue
             when = parse_timestamp(item.get("slot_start_utc"))
-            if when is None:
+            if when is None or when < generated or when > valid_until:
                 continue
             slot = slots.get(_utc_text(when))
-            if slot is None:
+            if slot is None or slot["plan"] is not None:
                 continue
-            forecast_w = item.get("pvForecastW")
-            if (slot["forecast"] is None
-                    and generated <= when - timedelta(hours=12)
-                    and isinstance(forecast_w, (int, float))
-                    and not isinstance(forecast_w, bool)
-                    and 0 <= forecast_w <= 50000):
-                confidence = item.get("confidence")
-                if not isinstance(confidence, (int, float)) or isinstance(confidence, bool) or not 0 <= confidence <= 1:
-                    confidence = None
-                slot["forecast"] = {
-                    "pvForecastW": forecast_w,
-                    "confidence": confidence,
-                    "generatedAt": generated_value,
-                    "leadMinutes": round((when - generated).total_seconds()/60, 1),
-                }
-            if (slot["plan"] is None
-                    and generated <= when
-                    and valid_until is not None
-                    and valid_until >= when):
-                ev_w = item.get("evPlanW")
-                ww_w = item.get("wwPlanW")
-                imp_w = item.get("gridImportAfterFlexW")
-                exp_w = item.get("gridExportAfterFlexW")
-                values = (ev_w, ww_w, imp_w, exp_w)
-                if any(not isinstance(w, (int, float)) or isinstance(w, bool) or not 0 <= w <= 50000 for w in values):
-                    continue
-                ev_reason = item.get("evAllocationReason")
-                ww_reason = item.get("wwAllocationReason")
-                slot["plan"] = {
-                    "evPlanW": ev_w,
-                    "wwPlanW": ww_w,
-                    "gridImportAfterFlexW": imp_w,
-                    "gridExportAfterFlexW": exp_w,
-                    "evReason": ev_reason if isinstance(ev_reason, str) and len(ev_reason) <= 120 else None,
-                    "wwReason": ww_reason if isinstance(ww_reason, str) and len(ww_reason) <= 120 else None,
-                    "generatedAt": generated_value,
-                }
+            try:
+                values = {key: watts(item, key) for key in (
+                    "pvForecastW", "evPlanW", "wwPlanW",
+                    "gridImportAfterFlexW", "gridExportAfterFlexW",
+                )}
+                quooker_w = watts(item, "quookerPlanW", optional=True)
+            except ValueError:
+                continue
+            confidence = item.get("confidence")
+            if (not isinstance(confidence, (int, float))
+                    or isinstance(confidence, bool)
+                    or not 0 <= confidence <= 1):
+                confidence = None
+            ev_reason = item.get("evAllocationReason")
+            ww_reason = item.get("wwAllocationReason")
+            quooker_mode = item.get("quookerMode")
+            if quooker_mode not in {"OPPORTUNITY", "FORCED_ON", "OFF"}:
+                quooker_mode = None
+            quooker_allowed = item.get("quookerOpportunityAllowed")
+            if not isinstance(quooker_allowed, bool):
+                quooker_allowed = None
+            # The forecast is the value the SAME selected decision used.
+            slot["forecast"] = {
+                "pvForecastW": values["pvForecastW"],
+                "confidence": confidence,
+                "generatedAt": generated_value,
+            }
+            slot["plan"] = {
+                "evPlanW": values["evPlanW"],
+                "wwPlanW": values["wwPlanW"],
+                "quookerPlanW": quooker_w,
+                "quookerMode": quooker_mode,
+                "quookerOpportunityAllowed": quooker_allowed,
+                "wwSourceMode": ww_mode,
+                "teslaAvailableForecast": item.get("teslaAvailableForecast")
+                    if isinstance(item.get("teslaAvailableForecast"), bool) else None,
+                "gridImportAfterFlexW": values["gridImportAfterFlexW"],
+                "gridExportAfterFlexW": values["gridExportAfterFlexW"],
+                "evReason": ev_reason if isinstance(ev_reason, str) and len(ev_reason) <= 120 else None,
+                "wwReason": ww_reason if isinstance(ww_reason, str) and len(ww_reason) <= 120 else None,
+                "generatedAt": generated_value,
+                "validUntil": valid_until_value,
+            }
 
     series = list(slots.values())
-    forecasts = [slot["forecast"] for slot in series if slot["forecast"] is not None]
     planned = [slot["plan"] for slot in series if slot["plan"] is not None]
+    quooker_known = [item["quookerPlanW"] for item in planned if item["quookerPlanW"] is not None]
     return {
         "schema": PLANNER_EVALUATION_API_SCHEMA,
         "mode": "READ_ONLY",
         "controlWrites": False,
         "forecastSource": "ARCHIVED_CANONICAL_V1_DYNAMIC_PLAN",
-        "forecastSelection": {"kind": "FIXED_LEAD_12H", "targetLeadMinutes": 720},
+        "forecastSelection": {"kind": "SAME_AS_VALID_PLAN_DECISION"},
         "planSelection": {"kind": "LATEST_VALID_BEFORE_SLOT_START"},
         "summary": {
-            "forecastSlots": len(forecasts),
-            "forecastKWh": round(sum(item["pvForecastW"] for item in forecasts)/4000, 6) if forecasts else None,
+            "forecastSlots": len(planned),
+            "forecastKWh": round(sum(slot["forecast"]["pvForecastW"] for slot in series
+                                     if slot["forecast"] is not None)/4000, 6) if planned else None,
             "planSlots": len(planned),
             "plannedEvKWh": round(sum(item["evPlanW"] for item in planned)/4000, 6) if planned else None,
             "plannedWwKWh": round(sum(item["wwPlanW"] for item in planned)/4000, 6) if planned else None,
+            "quookerPlanSlots": len(quooker_known),
+            "plannedQuookerKWh": round(sum(quooker_known)/4000, 6) if quooker_known else None,
         },
         "series": series,
     }
@@ -1092,7 +1113,21 @@ def dynamic_planner_resource():
         for reason in (ev_reason, ww_reason):
             if reason is not None and (not isinstance(reason, str) or len(reason) > 120):
                 raise ValueError("DYNAMIC_PLAN_REASON_INVALID")
+        quooker_w = item.get("quookerPlanW")
+        if quooker_w is not None and (not isinstance(quooker_w, (int, float))
+                                       or isinstance(quooker_w, bool)
+                                       or not 0 <= quooker_w <= 50000):
+            raise ValueError("DYNAMIC_PLAN_QUOOKER_INVALID")
+        quooker_mode = item.get("quookerMode")
+        if quooker_mode not in {"OPPORTUNITY", "FORCED_ON", "OFF"}:
+            quooker_mode = None
+        quooker_opportunity = item.get("quookerOpportunityAllowed")
+        if not isinstance(quooker_opportunity, bool):
+            quooker_opportunity = None
         exposed.append({
+            "quookerPlanW": quooker_w,
+            "quookerMode": quooker_mode,
+            "quookerOpportunityAllowed": quooker_opportunity,
             "start": item["slot_start_utc"],
             **values,
             "confidence": confidence,

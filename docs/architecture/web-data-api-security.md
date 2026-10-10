@@ -477,3 +477,23 @@ Homey publisher or independent planning authority is introduced.
 ## Read-only archived Planner V1 evaluation resource
 
 `GET /web/analysis/planner/day/YYYY-MM-DD` exposes the canonical V1 forecast saved at least 12 hours before each target slot and, independently, the latest still-valid EV/WW allocation saved before that slot. Only allowlisted values and their generation times leave `planner-history.sqlite`; the original V2 forecast archive remains available for rollback but is never silently used as V1. This API is presentation-only and does not reconstruct new decisions.
+
+## EMS decision and execution evidence contract (2026-10-10)
+
+`GET /web/analysis/planner/day/YYYY-MM-DD` now returns
+`EMS_WEB_PLANNER_EVALUATION_V2`. PV forecast and planned EV, electric WW,
+Quooker (mode, planned quarter-hour average and opportunity allowed) plus
+projected grid flows all originate from **one latest valid archived V1 plan
+before that slot**. The payload exposes generation/valid-until provenance,
+and rejects future plans. The projection reads SQLite in read-only WAL-safe
+mode and does not infer device execution or planner intent from current state.
+
+Quooker power is a **planning allocation**, not an observation. The current
+historical device-power endpoint exposes Tesla and boiler measurements, not
+a verified Quooker watt trace. The Evaluatie page labels its Quooker actual
+unknown; an opportunity flag is a permission/envelope, not proof of switching
+the element on. Weather forecast accuracy at a fixed lead remains a separate
+historical archive concern, not the primary EMS decision evaluation.
+The older V1 evaluation endpoint response is replaced with V2 under the
+same internal API route; source forecast archives and the shadow V2 runtime
+are left intact for rollback. All pages remain private/read-only.

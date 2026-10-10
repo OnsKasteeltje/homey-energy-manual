@@ -18,7 +18,8 @@ iso = lambda dt: dt.isoformat().replace("+00:00", "Z")
 slot = {
     "pvForecastW": 2200, "evPlanW": 1400, "wwPlanW": 0,
     "gridImportAfterFlexW": 0, "gridExportAfterFlexW": 400,
-    "confidence": 0.8, "evAllocationReason": "PV_OPPORTUNITY",
+    "confidence": 0.8, "quookerPlanW": 1000, "quookerMode": "FORCED_ON", "quookerOpportunityAllowed": False,
+    "evAllocationReason": "PV_OPPORTUNITY",
     "wwAllocationReason": "BLOCKED_SOURCE_CV",
 }
 source = {
@@ -44,6 +45,8 @@ with tempfile.TemporaryDirectory() as tmp:
     assert len(result["slots"])==96
     assert result["slots"][0]["pvForecastW"]==2200
     assert result["slots"][0]["evPlanW"]==1400
+    assert result["slots"][0]["quookerPlanW"]==1000
+    assert result["slots"][0]["quookerMode"]=="FORCED_ON"
     assert result["slots"][0]["evReason"]=="PV_OPPORTUNITY"
     assert "secret" not in json.dumps(result)
     assert "guardrails" not in result
