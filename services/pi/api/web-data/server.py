@@ -1145,7 +1145,7 @@ def heating_schedule_resource():
     generated_at = source.get("generatedAt")
     if parse_timestamp(generated_at) is None:
         raise ValueError("HEATING_SCHEDULE_SOURCE_INVALID")
-    allowed_keys = {"woonkamer", "eetkamer", "keuken", "serre"}
+    allowed_keys = {"woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"}
     rooms = []
     for zone in source.get("zones", []):
         if zone.get("key") not in allowed_keys:
@@ -1169,6 +1169,8 @@ def heating_schedule_resource():
             "livingArea": ["woonkamer", "eetkamer"],
             "kitchen": ["keuken"],
             "conservatory": ["serre"],
+            "douweBedroom": ["douwe_slaapkamer"],
+            "douweStudy": ["erker_douwe"],
         },
         "rooms": rooms,
     }
@@ -1186,7 +1188,7 @@ def heating_temperature_history_resource(*, generated_at=None):
     now = now.astimezone(timezone.utc)
     start = now - timedelta(hours=6)
 
-    allowed_rooms = ("woonkamer", "eetkamer", "keuken", "serre")
+    allowed_rooms = ("woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe")
     device_keys = tuple(f"honeywell_{key}" for key in allowed_rooms)
     placeholders = ",".join("?" for _ in device_keys)
 
@@ -1281,7 +1283,7 @@ def heating_preheat_progression_resource():
     if policy.get("opportunityHistoryRetentionHours") != 48:
         raise ValueError("HEATING_PREHEAT_PROGRESSION_OPPORTUNITY_HISTORY_POLICY_INVALID")
 
-    allowed_rooms = {"woonkamer", "eetkamer", "keuken", "serre"}
+    allowed_rooms = {"woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"}
     allowed_states = {
         "INACTIVE",
         "WAITING_FOR_FRESH_PRIORITY",
@@ -1577,7 +1579,7 @@ def heating_preheat_shadow_resource():
         raise ValueError("HEATING_PREHEAT_SHADOW_MAX_ADVANCE_INVALID")
 
     rooms = []
-    allowed_rooms = {"woonkamer", "eetkamer", "keuken", "serre"}
+    allowed_rooms = {"woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"}
     allowed_states = {
         "NOT_ELIGIBLE",
         "BASELINE_HEATING",
