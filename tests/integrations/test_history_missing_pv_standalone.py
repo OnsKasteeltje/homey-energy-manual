@@ -1,162 +1,128 @@
 #!/usr/bin/env python3
-"""Offline 2026-10-09 PV/P1 history regression; no pytest and no real DB writes."""
+"""KISS regressions for measured P1 and cumulative PV energy, no pytest."""
 import importlib.util
 import sqlite3
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[2]
+
+ROOT = Path(__file__).resolve().parents[2]
+
 def load(path, name):
-    spec=importlib.util.spec_from_file_location(name, ROOT/path)
-    obj=importlib.util.module_from_spec(spec)
+    spec = importlib.util.spec_from_file_location(name, ROOT / path)
+    obj = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(obj)
     return obj
-builder=load("services/pi/history/build_house_energy_history.py", "history_builder")
-api=load("services/pi/api/web-data/server.py", "web_history_api")
 
-class P1PvRegression(unittest.TestCase):
-    def test_near_duplicate_snapshot_does_not_downgrade_pv_quality(self):
-        # Regression: mixed precision timestamps must be ordered chronologically.\n        # The older tests also require extra <1 s records
-        # do not make the later ordinary 5-min observation an estimate.
-        for duplicate_delta in (0.481, 0.982):
-            with self.subTest(delta=duplicate_delta), tempfile.TemporaryDirectory() as d:
-                path=Path(d)/"dup.sqlite"
-                con=sqlite3.connect(path)
-                con.executescript("""
-                  CREATE TABLE devices(id INTEGER PRIMARY KEY,device_key TEXT);
-                  CREATE TABLE metrics(id INTEGER PRIMARY KEY,metric_key TEXT);
-                  CREATE TABLE measurements(ts_utc TEXT,device_id INTEGER,metric_id INTEGER,
-                     value_real REAL,source_resolution_seconds INTEGER,quality TEXT);
-                """)
-                for n,name in enumerate(("grid_p1","pv_solaredge","pv_goodwe4200","pv_goodwe2000"),1):
-                    con.execute("INSERT INTO devices VALUES (?,?)",(n,name))
-                for n,name in enumerate(("energy_import_kwh","energy_export_kwh","energy_produced_kwh"),1):
-                    con.execute("INSERT INTO metrics VALUES (?,?)",(n,name))
-                start=datetime(2026,9,19,20,0,tzinfo=timezone.utc)
-                for delta,imp,se,gw42,gw20 in (
-                    (0,100,1000,2000,3000),
-                    (duplicate_delta,100,1000,2000,3000),
-                    (300,100.4,1000.2,2000.3,3000.1)
-                ):
-                    stamp=(start+timedelta(seconds=delta)).isoformat().replace("+00:00","Z")
-                    vals=((1,1,imp),(1,2,50.0),(2,3,se),(3,3,gw42),(4,3,gw20))
-                    con.executemany("INSERT INTO measurements VALUES (?,?,?,?,?,?)",
-                      [(stamp,dev,metric,value,300,"observed") for dev,metric,value in vals])
-                con.commit()
-                con.close()
-                builder.build(path)
-                with sqlite3.connect(path) as db:
-                    quality=db.execute("SELECT quality FROM house_energy_intervals").fetchone()
-                self.assertEqual(quality,("observed",))
+builder = load("services/pi/history/build_house_energy_history.py", "kiss_builder")
+api = load("services/pi/api/web-data/server.py", "kiss_api")
 
-    def test_oct9_long_solar_edge_delay_does_not_erase_other_sources(self):
+
+def fixtures(path):
+    db = sqlite3.connect(path)
+    db.executescript("""
+        CREATE TABLE devices (id INTEGER PRIMARY KEY, device_key TEXT);
+        CREATE TABLE metrics (id INTEGER PRIMARY KEY, metric_key TEXT);
+        CREATE TABLE measurements (
+            ts_utc TEXT, device_id INTEGER, metric_id INTEGER,
+            value_real REAL, source_resolution_seconds INTEGER, quality TEXT
+        );
+    """)
+    for i, name in enumerate(("grid_p1", "pv_solaredge", "pv_goodwe4200", "pv_goodwe2000"), 1):
+        db.execute("INSERT INTO devices VALUES (?,?)", (i, name))
+    for i, name in enumerate(("energy_import_kwh", "energy_export_kwh", "energy_produced_kwh"), 1):
+        db.execute("INSERT INTO metrics VALUES (?,?)", (i, name))
+    return db
+
+
+class HistoryKissTest(unittest.TestCase):
+    def test_mixed_timestamp_precision_keeps_correct_order(self):
         with tempfile.TemporaryDirectory() as d:
-            path=Path(d)/"h.sqlite"
-            con=sqlite3.connect(path)
-            con.executescript("""
-              CREATE TABLE devices (id INTEGER PRIMARY KEY,device_key TEXT);
-              CREATE TABLE metrics (id INTEGER PRIMARY KEY,metric_key TEXT);
-              CREATE TABLE measurements (ts_utc TEXT,device_id INTEGER,
-                  metric_id INTEGER,value_real REAL,source_resolution_seconds INTEGER,quality TEXT);
-            """)
-            for n,name in enumerate(("grid_p1","pv_solaredge","pv_goodwe4200","pv_goodwe2000"),1):
-                con.execute("INSERT INTO devices VALUES (?,?)",(n,name))
-            for n,name in enumerate(("energy_import_kwh","energy_export_kwh","energy_produced_kwh"),1):
-                con.execute("INSERT INTO metrics VALUES (?,?)",(n,name))
-            start=datetime(2026,10,9,6,0,tzinfo=timezone.utc)
-            for n in range(52):
-                stamp=(start+timedelta(minutes=5*n)).isoformat().replace("+00:00","Z")
-                # P1 and one GoodWe advance normally, SolarEdge jumps after >3h.
-                se=1000.0 if n<50 else 1000.456
-                vals=((1,1,100+n*.20),(1,2,50.0),
-                      (2,3,se),(3,3,2000+n*.01),(4,3,3000.0))
-                con.executemany("INSERT INTO measurements VALUES (?,?,?,?,?,?)",
-                      [(stamp,dev,metric,value,300,"observed") for dev,metric,value in vals])
-            con.commit()
-            con.close()
+            path = Path(d) / "counter.sqlite"
+            db = fixtures(path)
+            samples = (
+                ("2026-09-19T20:00:00Z", 100.0),
+                ("2026-09-19T20:00:00.481Z", 100.0),
+                ("2026-09-19T20:05:00Z", 100.4),
+            )
+            for ts, imported in samples:
+                for device, metric, value in (
+                    (1, 1, imported), (1, 2, 50.0),
+                    (2, 3, 1000.0), (3, 3, 2000.0), (4, 3, 3000.0),
+                ):
+                    db.execute("INSERT INTO measurements VALUES (?,?,?,?,?,?)",
+                               (ts, device, metric, value, 300, "observed"))
+            db.commit()
+            db.close()
             builder.build(path)
             with sqlite3.connect(path) as db:
-                row=db.execute("""
-                    SELECT import_kwh,pv_solaredge_kwh,pv_goodwe4200_kwh,
-                           pv_goodwe2000_kwh,pv_total_kwh,house_kwh,p1_quality,pv_quality
-                    FROM house_energy_intervals
-                    WHERE end_ts_utc='2026-10-09T09:00:00Z'
-                """).fetchone()
-            self.assertIsNotNone(row)
-            self.assertAlmostEqual(row[0],.20)
-            self.assertIsNone(row[1])
-            self.assertAlmostEqual(row[2],.01)
-            self.assertAlmostEqual(row[3],0.0)
-            self.assertIsNone(row[4])
-            self.assertIsNone(row[5])
-            self.assertEqual(row[6],"observed")
-            self.assertEqual(row[7],"gap")
+                rows = db.execute("SELECT import_kwh,quality FROM house_energy_intervals").fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertAlmostEqual(rows[0][0], 0.4)
+            self.assertEqual(rows[0][1], "observed")
 
-    def test_oct9_minimum_house_uses_p1_without_inventing_pv(self):
+    def test_oct9_delayed_inverter_does_not_hide_measured_house(self):
         with tempfile.TemporaryDirectory() as d:
-            path=Path(d)/"h.sqlite"
+            path = Path(d) / "counter.sqlite"
+            db = fixtures(path)
+            start = datetime(2026, 10, 9, 6, tzinfo=timezone.utc)
+            for i in range(52):
+                ts = (start + timedelta(minutes=5*i)).isoformat().replace("+00:00", "Z")
+                values = (
+                    (1, 1, 100 + .2*i), (1, 2, 50.0),
+                    (2, 3, 1000 if i < 50 else 1000.456),
+                    (3, 3, 2000 + .01*i), (4, 3, 3000.0),
+                )
+                for device, metric, value in values:
+                    db.execute("INSERT INTO measurements VALUES (?,?,?,?,?,?)",
+                               (ts, device, metric, value, 300, "observed"))
+            db.commit()
+            db.close()
+            builder.build(path)
             with sqlite3.connect(path) as db:
-                db.execute("""CREATE TABLE house_energy_intervals(
-                  start_ts_utc TEXT,end_ts_utc TEXT,duration_seconds INTEGER,
-                  import_kwh REAL,export_kwh REAL,pv_solaredge_kwh REAL,
-                  pv_goodwe4200_kwh REAL,pv_goodwe2000_kwh REAL,
-                  pv_total_kwh REAL,house_kwh REAL,quality TEXT,discontinuity_reason TEXT)""")
-                # 08:00 PV unknown: not zero! Full P1 import is a house lower bound.
-                db.executemany("INSERT INTO house_energy_intervals VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",[
-                  ("2026-10-09T06:00:00Z","2026-10-09T07:00:00Z",3600,7.93,0.0,
-                   None,0.0,0.0,None,None,"gap",None),
-                  ("2026-10-09T07:00:00Z","2026-10-09T08:00:00Z",3600,3.79,0.0,
-                   0.1,0.1,0.1,0.3,4.09,"observed",None),
-                  ("2026-10-09T08:00:00Z","2026-10-09T09:00:00Z",3600,2.0,0.5,
-                   None,0.0,0.0,None,None,"gap",None),
-                ])
-            api.HISTORY_DB=str(path)
-            data=api.history_resource("day","2026-10-09")
-            h8=[x for x in data["series"] if x["start"].startswith("2026-10-09T08:00")][0]
-            h9=[x for x in data["series"] if x["start"].startswith("2026-10-09T09:00")][0]
-            h10=[x for x in data["series"] if x["start"].startswith("2026-10-09T10:00")][0]
-            self.assertEqual(h8["knownFraction"]["houseKWh"],0.0)
-            self.assertAlmostEqual(h8["houseMinimumKWh"],7.93)
-            self.assertEqual(h8["houseMinimumCoverage"],1.0)
-            self.assertAlmostEqual(h9["houseMinimumKWh"],4.09) # exact known house
-            self.assertAlmostEqual(h10["houseMinimumKWh"],1.5) # import - export
-            self.assertAlmostEqual(data["summary"]["houseMinimumKWh"],13.52)
-            self.assertAlmostEqual(data["summary"]["houseKWh"],4.09)
-            self.assertAlmostEqual(data["summary"]["importKWh"],13.72)
-            self.assertAlmostEqual(data["quality"]["houseMinimumFraction"],1.0)
-            self.assertFalse(data["quality"]["metricQuality"]["houseKWh"]["completeWithinMeasuredIntervals"])
+                rows = db.execute("""
+                    SELECT import_kwh,pv_total_kwh,house_kwh,p1_quality,pv_quality
+                    FROM house_energy_intervals ORDER BY end_ts_utc
+                """).fetchall()
+            self.assertEqual(len(rows), 51)
+            self.assertTrue(all(r[2] is not None for r in rows))
+            self.assertAlmostEqual(sum(r[0] for r in rows), 10.2)
+            self.assertAlmostEqual(sum(r[1] for r in rows), .966)
+            self.assertAlmostEqual(sum(r[2] for r in rows), 11.166)
+            self.assertTrue(all(r[3:] == ("observed", "observed") for r in rows))
+            # Late PV increment lands in the observed counter interval.
+            self.assertAlmostEqual(rows[48][1], .01)
+            self.assertAlmostEqual(rows[49][1], .466)
 
-    def test_oct9_p1_wins_even_when_house_unknown(self):
+    def test_hourly_api_restores_simple_house_balance(self):
         with tempfile.TemporaryDirectory() as d:
-            path=Path(d)/"h.sqlite"
+            path = Path(d) / "history.sqlite"
             with sqlite3.connect(path) as db:
-                db.execute("""CREATE TABLE house_energy_intervals(
-                  start_ts_utc TEXT,end_ts_utc TEXT,duration_seconds INTEGER,
-                  import_kwh REAL,export_kwh REAL,pv_solaredge_kwh REAL,
-                  pv_goodwe4200_kwh REAL,pv_goodwe2000_kwh REAL,
-                  pv_total_kwh REAL,house_kwh REAL,quality TEXT,discontinuity_reason TEXT)""")
-                # Local Amsterdam hours 08 and 09: one unknown despite 7.93 kWh P1 import.
-                db.executemany("INSERT INTO house_energy_intervals VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",[
-                  ("2026-10-09T06:00:00Z","2026-10-09T07:00:00Z",3600,7.93,0.0,
-                   None,0.0,0.0,None,None,"gap",None),
-                  ("2026-10-09T07:00:00Z","2026-10-09T08:00:00Z",3600,3.79,0.0,
-                   0.1,0.1,0.1,0.3,4.09,"observed",None)
+                db.execute("""
+                    CREATE TABLE house_energy_intervals (
+                        start_ts_utc TEXT, end_ts_utc TEXT, duration_seconds INTEGER,
+                        import_kwh REAL, export_kwh REAL,
+                        pv_solaredge_kwh REAL, pv_goodwe4200_kwh REAL,
+                        pv_goodwe2000_kwh REAL, pv_total_kwh REAL, house_kwh REAL,
+                        quality TEXT, discontinuity_reason TEXT
+                    )
+                """)
+                db.executemany("INSERT INTO house_energy_intervals VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", [
+                    ("2026-10-09T06:00:00Z", "2026-10-09T07:00:00Z", 3600,
+                     7.93, 0, 0, 0, 0, 0, 7.93, "observed", None),
+                    ("2026-10-09T07:00:00Z", "2026-10-09T08:00:00Z", 3600,
+                     3.79, 0, .1, .1, .1, .3, 4.09, "observed", None),
                 ])
-            api.HISTORY_DB=str(path)
-            data=api.history_resource("day","2026-10-09")
-            a=[x for x in data["series"] if x["start"].startswith("2026-10-09T08:00")][0]
-            b=[x for x in data["series"] if x["start"].startswith("2026-10-09T09:00")][0]
-            self.assertAlmostEqual(a["importKWh"],7.93)
-            self.assertEqual(a["knownFraction"]["importKWh"],1.0)
-            self.assertEqual(a["knownFraction"]["houseKWh"],0.0)
-            self.assertAlmostEqual(b["houseKWh"],4.09)
-            self.assertEqual(b["knownFraction"]["houseKWh"],1.0)
-            self.assertAlmostEqual(data["summary"]["importKWh"],11.72)
-            self.assertAlmostEqual(data["summary"]["houseKWh"],4.09)
-            self.assertFalse(data["quality"]["metricQuality"]["houseKWh"]["completeWithinMeasuredIntervals"])
-            self.assertTrue(data["quality"]["metricQuality"]["importKWh"]["completeWithinMeasuredIntervals"])
-            self.assertAlmostEqual(data["quality"]["metricQuality"]["houseKWh"]["fractionOfMeasuredIntervals"],.5)
+            api.HISTORY_DB = str(path)
+            result = api.history_resource("day", "2026-10-09")
+            self.assertAlmostEqual(result["summary"]["importKWh"], 11.72)
+            self.assertAlmostEqual(result["summary"]["pvKWh"], .3)
+            self.assertAlmostEqual(result["summary"]["houseKWh"], 12.02)
+            self.assertEqual(len(result["series"]), 24)
+            self.assertNotIn("houseMinimumKWh", result["summary"])
+            self.assertNotIn("metricQuality", result["quality"])
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone regressions for held PV interval timing (no pytest required)."""
+"""KISS cumulative PV counter timing regressions (no pytest required)."""
 import importlib.util
 import sqlite3
 import tempfile
@@ -51,7 +51,7 @@ class HeldPvTests(unittest.TestCase):
           FROM house_energy_intervals ORDER BY end_ts_utc
         """).fetchall()
 
-    def test_held_spike_distributed_over_observed_interval(self):
+    def test_held_counter_no_synthetic_interpolation(self):
         self.sample("10:00",0,1000.0,"observed")
         self.sample("10:05",1,1000.0,"held")
         self.sample("10:10",2,1000.0,"held")
@@ -59,12 +59,12 @@ class HeldPvTests(unittest.TestCase):
         self.sample("10:20",4,1000.4,"observed")
         rows=self.build_rows()
         self.assertEqual(len(rows),4)
-        self.assertTrue(all(abs(x[0]-0.1)<1e-7 for x in rows))
-        self.assertTrue(all(abs(x[1]-0.25)<1e-7 for x in rows))
+        self.assertEqual([round(x[0],6) for x in rows],[0,0,0,0.4])
+        self.assertEqual([round(x[1],6) for x in rows],[0.15,0.15,0.15,0.55])
         self.assertTrue(all(abs(x[2]-0.05)<1e-7 for x in rows))
         self.assertEqual([r[3] for r in rows],["held","held","held","held"])
 
-    def test_observed_plateau_reallocates_energy_without_spike(self):
+    def test_observed_plateau_keeps_counter_increment_timing(self):
         # Regression based on SolarEdge 14:40-15:40: identical 'observed'
         # readings precede multi-interval delayed counter increments.
         self.sample("14:40",0,1000.000,"observed")
@@ -76,12 +76,11 @@ class HeldPvTests(unittest.TestCase):
         self.sample("15:10",6,1001.018,"observed")
         rows=self.build_rows()
         self.assertEqual(len(rows),6)
-        self.assertTrue(all(abs(x[0]-0.556/3)<1e-7 for x in rows[:3]))
-        self.assertTrue(all(abs(x[0]-0.462/3)<1e-7 for x in rows[3:]))
+        self.assertEqual([round(x[0],6) for x in rows],[0,0,0.556,0,0,0.462])
         self.assertAlmostEqual(sum(x[0] for x in rows),1.018,places=6)
-        self.assertTrue(all(x[3]=="held" for x in rows))
+        self.assertTrue(all(x[3]=="observed" for x in rows))
 
-    def test_long_unknown_interval_fails_closed(self):
+    def test_long_plateau_preserves_counter_delta(self):
         self.sample("07:00",0,1000,"observed")
         for i in range(1,49):
             minutes=7*60+5*i
@@ -90,12 +89,12 @@ class HeldPvTests(unittest.TestCase):
                         "held" if i<48 else "observed")
         rows=self.build_rows()
         self.assertEqual(rows[-1][4],"observed")
-        self.assertEqual(rows[-1][5],"gap")
+        self.assertEqual(rows[-1][5],"held")
         self.assertAlmostEqual(rows[-1][2],0.05)
-        self.assertIsNone(rows[-1][0])
-        self.assertIsNone(rows[-1][1])
+        self.assertAlmostEqual(rows[-1][0],2.0)
+        self.assertAlmostEqual(rows[-1][1],2.15)
 
-    def test_p1_independent_of_unknown_pv(self):
+    def test_p1_independent_of_late_pv(self):
         self.sample("07:00",0,1000,"observed")
         for i in range(1,49):
             minutes = 7*60 + 5*i
@@ -104,9 +103,9 @@ class HeldPvTests(unittest.TestCase):
                         "held" if i < 48 else "observed")
         rows=self.build_rows()
         self.assertEqual(rows[-1][4],"observed")
-        self.assertEqual(rows[-1][5],"gap")
+        self.assertEqual(rows[-1][5],"held")
         self.assertGreater(rows[-1][2],0)
-        self.assertIsNone(rows[-1][1])
+        self.assertAlmostEqual(rows[-1][1],2.15)
 
     def test_no_spurious_pv_for_held_zero_generation(self):
         self.sample("18:00",0,1000,"observed")

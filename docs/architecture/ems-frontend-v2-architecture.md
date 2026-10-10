@@ -377,3 +377,19 @@ must never be displayed as exact `houseKWh`. The frontend uses dashed
 blue minimum bars and a `≥`-prefixed total with visible provenance;
 unknown PV remains unknown. Never use held/uncertified 15-minute inverter
 power as an unguarded PV substitute.
+
+### 17.7 October 10 KISS rollback supersedes 17.4–17.6
+
+The 2026-10-02 History V2 chart and cumulative-counter-derived
+house/PV balance are restored after a real-data Pi SQLite-copy
+comparison (51.01 kWh house versus 18.22 kWh known, same 47.02 kWh
+P1 import on 9 October). Historic house and PV use five-minute
+counter increments at their recorded measurement intervals.
+Delayed meter updates can be time-shifted but neither speculative PV
+interpolation nor wholesale house-history withholding is used.
+The frontend uses four regular series and simple totals, no
+question marks, dashed minimum bars or extra quality projections.
+Keep the existing `p1_quality` / `pv_quality` schema for PV/Flex
+readers and accurate timestamp ordering; P1 authority and
+physical EMS controls are unchanged. Supersedes earlier sections
+17.4–17.6 describing PRs #215/#216.
