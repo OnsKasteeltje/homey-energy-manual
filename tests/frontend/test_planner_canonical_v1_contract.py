@@ -18,4 +18,8 @@ assert "Quooker gepland" in html
 assert "/web/planner/pv-forecast" not in js, "Planner may not show V2 as active source"
 assert "innerHTML" not in js
 assert ".importline" in css
+assert "#111827" in css and ".quookerline" in css
+assert "closestPlannerLine" in js and "getScreenCTM" in js
+assert 'tooltip.replaceChildren()' in js
+assert 'const hit=add("rect",{x:p.l,y:p.t,width:iw,height:ih,class:"hit"});' in js
 print("PASS: Planner uses canonical V1 Dynamic Pi Planner; V2 remains rollback-only")

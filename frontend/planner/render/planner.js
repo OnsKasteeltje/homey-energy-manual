@@ -20,6 +20,37 @@ async function load() {
   if (plan.schema !== "EMS_WEB_DYNAMIC_PLAN_V1") throw new Error("Onbekend dynamisch plan");
   return {plan, ev};
 }
+
+// Select the closest *visible* series segment within a small pixel radius.
+// A flat 0 W baseline is shared by many series and cannot identify one line.
+function closestPlannerLine(slots, fields, px, py, xAt, yAt, radius) {
+  if (slots.length < 2 || !Number.isFinite(px) || !Number.isFinite(py)) return null;
+  const step = xAt(1) - xAt(0);
+  if (!(step > 0)) return null;
+  const position = (px - xAt(0)) / step;
+  if (position < 0 || position > slots.length - 1) return null;
+  const at = Math.min(slots.length - 2, Math.floor(position));
+  let best = null;
+  let distance = radius;
+  for (const [field] of fields) {
+    for (let i = Math.max(0, at - 1); i <= Math.min(slots.length - 2, at + 1); i++) {
+      const a = slots[i][field], b = slots[i + 1][field];
+      if (typeof a !== "number" || !Number.isFinite(a) ||
+          typeof b !== "number" || !Number.isFinite(b) || (a === 0 && b === 0)) continue;
+      const x1 = xAt(i), x2 = xAt(i + 1), y1 = yAt(a), y2 = yAt(b);
+      const dx = x2 - x1, dy = y2 - y1;
+      const fraction = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) /
+        (dx * dx + dy * dy)));
+      const error = Math.hypot(px - (x1 + dx * fraction), py - (y1 + dy * fraction));
+      if (error < distance) {
+        distance = error;
+        best = {field, slot: slots[Math.max(0, Math.min(slots.length - 1,
+          Math.round(position)))]};
+      }
+    }
+  }
+  return best;
+}
 function renderRequirement(ev) {
   const out = $("ev-summary");
   if (ev && ev.active && ev.status === "TRACKING" && number(ev.remainingKWh) > 0) {
@@ -47,8 +78,12 @@ function render({plan, ev}) {
   const W = 1100, H = 390, p = {l:55,r:18,t:24,b:48};
   const iw = W-p.l-p.r, ih = H-p.t-p.b;
   const fields = [
-    ["pvForecastW","pvline"],["evPlanW","evline"],["wwPlanW","wwline"],["quookerPlanW","quookerline"],
-    ["gridExportAfterFlexW","exportline"],["gridImportAfterFlexW","importline"]
+    ["pvForecastW","pvline","PV voorspeld"],
+    ["evPlanW","evline","Tesla gepland"],
+    ["wwPlanW","wwline","Warm water gepland"],
+    ["quookerPlanW","quookerline","Quooker gepland"],
+    ["gridExportAfterFlexW","exportline","Export verwacht"],
+    ["gridImportAfterFlexW","importline","Import verwacht"]
   ];
   const rawMax = Math.max(1000, ...slots.flatMap(s=>fields.map(([key])=>number(s[key]))));
   const rough = rawMax/4, pow = 10**Math.floor(Math.log10(rough)), n = rough/pow;
@@ -97,43 +132,52 @@ function render({plan, ev}) {
     add("text",{x:xFor(ms),y:H-20,class:"axis","text-anchor":h===0?"start":h===24?"end":"middle"},localTime(ms));
   }
   const tooltip=$("tooltip");
-  for (const slot of slots) {
-    const start=new Date(slot.start).getTime();
-    const end=start+900000;
-    const hit=add("rect",{
-      x:xFor(start),y:p.t,width:Math.max(1,xFor(end)-xFor(start)),
-      height:ih,class:"hit"
-    });
-    hit.addEventListener("mousemove",event=>{
-      tooltip.replaceChildren();
-      const title=document.createElement("strong");
-      title.textContent=localDateTime(slot.start);
-      tooltip.appendChild(title);
-      const values=[
-        ["PV voorspeld",fmtW(slot.pvForecastW)],
-        ["Tesla gepland",fmtW(slot.evPlanW)],
-        ["Warm water gepland",fmtW(slot.wwPlanW)],
-        ["Quooker gepland",slot.quookerPlanW==null?"—":fmtW(slot.quookerPlanW)],
-        ["Quooker modus",slot.quookerMode||"—"],
-        ["Quooker PV-kans",slot.quookerOpportunityAllowed===true?"toegestaan":slot.quookerOpportunityAllowed===false?"niet toegestaan":"—"],
-        ["Export verwacht",fmtW(slot.gridExportAfterFlexW)],
-        ["Import verwacht",fmtW(slot.gridImportAfterFlexW)],
-        ["EV reden",slot.evReason || "—"],
-        ["WW reden",slot.wwReason || "—"],
-        ["Confidence",slot.confidence == null?"—":Math.round(slot.confidence*100)+"%"]
-      ];
-      for (const [label,value] of values) {
-        const el=document.createElement("span");
-        el.textContent=label+": "+value;
-        tooltip.appendChild(el);
-      }
-      tooltip.hidden=false;
-      const rect=svg.parentElement.getBoundingClientRect();
-      tooltip.style.left=Math.min(rect.width-235,Math.max(8,event.clientX-rect.left+10))+"px";
-      tooltip.style.top=Math.max(8,event.clientY-rect.top-100)+"px";
-    });
-    hit.addEventListener("mouseleave",()=>tooltip.hidden=true);
-  }
+  // One transparent hit surface; report only the nearest actual graph line.
+  const hit=add("rect",{x:p.l,y:p.t,width:iw,height:ih,class:"hit"});
+  hit.addEventListener("mousemove",event=>{
+    const matrix=svg.getScreenCTM();
+    if (!matrix) { tooltip.hidden=true; return; }
+    const pointer=svg.createSVGPoint();
+    pointer.x=event.clientX;
+    pointer.y=event.clientY;
+    const point=pointer.matrixTransform(matrix.inverse());
+    const scale=Math.hypot(matrix.a,matrix.b);
+    const selection=closestPlannerLine(slots,fields,point.x,point.y,
+      i=>xFor(new Date(slots[i].start).getTime()+450000),yFor,12/scale);
+    if (!selection) { tooltip.hidden=true; return; }
+
+    const {field,slot}=selection;
+    const label=fields.find(([key])=>key===field)[2];
+    tooltip.replaceChildren();
+    const title=document.createElement("strong");
+    title.textContent=localDateTime(slot.start);
+    tooltip.appendChild(title);
+    const addDetail=(name,value)=>{
+      const row=document.createElement("span");
+      row.textContent=name+": "+value;
+      tooltip.appendChild(row);
+    };
+    addDetail(label,slot[field]==null?"—":fmtW(slot[field]));
+    if (field==="quookerPlanW") {
+      addDetail("Quooker modus",slot.quookerMode||"—");
+      addDetail("PV-kans",slot.quookerOpportunityAllowed===true?"toegestaan":
+        slot.quookerOpportunityAllowed===false?"niet toegestaan":"—");
+    } else if (field==="evPlanW") {
+      addDetail("EV reden",slot.evReason||"—");
+    } else if (field==="wwPlanW") {
+      addDetail("WW reden",slot.wwReason||"—");
+    } else if (field==="pvForecastW") {
+      addDetail("Confidence",slot.confidence==null?"—":
+        Math.round(slot.confidence*100)+"%");
+    }
+    tooltip.hidden=false;
+    const rect=svg.parentElement.getBoundingClientRect();
+    tooltip.style.left=Math.min(Math.max(8,rect.width-tooltip.offsetWidth-8),
+      Math.max(8,event.clientX-rect.left+12))+"px";
+    tooltip.style.top=Math.min(Math.max(8,rect.height-tooltip.offsetHeight-8),
+      Math.max(8,event.clientY-rect.top-tooltip.offsetHeight-12))+"px";
+  });
+  hit.addEventListener("mouseleave",()=>tooltip.hidden=true);
 }
 load().then(render).catch(error=>{
   $("freshness").textContent=error.message;
