@@ -7,6 +7,7 @@ control/device write path.
 import json
 import os
 import sqlite3
+import zlib
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -39,6 +40,7 @@ EMS_SETTINGS_COMMAND_FILE = os.environ.get(
     "/home/jeroen/ems/repo/homey-energy-manual/docs/data/ems-settings-command.json",
 )
 HISTORY_DB = os.environ.get("EMS_HISTORY_DB", "/home/jeroen/ems/data/ems-history.sqlite")
+PLANNER_HISTORY_DB = os.environ.get("EMS_PLANNER_HISTORY_DB", "/home/jeroen/ems/data/planner-history.sqlite")
 LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
 API_SCHEMA = "EMS_WEB_WW_SEASONAL_ADVICE_V1"
@@ -46,6 +48,7 @@ STATE_API_SCHEMA = "EMS_WEB_STATE_CURRENT_V1"
 COMMANDS_API_SCHEMA = "EMS_WEB_COMMANDS_CURRENT_V1"
 HISTORY_API_SCHEMA = "EMS_WEB_HISTORY_V1"
 PV_FLEX_API_SCHEMA = "EMS_WEB_PV_FLEX_ANALYSIS_V1"
+PLANNER_EVALUATION_API_SCHEMA = "EMS_WEB_PLANNER_EVALUATION_V1"
 PV_FORECAST_API_SCHEMA = "EMS_WEB_PV_FORECAST_V2"
 DYNAMIC_PLAN_API_SCHEMA = "EMS_WEB_DYNAMIC_PLAN_V1"
 EV_REQUIREMENT_API_SCHEMA = "EMS_WEB_EV_REQUIREMENT_V1"
@@ -566,6 +569,123 @@ def history_resource(kind, value):
         },
     }
 
+
+
+
+def planner_evaluation_resource(value):
+    """Archived V1 PV forecast (12h lead) and near-term EV/WW plan, never reconstructed.
+
+    A forecast selected 12 hours before a slot is different evidence from the
+    latest valid plan before that slot. Return both with their original generation
+    timestamps. No historical V2 forecasts are read or substituted.
+    """
+    start_local, end_local, _ = _history_period("day", value)
+    start = start_local.astimezone(timezone.utc)
+    end = end_local.astimezone(timezone.utc)
+    slots = {}
+    cursor = start
+    while cursor < end:
+        slots[_utc_text(cursor)] = {
+            "start": cursor.astimezone(LOCAL_TZ).isoformat(),
+            "forecast": None,
+            "plan": None,
+        }
+        cursor += timedelta(minutes=15)
+
+    with sqlite3.connect(f"file:{PLANNER_HISTORY_DB}?mode=ro", uri=True) as db:
+        snapshots = db.execute(
+            """SELECT generated_at_utc, valid_until_utc, snapshot_zlib
+               FROM planner_snapshots
+               WHERE julianday(generated_at_utc) >= julianday(?)
+                 AND julianday(generated_at_utc) < julianday(?)
+               ORDER BY julianday(generated_at_utc) DESC
+               LIMIT 1000""",
+            (_utc_text(start - timedelta(hours=36)), _utc_text(end)),
+        ).fetchall()
+
+    for generated_value, valid_until_value, payload in snapshots:
+        generated = parse_timestamp(generated_value)
+        valid_until = parse_timestamp(valid_until_value)
+        if generated is None:
+            continue
+        try:
+            document = json.loads(zlib.decompress(payload))
+            plan = document.get("plan") or {}
+        except (zlib.error, ValueError, TypeError):
+            continue
+        if (plan.get("schema") != "EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3"
+                or plan.get("mode") != "PURE_SHADOW"
+                or plan.get("readOnly") is not True
+                or plan.get("control_writes") is not False):
+            continue
+        if parse_timestamp(plan.get("generated_at")) != generated:
+            continue
+        for item in plan.get("slots") or []:
+            if not isinstance(item, dict):
+                continue
+            when = parse_timestamp(item.get("slot_start_utc"))
+            if when is None:
+                continue
+            slot = slots.get(_utc_text(when))
+            if slot is None:
+                continue
+            forecast_w = item.get("pvForecastW")
+            if (slot["forecast"] is None
+                    and generated <= when - timedelta(hours=12)
+                    and isinstance(forecast_w, (int, float))
+                    and not isinstance(forecast_w, bool)
+                    and 0 <= forecast_w <= 50000):
+                confidence = item.get("confidence")
+                if not isinstance(confidence, (int, float)) or isinstance(confidence, bool) or not 0 <= confidence <= 1:
+                    confidence = None
+                slot["forecast"] = {
+                    "pvForecastW": forecast_w,
+                    "confidence": confidence,
+                    "generatedAt": generated_value,
+                    "leadMinutes": round((when - generated).total_seconds()/60, 1),
+                }
+            if (slot["plan"] is None
+                    and generated <= when
+                    and valid_until is not None
+                    and valid_until >= when):
+                ev_w = item.get("evPlanW")
+                ww_w = item.get("wwPlanW")
+                imp_w = item.get("gridImportAfterFlexW")
+                exp_w = item.get("gridExportAfterFlexW")
+                values = (ev_w, ww_w, imp_w, exp_w)
+                if any(not isinstance(w, (int, float)) or isinstance(w, bool) or not 0 <= w <= 50000 for w in values):
+                    continue
+                ev_reason = item.get("evAllocationReason")
+                ww_reason = item.get("wwAllocationReason")
+                slot["plan"] = {
+                    "evPlanW": ev_w,
+                    "wwPlanW": ww_w,
+                    "gridImportAfterFlexW": imp_w,
+                    "gridExportAfterFlexW": exp_w,
+                    "evReason": ev_reason if isinstance(ev_reason, str) and len(ev_reason) <= 120 else None,
+                    "wwReason": ww_reason if isinstance(ww_reason, str) and len(ww_reason) <= 120 else None,
+                    "generatedAt": generated_value,
+                }
+
+    series = list(slots.values())
+    forecasts = [slot["forecast"] for slot in series if slot["forecast"] is not None]
+    planned = [slot["plan"] for slot in series if slot["plan"] is not None]
+    return {
+        "schema": PLANNER_EVALUATION_API_SCHEMA,
+        "mode": "READ_ONLY",
+        "controlWrites": False,
+        "forecastSource": "ARCHIVED_CANONICAL_V1_DYNAMIC_PLAN",
+        "forecastSelection": {"kind": "FIXED_LEAD_12H", "targetLeadMinutes": 720},
+        "planSelection": {"kind": "LATEST_VALID_BEFORE_SLOT_START"},
+        "summary": {
+            "forecastSlots": len(forecasts),
+            "forecastKWh": round(sum(item["pvForecastW"] for item in forecasts)/4000, 6) if forecasts else None,
+            "planSlots": len(planned),
+            "plannedEvKWh": round(sum(item["evPlanW"] for item in planned)/4000, 6) if planned else None,
+            "plannedWwKWh": round(sum(item["wwPlanW"] for item in planned)/4000, 6) if planned else None,
+        },
+        "series": series,
+    }
 
 
 def pv_flex_analysis_resource(value):
@@ -1591,6 +1711,15 @@ class Handler(BaseHTTPRequestHandler):
 
 
 
+
+        if len(parts) == 5 and parts[:4] == ["web", "analysis", "planner", "day"]:
+            try:
+                send_json(self, 200, planner_evaluation_resource(parts[4]))
+            except ValueError:
+                send_json(self, 400, {"schema":"EMS_WEB_ERROR_V1","status":"ERROR","reason":"HISTORY_PERIOD_INVALID"})
+            except (OSError, sqlite3.Error):
+                send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
+            return
 
         if len(parts) == 5 and parts[:4] == ["web", "analysis", "pv-flex", "day"]:
             try:
