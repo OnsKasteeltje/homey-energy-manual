@@ -129,7 +129,7 @@ Use the same conceptual time axis as Planner and compare:
 
 - forecast PV;
 - actual validated PV;
-- planned EV/WW/heating allocation;
+- planned EV/WW/Quooker/heating allocation;
 - actual EV/WW/heating operation;
 - actual P1 import/export;
 - data quality/coverage.

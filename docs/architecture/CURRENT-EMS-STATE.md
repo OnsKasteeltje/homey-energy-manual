@@ -922,3 +922,20 @@ Evaluatie reads frozen V1 forecast evidence at 12-hour lead from the planner sna
 ## 2026-10-10 — V2 shadow-only array azimuth correction
 
 The V2-only Open-Meteo geometry inputs have been corrected to GoodWe2000 southeast -45 degrees and GoodWe4200/SolarEdge southwest +45 degrees; Open-Meteo uses zero=south. The source V2 forecast model and matching PV array config now agree. V2 newly generated forecast records use an `AZIMUTH_FIXED_V2` modelBasis suffix in the unchanged archive schema, separating them from earlier forecasts generated with incorrect NE/NW orientations. No old forecast archive rows are rewritten. The active V1 Dynamic Pi Planner and all physical control remain unchanged; retirement of V2 shadow generation remains gated on Pi website verification.
+
+## 2026-10-10 — Decision-centric PV & Flex Evaluatie; Quooker observability
+
+Frontend V2 Evaluatie is now primarily a retrospective **decision-versus-outcome**
+view rather than a fixed-12-hour PV weather forecast accuracy report. The read-only
+`EMS_WEB_PLANNER_EVALUATION_V2` projection chooses the latest valid archived
+Dynamic Pi Planner decision at or before each target 15-minute slot, and exposes
+the V1 PV forecast **from that same original snapshot** with its generation time,
+EV/boiler/Quooker plan, Quooker opportunity/mode, expected grid consequences and
+documented constraints/reasons. No future/hindsight plan is allowed.
+
+Measured P1/PV, independently observed Tesla/boiler power and existing persisted
+Heating shadow history remain independent evidence. No historical Quooker power
+measurement is claimed from a Quooker plan or detector event. Missing evidence
+is unknown; no automatic judgement of optimality or missed PV capture without a
+feasible benchmark. The website Planner also displays the existing Quooker plan.
+No planner control, Homey writes, V1 forecast model or V2 archive/timer is changed.
