@@ -94,6 +94,8 @@ EV_STOP_1P_W = 1100
 EV_ENTER_3P_W = 4400
 EV_LEAVE_3P_W = 3600
 EV_MIN_MODE_DWELL_SEC = 120
+EV_P1_COMPENSATION_MAX_STATE_AGE_SEC = 120
+EV_P1_COMPENSATION_MAX_POWER_W = 12000  # 3x16 A at up to 250 V
 EV_RUN_MIN_W = EV_1P_MIN_W
 EV_MIN_WINDOW_SLOTS = 2
 EV_MIN_WINDOW_PV_COVERAGE = 0.0
@@ -547,7 +549,39 @@ def horizon_factor(slot_dt, now_utc):
     return 1.0 - 0.08 * min(1.0, hours / 24.0)
 
 
-def update_recent_export_history(confidence_state, now_utc, actual_export_w):
+def ev_available_pv_export(energy_state, now_utc):
+    """P1 export plus *current* EV load, without losing net import.
+
+    Return the original measured P1 export unless the canonical EV and P1
+    snapshot is fresh and physically coherent. This is forecast input only.
+    """
+    grid = energy_state.get("grid") or {}
+    raw_export_w = max(0.0, float(grid.get("export_w") or 0))
+    tesla = energy_state.get("tesla") or {}
+    if tesla.get("connected") is not True or tesla.get("charging") is not True:
+        return raw_export_w, 0.0
+
+    try:
+        sampled_at = parse_utc((energy_state.get("meta") or {})["source_sample_at"])
+        age_sec = (now_utc - sampled_at).total_seconds()
+        ev_w = float(tesla["power_w"])
+        p1_net_w = float(grid["power_w"])  # positive import, negative export
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return raw_export_w, 0.0
+
+    if not (
+        0 <= age_sec <= EV_P1_COMPENSATION_MAX_STATE_AGE_SEC
+        and math.isfinite(ev_w) and 0 < ev_w <= EV_P1_COMPENSATION_MAX_POWER_W
+        and math.isfinite(p1_net_w)
+    ):
+        return raw_export_w, 0.0
+    if ((energy_state.get("balance") or {}).get("control_gate") or {}).get("p1_fresh") is False:
+        return raw_export_w, 0.0
+
+    return max(0.0, ev_w - p1_net_w), ev_w
+
+
+def update_recent_export_history(confidence_state, now_utc, actual_export_w, available_for_ev_w):
     history = confidence_state.get("recentP1ExportSamples") or []
     clean = []
     cutoff = now_utc - timedelta(minutes=45)
@@ -555,19 +589,22 @@ def update_recent_export_history(confidence_state, now_utc, actual_export_w):
         try:
             ts = parse_utc(item["ts"])
             value = max(0.0, float(item["exportW"]))
+            available = max(0.0, float(item.get("availableForEvW", value)))
         except Exception:
             continue
         if ts >= cutoff:
-            clean.append({"ts": item["ts"], "exportW": value})
+            clean.append({"ts": item["ts"], "exportW": value, "availableForEvW": available})
     clean.append({
         "ts": now_utc.isoformat().replace("+00:00", "Z"),
         "exportW": max(0.0, float(actual_export_w)),
+        "availableForEvW": max(0.0, float(available_for_ev_w)),
     })
     return clean[-3:]
 
 
 def recent_export_baseline(samples, fallback):
-    values = [max(0.0, float(x.get("exportW") or 0)) for x in samples]
+    # Old history lacks availableForEvW; raw P1 remains its fallback.
+    values = [max(0.0, float(x.get("availableForEvW", x.get("exportW") or 0))) for x in samples]
     if not values:
         return max(0.0, float(fallback)), 0.0
     ordered = sorted(values)
@@ -579,7 +616,7 @@ def recent_export_baseline(samples, fallback):
 
 def realtime_corrected_export(
     forecast_export_w, confidence, stability, slot_dt, now_utc,
-    actual_export_w, recent_export_samples
+    available_for_ev_w, recent_export_samples
 ):
     """Adaptive near-horizon P1 correction.
 
@@ -590,7 +627,7 @@ def realtime_corrected_export(
     if hours > 2.0:
         return forecast_export_w, 0.0
     recency = 1.0 - hours / 2.0
-    baseline, _trend = recent_export_baseline(recent_export_samples, actual_export_w)
+    baseline, _trend = recent_export_baseline(recent_export_samples, available_for_ev_w)
     stability_factor = 0.45 + 0.55 * clamp(stability)
     live_weight = clamp(
         ((1.0 - confidence) * recency + 0.35 * recency) * stability_factor,
@@ -1195,8 +1232,9 @@ def main():
     today_local = now_utc.astimezone(TZ).date().isoformat()
     grid = energy_state.get("grid") or {}
     actual_export_w = max(0.0, float(grid.get("export_w") or 0))
+    available_for_ev_w, ev_compensation_w = ev_available_pv_export(energy_state, now_utc)
     recent_export_samples = update_recent_export_history(
-        confidence_state, now_utc, actual_export_w
+        confidence_state, now_utc, actual_export_w, available_for_ev_w
     )
 
     previous_pv = confidence_state.get("previousPvForecast") or {}
@@ -1235,7 +1273,7 @@ def main():
             stability,
             slot_dt,
             now_utc,
-            actual_export_w,
+            available_for_ev_w,
             recent_export_samples,
         )
 
@@ -1777,9 +1815,11 @@ def main():
         },
         "realtime": {
             "actualP1ExportW": round(actual_export_w),
+            "availableForEvW": round(available_for_ev_w),
+            "evCompensationW": round(ev_compensation_w),
             "recentLocalAccuracy": round(local_accuracy, 3),
             "recentP1ExportSamples": recent_export_samples,
-            "p1CorrectionPolicy": "MEDIAN_TREND_CLOUD_STABILITY_ADAPTIVE",
+            "p1CorrectionPolicy": "MEDIAN_TREND_CLOUD_STABILITY_EV_COMPENSATED_WHEN_CHARGING",
         },
         "dailyPlans": daily,
         "slot_count": len(slots),
