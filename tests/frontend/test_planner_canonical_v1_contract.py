@@ -13,6 +13,8 @@ for token in ("/web/planner/current", "EMS_WEB_DYNAMIC_PLAN_V1",
               "evPlanW","wwPlanW","gridImportAfterFlexW","gridExportAfterFlexW",
               "evReason","wwReason","validUntil"):
     assert token in js and token in api, token
+assert "quookerPlanW" in js and "quookerPlanW" in api
+assert "Quooker gepland" in html
 assert "/web/planner/pv-forecast" not in js, "Planner may not show V2 as active source"
 assert "innerHTML" not in js
 assert ".importline" in css
