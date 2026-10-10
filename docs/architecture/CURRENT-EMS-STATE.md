@@ -869,3 +869,28 @@ house values remain exact. Unknown PV is absent with explanatory tooltip,
 not fabricated as 0 and not represented by walls of question marks.
 A regression covers full unknown, exact, and import-with-export buckets.
 No control write paths or raw production measurements change.
+
+### KISS household-energy history rollback — 2026-10-10 (not yet deployed on Pi)
+
+A read-only replay on a copy of the real Pi history SQLite with the
+2026-10-02 historical builder gave 51.01 kWh house use for
+2026-10-09, versus 18.22 kWh known from the October 8+ withheld
+PV reconstruction. P1 import was **47.02 kWh in both runs**.
+This regression originated in the subsequent counter interpolation
+and long-gap withholding, not from a P1 measurement failure.
+
+History is intentionally reverted to the four-series 2 October
+counter-delta semantics and UI:
+`house = P1 import + SolarEdge PV + GoodWe4200 PV + GoodWe2000 PV - P1 export`.
+No retrospective PV distribution, 3h withholding, partial/missing
+history API, or `>=` minimum bar. The two retained compatibility
+exceptions are chronological timestamp ordering, including mixed
+fractional precision, and retained `p1_quality`/`pv_quality`
+columns needed by the PV/Flex API. The API uses WAL-safe `mode=ro`.
+
+A late cumulative PV increment can appear in the hour it arrives
+rather than its actual production hour; this known limitation is
+preferred over losing reliably measured house/P1 intervals. This
+entry supersedes PR #215/#216 history presentation policy.
+No live Pi runtime or raw measurement tables are changed by this
+repository change; separate guarded runtime promotion is required.

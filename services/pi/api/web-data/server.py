@@ -459,9 +459,7 @@ def history_resource(kind, value):
             buckets[_utc_text(cursor)] = {
                 "start": cursor.isoformat(), "end": nxt.isoformat(),
                 **{name: 0.0 for name in fields},
-                "coveredSeconds": 0, "metricKnownSeconds": {name: 0.0 for name in fields},
-                "houseMinimumKWh": 0.0, "houseMinimumKnownSeconds": 0.0,
-                "gapCount": 0, "discontinuityCount": 0,
+                "coveredSeconds": 0, "gapCount": 0, "discontinuityCount": 0,
             }
             cursor_utc = nxt_utc
     else:
@@ -471,9 +469,7 @@ def history_resource(kind, value):
             buckets[_utc_text(cursor)] = {
                 "start": cursor.isoformat(), "end": nxt.isoformat(),
                 **{name: 0.0 for name in fields},
-                "coveredSeconds": 0, "metricKnownSeconds": {name: 0.0 for name in fields},
-                "houseMinimumKWh": 0.0, "houseMinimumKnownSeconds": 0.0,
-                "gapCount": 0, "discontinuityCount": 0,
+                "coveredSeconds": 0, "gapCount": 0, "discontinuityCount": 0,
             }
             cursor = nxt
 
@@ -483,9 +479,6 @@ def history_resource(kind, value):
     first_data = None
     last_data = None
     totals = {name: 0.0 for name in fields}
-    known_seconds = {name: 0.0 for name in fields}
-    house_minimum_total = 0.0
-    house_minimum_seconds = 0.0
     column_map = {
         "importKWh": 3, "exportKWh": 4, "pvSolarEdgeKWh": 5,
         "pvGoodWe4200KWh": 6, "pvGoodWe2000KWh": 7,
@@ -530,47 +523,18 @@ def history_resource(kind, value):
                 else:
                     bucket["coveredSeconds"] += segment_seconds
                     fraction = segment_seconds / row_seconds
-                    # The P1 meter remains authoritative when cumulative PV
-                    # production cannot be time-attributed. Grid import minus
-                    # export is a physically justified LOWER bound on house
-                    # consumption (PV >= 0), not a fabricated exact value.
-                    # If house energy is measured, keep the complete amount.
-                    if row[9] is not None:
-                        house_minimum = max(0.0, float(row[9]))
-                    elif row[3] is not None and row[4] is not None:
-                        house_minimum = max(0.0, float(row[3]) - float(row[4]))
-                    else:
-                        house_minimum = None
-                    if house_minimum is not None:
-                        minimum_amount = house_minimum * fraction
-                        bucket["houseMinimumKWh"] += minimum_amount
-                        bucket["houseMinimumKnownSeconds"] += segment_seconds
-                        house_minimum_total += minimum_amount
-                        house_minimum_seconds += segment_seconds
                     for name, index in column_map.items():
                         value_num = row[index]
                         if value_num is not None:
                             amount = float(value_num) * fraction
                             bucket[name] += amount
                             totals[name] += amount
-                            bucket["metricKnownSeconds"][name] += segment_seconds
-                            known_seconds[name] += segment_seconds
             segment_start = segment_end
 
     requested_seconds = (end_local.astimezone(timezone.utc) - start_local.astimezone(timezone.utc)).total_seconds()
     series = []
     for bucket in buckets.values():
         item = dict(bucket)
-        metric_seconds = item.pop("metricKnownSeconds")
-        covered = item["coveredSeconds"]
-        item["houseMinimumCoverage"] = round(
-            min(1.0, item.pop("houseMinimumKnownSeconds") / covered), 6
-        ) if covered > 0 else 0.0
-        item["houseMinimumKWh"] = round(item["houseMinimumKWh"], 6)
-        item["knownFraction"] = {
-            name: round(min(1.0, metric_seconds[name] / covered), 6) if covered > 0 else 0.0
-            for name in fields
-        }
         for name in fields:
             item[name] = round(item[name], 6)
         bucket_start = datetime.fromisoformat(item["start"])
@@ -586,28 +550,10 @@ def history_resource(kind, value):
             "start": start_local.isoformat(), "end": end_local.isoformat(),
             "bucket": bucket_kind,
         },
-        "summary": {
-            **{name: round(value_num, 6) for name, value_num in totals.items()},
-            "houseMinimumKWh": round(house_minimum_total, 6),
-        },
+        "summary": {name: round(value_num, 6) for name, value_num in totals.items()},
         "series": series,
         "quality": {
             "coverage": round(min(1.0, valid_seconds / requested_seconds), 6),
-            "houseMinimumFraction": round(
-                min(1.0, house_minimum_seconds / valid_seconds), 6
-            ) if valid_seconds > 0 else 0.0,
-            "metricQuality": {
-                name: {
-                    "knownSeconds": round(known_seconds[name], 3),
-                    "fractionOfMeasuredIntervals": round(
-                        min(1.0, known_seconds[name] / valid_seconds), 6
-                    ) if valid_seconds > 0 else 0.0,
-                    "completeWithinMeasuredIntervals": (
-                        valid_seconds > 0 and known_seconds[name] >= valid_seconds - 1.0
-                    ),
-                }
-                for name in fields
-            },
             "gapCount": gaps,
             "discontinuityCount": discontinuities,
             "firstDataAt": _utc_text(first_data) if first_data else None,
