@@ -351,16 +351,42 @@ function render(rooms,start,now,maxAdvanceMinutes){
 
   legend.innerHTML = "";
   const off = new Set();
+  const roomButtons = new Map();
+  const allButton = document.createElement("button");
+  allButton.type = "button";
+  allButton.className = "all-rooms-toggle";
+  allButton.textContent = "Alles uit";
+  legend.append(allButton);
+
+  function updateSelection(){
+    for(const room of rooms){
+      const selected = !off.has(room.key);
+      const button = roomButtons.get(room.key);
+      button.classList.toggle("off",!selected);
+      button.setAttribute("aria-pressed",String(selected));
+      document.querySelector(`.room-status-card[data-room="${room.key}"]`)?.classList.toggle("off",!selected);
+    }
+    allButton.textContent = off.size === rooms.length ? "Alles aan" : "Alles uit";
+    $("#tooltip").hidden = true;
+    draw();
+  }
+
+  allButton.onclick = () => {
+    if(off.size === rooms.length) off.clear();
+    else rooms.forEach(room => off.add(room.key));
+    updateSelection();
+  };
 
   rooms.forEach(room => {
     const button = document.createElement("button");
+    button.type = "button";
     button.innerHTML = `<i style="background:${room.color}"></i>${room.displayName}`;
+    button.setAttribute("aria-pressed","true");
     button.onclick = () => {
       off.has(room.key) ? off.delete(room.key) : off.add(room.key);
-      button.classList.toggle("off");
-      document.querySelector(`.room-status-card[data-room="${room.key}"]`)?.classList.toggle("off");
-      draw();
+      updateSelection();
     };
+    roomButtons.set(room.key,button);
     legend.append(button);
   });
 
