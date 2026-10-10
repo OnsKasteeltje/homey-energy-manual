@@ -11,7 +11,7 @@ expected = (
     ("settings", "Invoer"),
     ("history", "Historie"),
     ("planner", "Planner"),
-    ("pv-flex", "PV & Flex"),
+    ("pv-flex", "Evaluatie"),
     ("heating", "Verwarming"),
     ("ai", "AI Analyse"),
     ("groups", "Groepen & fasen"),
