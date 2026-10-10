@@ -16,9 +16,11 @@ PV-preheat scope is deliberately limited to:
 - `woonkamer`;
 - `eetkamer`;
 - `keuken`;
-- `serre`.
+- `serre`;
+- `douwe_slaapkamer`;
+- `erker_douwe`.
 
-`woonkamer` and `eetkamer` are tagged as the common `living_area` planning group because they are physically connected and should later be evaluated jointly at source level. This grouping does not invent a thermodynamic coupling coefficient.
+`woonkamer` and `eetkamer` are tagged as the common `living_area` planning group because they are physically connected and should later be evaluated jointly at source level. This grouping does not invent a thermodynamic coupling coefficient. `douwe_slaapkamer` and `erker_douwe` are independent shadow candidates without a shared control group.
 
 All other Honeywell rooms remain normal baseline/comfort rooms but are outside PV-preheat optimisation until explicitly added.
 
@@ -115,7 +117,7 @@ It performs **no Homey call and no device write**. The five-minute shadow cadenc
 
 For CV activity observation V0.3 uses the Quatt observer-only field `observerOnly.cvActive`. This is a read-only statement that the CV boiler is currently active for space heating; it is not an EMS command and it is unrelated to the domestic-hot-water boiler. Every successful Homey current-state fetch stamps the projected value with `observedAt`. The existing Quatt current artifact `generatedAt` remains the single freshness gate with the existing bounded age; `observedAt` must only be coherent with that same successful fetch and MUST NOT introduce an additional stale timer. The Homey capability `sourceLastUpdated` is retained only as provenance/last-change information and MUST NOT be interpreted as measurement freshness. Missing, invalid or stale Quatt current state blocks a new shadow preheat increment; it does not alter normal Honeywell baseline heating.
 
-V0.3 derives house-wide `baselineHeatingDemandPresent` from all canonical Honeywell rooms, not only the four preheat rooms. Until Thermal Learning validates a suitable tolerance/hysteresis, V0.3 deliberately uses an exact/conservative comparison rather than inventing a thermal tolerance.
+V0.3 derives house-wide `baselineHeatingDemandPresent` from all canonical Honeywell rooms, not only the six preheat rooms. Until Thermal Learning validates a suitable tolerance/hysteresis, V0.3 deliberately uses an exact/conservative comparison rather than inventing a thermal tolerance.
 
 V0.3 does **not** grant heating opportunity itself. Each room exposes `plannerGrant = NOT_EVALUATED`, no active physical step, the next thermally legal `+0.5 C` step and `opportunityClosesAt`. Central Heating/EV/WW priority remains a later Dynamic Pi Planner responsibility.
 
@@ -232,7 +234,7 @@ Historic Homey year exports are useful for coarse seasonal behaviour but are agg
 
 When active heating resumes, fine-grained observations should be retained on the Pi before Homey aggregates them. Useful learning inputs include Honeywell target, measured room temperature, Quatt activity/electrical power, outside temperature and P1 energy context.
 
-Initial learning focus is Woonkamer/Eetkamer, followed by validation against Keuken and Serre. The objective is to learn response/retention behaviour and later replace provisional timing guidance with evidence-based parameters.
+Initial learning focus is Woonkamer/Eetkamer, followed by validation against Keuken, Serre, Douwe slaapkamer and Erker Douwe. The objective is to learn response/retention behaviour and later replace provisional timing guidance with evidence-based parameters.
 
 ## Safety invariants
 
