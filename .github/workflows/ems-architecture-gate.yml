@@ -73,6 +73,11 @@ jobs:
           python tests/integrations/test_quooker_evidence_contract.py
           python tests/integrations/test_ai_v0_4_flex_context_contract.py
 
+      - name: Validate canonical website Planner read-only projection
+        run: |
+          python3 tests/api/test_dynamic_planner_web_resource.py
+          python3 tests/frontend/test_planner_canonical_v1_contract.py
+
       - name: Run EV AI reason evidence regression test
         run: python tests/api/test_ai_ev_control_reason_evidence.py
 
