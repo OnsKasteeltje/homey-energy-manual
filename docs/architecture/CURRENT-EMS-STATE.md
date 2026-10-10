@@ -916,3 +916,7 @@ are part of this implementation.
 ## 2026-10-10 — Canonical V1 retrospective evaluation
 
 Evaluatie reads frozen V1 forecast evidence at 12-hour lead from the planner snapshot archive, separate from the last valid EV/WW plan recorded before each quarter-hour. Missing archival evidence remains missing while P1/PV actuals remain visible. The original V2 archive and shadow generation remain unchanged for rollback and research; original historic forecast records are not rewritten. No physical control or planner sources are changed.
+
+## 2026-10-10 — V2 shadow-only array azimuth correction
+
+The V2-only Open-Meteo geometry inputs have been corrected to GoodWe2000 southeast -45 degrees and GoodWe4200/SolarEdge southwest +45 degrees; Open-Meteo uses zero=south. The source V2 forecast model and matching PV array config now agree. V2 newly generated forecast records use an `AZIMUTH_FIXED_V2` modelBasis suffix in the unchanged archive schema, separating them from earlier forecasts generated with incorrect NE/NW orientations. No old forecast archive rows are rewritten. The active V1 Dynamic Pi Planner and all physical control remain unchanged; retirement of V2 shadow generation remains gated on Pi website verification.
