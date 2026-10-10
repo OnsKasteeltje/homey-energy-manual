@@ -5,7 +5,7 @@ const pct=v=>`${Math.round(Number(v||0)*100)}%`;
 const time=x=>new Date(x).toLocaleTimeString("nl-NL",{timeZone:"Europe/Amsterdam",hour:"2-digit",minute:"2-digit"});
 function summary(d){
  $("day-title").textContent=new Date(d.period.start).toLocaleDateString("nl-NL",{timeZone:"Europe/Amsterdam",weekday:"long",day:"numeric",month:"long",year:"numeric"});
- $("kpi-forecast").textContent=kwh(d.summary.forecastKWh); $("kpi-slots").textContent=`${d.summary.forecastSlots}/${d.series.length} forecastkwartieren`;
+ $("kpi-forecast").textContent=kwh(d.summary.forecastKWh); $("kpi-slots").textContent=d.historicalPlannerAvailable?`${d.summary.forecastSlots}/${d.series.length} V1-kwartieren · 12 uur vooraf`:"V1 plannerarchief niet beschikbaar";
  $("kpi-pv").textContent=kwh(d.summary.pvKWh);
  const visibleSelfKWh=d.series.reduce((sum,x)=>{
   const a=slotAllocation(x);
@@ -15,6 +15,7 @@ function summary(d){
  $("kpi-self-note").textContent=d.quality.actualCoverage<0.999?"Geregistreerd · onvolledige dekking":"PV − teruglevering";
  $("kpi-export").textContent=kwh(d.summary.exportKWh);
  $("quality").textContent=`Dekking ${pct(d.quality.actualCoverage)}`; $("next").disabled=day>=todayAmsterdam();
+ $("archive-status").textContent=d.historicalPlannerAvailable?`Geplande EV ${kwh(d.summary.plannedEvKWh)} · warm water ${kwh(d.summary.plannedWwKWh)} · ${d.summary.planSlots}/${d.series.length} plankwartieren`:"V1-plannerarchief ontbreekt. Gemeten P1/PV blijft zichtbaar; geen terugval op V2.";
 }
 function slotAllocation(x){
  const coverage=Number(x.actual?.coverage||0);
@@ -32,7 +33,7 @@ function slotAllocation(x){
 function chart(d){
  const svg=$("pv-chart"), tip=$("tooltip"), a=d.series; svg.replaceChildren(); const has=a.some(x=>x.actual.coverage>0||x.forecast); $("empty").hidden=has; svg.hidden=!has;if(!has)return;
  const W=1000,H=330,p={l:52,r:18,t:18,b:40},iw=W-p.l-p.r,ih=H-p.t-p.b,ns="http://www.w3.org/2000/svg";
- const allocated=a.map(slotAllocation), max=Math.max(100,...a.flatMap((x,i)=>[allocated[i].pvW,x.forecast?.pvForecastW||0]));
+ const allocated=a.map(slotAllocation), max=Math.max(100,...a.flatMap((x,i)=>[allocated[i].pvW,x.forecast?.pvForecastW||0,x.plan?.evPlanW||0,x.plan?.wwPlanW||0]));
  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
  const add=(t,z,txt)=>{const e=document.createElementNS(ns,t);Object.entries(z).forEach(([k,v])=>e.setAttribute(k,v));if(txt!=null)e.textContent=txt;svg.appendChild(e);return e;};
  for(let i=0;i<=4;i++){let y=p.t+ih*i/4;add("line",{x1:p.l,y1:y,x2:W-p.r,y2:y,class:"gridline"});add("text",{x:p.l-7,y:y+4,class:"axis","text-anchor":"end"},`${Math.round(max*(4-i)/400)/10}kW`);}
@@ -47,7 +48,7 @@ function chart(d){
    const h=w/max*ih;
    if(h>0){y-=h;add("rect",{x:cx-barW/2,y,width:barW,height:h,class:cls});}
   }
-  if(x.forecast)points.push(`${cx},${p.t+ih-(x.forecast.pvForecastW/max*ih)}`);
+  points.push(x.forecast?`${cx},${p.t+ih-(x.forecast.pvForecastW/max*ih)}`:null);
   if(i%8===0)add("text",{x:cx,y:H-15,class:"axis","text-anchor":"middle"},time(x.start));
   const hit=add("rect",{x:p.l+i*step,y:p.t,width:step,height:ih,class:"hit"});
   hit.addEventListener("mousemove",e=>{
@@ -63,11 +64,34 @@ function chart(d){
    }).join(", ")||"—";
    tip.hidden=false;
    tip.innerHTML=`<strong>${time(x.start)}</strong><span>PV werkelijk ${actualPv}</span><span>Dekking werkelijk ${Math.round(s.coverage*100)}%</span><span>Forecast ${forecast}</span><span>EV uit PV ${evPv}</span><span>Tesla werkelijk ${(s.evActualW/1000).toFixed(2)} kW</span><span>Overig eigen PV ${otherPv}</span><span>Export ${exportPv}</span><span>Heating opportunity ${heatingOpportunity}</span><span>Heating intent ${heatingIntent}</span><span>Confidence ${x.forecast?.confidence!=null?Math.round(x.forecast.confidence*100)+"%":"—"}</span><span>Lead ${x.forecast?.leadMinutes??"—"} min</span>`;
-   const r=svg.parentElement.getBoundingClientRect();tip.style.left=`${Math.min(r.width-210,Math.max(8,e.clientX-r.left+10))}px`;tip.style.top=`${Math.max(8,e.clientY-r.top-110)}px`;
+       for(const [name,value] of [
+     ["Tesla gepland",x.plan?.evPlanW],
+     ["Warm water gepland",x.plan?.wwPlanW],
+     ["Netimport gepland",x.plan?.gridImportAfterFlexW],
+     ["Netexport gepland",x.plan?.gridExportAfterFlexW],
+     ["Boiler werkelijk",x.devices?.boilerPowerW]
+    ]){
+     const el=document.createElement("span");
+     el.textContent=name+" "+(typeof value==="number"?(value/1000).toFixed(2)+" kW":"—");
+     tip.appendChild(el);
+    }
+    for(const [name,value] of [["EV planreden",x.plan?.evReason],["WW planreden",x.plan?.wwReason],["Plan vastgelegd",x.plan?.generatedAt]]){
+     const el=document.createElement("span");el.textContent=name+" "+(value||"—");tip.appendChild(el);
+    }
+    const r=svg.parentElement.getBoundingClientRect();tip.style.left=`${Math.min(r.width-210,Math.max(8,e.clientX-r.left+10))}px`;tip.style.top=`${Math.max(8,e.clientY-r.top-110)}px`;
   });
   hit.addEventListener("mouseleave",()=>tip.hidden=true);
  });
- if(points.length>1)add("polyline",{points:points.join(" "),class:"forecast-line",fill:"none"});
+ const plotSegments=(values,cls)=>{
+  let segment=[];
+  const flush=()=>{if(segment.length>1)add("polyline",{points:segment.join(" "),class:cls,fill:"none"});segment=[];};
+  for(const v of values){if(v==null)flush();else segment.push(v);}
+  flush();
+ };
+ plotSegments(points,"forecast-line");
+ for(const [field,cls] of [["evPlanW","planned-ev-line"],["wwPlanW","planned-ww-line"]]){
+  plotSegments(a.map((slot,i)=>slot.plan?(p.l+(i+.5)*step)+","+(p.t+ih-slot.plan[field]/max*ih):null),cls);
+ }
 }
 const temp=v=>typeof v==="number"&&Number.isFinite(v)?`${v.toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})} °C`:"—";
 const label=s=>({
