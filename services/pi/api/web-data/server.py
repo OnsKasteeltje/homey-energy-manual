@@ -1263,7 +1263,8 @@ def heating_preheat_progression_resource():
         raise ValueError("HEATING_PREHEAT_PROGRESSION_AUTHORITY_INVALID")
     if source.get("eligibilityAuthority") != "EMS_HEATING_PREHEAT_SHADOW_V0.3":
         raise ValueError("HEATING_PREHEAT_PROGRESSION_ELIGIBILITY_INVALID")
-    if source.get("allocationAuthority") != "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1":
+    # V0.4 consumes the Production Heating Grant, not Flex Priority directly.
+    if source.get("allocationAuthority") != "EMS_PI_DYNAMIC_HEATING_GRANT_V0.1":
         raise ValueError("HEATING_PREHEAT_PROGRESSION_ALLOCATION_INVALID")
 
     generated_at = source.get("generatedAt")
