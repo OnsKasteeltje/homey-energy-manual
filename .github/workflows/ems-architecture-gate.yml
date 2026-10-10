@@ -86,6 +86,11 @@ jobs:
           node --check frontend/pv-flex/state/pv-flex-state.js
           node --check frontend/pv-flex/render/pv-flex.js
 
+      - name: Validate V2 shadow array orientation
+        run: |
+          python3 tests/forecast/test_pv_forecast_v2_contract.py
+          python3 tests/forecast/test_v2_shadow_azimuth_geometry.py
+
       - name: Run EV AI reason evidence regression test
         run: python tests/api/test_ai_ev_control_reason_evidence.py
 

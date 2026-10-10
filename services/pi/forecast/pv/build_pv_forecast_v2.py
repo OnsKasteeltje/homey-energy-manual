@@ -18,7 +18,10 @@ MIN_CLEAR_SKY_W_M2 = 25.0
 HISTORICAL_WEIGHT = 0.85
 MIN_PROFILE_DAYS = 3
 MIN_PROFILE_SAMPLES = 3
-PV_ARRAYS = [("goodwe2000", -135, 30), ("goodwe4200", 135, 30), ("solaredge", 135, 25)]
+# Open-Meteo azimuth convention: 0=south, -90=east, +90=west.
+# Corrected from +/-135 (NE/NW) on 2026-10-10. Historical archives
+# remain immutable and modelBasis marks forecasts built after this fix.
+PV_ARRAYS = [("goodwe2000", -45, 30), ("goodwe4200", 45, 30), ("solaredge", 45, 25)]
 
 AXIS = Path("/home/jeroen/ems/data/planner-axis.json")
 PROFILE = Path("/home/jeroen/ems/data/pv-history-profile.json")
@@ -131,12 +134,12 @@ def main():
             historical = max(0.0, float(envelope) * cloud_factor)
             pv = min(PV_NOMINAL_W, HISTORICAL_WEIGHT * historical
                      + (1.0 - HISTORICAL_WEIGHT) * theoretical)
-            basis = "HISTORICAL_ENVELOPE_CLOUD_ADJUSTED"
+            basis = "HISTORICAL_ENVELOPE_CLOUD_ADJUSTED_AZIMUTH_FIXED_V2"
             history_quality = clamp(samples / 12.0)
         else:
             cloud_factor = None
             pv = theoretical
-            basis = "THEORETICAL_FALLBACK"
+            basis = "THEORETICAL_FALLBACK_AZIMUTH_FIXED_V2"
             history_quality = 0.35
 
         cloud_window = [float(x or 0) for x in clouds[max(0, i-2):min(len(clouds), i+3)]]
@@ -191,6 +194,7 @@ def main():
             "nominalW": PV_NOMINAL_W,
             "arrays": [{"name": n, "azimuth": a, "tiltDeg": t} for n, a, t in PV_ARRAYS],
             "arrayCapacityBasis": "NOT_ASSUMED_FROM_INVERTER_AC_RATING",
+            "geometryConfigVersion": "AZIMUTH_FIXED_V2_20261010",
             "calibration": "ROLLING_HISTORICAL_CLEAR_ENVELOPE",
             "confidenceAdvisoryOnly": True,
             "recentLocalAccuracySource": "CLOSED_VALIDATED_HISTORY_ONLY",
