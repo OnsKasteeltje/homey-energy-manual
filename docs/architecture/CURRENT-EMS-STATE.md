@@ -912,3 +912,7 @@ Historical Evaluatie cutover and eventual V2 retirement require separate
 snapshot validation and release gates. No forecast- or control-path changes
 are part of this implementation.
 
+
+## 2026-10-10 — Canonical V1 retrospective evaluation
+
+Evaluatie reads frozen V1 forecast evidence at 12-hour lead from the planner snapshot archive, separate from the last valid EV/WW plan recorded before each quarter-hour. Missing archival evidence remains missing while P1/PV actuals remain visible. The original V2 archive and shadow generation remain unchanged for rollback and research; original historic forecast records are not rewritten. No physical control or planner sources are changed.
