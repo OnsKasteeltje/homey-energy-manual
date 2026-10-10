@@ -107,6 +107,8 @@ Retain household energy, PV, import/export and data-quality/coverage. Extend the
 
 ### Planner — intended future behaviour
 
+The Planner frontend reads the existing Dynamic Pi Planner 96-slot decision as a read-only allowlisted projection. Its PV curve must be the V1 forecast actually used for EV/WW allocation; V2 forecast comparison remains separate from decision observability.
+
 Must evolve from a PV Forecast display into the joint planning view. On one common 15-minute time axis it should expose at least:
 
 - PV forecast + confidence;

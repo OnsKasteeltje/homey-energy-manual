@@ -1,16 +1,140 @@
-const $=id=>document.getElementById(id);const fmtW=v=>Number(v||0).toLocaleString("nl-NL")+" W";
-const localTime=v=>new Date(v).toLocaleTimeString("nl-NL",{timeZone:"Europe/Amsterdam",hour:"2-digit",minute:"2-digit"});
-async function get(url,label){const r=await fetch(url,{cache:"no-store"});if(!r.ok)throw new Error(label+" niet beschikbaar");return r.json()}
-async function load(){const [pv,ev]=await Promise.all([get("/web/planner/pv-forecast","PV Forecast"),get("/web/planner/ev-requirement","EV requirement").catch(()=>null)]);return{pv,ev}}
-function render({pv:d,ev}){$("freshness").textContent="Forecast "+localTime(d.generatedAt);const s=d.slots||[],svg=$("pv-chart");svg.replaceChildren();if(!s.length){$("empty").hidden=false;return}
-const W=1100,H=390,p={l:55,r:18,t:24,b:48},iw=W-p.l-p.r,ih=H-p.t-p.b,viewStartMs=new Date(s[0].start).getTime(),viewEndMs=new Date(s[s.length-1].start).getTime()+15*60*1000,visible=s,rawMax=Math.max(1000,...visible.map(x=>Number(x.pvForecastW)||0)),niceStep=v=>{const rough=v/4,pow=10**Math.floor(Math.log10(rough)),n=rough/pow;return(n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*pow},tickStep=niceStep(rawMax),max=tickStep*4,fmtTick=v=>{if(v===0)return"0";const kw=v/1000;return kw.toLocaleString("nl-NL",{maximumFractionDigits:2})+"k"},ns="http://www.w3.org/2000/svg";
-svg.setAttribute("viewBox",`0 0 ${W} ${H}`);const add=(t,a,txt)=>{const e=document.createElementNS(ns,t);Object.entries(a).forEach(([k,v])=>e.setAttribute(k,v));if(txt!=null)e.textContent=txt;svg.appendChild(e);return e};
-for(let i=0;i<=4;i++){let y=p.t+ih*i/4;add("line",{x1:p.l,y1:y,x2:W-p.r,y2:y,class:"grid"});add("text",{x:p.l-8,y:y+4,class:"axis","text-anchor":"end"},fmtTick(tickStep*(4-i)))}
-const xFor=ms=>p.l+(ms-viewStartMs)/(viewEndMs-viewStartMs)*iw,pts=visible.map(x=>[xFor(new Date(x.start).getTime()+7.5*60*1000),p.t+ih-(Number(x.pvForecastW)||0)/max*ih]);
-/* Confidence is encoded as visual thickness only; this is not a statistical prediction interval. */
-const upper=[],lower=[];visible.forEach((x,i)=>{const c=x.confidence==null?1:Math.max(0,Math.min(1,Number(x.confidence)));const w=Number(x.pvForecastW)||0;const half=w<=0?0:3+(1-c)*28;upper.push([pts[i][0],Math.max(p.t,pts[i][1]-half)]);lower.push([pts[i][0],Math.min(p.t+ih,pts[i][1]+half)])});
-add("polygon",{points:upper.concat([...lower].reverse()).map(x=>x.join(",")).join(" "),class:"confidence-band"});add("polyline",{points:pts.map(x=>x.join(",")).join(" "),class:"pvline",fill:"none"});
-const marker=(when,cls,label)=>{if(!when)return;const ms=new Date(when).getTime();if(!Number.isFinite(ms)||ms<viewStartMs||ms>viewEndMs)return;const x=xFor(ms);add("line",{x1:x,y1:p.t,x2:x,y2:p.t+ih,class:cls});add("text",{x:x+5,y:p.t+14,class:"ev-label"},label+" "+localTime(when))};
-const evTracking=!!(ev&&ev.active&&ev.status==="TRACKING"&&Number(ev.remainingKWh)>0);if(evTracking){marker(ev.latestStartAt,"ev-latest","EV latest start");marker(ev.deadlineAt,"ev-deadline","EV deadline");$("ev-summary").textContent=`${Number(ev.remainingKWh).toLocaleString("nl-NL",{maximumFractionDigits:2})} kWh resterend · max ${ev.maxA??"—"} A · deadline ${ev.deadlineAt?localTime(ev.deadlineAt):"—"} · ${ev.status}`}else{$("ev-summary").textContent=ev?`Geen actieve deadline · ${ev.status||"inactief"}`:"EV requirement niet beschikbaar"}
-for(let h=0;h<=24;h+=2){const ms=viewStartMs+h*60*60*1000;add("text",{x:xFor(ms),y:H-20,class:"axis","text-anchor":h===0?"start":h===24?"end":"middle"},localTime(ms))}visible.forEach((x,i)=>{const slotStart=new Date(x.start).getTime(),slotEnd=slotStart+15*60*1000;const hit=add("rect",{x:xFor(Math.max(slotStart,viewStartMs)),y:p.t,width:Math.max(1,xFor(Math.min(slotEnd,viewEndMs))-xFor(Math.max(slotStart,viewStartMs))),height:ih,class:"hit"});hit.addEventListener("mousemove",e=>{const t=$("tooltip");t.hidden=false;t.innerHTML=`<strong>${new Date(x.start).toLocaleString("nl-NL",{timeZone:"Europe/Amsterdam",weekday:"short",hour:"2-digit",minute:"2-digit"})}</strong><span>PV ${fmtW(x.pvForecastW)}</span><span>Confidence ${x.confidence==null?"—":Math.round(x.confidence*100)+"%"}</span>`;const r=svg.parentElement.getBoundingClientRect();t.style.left=Math.min(r.width-180,Math.max(8,e.clientX-r.left+10))+"px";t.style.top=Math.max(8,e.clientY-r.top-75)+"px"});hit.addEventListener("mouseleave",()=>$("tooltip").hidden=true)})}
-load().then(render).catch(e=>{$("freshness").textContent=e.message;$("empty").hidden=false})
+const $ = id => document.getElementById(id);
+const number = value => Number(value || 0);
+const fmtW = value => number(value).toLocaleString("nl-NL") + " W";
+const localTime = value => new Date(value).toLocaleTimeString("nl-NL", {
+  timeZone:"Europe/Amsterdam", hour:"2-digit", minute:"2-digit"
+});
+const localDateTime = value => new Date(value).toLocaleString("nl-NL", {
+  timeZone:"Europe/Amsterdam", weekday:"short", hour:"2-digit", minute:"2-digit"
+});
+async function get(url, label) {
+  const response = await fetch(url, {cache:"no-store"});
+  if (!response.ok) throw new Error(label + " niet beschikbaar");
+  return response.json();
+}
+async function load() {
+  const [plan, ev] = await Promise.all([
+    get("/web/planner/current", "Dynamisch plan"),
+    get("/web/planner/ev-requirement", "EV requirement").catch(() => null)
+  ]);
+  if (plan.schema !== "EMS_WEB_DYNAMIC_PLAN_V1") throw new Error("Onbekend dynamisch plan");
+  return {plan, ev};
+}
+function renderRequirement(ev) {
+  const out = $("ev-summary");
+  if (ev && ev.active && ev.status === "TRACKING" && number(ev.remainingKWh) > 0) {
+    out.textContent = number(ev.remainingKWh).toLocaleString("nl-NL", {
+      maximumFractionDigits:2
+    }) + " kWh resterend · max " + (ev.maxA ?? "—") + " A · deadline " +
+      (ev.deadlineAt ? localTime(ev.deadlineAt) : "—");
+  } else {
+    out.textContent = ev ? "Geen actieve deadline · " + (ev.status || "inactief") :
+      "EV requirement niet beschikbaar";
+  }
+}
+function render({plan, ev}) {
+  $("freshness").textContent = "Plan " + localTime(plan.generatedAt) +
+    " · geldig tot " + localTime(plan.validUntil);
+  $("plan-mode").textContent = "Warmwaterbron: " + (plan.wwSourceMode || "onbekend") +
+    ". Alle lijnen zijn plan/forecast, geen gemeten uitvoering. Verwarming heeft een aparte shadow-keten; realtime P1 blijft leidend.";
+  renderRequirement(ev);
+
+  const slots = plan.slots || [];
+  const svg = $("pv-chart");
+  svg.replaceChildren();
+  if (!slots.length) { $("empty").hidden = false; return; }
+  $("empty").hidden = true;
+  const W = 1100, H = 390, p = {l:55,r:18,t:24,b:48};
+  const iw = W-p.l-p.r, ih = H-p.t-p.b;
+  const fields = [
+    ["pvForecastW","pvline"],["evPlanW","evline"],["wwPlanW","wwline"],
+    ["gridExportAfterFlexW","exportline"],["gridImportAfterFlexW","importline"]
+  ];
+  const rawMax = Math.max(1000, ...slots.flatMap(s=>fields.map(([key])=>number(s[key]))));
+  const rough = rawMax/4, pow = 10**Math.floor(Math.log10(rough)), n = rough/pow;
+  const tickStep = (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*pow;
+  const max = tickStep*4;
+  const viewStart = new Date(slots[0].start).getTime();
+  const viewEnd = new Date(slots[slots.length-1].start).getTime() + 900000;
+  const xFor = ms => p.l + (ms-viewStart)/(viewEnd-viewStart)*iw;
+  const yFor = val => p.t + ih - number(val)/max*ih;
+  const ns = "http://www.w3.org/2000/svg";
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  const add = (tag, attrs, text) => {
+    const el = document.createElementNS(ns, tag);
+    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k,v));
+    if (text != null) el.textContent = text;
+    svg.appendChild(el);
+    return el;
+  };
+  for (let i=0;i<=4;i++) {
+    const y=p.t+ih*i/4;
+    add("line",{x1:p.l,y1:y,x2:W-p.r,y2:y,class:"grid"});
+    add("text",{x:p.l-8,y:y+4,class:"axis","text-anchor":"end"},
+      (tickStep*(4-i)/1000).toLocaleString("nl-NL",{maximumFractionDigits:2})+"k");
+  }
+  for (const [field, cls] of fields) {
+    const points=slots.map(s=>[
+      xFor(new Date(s.start).getTime()+450000),
+      yFor(s[field])
+    ].join(",")).join(" ");
+    add("polyline",{points,class:cls,fill:"none"});
+  }
+  const marker = (when,cls,label) => {
+    if (!when) return;
+    const ms=new Date(when).getTime();
+    if (!Number.isFinite(ms) || ms < viewStart || ms > viewEnd) return;
+    const x=xFor(ms);
+    add("line",{x1:x,y1:p.t,x2:x,y2:p.t+ih,class:cls});
+    add("text",{x:x+5,y:p.t+14,class:"ev-label"},label+" "+localTime(when));
+  };
+  if (ev && ev.active && ev.status === "TRACKING" && number(ev.remainingKWh)>0) {
+    marker(ev.latestStartAt,"ev-latest","EV uiterlijk starten");
+    marker(ev.deadlineAt,"ev-deadline","EV deadline");
+  }
+  for (let h=0;h<=24;h+=2) {
+    const ms=viewStart+h*3600000;
+    add("text",{x:xFor(ms),y:H-20,class:"axis","text-anchor":h===0?"start":h===24?"end":"middle"},localTime(ms));
+  }
+  const tooltip=$("tooltip");
+  for (const slot of slots) {
+    const start=new Date(slot.start).getTime();
+    const end=start+900000;
+    const hit=add("rect",{
+      x:xFor(start),y:p.t,width:Math.max(1,xFor(end)-xFor(start)),
+      height:ih,class:"hit"
+    });
+    hit.addEventListener("mousemove",event=>{
+      tooltip.replaceChildren();
+      const title=document.createElement("strong");
+      title.textContent=localDateTime(slot.start);
+      tooltip.appendChild(title);
+      const values=[
+        ["PV voorspeld",fmtW(slot.pvForecastW)],
+        ["Tesla gepland",fmtW(slot.evPlanW)],
+        ["Warm water gepland",fmtW(slot.wwPlanW)],
+        ["Export verwacht",fmtW(slot.gridExportAfterFlexW)],
+        ["Import verwacht",fmtW(slot.gridImportAfterFlexW)],
+        ["EV reden",slot.evReason || "—"],
+        ["WW reden",slot.wwReason || "—"],
+        ["Confidence",slot.confidence == null?"—":Math.round(slot.confidence*100)+"%"]
+      ];
+      for (const [label,value] of values) {
+        const el=document.createElement("span");
+        el.textContent=label+": "+value;
+        tooltip.appendChild(el);
+      }
+      tooltip.hidden=false;
+      const rect=svg.parentElement.getBoundingClientRect();
+      tooltip.style.left=Math.min(rect.width-235,Math.max(8,event.clientX-rect.left+10))+"px";
+      tooltip.style.top=Math.max(8,event.clientY-rect.top-100)+"px";
+    });
+    hit.addEventListener("mouseleave",()=>tooltip.hidden=true);
+  }
+}
+load().then(render).catch(error=>{
+  $("freshness").textContent=error.message;
+  $("empty").hidden=false;
+  $("pv-chart").hidden=true;
+  $("ev-summary").textContent="Planner niet beschikbaar";
+});

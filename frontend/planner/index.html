@@ -1,6 +1,52 @@
-<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="light"><title>EMS · Planner</title><link rel="stylesheet" href="../shared/styles/v2-shell.css"><link rel="stylesheet" href="./styles/planner.css"></head><body>
-<header class="topbar"><a class="brand" href="../live/">EMS <span>Productie</span></a><nav data-ems-main-nav aria-label="Hoofdnavigatie"></nav><div id="freshness" class="freshness">Laden…</div></header>
-<main><section class="intro"><div><small>PLANNER V2 · SHADOW</small><h1>PV Forecast</h1><p>Verwachte PV-productie voor de komende 24 uur. P1 blijft realtime authority.</p></div></section>
-<section class="panel"><header><div><small>96 × 15 MINUTEN</small><h2>PV-productie</h2></div><span class="badge">SHADOW</span></header><div class="legend"><span>PV Forecast</span><span>Confidence · bandbreedte</span><span>EV requirement · markers</span></div><div class="chart-wrap"><svg id="pv-chart" role="img" aria-label="PV Forecast V2"></svg><div id="tooltip" class="tooltip" hidden></div></div><p id="empty" hidden>Forecast niet beschikbaar.</p><div id="ev-requirement" class="ev-requirement"><strong>EV requirement</strong><span id="ev-summary">Laden…</span></div></section>
-<p class="preview-note">EMS productie · Planner V2 shadow</p></main><script type="module" src="./render/planner.js"></script><script type="module" src="../shared/navigation.js"></script>
-</body></html>
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>EMS · Planner</title>
+  <link rel="stylesheet" href="../shared/styles/v2-shell.css">
+  <link rel="stylesheet" href="./styles/planner.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../live/">EMS <span>Productie</span></a>
+  <nav data-ems-main-nav aria-label="Hoofdnavigatie"></nav>
+  <div id="freshness" class="freshness">Laden…</div>
+</header>
+<main>
+  <section class="intro">
+    <div>
+      <small>DYNAMIC PI PLANNER · SHADOW</small>
+      <h1>EMS-planning</h1>
+      <p>Wat plant de Pi voor de komende 24 uur? PV V1, Tesla, warm water en de verwachte netbalans — rechtstreeks uit hetzelfde dynamische plan.</p>
+    </div>
+  </section>
+  <section class="panel">
+    <header>
+      <div><small>96 × 15 MINUTEN · READ-ONLY</small><h2>Voorspelling en flexplanning</h2></div>
+      <span class="badge">SHADOW</span>
+    </header>
+    <div class="legend" aria-label="Grafieklegenda">
+      <span class="key pv">PV voorspeld</span>
+      <span class="key ev">Tesla gepland</span>
+      <span class="key ww">Warm water gepland</span>
+      <span class="key export">Export verwacht</span>
+      <span class="key import">Import verwacht</span>
+    </div>
+    <div class="chart-wrap">
+      <svg id="pv-chart" role="img" aria-label="Dynamische planning voor PV, Tesla, warm water en import/export"></svg>
+      <div id="tooltip" class="tooltip" hidden></div>
+    </div>
+    <p id="empty" class="empty" hidden>Actueel dynamisch plan niet beschikbaar.</p>
+    <div id="ev-requirement" class="ev-requirement">
+      <strong>EV-deadline</strong><span id="ev-summary">Laden…</span>
+    </div>
+    <p id="plan-mode" class="note">Geplande waarden zijn geen gemeten of gegarandeerde uitvoering. Verwarming heeft een afzonderlijke shadow-keten; realtime P1 blijft leidend.</p>
+  </section>
+  <p class="preview-note">EMS productie · Dynamische Pi Planner · read-only</p>
+</main>
+<script type="module" src="./render/planner.js"></script>
+<script type="module" src="../shared/navigation.js"></script>
+</body>
+</html>
