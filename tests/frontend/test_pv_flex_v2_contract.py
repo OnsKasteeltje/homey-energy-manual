@@ -58,7 +58,7 @@ assert '.heating-opportunity-lane' in css
 assert '.heating-intent-lane' in css
 assert '.preheat-room' in css and '.preheat-state' in css
 assert '.evbar' not in css and '.evlane' not in css
-assert 'boilerPowerW' not in render
+assert 'boilerPowerW' in render, 'EV and boiler measured power are compared with plans'
 assert "fetch(" not in render, "renderer must use state adapter"
 print("PASS: PV & Flex Analysis V2 single-render frontend contract")
 
