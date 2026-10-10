@@ -53,4 +53,16 @@ baseline, trend = planner.recent_export_baseline(updated, 3805)
 assert baseline == 2588 + 0.25 * (3805 - 2588)
 assert trend == 3805 - 2588
 
+# Demonstrate why the realtime correction may cross the 1P start band.
+near_slot = now + timedelta(minutes=15)
+corrected, _ = planner.realtime_corrected_export(
+    1081, 0.6, 0.7, near_slot, now, 3805, updated
+)
+raw_only = [{"ts": sample["ts"], "exportW": sample["exportW"]} for sample in updated]
+uncorrected, _ = planner.realtime_corrected_export(
+    1081, 0.6, 0.7, near_slot, now, 382, raw_only
+)
+assert corrected >= planner.EV_START_1P_W, corrected
+assert uncorrected < planner.EV_START_1P_W, uncorrected
+
 print("PASS: EV-corrected P1 headroom; raw P1 preserved; fail-closed fallback")
