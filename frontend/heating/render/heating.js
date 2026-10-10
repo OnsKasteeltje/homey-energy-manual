@@ -4,8 +4,8 @@ const SHADOW_URL = "/web/planner/heating-preheat-shadow";
 const PROGRESSION_URL = "/web/planner/heating-preheat-progression-shadow";
 
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-const ROOM_KEYS = ["woonkamer","eetkamer","keuken","serre"];
-const COLORS = ["#2f9e87","#2e86b7","#d08b33","#8d6cab"];
+const ROOM_KEYS = ["woonkamer","eetkamer","keuken","serre","douwe_slaapkamer","erker_douwe"];
+const COLORS = ["#2f9e87","#2e86b7","#d08b33","#8d6cab","#c04f7a","#488c69"];
 const HORIZON_MIN = 1440;
 const HISTORY_MIN = 360;
 
@@ -345,6 +345,8 @@ function render(rooms,start,now,maxAdvanceMinutes){
     "<span><b>Leefzone</b> · Woonkamer + Eetkamer</span>",
     "<span><b>Keuken</b> · zelfstandig</span>",
     "<span><b>Serre</b> · zelfstandig</span>",
+    "<span><b>Douwe slaapkamer</b> · zelfstandig</span>",
+    "<span><b>Erker Douwe</b> · zelfstandig</span>",
   ].join("");
 
   legend.innerHTML = "";
