@@ -5,7 +5,7 @@ const pct=v=>`${Math.round(Number(v||0)*100)}%`;
 const time=x=>new Date(x).toLocaleTimeString("nl-NL",{timeZone:"Europe/Amsterdam",hour:"2-digit",minute:"2-digit"});
 function summary(d){
  $("day-title").textContent=new Date(d.period.start).toLocaleDateString("nl-NL",{timeZone:"Europe/Amsterdam",weekday:"long",day:"numeric",month:"long",year:"numeric"});
- $("kpi-forecast").textContent=kwh(d.summary.forecastKWh); $("kpi-slots").textContent=d.historicalPlannerAvailable?`${d.summary.forecastSlots}/${d.series.length} V1-kwartieren · 12 uur vooraf`:"V1 plannerarchief niet beschikbaar";
+ $("kpi-forecast").textContent=kwh(d.summary.forecastKWh); $("kpi-slots").textContent=d.historicalPlannerAvailable?`${d.summary.planSlots}/${d.series.length} kwartieren met beslissing`:"V1-plannerarchief niet beschikbaar";
  $("kpi-pv").textContent=kwh(d.summary.pvKWh);
  const visibleSelfKWh=d.series.reduce((sum,x)=>{
   const a=slotAllocation(x);
@@ -15,7 +15,7 @@ function summary(d){
  $("kpi-self-note").textContent=d.quality.actualCoverage<0.999?"Geregistreerd · onvolledige dekking":"PV − teruglevering";
  $("kpi-export").textContent=kwh(d.summary.exportKWh);
  $("quality").textContent=`Dekking ${pct(d.quality.actualCoverage)}`; $("next").disabled=day>=todayAmsterdam();
- $("archive-status").textContent=d.historicalPlannerAvailable?`Geplande EV ${kwh(d.summary.plannedEvKWh)} · warm water ${kwh(d.summary.plannedWwKWh)} · ${d.summary.planSlots}/${d.series.length} plankwartieren`:"V1-plannerarchief ontbreekt. Gemeten P1/PV blijft zichtbaar; geen terugval op V2.";
+ $("archive-status").textContent=d.historicalPlannerAvailable?`Historisch besluit: EV ${kwh(d.summary.plannedEvKWh)} · boiler ${kwh(d.summary.plannedWwKWh)} · Quooker ${kwh(d.summary.plannedQuookerKWh)} · ${d.summary.planSlots}/${d.series.length} geldige kwartieren`:"V1-plannerarchief ontbreekt. Werkelijke P1/PV blijft zichtbaar; geen terugval op V2.";
 }
 function slotAllocation(x){
  const coverage=Number(x.actual?.coverage||0);
@@ -30,10 +30,63 @@ function slotAllocation(x){
  const otherPvW=actualKnown?Math.max(0,directPvW-evPvW):0;
  return {pvW,exportW,directPvW,houseW,evActualW,evPvW,otherPvW,actualKnown,coverage};
 }
+const measuredW=v=>typeof v==="number"&&Number.isFinite(v)?(v/1000).toLocaleString("nl-NL",{maximumFractionDigits:2})+" kW":"— (niet gemeten)";
+const planW=v=>typeof v==="number"&&Number.isFinite(v)?(v/1000).toLocaleString("nl-NL",{maximumFractionDigits:2})+" kW":"— (niet vastgelegd)";
+const stamp=v=>v?new Date(v).toLocaleString("nl-NL",{timeZone:"Europe/Amsterdam",hour:"2-digit",minute:"2-digit",second:"2-digit"}):"—";
+function renderEvidence(slot){
+ const root=$("decision-evidence");root.replaceChildren();
+ if(!slot){$("evidence-time").textContent="—";return;}
+ $("evidence-time").textContent=time(slot.start);
+ const plan=slot.plan,actual=slot.actual||{},devices=slot.devices||{};
+ const pvKnown=Number(actual.pvCoverage||0)>0,p1Known=Number(actual.p1Coverage||0)>0;
+ const evKnown=typeof devices.evPowerW==="number";
+ const wwKnown=typeof devices.boilerPowerW==="number";
+ const cells=[
+  ["1. Informatie",[
+    "Besluit vastgelegd: "+stamp(plan?.generatedAt),
+    "PV verwacht: "+planW(slot.forecast?.pvForecastW),
+    "EV beschikbaar (prognose): "+(plan?.teslaAvailableForecast==null?"—":plan.teslaAvailableForecast?"Ja":"Nee"),
+    "Warmwaterbron: "+(plan?.wwSourceMode||"—")
+  ]],
+  ["2. Beslissing",[
+    "Tesla: "+planW(plan?.evPlanW)+" · "+(plan?.evReason||"reden onbekend"),
+    "Boiler: "+planW(plan?.wwPlanW)+" · "+(plan?.wwReason||"reden onbekend"),
+    "Quooker: "+planW(plan?.quookerPlanW)+" · "+(plan?.quookerMode||"modus onbekend"),
+    "PV-opportunity Quooker: "+(plan?.quookerOpportunityAllowed==null?"—":plan.quookerOpportunityAllowed?"toegestaan":"niet toegestaan"),
+    "Net gepland: import "+planW(plan?.gridImportAfterFlexW)+" / export "+planW(plan?.gridExportAfterFlexW)
+  ]],
+  ["3. Uitvoering",[
+    "Tesla werkelijk: "+measuredW(devices.evPowerW),
+    "Boiler werkelijk: "+measuredW(devices.boilerPowerW),
+    "Quooker werkelijk: — (geen historische vermogensmeting in deze API)",
+    "Heating: "+(slot.heatingFlex?.intent?"shadow-intent geregistreerd":"geen geregistreerde shadow-intent")
+  ]],
+  ["4. Resultaat",[
+    "PV gemeten: "+(pvKnown?kwh(actual.pvKWh):"— (geen PV-dekking)"),
+    "Import: "+(p1Known?kwh(actual.importKWh):"— (geen P1-dekking)"),
+    "Export: "+(p1Known?kwh(actual.exportKWh):"— (geen P1-dekking)"),
+    "Direct PV-gebruik: "+kwh(actual.pvSelfConsumedKWh),
+    "Dekking P1/PV: "+pct(actual.p1Coverage||0)+" / "+pct(actual.pvCoverage||0)
+  ]],
+  ["5. Beoordeling",[
+    !plan?"Geen geldig historisch plannerbesluit beschikbaar":!pvKnown||!p1Known?"Onvoldoende gemeten P1/PV om uitkomst te beoordelen":"Besluit en resultaat beschikbaar; oorzakelijke kwaliteit niet automatisch bewezen",
+    "EV uitvoering: "+(!plan||!evKnown?"onvoldoende bewijs":"plan "+planW(plan.evPlanW)+" / gemeten "+measuredW(devices.evPowerW)),
+    "Boiler uitvoering: "+(!plan||!wwKnown?"onvoldoende bewijs":"plan "+planW(plan.wwPlanW)+" / gemeten "+measuredW(devices.boilerPowerW)),
+    "Quooker: uitvoering niet vastgesteld",
+    "Gemiste kans: niet beoordeeld (haalbare benchmark ontbreekt)"
+  ]]
+ ];
+ for(const [heading,lines] of cells){
+  const card=document.createElement("article");card.className="evidence-step";
+  const title=document.createElement("strong");title.textContent=heading;
+  const text=document.createElement("p");text.textContent=lines.join("\n");
+  card.append(title,text);root.append(card);
+ }
+}
 function chart(d){
- const svg=$("pv-chart"), tip=$("tooltip"), a=d.series; svg.replaceChildren(); const has=a.some(x=>x.actual.coverage>0||x.forecast); $("empty").hidden=has; svg.hidden=!has;if(!has)return;
+ const svg=$("pv-chart"), tip=$("tooltip"), a=d.series; svg.replaceChildren(); const has=a.some(x=>x.actual.coverage>0||x.plan); $("empty").hidden=has; svg.hidden=!has;if(!has)return;
  const W=1000,H=330,p={l:52,r:18,t:18,b:40},iw=W-p.l-p.r,ih=H-p.t-p.b,ns="http://www.w3.org/2000/svg";
- const allocated=a.map(slotAllocation), max=Math.max(100,...a.flatMap((x,i)=>[allocated[i].pvW,x.forecast?.pvForecastW||0,x.plan?.evPlanW||0,x.plan?.wwPlanW||0]));
+ const allocated=a.map(slotAllocation), max=Math.max(100,...a.flatMap((x,i)=>[allocated[i].pvW,x.forecast?.pvForecastW||0,x.plan?.evPlanW||0,x.plan?.wwPlanW||0,x.plan?.quookerPlanW||0]));
  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
  const add=(t,z,txt)=>{const e=document.createElementNS(ns,t);Object.entries(z).forEach(([k,v])=>e.setAttribute(k,v));if(txt!=null)e.textContent=txt;svg.appendChild(e);return e;};
  for(let i=0;i<=4;i++){let y=p.t+ih*i/4;add("line",{x1:p.l,y1:y,x2:W-p.r,y2:y,class:"gridline"});add("text",{x:p.l-7,y:y+4,class:"axis","text-anchor":"end"},`${Math.round(max*(4-i)/400)/10}kW`);}
@@ -63,10 +116,11 @@ function chart(d){
     return Number.isFinite(target)?`${r.displayName||r.key} ${target.toFixed(1)} °C`:(r.displayName||r.key);
    }).join(", ")||"—";
    tip.hidden=false;
-   tip.innerHTML=`<strong>${time(x.start)}</strong><span>PV werkelijk ${actualPv}</span><span>Dekking werkelijk ${Math.round(s.coverage*100)}%</span><span>Forecast ${forecast}</span><span>EV uit PV ${evPv}</span><span>Tesla werkelijk ${(s.evActualW/1000).toFixed(2)} kW</span><span>Overig eigen PV ${otherPv}</span><span>Export ${exportPv}</span><span>Heating opportunity ${heatingOpportunity}</span><span>Heating intent ${heatingIntent}</span><span>Confidence ${x.forecast?.confidence!=null?Math.round(x.forecast.confidence*100)+"%":"—"}</span><span>Lead ${x.forecast?.leadMinutes??"—"} min</span>`;
+   tip.innerHTML=`<strong>${time(x.start)}</strong><span>PV werkelijk ${actualPv}</span><span>Dekking werkelijk ${Math.round(s.coverage*100)}%</span><span>Forecast ${forecast}</span><span>EV uit PV ${evPv}</span><span>Tesla werkelijk ${(s.evActualW/1000).toFixed(2)} kW</span><span>Overig eigen PV ${otherPv}</span><span>Export ${exportPv}</span><span>Heating opportunity ${heatingOpportunity}</span><span>Heating intent ${heatingIntent}</span><span>Confidence ${x.forecast?.confidence!=null?Math.round(x.forecast.confidence*100)+"%":"—"}</span><span>V1 bij besluit ${stamp(x.plan?.generatedAt)}</span>`;
        for(const [name,value] of [
      ["Tesla gepland",x.plan?.evPlanW],
      ["Warm water gepland",x.plan?.wwPlanW],
+     ["Quooker gepland",x.plan?.quookerPlanW],
      ["Netimport gepland",x.plan?.gridImportAfterFlexW],
      ["Netexport gepland",x.plan?.gridExportAfterFlexW],
      ["Boiler werkelijk",x.devices?.boilerPowerW]
@@ -75,12 +129,16 @@ function chart(d){
      el.textContent=name+" "+(typeof value==="number"?(value/1000).toFixed(2)+" kW":"—");
      tip.appendChild(el);
     }
-    for(const [name,value] of [["EV planreden",x.plan?.evReason],["WW planreden",x.plan?.wwReason],["Plan vastgelegd",x.plan?.generatedAt]]){
+    for(const [name,value] of [["Quooker modus",x.plan?.quookerMode],
+     ["Quooker opportunity",x.plan?.quookerOpportunityAllowed==null?"—":x.plan.quookerOpportunityAllowed?"toegestaan":"niet toegestaan"],
+     ["EV planreden",x.plan?.evReason],["WW planreden",x.plan?.wwReason],["Plan vastgelegd",x.plan?.generatedAt]]){
      const el=document.createElement("span");el.textContent=name+" "+(value||"—");tip.appendChild(el);
     }
+    renderEvidence(x);
     const r=svg.parentElement.getBoundingClientRect();tip.style.left=`${Math.min(r.width-210,Math.max(8,e.clientX-r.left+10))}px`;tip.style.top=`${Math.max(8,e.clientY-r.top-110)}px`;
   });
   hit.addEventListener("mouseleave",()=>tip.hidden=true);
+  hit.addEventListener("click",()=>renderEvidence(x));
  });
  const plotSegments=(values,cls)=>{
   let segment=[];
@@ -89,9 +147,11 @@ function chart(d){
   flush();
  };
  plotSegments(points,"forecast-line");
- for(const [field,cls] of [["evPlanW","planned-ev-line"],["wwPlanW","planned-ww-line"]]){
-  plotSegments(a.map((slot,i)=>slot.plan?(p.l+(i+.5)*step)+","+(p.t+ih-slot.plan[field]/max*ih):null),cls);
+ for(const [field,cls] of [["evPlanW","planned-ev-line"],["wwPlanW","planned-ww-line"],["quookerPlanW","planned-quooker-line"]]){
+  plotSegments(a.map((slot,i)=>typeof slot.plan?.[field]==="number"?(p.l+(i+.5)*step)+","+(p.t+ih-slot.plan[field]/max*ih):null),cls);
  }
+ const selected=[...a].reverse().find(x=>x.plan&&Number(x.actual?.coverage||0)>0)||a.find(x=>x.plan)||a[0];
+ renderEvidence(selected);
 }
 const temp=v=>typeof v==="number"&&Number.isFinite(v)?`${v.toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})} °C`:"—";
 const label=s=>({
