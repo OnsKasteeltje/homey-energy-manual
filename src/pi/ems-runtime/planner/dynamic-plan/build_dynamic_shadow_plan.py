@@ -95,6 +95,7 @@ EV_ENTER_3P_W = 4400
 EV_LEAVE_3P_W = 3600
 EV_MIN_MODE_DWELL_SEC = 120
 EV_P1_COMPENSATION_MAX_STATE_AGE_SEC = 120
+EV_P1_COMPENSATION_MAX_POWER_W = 12000  # 3x16 A at up to 250 V
 EV_RUN_MIN_W = EV_1P_MIN_W
 EV_MIN_WINDOW_SLOTS = 2
 EV_MIN_WINDOW_PV_COVERAGE = 0.0
@@ -570,7 +571,7 @@ def ev_available_pv_export(energy_state, now_utc):
 
     if not (
         0 <= age_sec <= EV_P1_COMPENSATION_MAX_STATE_AGE_SEC
-        and math.isfinite(ev_w) and 0 < ev_w <= EV_3P_MAX_W
+        and math.isfinite(ev_w) and 0 < ev_w <= EV_P1_COMPENSATION_MAX_POWER_W
         and math.isfinite(p1_net_w)
     ):
         return raw_export_w, 0.0
