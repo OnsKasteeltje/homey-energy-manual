@@ -333,6 +333,8 @@ class HeatingTemperatureHistoryResourceTest(unittest.TestCase):
                     (2, "honeywell_eetkamer"),
                     (3, "honeywell_keuken"),
                     (4, "honeywell_serre"),
+                    (5, "honeywell_douwe_slaapkamer"),
+                    (6, "honeywell_erker_douwe"),
                 ],
             )
             db.execute(
@@ -350,6 +352,8 @@ class HeatingTemperatureHistoryResourceTest(unittest.TestCase):
                     ("2026-09-27T06:15:00Z", 2, 1, 18.0, 17.9, 18.0, 8, None, "partial"),
                     ("2026-09-27T06:30:00Z", 2, 1, 99.0, 99.0, 99.0, 1, None, "held"),
                     ("2026-09-27T00:00:00Z", 1, 1, 16.0, 16.0, 16.0, 4, None, "complete"),
+                    ("2026-09-27T06:15:00Z", 5, 1, 17.2, 17.1, 17.3, 12, None, "complete"),
+                    ("2026-09-27T06:30:00Z", 6, 1, 18.1, 18.0, 18.2, 8, None, "partial"),
                 ],
             )
         return path
@@ -364,7 +368,7 @@ class HeatingTemperatureHistoryResourceTest(unittest.TestCase):
         self.assertEqual(result["period"]["historyMinutes"], 360)
         self.assertEqual(
             [room["key"] for room in result["rooms"]],
-            ["woonkamer", "eetkamer", "keuken", "serre"],
+            ["woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"],
         )
 
         eetkamer = next(room for room in result["rooms"] if room["key"] == "eetkamer")
@@ -374,6 +378,10 @@ class HeatingTemperatureHistoryResourceTest(unittest.TestCase):
 
         woonkamer = next(room for room in result["rooms"] if room["key"] == "woonkamer")
         self.assertEqual(woonkamer["series"], [])
+        douwe = next(room for room in result["rooms"] if room["key"] == "douwe_slaapkamer")
+        erker = next(room for room in result["rooms"] if room["key"] == "erker_douwe")
+        self.assertEqual([item["avg_C"] for item in douwe["series"]], [17.2])
+        self.assertEqual([item["avg_C"] for item in erker["series"]], [18.1])
 
 
 
@@ -387,7 +395,7 @@ class HeatingPreheatShadowResourceTest(unittest.TestCase):
 
     def source(self):
         rooms = []
-        for key in ("woonkamer", "eetkamer", "keuken", "serre"):
+        for key in ("woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"):
             rooms.append({
                 "key": key,
                 "displayName": key.title(),
@@ -457,13 +465,23 @@ class HeatingPreheatShadowResourceTest(unittest.TestCase):
         self.assertNotIn("boilerAssistOn", result["cvGuard"])
         self.assertEqual(result["cvGuard"]["observedAt"], "2026-09-26T11:59:30Z")
         self.assertEqual(result["cvGuard"]["sourceLastUpdated"], "2026-09-24T07:15:32Z")
-        self.assertEqual(len(result["rooms"]), 4)
+        self.assertEqual(len(result["rooms"]), 6)
+        self.assertEqual({room["key"] for room in result["rooms"]}, {
+            "woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe",
+        })
         self.assertFalse(result["controlWrites"])
         self.assertEqual(result["baselineAuthority"], "HONEYWELL")
         self.assertEqual(result["policy"]["maxAdvanceMinutes"], 180.0)
         self.assertEqual(result["rooms"][0]["shadow"]["state"], "PREHEAT_READY_FOR_GRANT")
         self.assertNotIn("secret", result["rooms"][0])
         self.assertNotIn("internalSecretLikeField", result)
+
+    def test_missing_douwe_room_fails_closed(self):
+        payload = self.source()
+        payload["rooms"] = [r for r in payload["rooms"] if r["key"] != "erker_douwe"]
+        server.HEATING_PREHEAT_SHADOW_FILE = self.write_source(payload)
+        with self.assertRaisesRegex(ValueError, "HEATING_PREHEAT_SHADOW_ROOMS_INCOMPLETE"):
+            server.heating_preheat_shadow_resource()
 
     def test_invalid_max_advance_fails_closed(self):
         payload = self.source()
@@ -490,7 +508,7 @@ class HeatingPreheatProgressionResourceTest(unittest.TestCase):
 
     def source(self):
         rooms = []
-        for key in ("woonkamer", "eetkamer", "keuken", "serre"):
+        for key in ("woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"):
             rooms.append({
                 "key": key,
                 "displayName": key.title(),
@@ -573,6 +591,9 @@ class HeatingPreheatProgressionResourceTest(unittest.TestCase):
         server.HEATING_PREHEAT_PROGRESSION_FILE = self.write_source(self.source())
         result = server.heating_preheat_progression_resource()
         self.assertEqual(result["schema"], "EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1")
+        self.assertEqual({room["key"] for room in result["rooms"]}, {
+            "woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe",
+        })
         self.assertFalse(result["controlWrites"])
         self.assertFalse(result["physicalWriteAllowed"])
         self.assertEqual(result["policy"]["maxStep_C"], 0.5)
@@ -586,6 +607,13 @@ class HeatingPreheatProgressionResourceTest(unittest.TestCase):
         self.assertEqual(result["rooms"][0]["stepHistory"][0]["outcome"], "ADVANCED_STEP")
         self.assertNotIn("secret", result["rooms"][0])
         self.assertNotIn("internalSecretLikeField", result)
+
+    def test_missing_douwe_room_fails_closed(self):
+        payload = self.source()
+        payload["rooms"] = [r for r in payload["rooms"] if r["key"] != "douwe_slaapkamer"]
+        server.HEATING_PREHEAT_PROGRESSION_FILE = self.write_source(payload)
+        with self.assertRaisesRegex(ValueError, "HEATING_PREHEAT_PROGRESSION_ROOMS_INCOMPLETE"):
+            server.heating_preheat_progression_resource()
 
     def test_invalid_opportunity_history_fails_closed(self):
         payload = self.source()

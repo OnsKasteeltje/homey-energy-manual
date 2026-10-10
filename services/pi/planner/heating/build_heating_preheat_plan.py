@@ -16,7 +16,7 @@ OUTPUT_SCHEMA = "EMS_HEATING_PREHEAT_PLAN_V0.2"
 HOME_TZ_NAME = "Europe/Amsterdam"
 MAX_ADVANCE = timedelta(hours=3)
 MAX_STEP_C = 0.5
-SCOPED_ROOMS = {"woonkamer", "eetkamer", "keuken", "serre"}
+SCOPED_ROOMS = {"woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"}
 ROOM_GROUPS = {"living_area": ["woonkamer", "eetkamer"]}
 
 

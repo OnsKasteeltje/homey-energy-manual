@@ -84,17 +84,24 @@ def test_past_transition_is_not_eligible():
     assert r["candidate"]["reason"] == "OUTSIDE_MAX_ADVANCE_WINDOW"
 
 
-@pytest.mark.parametrize("key", ["woonkamer", "eetkamer", "keuken", "serre"])
-def test_only_four_selected_rooms_are_in_scope(key):
+@pytest.mark.parametrize("key", ["woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"])
+def test_six_selected_rooms_are_in_scope(key):
     r = build(room_model([room(key=key)]))["rooms"][0]
     assert r["preheatScope"] is True
 
 
-@pytest.mark.parametrize("key", ["douwe_slaapkamer", "erker_douwe", "master_bedroom", "krijn_slaapkamer"])
+@pytest.mark.parametrize("key", ["master_bedroom", "krijn_slaapkamer"])
 def test_other_rooms_are_explicitly_out_of_preheat_scope(key):
     r = build(room_model([room(key=key)]))["rooms"][0]
     assert r["preheatScope"] is False
     assert r["candidate"]["reason"] == "ROOM_OUT_OF_PREHEAT_SCOPE"
+
+
+@pytest.mark.parametrize("key", ["douwe_slaapkamer", "erker_douwe"])
+def test_douwe_rooms_remain_independent(key):
+    r = build(room_model([room(key=key)]))["rooms"][0]
+    assert r["group"] is None
+    assert r["candidate"]["status"] == "ELIGIBLE_UP_TRANSITION"
 
 
 def test_woonkamer_and_eetkamer_share_living_area_group():
