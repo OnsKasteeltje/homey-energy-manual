@@ -4,7 +4,7 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-10-08
+**Status date:** 2026-10-10
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-07 Mobile API V1 read-only commissioning/freshness hardening  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
@@ -65,7 +65,9 @@ Honeywell/Resideo remains the comfort and schedule authority. The canonical vend
 
 The canonical EMS interpretation layer is `services/pi/state/heating/build_heating_room_model.py`, schema `EMS_HEATING_ROOM_MODEL_V0.1`. It joins schedule and current room state by stable canonical room key, preserves the actual Honeywell target separately from the scheduled baseline, and classifies the next baseline transition as `UP`, `DOWN` or `NONE` using scheduled current/next targets only. EMS-facing schedule timestamps are offset-aware in `Europe/Amsterdam`.
 
-The canonical shadow preheat layer is `services/pi/planner/heating/build_heating_preheat_plan.py`, schema `EMS_HEATING_PREHEAT_PLAN_V0.2`. It remains **READ_ONLY / SHADOW** and creates no physical writes. PV-preheat scope is explicitly limited to `woonkamer`, `eetkamer`, `keuken` and `serre`; `woonkamer` and `eetkamer` carry common `living_area` grouping metadata. Other Honeywell rooms remain normal baseline/comfort rooms but are outside PV-preheat scope.
+The canonical shadow preheat layer is `services/pi/planner/heating/build_heating_preheat_plan.py`, schema `EMS_HEATING_PREHEAT_PLAN_V0.2`. It remains **READ_ONLY / SHADOW** and creates no physical writes. PV-preheat scope is explicitly limited to six zones: `woonkamer`, `eetkamer`, `keuken`, `serre`, `douwe_slaapkamer`, and `erker_douwe`. `woonkamer` and `eetkamer` retain common `living_area` grouping metadata; the two Douwe rooms are independent candidates. `master_bedroom` and `krijn_slaapkamer` remain normal baseline/comfort rooms outside PV-preheat scope.
+
+The read-only Heating dashboard projects these same six zones through the Web Data API schedule, 15-minute temperature history, V0.3 shadow and V0.4 progression endpoints. Each of those endpoints is explicitly allowlisted to the same six keys; there is no new Honeywell polling, collector, Homey publisher or physical write. The existing 0.3/0.4/0.5 fail-closed chain remains intact. This source change requires an explicit Pi sync/deploy and 6-zone runtime verification before claiming production cutover.
 
 Only an upcoming Honeywell `UP` transition can become a preheat candidate. The provisional maximum advancement horizon is 180 minutes. Measured room temperature is decisive: when the later Honeywell target is already satisfied, no preheat candidate exists. When an eligible larger baseline increase is advanced, V0.2 exposes candidate setpoint steps of at most 0.5 °C and skips already-satisfied steps. The later Honeywell target is an absolute ceiling. `DOWN` and `NONE` transitions are never advanced.
 
