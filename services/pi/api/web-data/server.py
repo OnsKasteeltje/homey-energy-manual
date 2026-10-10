@@ -1113,7 +1113,21 @@ def dynamic_planner_resource():
         for reason in (ev_reason, ww_reason):
             if reason is not None and (not isinstance(reason, str) or len(reason) > 120):
                 raise ValueError("DYNAMIC_PLAN_REASON_INVALID")
+        quooker_w = item.get("quookerPlanW")
+        if quooker_w is not None and (not isinstance(quooker_w, (int, float))
+                                       or isinstance(quooker_w, bool)
+                                       or not 0 <= quooker_w <= 50000):
+            raise ValueError("DYNAMIC_PLAN_QUOOKER_INVALID")
+        quooker_mode = item.get("quookerMode")
+        if quooker_mode not in {"OPPORTUNITY", "FORCED_ON", "OFF"}:
+            quooker_mode = None
+        quooker_opportunity = item.get("quookerOpportunityAllowed")
+        if not isinstance(quooker_opportunity, bool):
+            quooker_opportunity = None
         exposed.append({
+            "quookerPlanW": quooker_w,
+            "quookerMode": quooker_mode,
+            "quookerOpportunityAllowed": quooker_opportunity,
             "start": item["slot_start_utc"],
             **values,
             "confidence": confidence,

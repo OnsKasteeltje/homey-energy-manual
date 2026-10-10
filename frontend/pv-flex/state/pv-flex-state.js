@@ -24,7 +24,7 @@ export async function loadPvFlex(day){
  let evidence=null;
  if(archivedResponse?.ok){
   const candidate=await archivedResponse.json();
-  if(candidate.schema==="EMS_WEB_PLANNER_EVALUATION_V1" &&
+  if(candidate.schema==="EMS_WEB_PLANNER_EVALUATION_V2" &&
      candidate.forecastSource==="ARCHIVED_CANONICAL_V1_DYNAMIC_PLAN") evidence=candidate;
  }
  // NEVER let V2 forecasts from the old resource masquerade as historical V1.
@@ -38,7 +38,9 @@ export async function loadPvFlex(day){
    forecastSlots:evidence?.summary?.forecastSlots||0,
    planSlots:evidence?.summary?.planSlots||0,
    plannedEvKWh:evidence?.summary?.plannedEvKWh??null,
-   plannedWwKWh:evidence?.summary?.plannedWwKWh??null
+   plannedWwKWh:evidence?.summary?.plannedWwKWh??null,
+   plannedQuookerKWh:evidence?.summary?.plannedQuookerKWh??null,
+   quookerPlanSlots:evidence?.summary?.quookerPlanSlots||0
   },
   series:d.series.map(slot=>{
    const historical=map.get(new Date(slot.start).getTime());
