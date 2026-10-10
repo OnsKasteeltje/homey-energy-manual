@@ -939,3 +939,21 @@ measurement is claimed from a Quooker plan or detector event. Missing evidence
 is unknown; no automatic judgement of optimality or missed PV capture without a
 feasible benchmark. The website Planner also displays the existing Quooker plan.
 No planner control, Homey writes, V1 forecast model or V2 archive/timer is changed.
+
+## 2026-10-10 — Evaluatie provisional-interval and series-only interaction guard
+
+Frontend V2 Evaluatie now keeps mouse hover read-only to **one closest visible
+forecast/plan line or one measured PV-allocation bar** (time and value only),
+while clicking a 15-minute slot selects its full five-step evidence chain.
+The selected quarter remains stable during hover. A currently open quarter is
+visually provisional and never treated as completed measured outcome.
+
+Decision-time PV versus actual PV dashboard KPIs compare **the same closed
+quarter-hour slots**, requiring both independent P1 and PV coverage >= 95% and
+a valid original planner decision; insufficient evidence produces an explicit
+unknown value, not a fabricated physical zero. Direct PV-use KPI keeps the
+canonical independent coverage restriction of its underlying validated
+metered self-use evidence. Tesla/boiler observed power during open slots is
+shown as provisional, not proof of an actuator failure. No interpretation of
+a missed opportunity or control cause is inferred from a planner-versus-meter
+difference. Change is frontend-only, no Homey/Pi planner/forecast writes.

@@ -21,10 +21,10 @@ assert 'PREHEAT_PROGRESSION_ROOT="/web/planner/heating-preheat-progression-shado
 assert 'EMS_WEB_FLEX_PRIORITY_SHADOW_V1' in state
 assert 'EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1' in state
 assert 'id="kpi-self-note"' in index
-assert 'const visibleSelfKWh=d.series.reduce' in render
-assert 'a.actualKnown?a.directPvW/4000:0' in render
-assert 'Geregistreerd · onvolledige dekking' in render
-assert 'const kwh=v=>v==null?"—":' in render, "missing daily kWh must not display as zero"
+assert 'const matched=d.series.filter(x=>slotEvidence(x).comparable)' in render
+assert 'matched.reduce((sum,x)=>sum+x.forecast.pvForecastW/4000,0)' in render
+assert 'kwartieren met gevalideerd direct PV-gebruik' in render
+assert 'const kwh=v=>typeof v==="number"&&Number.isFinite(v)?' in render, "missing daily kWh must not display as zero"
 assert "forecast?.confidence" in render
 assert 'function lane(' not in render
 assert 'evPowerW' in render
@@ -60,6 +60,13 @@ assert '.preheat-room' in css and '.preheat-state' in css
 assert '.evbar' not in css and '.evlane' not in css
 assert 'boilerPowerW' in render, 'EV and boiler measured power are compared with plans'
 assert "fetch(" not in render, "renderer must use state adapter"
+assert "tip.innerHTML" not in render, "large all-values hover must be retired"
+assert 'closestEvaluationSeries' in render
+assert 'hit.addEventListener("click"' in render
+assert 'renderEvidence(slot,Date.now())' in render
+assert 'MIN_COVERAGE=0.95' in render
+assert 'provisional-quarter' in render and 'selected-quarter' in render
+assert 'id="kpi-pv-note"' in index and 'id="kpi-export-note"' in index
 print("PASS: PV & Flex Analysis V2 single-render frontend contract")
 
 
