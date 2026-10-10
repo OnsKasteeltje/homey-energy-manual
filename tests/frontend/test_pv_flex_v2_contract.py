@@ -23,7 +23,7 @@ assert 'EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1' in state
 assert 'id="kpi-self-note"' in index
 assert 'const matched=d.series.filter(x=>slotEvidence(x).comparable)' in render
 assert 'matched.reduce((sum,x)=>sum+x.forecast.pvForecastW/4000,0)' in render
-assert 'Geregistreerd · onvolledige dekking' in render
+assert 'kwartieren met gevalideerd direct PV-gebruik' in render
 assert 'const kwh=v=>typeof v==="number"&&Number.isFinite(v)?' in render, "missing daily kWh must not display as zero"
 assert "forecast?.confidence" in render
 assert 'function lane(' not in render
