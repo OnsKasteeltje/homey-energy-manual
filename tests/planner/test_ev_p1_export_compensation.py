@@ -30,8 +30,20 @@ assert planner.ev_available_pv_export(idle, now) == (388, 0.0)
 disconnected = {**state, "tesla": {**state["tesla"], "connected": False}}
 assert planner.ev_available_pv_export(disconnected, now) == (388, 0.0)
 
-stale = {**state, "meta": {"source_sample_at": "2026-10-10T09:13:06Z"}}
+# The five-minute Homey push from 09:15 is 187 seconds old at 09:18:07.
+# This must compensate; the former 120-second guard suppressed it.
+assert planner.EV_P1_COMPENSATION_MAX_STATE_AGE_SEC == 360
+five_minute_push = {**state, "meta": {"source_sample_at": "2026-10-10T09:15:00Z"}}
+assert planner.ev_available_pv_export(five_minute_push, now) == (2588, 2200)
+
+at_freshness_limit = {**state, "meta": {"source_sample_at": "2026-10-10T09:12:07Z"}}
+assert planner.ev_available_pv_export(at_freshness_limit, now) == (2588, 2200)
+
+stale = {**state, "meta": {"source_sample_at": "2026-10-10T09:12:06Z"}}
 assert planner.ev_available_pv_export(stale, now) == (388, 0.0)
+
+future = {**state, "meta": {"source_sample_at": "2026-10-10T09:18:08Z"}}
+assert planner.ev_available_pv_export(future, now) == (388, 0.0)
 
 high_voltage = {**state, "tesla": {**state["tesla"], "power_w": 11650}}
 assert planner.ev_available_pv_export(high_voltage, now) == (12038, 11650)
