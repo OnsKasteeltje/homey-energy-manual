@@ -473,3 +473,7 @@ second PV forecast, an optimization or a physical-control path. The
 `/web/planner/pv-forecast` V2 endpoint is temporarily retained for rollback
 and historical research, not consumed by the Planner frontend. No new writer,
 Homey publisher or independent planning authority is introduced.
+
+## Read-only archived Planner V1 evaluation resource
+
+`GET /web/analysis/planner/day/YYYY-MM-DD` exposes the canonical V1 forecast saved at least 12 hours before each target slot and, independently, the latest still-valid EV/WW allocation saved before that slot. Only allowlisted values and their generation times leave `planner-history.sqlite`; the original V2 forecast archive remains available for rollback but is never silently used as V1. This API is presentation-only and does not reconstruct new decisions.
