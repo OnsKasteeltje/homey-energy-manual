@@ -77,6 +77,8 @@ jobs:
         run: |
           python3 tests/api/test_dynamic_planner_web_resource.py
           python3 tests/frontend/test_planner_canonical_v1_contract.py
+          node --check frontend/planner/render/planner.js
+          node --test tests/frontend/test_planner_line_hover.mjs
 
       - name: Validate archived V1 Planner Evaluatie
         run: |
