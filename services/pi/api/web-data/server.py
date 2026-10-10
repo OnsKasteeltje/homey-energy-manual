@@ -22,6 +22,10 @@ EV_DEADLINE_FILE = os.environ.get(
     "EMS_EV_DEADLINE_FILE",
     "/home/jeroen/ems/data/ev-deadline-shadow-state.json",
 )
+DYNAMIC_PLAN_FILE = os.environ.get(
+    "EMS_DYNAMIC_PLAN_FILE",
+    "/home/jeroen/ems/data/dynamic-shadow-plan.json",
+)
 ENERGY_STATE_FILE = os.environ.get(
     "EMS_ENERGY_STATE_FILE",
     "/home/jeroen/ems/data/energy-state-v2.json",
@@ -43,6 +47,7 @@ COMMANDS_API_SCHEMA = "EMS_WEB_COMMANDS_CURRENT_V1"
 HISTORY_API_SCHEMA = "EMS_WEB_HISTORY_V1"
 PV_FLEX_API_SCHEMA = "EMS_WEB_PV_FLEX_ANALYSIS_V1"
 PV_FORECAST_API_SCHEMA = "EMS_WEB_PV_FORECAST_V2"
+DYNAMIC_PLAN_API_SCHEMA = "EMS_WEB_DYNAMIC_PLAN_V1"
 EV_REQUIREMENT_API_SCHEMA = "EMS_WEB_EV_REQUIREMENT_V1"
 HEATING_SCHEDULE_API_SCHEMA = "EMS_WEB_HEATING_SCHEDULE_V1"
 HEATING_TEMPERATURE_HISTORY_API_SCHEMA = "EMS_WEB_HEATING_TEMPERATURE_HISTORY_V1"
@@ -920,6 +925,77 @@ def ev_requirement_resource():
         "presentationOnly": True,
     }
 
+
+def dynamic_planner_resource():
+    """Expose the canonical Dynamic Pi Planner's V1 PV and flex slots, not a second forecast."""
+    source = load_json(DYNAMIC_PLAN_FILE)
+    if (source.get("schema") != "EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3"
+            or source.get("mode") != "PURE_SHADOW"
+            or source.get("readOnly") is not True
+            or source.get("control_writes") is not False):
+        raise ValueError("DYNAMIC_PLAN_SOURCE_INVALID")
+    generated = parse_timestamp(source.get("generated_at"))
+    valid_until = parse_timestamp(source.get("validUntil"))
+    now = datetime.now(timezone.utc)
+    if (generated is None or valid_until is None
+            or generated > now + timedelta(minutes=2)
+            or valid_until <= now or valid_until <= generated):
+        raise ValueError("DYNAMIC_PLAN_STALE")
+    source_slots = source.get("slots")
+    if not isinstance(source_slots, list) or len(source_slots) != 96:
+        raise ValueError("DYNAMIC_PLAN_SLOT_COUNT_INVALID")
+    numeric = ("pvForecastW", "evPlanW", "wwPlanW",
+               "gridImportAfterFlexW", "gridExportAfterFlexW")
+    exposed = []
+    previous = None
+    for item in source_slots:
+        if not isinstance(item, dict):
+            raise ValueError("DYNAMIC_PLAN_SLOT_INVALID")
+        start = parse_timestamp(item.get("slot_start_utc"))
+        if start is None or (previous is not None and start - previous != timedelta(minutes=15)):
+            raise ValueError("DYNAMIC_PLAN_AXIS_INVALID")
+        previous = start
+        values = {}
+        for key in numeric:
+            value = item.get(key)
+            if (not isinstance(value, (int, float)) or isinstance(value, bool)
+                    or not 0 <= value <= 50000):
+                raise ValueError("DYNAMIC_PLAN_POWER_INVALID")
+            values[key] = value
+        confidence = item.get("confidence")
+        if confidence is not None and (not isinstance(confidence, (int, float))
+                                       or isinstance(confidence, bool)
+                                       or not 0 <= confidence <= 1):
+            raise ValueError("DYNAMIC_PLAN_CONFIDENCE_INVALID")
+        ev_reason = item.get("evAllocationReason")
+        ww_reason = item.get("wwAllocationReason")
+        for reason in (ev_reason, ww_reason):
+            if reason is not None and (not isinstance(reason, str) or len(reason) > 120):
+                raise ValueError("DYNAMIC_PLAN_REASON_INVALID")
+        exposed.append({
+            "start": item["slot_start_utc"],
+            **values,
+            "confidence": confidence,
+            "evReason": ev_reason,
+            "wwReason": ww_reason,
+        })
+    guardrails = source.get("guardrails") or {}
+    mode = guardrails.get("wwSourceMode")
+    if mode not in {"CV", "BOILER", "UNKNOWN"}:
+        mode = None
+    return {
+        "schema": DYNAMIC_PLAN_API_SCHEMA,
+        "generatedAt": source["generated_at"],
+        "validUntil": source["validUntil"],
+        "status": "SHADOW",
+        "controlWrites": False,
+        "realtimeAuthority": "P1",
+        "forecastSource": "PV_V1_EMBEDDED_IN_DYNAMIC_PLAN",
+        "wwSourceMode": mode,
+        "slots": exposed,
+    }
+
+
 def pv_forecast_resource():
     """Return allowlisted PV Forecast V2 shadow data for Frontend V2."""
     source = load_json("/home/jeroen/ems/data/pv-forecast-v2.json")
@@ -1567,6 +1643,13 @@ class Handler(BaseHTTPRequestHandler):
         if path.path == "/web/planner/ev-requirement":
             try:
                 send_json(self, 200, ev_requirement_resource())
+            except (OSError, json.JSONDecodeError, ValueError):
+                send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
+            return
+
+        if path.path == "/web/planner/current":
+            try:
+                send_json(self, 200, dynamic_planner_resource())
             except (OSError, json.JSONDecodeError, ValueError):
                 send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
             return

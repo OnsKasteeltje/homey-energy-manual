@@ -894,3 +894,21 @@ preferred over losing reliably measured house/P1 intervals. This
 entry supersedes PR #215/#216 history presentation policy.
 No live Pi runtime or raw measurement tables are changed by this
 repository change; separate guarded runtime promotion is required.
+
+## 2026-10-10 — Frontend Planner uses canonical Dynamic Pi Planner V1 forecast
+
+The Frontend V2 Planner now reads a read-only, allowlisted projection of the
+existing canonical `dynamic-shadow-plan.json` at `GET /web/planner/current`,
+schema `EMS_WEB_DYNAMIC_PLAN_V1`. This exposes the **PV V1 input actually
+embedded in the Dynamic Pi Planner decision**, EV/WW targets, projected grid
+import/export and reasons on the same 96 × 15-minute axis. The endpoint checks
+source schema, shadow/write prohibition, axis and `validUntil` before serving;
+expired or invalid data fail closed. The UI does not run a planner, infer
+allocation or perform writes. P1 remains the realtime execution authority.
+
+The separate V2 forecast file, generation timer, historical SQLite archive
+and old `/web/planner/pv-forecast` API are **unchanged and available for rollback**.
+Historical Evaluatie cutover and eventual V2 retirement require separate
+snapshot validation and release gates. No forecast- or control-path changes
+are part of this implementation.
+

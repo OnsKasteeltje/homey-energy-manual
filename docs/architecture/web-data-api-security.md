@@ -457,3 +457,19 @@ The Pi status/control API and Homey LAN control path remain unchanged,
 and the command handler refuses non-loopback direct callers. Never open a
 public listener, port forwarding, Funnel, or second LAN browser entrypoint.
 Pi preflight and runtime listener checks confirmed the single tailnet-only Caddy binding. Historical LAN-plus-tailnet rules above describe the previous deployment and are superseded for the V2 frontend. Mobile client functionality and a successful new authenticated deadline to physical Easee charging remain separate outstanding runtime validations.
+
+
+## Dynamic Planner V1 observability projection (2026-10-10)
+
+The read-only `GET /web/planner/current` endpoint exposes an allowlisted 96 × 15-minute
+projection of the canonical `dynamic-shadow-plan.json`, schema
+`EMS_WEB_DYNAMIC_PLAN_V1`: original V1 PV forecast, planner confidence,
+EV/WW planned watts, projected grid import/export and per-slot allocation reasons.
+The source, validity and monotonic axis are checked before serving; malformed
+or expired plans are unavailable rather than treated as current.
+
+This is a *projection of the actual Dynamic Pi Planner decision*, not a
+second PV forecast, an optimization or a physical-control path. The
+`/web/planner/pv-forecast` V2 endpoint is temporarily retained for rollback
+and historical research, not consumed by the Planner frontend. No new writer,
+Homey publisher or independent planning authority is introduced.
