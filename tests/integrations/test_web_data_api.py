@@ -563,7 +563,7 @@ class HeatingPreheatProgressionResourceTest(unittest.TestCase):
             "generatedAt": "2026-09-26T12:00:30Z",
             "baselineAuthority": "HONEYWELL",
             "eligibilityAuthority": "EMS_HEATING_PREHEAT_SHADOW_V0.3",
-            "allocationAuthority": "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1",
+            "allocationAuthority": "EMS_PI_DYNAMIC_HEATING_GRANT_V0.1",
             "sourceFreshness": {
                 "heating": {"status": "OK", "reason": "HEATING_SHADOW_CURRENT", "ageSeconds": 30},
                 "priority": {"status": "OK", "reason": "FLEX_PRIORITY_CURRENT", "ageSeconds": 29},
@@ -607,6 +607,13 @@ class HeatingPreheatProgressionResourceTest(unittest.TestCase):
         self.assertEqual(result["rooms"][0]["stepHistory"][0]["outcome"], "ADVANCED_STEP")
         self.assertNotIn("secret", result["rooms"][0])
         self.assertNotIn("internalSecretLikeField", result)
+
+    def test_obsolete_flex_priority_allocation_authority_fails_closed(self):
+        payload = self.source()
+        payload["allocationAuthority"] = "EMS_PI_FLEX_PRIORITY_SHADOW_V0.1"
+        server.HEATING_PREHEAT_PROGRESSION_FILE = self.write_source(payload)
+        with self.assertRaisesRegex(ValueError, "HEATING_PREHEAT_PROGRESSION_ALLOCATION_INVALID"):
+            server.heating_preheat_progression_resource()
 
     def test_missing_douwe_room_fails_closed(self):
         payload = self.source()
