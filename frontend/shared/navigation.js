@@ -3,7 +3,7 @@ const ITEMS = [
   { key: "settings", label: "Invoer", href: "../settings/" },
   { key: "history", label: "Historie", href: "../history/" },
   { key: "planner", label: "Planner", href: "../planner/" },
-  { key: "pv-flex", label: "PV & Flex", href: "../pv-flex/" },
+  { key: "pv-flex", label: "Evaluatie", href: "../pv-flex/" },
   { key: "heating", label: "Verwarming", href: "../heating/" },
   { key: "ai", label: "AI Analyse", href: "../ai/" },
   { key: "groups", label: "Groepen & fasen", disabled: true },
