@@ -78,6 +78,14 @@ jobs:
           python3 tests/api/test_dynamic_planner_web_resource.py
           python3 tests/frontend/test_planner_canonical_v1_contract.py
 
+      - name: Validate archived V1 Planner Evaluatie
+        run: |
+          python3 tests/api/test_planner_evaluation_v1_archive.py
+          python3 tests/frontend/test_evaluatie_v1_history_contract.py
+          python3 tests/frontend/test_pv_flex_v2_contract.py
+          node --check frontend/pv-flex/state/pv-flex-state.js
+          node --check frontend/pv-flex/render/pv-flex.js
+
       - name: Run EV AI reason evidence regression test
         run: python tests/api/test_ai_ev_control_reason_evidence.py
 
