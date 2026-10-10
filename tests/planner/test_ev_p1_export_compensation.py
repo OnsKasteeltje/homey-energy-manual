@@ -33,6 +33,9 @@ assert planner.ev_available_pv_export(disconnected, now) == (388, 0.0)
 stale = {**state, "meta": {"source_sample_at": "2026-10-10T09:13:06Z"}}
 assert planner.ev_available_pv_export(stale, now) == (388, 0.0)
 
+high_voltage = {**state, "tesla": {**state["tesla"], "power_w": 11650}}
+assert planner.ev_available_pv_export(high_voltage, now) == (12038, 11650)
+
 invalid = {**state, "tesla": {**state["tesla"], "power_w": 20000}}
 assert planner.ev_available_pv_export(invalid, now) == (388, 0.0)
 
