@@ -62,11 +62,11 @@ Candidate thresholds remain aligned with the existing policy:
 
 | Transition | Condition |
 |---|---:|
-| OFF -> 1P | rolling available >= 1500 W |
+| OFF -> 1P | rolling available >= 1350 W |
 | OFF -> 3P | rolling available >= 4400 W |
 | 1P -> 3P | rolling available >= 4400 W |
-| 3P -> 1P | rolling available < 3600 W and >= 1500 W |
-| 3P -> OFF | rolling available < 1500 W |
+| 3P -> 1P | rolling available < 3600 W and >= 1350 W |
+| 3P -> OFF | rolling available < 1350 W |
 | 1P -> OFF | rolling available < 1100 W |
 
 The rolling signal is the trailing 120-second **time-weighted** mean of valid `available_total_w` samples.
@@ -226,3 +226,8 @@ Production acceptance requires:
 
 Rollback is the exact pre-deploy writable Bridge body captured before the single Homey update.
 
+
+
+## EV opportunity 1350 W bounded-start amendment (2026-10-11)
+
+The 1P/6 A nominal minimum is 1380 W at 230 V. The lower 1350 W entry threshold deliberately tolerates a maximum *planned, nominal* 30 W grid component only within the 1350–1379 W forecast start band. The PV optimizer's marginal PV score excludes this component. This is not a permission for unlimited grid charging or an override of the Homey realtime P1 guards. The Bridge uses the policy supplied by Pi /control/current; no direct Homey phase-bridge code change is required. All dwell/rolling/stop/3P/safety behavior is unchanged. Pi runtime cutover must be proven separately from GitHub source publication.

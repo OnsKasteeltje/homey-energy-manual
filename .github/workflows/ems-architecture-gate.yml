@@ -111,6 +111,9 @@ jobs:
       - name: Run PV surplus replay validation tests
         run: python tests/replay/test_pv_surplus_absorption_backtest.py
 
+      - name: Validate EV 1350 W phase-entry and bounded-import contract
+        run: python3 tests/planner/test_ev_phase_aware_dynamic_plan.py
+
       - name: Run EV phase-current controller tests
         run: |
           node --test \

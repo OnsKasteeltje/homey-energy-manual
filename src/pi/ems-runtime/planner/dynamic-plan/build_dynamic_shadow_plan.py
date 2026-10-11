@@ -89,7 +89,10 @@ EV_1P_MIN_W = EV_RUN_MIN_A * EV_1P_W_PER_A
 EV_1P_MAX_W = EV_MAX_A * EV_1P_W_PER_A
 EV_3P_MIN_W = EV_RUN_MIN_A * EV_3P_W_PER_A
 EV_3P_MAX_W = EV_MAX_A * EV_3P_W_PER_A
-EV_START_1P_W = 1500
+EV_START_1P_W = 1350
+# At the exact 1P/6A entry band the nominal 1380 W target may exceed
+# residual forecast PV by 30 W; do not treat that imported 30 W as PV benefit.
+EV_1P_START_NOMINAL_IMPORT_ALLOWANCE_W = max(0, EV_1P_MIN_W - EV_START_1P_W)
 EV_STOP_1P_W = 1100
 EV_ENTER_3P_W = 4400
 EV_LEAVE_3P_W = 3600
@@ -260,9 +263,10 @@ def ev_phase_option(residual_w):
 
     The 15-minute planner mirrors the realtime entry bands, but intentionally
     leaves 2-minute hysteresis and mode dwell to Homey's realtime executor.
-    Opportunity planning never intentionally targets more power than forecast
-    residual PV; deadline charging remains the separate 3P grid-import-capable
-    path below.
+    1P entry is allowed at 1350 W forecast residual PV despite the 6 A
+    nominal 1380 W physical minimum: a bounded 30 W nominal start import.
+    All other opportunity options remain PV-bounded; actual realtime
+    import is separately bounded by Homey. Deadline force remains separate.
     """
     residual = max(0.0, float(residual_w))
 
@@ -282,7 +286,9 @@ def ev_phase_option(residual_w):
 def ev_best_option(residual_w):
     """Return executable phase-aware EV target and marginal PV value."""
     _mode, _amps, target_w = ev_phase_option(residual_w)
-    return target_w, float(target_w)
+    # Imported start energy is not marginal PV value.
+    pv_benefit_w = min(float(target_w), max(0.0, float(residual_w)))
+    return target_w, pv_benefit_w
 
 
 def ev_target_from_residual(residual_w):
@@ -1667,7 +1673,11 @@ def main():
                 ev_w = int(s.get("evMarginalTargetCandidateW") or 0)
                 ev_a = int(s.get("evMarginalTargetCandidateA") or 0)
                 ev_phase_mode = str(s.get("evMarginalPhaseMode") or "OFF")
-                if s["evResidualExportW"] >= ev_w:
+                if s["evResidualExportW"] + (
+                    EV_1P_START_NOMINAL_IMPORT_ALLOWANCE_W
+                    if ev_phase_mode == "1P" and ev_a == EV_RUN_MIN_A
+                    else 0
+                ) >= ev_w:
                     ev_reason = "DYNAMIC_PV_PEAK_ABSORBER"
                 elif window["class"] == "SECONDARY":
                     ev_reason = "DYNAMIC_PV_SECONDARY_OPPORTUNITY"
@@ -1759,7 +1769,9 @@ def main():
             "evOpportunityMinPvCoverage": EV_MIN_WINDOW_PV_COVERAGE,
             "evForecastPhaseAware": True,
             "evForecastPhasePolicy": "ENTRY_BANDS_MATCH_HOMEY_PHASE_POLICY_V0.1",
-            "evOpportunityIntentionalGridImportAllowed": False,
+            "evOpportunityIntentionalGridImportAllowed": True,
+            "evOpportunityGridImportPolicy": "BOUNDED_1P_MIN_START_ONLY",
+            "evOpportunityNominalStartImportMaxW": EV_1P_START_NOMINAL_IMPORT_ALLOWANCE_W,
             "ev1pMinW": EV_1P_MIN_W,
             "ev1pMaxW": EV_1P_MAX_W,
             "ev1pStartW": EV_START_1P_W,

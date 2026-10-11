@@ -317,7 +317,7 @@ Mapping:
 ```text
 1P = 230 W/A, 6..16 A
 3P = 690 W/A, 6..16 A
-OFF→1P = 1500 W residual export
+OFF→1P = 1350 W residual export
 1P stop = 1100 W rolling 2-minute reconstructed signal
 OFF/1P→3P = 4400 W
 3P leave = 3600 W
@@ -462,3 +462,8 @@ User commands use a separate authenticated command interface and must not turn G
 Migration is artifact-by-artifact and fail-safe: inventory -> equivalent read-only resource -> parallel comparison -> consumer cutover -> validation -> only then stop that artifact's `main` mutation. No runtime publisher may be disabled merely to quiet `main`; all consumers and rollback requirements must first be proven.
 
 Canonical migration decision and publisher/consumer matrix: `docs/architecture/runtime-publication-separation.md`.
+
+
+### EV PV-start 1350 W — canonical policy release 11 oktober 2026
+
+De startdrempel voor een nieuwe OFF→1P-laadkans is aangepast naar **1350 W** in de Pi-strategische planner en de door Homey Bridge v1.5.9 gelezen `/control/current`-fasepolicy. De absolute regel dat EV-opportunity nooit enige netimport mag veroorzaken is genuanceerd: bij 1×6 A (nominaal 1380 W) mag de planner in de 1350–1379 W-band hoogstens 30 W berekend tekort accepteren. Die 30 W telt niet als PV-winst in de optimizer. De Pi creëert hiermee geen algemene netlaadmogelijkheid; de Homey-controller handhaaft P1-gebaseerde actuele beschikbaarheid, 250 W fase-entry-viability deadband en de bestaande circa +300 W realtime-importgrens. 1P-stop 1100 W, 120 s rolling, 120 s OFF-dwell, 3P-grenzen, deadlines en de unieke Homey Easee-writer v0.4.6 blijven ongewijzigd. **Broncode/contract gereed, fysieke Pi-deployment nog te bevestigen**; GitHub-sync alleen wijzigt de draaiende Pi niet.
