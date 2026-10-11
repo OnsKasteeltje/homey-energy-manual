@@ -201,7 +201,9 @@ def ev_realtime_envelope(plan, current, ev_w, ww_w, deadline):
             "min_A": EV_MIN_A if policy_valid else 0,
             "max_A": hard_max_a if policy_valid else 0,
             "voltage_V": 230,
-            "start1p_W": 1500,
+            "start1p_W": 1350,
+            "nominalStartImportAllowance_W": 30,  # 6 A x 230 V = 1380 W
+            "opportunityImportPolicy": "BOUNDED_1P_START_REALTIME_GUARDED",
             "stop1p_W": 1100,
             "enter3p_W": 4400,
             "leave3p_W": 3600,

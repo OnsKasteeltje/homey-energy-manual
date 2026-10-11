@@ -18,14 +18,19 @@ assert m.EV_1P_MIN_W == 1380
 assert m.EV_1P_MAX_W == 3680
 assert m.EV_3P_MIN_W == 4140
 assert m.EV_3P_MAX_W == 11040
-assert m.EV_START_1P_W == 1500
+assert m.EV_START_1P_W == 1350
+assert m.EV_1P_START_NOMINAL_IMPORT_ALLOWANCE_W == 30
 assert m.EV_STOP_1P_W == 1100
 assert m.EV_ENTER_3P_W == 4400
 assert m.EV_LEAVE_3P_W == 3600
 assert m.EV_MIN_MODE_DWELL_SEC == 120
 
 cases = [
-    (1499, ("OFF", 0, 0)),
+    (1349, ("OFF", 0, 0)),
+    (1350, ("1P", 6, 1380)),
+    (1379, ("1P", 6, 1380)),
+    (1380, ("1P", 6, 1380)),
+    (1499, ("1P", 6, 1380)),
     (1500, ("1P", 6, 1380)),
     (2500, ("1P", 10, 2300)),
     (3680, ("1P", 16, 3680)),
@@ -38,8 +43,14 @@ cases = [
 for residual, expected in cases:
     actual = m.ev_phase_option(residual)
     assert actual == expected, (residual, actual, expected)
-    assert actual[2] <= residual or actual[2] == 0
+    nominal_import_w = max(0, actual[2] - residual)
+    if nominal_import_w:
+        assert actual[0] == "1P" and actual[1] == 6
+    assert nominal_import_w <= m.EV_1P_START_NOMINAL_IMPORT_ALLOWANCE_W
 
+assert m.ev_best_option(1350) == (1380, 1350.0)
+assert m.ev_best_option(1379) == (1380, 1379.0)
+assert m.ev_best_option(1380) == (1380, 1380.0)
 assert m.ev_best_option(2500) == (2300, 2300.0)
 assert m.ev_best_option(4400) == (4140, 4140.0)
 
@@ -49,7 +60,9 @@ assert "planner.EV_MIN_WINDOW_SLOTS = 1" in start6
 
 status = STATUS.read_text(encoding="utf-8")
 for literal in (
-    '"start1p_W": 1500',
+    '"start1p_W": 1350',
+    '"nominalStartImportAllowance_W": 30',
+    '"opportunityImportPolicy": "BOUNDED_1P_START_REALTIME_GUARDED"',
     '"stop1p_W": 1100',
     '"enter3p_W": 4400',
     '"leave3p_W": 3600',
@@ -60,6 +73,8 @@ for literal in (
 planner_text = PLANNER.read_text(encoding="utf-8")
 assert "EV_IMPORT_PENALTY" not in planner_text
 assert '"evForecastPhaseAware": True' in planner_text
-assert '"evOpportunityIntentionalGridImportAllowed": False' in planner_text
+assert '"evOpportunityIntentionalGridImportAllowed": True' in planner_text
+assert '"evOpportunityGridImportPolicy": "BOUNDED_1P_MIN_START_ONLY"' in planner_text
+assert '"evOpportunityNominalStartImportMaxW": EV_1P_START_NOMINAL_IMPORT_ALLOWANCE_W' in planner_text
 
 print("PASS: Dynamic Pi Planner EV forecast matches production 1P/3P entry bands")
