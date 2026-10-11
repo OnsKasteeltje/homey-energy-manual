@@ -65,7 +65,10 @@ assert 'closestEvaluationSeries' in render
 assert 'hit.addEventListener("click"' in render
 assert 'renderEvidence(slot,Date.now())' in render
 assert 'MIN_COVERAGE=0.95' in render
-assert 'provisional-quarter' in render and 'selected-quarter' in render
+assert 'provisional-quarter' not in render and '.provisional-quarter' not in css
+assert 'class:"selected-quarter",visibility:"hidden"' in render
+assert 'selectedRect.setAttribute("visibility","visible")' in render
+assert 'renderEvidence(null,nowMs)' in render
 assert 'id="kpi-pv-note"' in index and 'id="kpi-export-note"' in index
 print("PASS: PV & Flex Analysis V2 single-render frontend contract")
 

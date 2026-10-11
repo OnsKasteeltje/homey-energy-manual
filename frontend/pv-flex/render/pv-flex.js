@@ -62,7 +62,14 @@ function slotAllocation(x,nowMs=Date.now()){
 }
 function renderEvidence(slot,nowMs=Date.now()){
  const root=$("decision-evidence");root.replaceChildren();
- if(!slot){$("evidence-time").textContent="—";return;}
+ if(!slot){
+  $("evidence-time").textContent="—";
+  const hint=document.createElement("p");
+  hint.className="evidence-placeholder";
+  hint.textContent="Selecteer een kwartier in de grafiek.";
+  root.appendChild(hint);
+  return;
+ }
  const q=slotEvidence(slot,nowMs);
  const state=q.phase==="OPEN"?"LOPEND · voorlopig":q.phase==="FUTURE"?"TOEKOMST · nog niet uitgevoerd":"AFGESLOTEN";
  $("evidence-time").textContent=time(slot.start)+" · "+state;
@@ -185,21 +192,10 @@ function chart(d){
   add("text",{x:p.l-7,y:y+4,class:"axis","text-anchor":"end"},(max*(4-i)/4000).toFixed(1)+"kW");
  }
  const step=iw/a.length;
- let selectedIndex=-1;
- for(let i=a.length-1;i>=0;i--){
-  if(slotEvidence(a[i],nowMs).comparable){selectedIndex=i;break;}
- }
- if(selectedIndex<0)selectedIndex=a.findIndex(x=>x.plan);
- if(selectedIndex<0)selectedIndex=0;
+ // Nothing is selected until the user clicks a quarter.
  const selectedRect=add("rect",{
-  x:p.l+selectedIndex*step,y:p.t,width:step,height:ih,class:"selected-quarter"
+  x:p.l,y:p.t,width:step,height:ih,class:"selected-quarter",visibility:"hidden"
  });
- for(let i=0;i<a.length;i++){
-  const q=slotEvidence(a[i],nowMs);
-  if(q.phase==="OPEN")add("rect",{
-   x:p.l+i*step,y:p.t,width:step,height:ih,class:"provisional-quarter"
-  });
- }
  const points=[];
  a.forEach((slot,i)=>{
   const cx=p.l+(i+.5)*step,s=allocated[i],barW=step*.68;
@@ -240,7 +236,8 @@ function chart(d){
   });
   hit.addEventListener("mouseleave",()=>tip.hidden=true);
   hit.addEventListener("click",()=>{
-   selectedIndex=i;selectedRect.setAttribute("x",p.l+i*step);
+   selectedRect.setAttribute("x",p.l+i*step);
+   selectedRect.setAttribute("visibility","visible");
    renderEvidence(slot,Date.now());
   });
  });
@@ -257,7 +254,7 @@ function chart(d){
   plotSegments(a.map((slot,i)=>available(slot.plan?.[field])?
    (p.l+(i+.5)*step)+","+(p.t+ih-slot.plan[field]/max*ih):null),cls);
  }
- renderEvidence(a[selectedIndex],nowMs);
+ renderEvidence(null,nowMs);
 }
 const temp=v=>typeof v==="number"&&Number.isFinite(v)?`${v.toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})} °C`:"—";
 const label=s=>({
