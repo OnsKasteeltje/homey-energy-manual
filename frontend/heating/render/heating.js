@@ -216,6 +216,24 @@ function shadowStepIntervals(room,now){
   return out;
 }
 
+function persistedOpportunityVisible(room,item,now){
+  const effective = room?.effective;
+  if(!effective || effective.preheatAdvanceAllowed === true) return true;
+
+  const opensAt = new Date(item?.opensAt);
+  const closesAt = new Date(item?.closesAt);
+  if(!Number.isFinite(opensAt.getTime()) || !Number.isFinite(closesAt.getTime())) return false;
+
+  if(closesAt <= now) return true;
+
+  if(effective.source === "TEMPORARY_OVERRIDE" && effective.overrideUntil){
+    const until = new Date(effective.overrideUntil);
+    if(Number.isFinite(until.getTime()) && opensAt >= until) return true;
+  }
+
+  return false;
+}
+
 function preheatWindows(room,start,now,maxAdvanceMinutes){
   const out = [];
   const byWindow = new Map();
@@ -237,6 +255,7 @@ function preheatWindows(room,start,now,maxAdvanceMinutes){
 
   for(const item of room.progressionSource?.opportunityHistory || []){
     if(!item?.opportunityId || !item?.opensAt || !item?.closesAt) continue;
+    if(!persistedOpportunityVisible(room,item,now)) continue;
     addWindow({
       opportunityId:item.opportunityId,
       opensAt:item.opensAt,

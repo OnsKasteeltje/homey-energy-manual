@@ -145,6 +145,16 @@ def test_effective_honeywell_baseline_overlays_active_overrides():
     assert "Honeywell modus" in render
 
 
+def test_stale_persisted_future_windows_are_hidden_while_override_active():
+    render = RENDER.read_text()
+
+    assert "function persistedOpportunityVisible(room,item,now)" in render
+    assert "if(closesAt <= now) return true" in render
+    assert 'effective.source === "TEMPORARY_OVERRIDE"' in render
+    assert "opensAt >= until" in render
+    assert "if(!persistedOpportunityVisible(room,item,now)) continue" in render
+
+
 def test_heating_room_card_distinguishes_current_window_from_future_potential():
     render = RENDER.read_text()
 

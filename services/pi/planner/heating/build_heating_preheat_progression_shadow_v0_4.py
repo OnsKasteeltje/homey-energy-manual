@@ -192,6 +192,52 @@ def _opportunity_history(previous_room: dict[str, Any] | None, now: datetime) ->
     return out[-MAX_OPPORTUNITY_HISTORY_ITEMS:]
 
 
+def _filter_opportunity_history_for_effective_state(
+    history: list[dict[str, Any]],
+    room: dict[str, Any],
+    now: datetime,
+) -> list[dict[str, Any]]:
+    """Hide stale current/future schedule opportunities while Honeywell overrides.
+
+    Closed historical windows remain durable evidence. For a temporary override
+    with a known expiry, a future window is retained only when it starts at or
+    after that expiry. Permanent/unknown override duration suppresses every
+    still-open or future schedule opportunity until fresh Honeywell state
+    returns the zone to schedule-following semantics.
+    """
+    effective = room.get("effective")
+    if not isinstance(effective, dict) or effective.get("preheatAdvanceAllowed") is True:
+        return history
+
+    source = effective.get("source")
+    override_until = None
+    if source == "TEMPORARY_OVERRIDE" and effective.get("overrideUntil"):
+        try:
+            override_until = _aware(
+                effective.get("overrideUntil"),
+                "effective.overrideUntil",
+            )
+        except ProgressionError:
+            override_until = None
+
+    filtered: list[dict[str, Any]] = []
+    for item in history:
+        try:
+            opens_dt = _aware(item.get("opensAt"), "opportunityHistory.opensAt")
+            closes_dt = _aware(item.get("closesAt"), "opportunityHistory.closesAt")
+        except ProgressionError:
+            continue
+
+        if closes_dt <= now:
+            filtered.append(item)
+            continue
+
+        if override_until is not None and opens_dt >= override_until:
+            filtered.append(item)
+
+    return filtered
+
+
 def _record_opportunity_window(history: list[dict[str, Any]], room: dict[str, Any]) -> None:
     baseline = _dict(room.get("baseline"), "room.baseline")
     if baseline.get("direction") != "UP":
@@ -478,6 +524,11 @@ def build_progression(
         prev_room = previous_rooms.get(key)
         history = _step_history(prev_room, now)
         opportunity_history = _opportunity_history(prev_room, now)
+        opportunity_history = _filter_opportunity_history_for_effective_state(
+            opportunity_history,
+            room,
+            now,
+        )
         _record_opportunity_window(opportunity_history, room)
         raw_prev_prog = prev_room.get("progression") if isinstance(prev_room, dict) else None
         same_opportunity = (
