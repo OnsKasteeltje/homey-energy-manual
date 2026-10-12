@@ -7,6 +7,8 @@ const VERSION='EMS_HEATING_CONTROL_ADAPTER_GATE_SHADOW_V0.2';
 const INTENT_SCHEMA='EMS_HEATING_CONTROL_INTENT_V0.2';
 const ADAPTER_SCHEMA='EMS_HEATING_CONTROL_ADAPTER_SHADOW_V0.2';
 const FRESH_MS=120000;
+// Universal override rule for every room, not a Douwe-only exception.
+const MANUAL_OVERRIDE_MODES=new Set(['temporary_override','permanent_override']);
 const ROOM_DEVICES={
   woonkamer:'6a79bb86-8c02-43db-be22-6f51e01efc6d',
   eetkamer:'dd7ef4a3-ed9f-4e4d-92bb-090502068421',
@@ -84,7 +86,7 @@ for(const cmd of Array.isArray(adapter?.commands)?adapter.commands:[]){
   const pinnedId=!!expectedId&&cmd?.deviceId===expectedId;
   const observedMode=String(cmd?.observedMode||'').toLowerCase();
   const observedSystemMode=String(cmd?.observedSystemMode||'').toLowerCase();
-  const overridden=observedMode==='permanent_override'||observedMode==='temporary_override';
+  const overridden=MANUAL_OVERRIDE_MODES.has(observedMode);
   const modeSafe=(observedMode==='follow_schedule'||(overridden&&action==='HOLD'&&cmd?.holdReason==='HONEYWELL_OVERRIDE_ACTIVE'))&&
     (action==='HOLD'||observedSystemMode==='auto');
   if(!unique)commandErrors.push(key+':DUPLICATE_ROOM');
