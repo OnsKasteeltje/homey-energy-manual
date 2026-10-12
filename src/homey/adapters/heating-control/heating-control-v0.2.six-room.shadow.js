@@ -16,6 +16,8 @@ const ROOM_DEVICES={
   erker_douwe:'f9db36cd-8c0f-4beb-aa28-0127597652cf'
 };
 const ALLOWED_ACTIONS=new Set(['HOLD','SET_TEMP','KEEP_TEMP','RESET_TO_SCHEDULE']);
+// Universal user comfort authority: applies to every mapped room.
+const MANUAL_OVERRIDE_MODES=new Set(['temporary_override','permanent_override']);
 
 const parse=v=>{try{return JSON.parse(String(v??''));}catch{return null;}};
 const num=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(v);return Number.isFinite(n)?n:null;};
@@ -68,7 +70,7 @@ if(Array.isArray(intent?.commands)){
     const deviceId=ROOM_DEVICES[key]||null;
     const observedMode=String(src?.vendorSetpointMode||'').toLowerCase();
     const observedSystemMode=String(src?.vendorSystemMode||'').toLowerCase();
-    const vendorHold=observedMode==='permanent_override'||observedMode==='temporary_override';
+    const vendorHold=MANUAL_OVERRIDE_MODES.has(observedMode);
     const actionOK=ALLOWED_ACTIONS.has(action);
     const targetOK=
       action==='SET_TEMP'||action==='KEEP_TEMP'
