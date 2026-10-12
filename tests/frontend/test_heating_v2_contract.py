@@ -28,7 +28,7 @@ def test_heating_chart_keeps_authority_observation_shadow_distinct():
     render = RENDER.read_text()
     style = STYLE.read_text()
 
-    assert "Honeywell baseline" in index
+    assert "Honeywell effectieve baseline" in index
     assert "werkelijke kamertemperatuur" in index
     assert "EMS preheat shadow" in index
 
@@ -75,7 +75,7 @@ def test_heating_hover_is_bound_to_individual_lines():
 def test_heating_tooltip_shows_one_room_and_one_signal():
     render = RENDER.read_text()
 
-    assert 'label = "Honeywell baseline"' in render
+    assert 'label = "Honeywell effectieve baseline"' in render
     assert 'label = "Gemeten temperatuur"' in render
     assert 'label = "EMS shadow-target"' in render
     assert 'class="tip-line"' in render
@@ -88,7 +88,7 @@ def test_preheat_window_is_derived_from_honeywell_up_transition_not_current_elig
     assert 'baseline?.direction === "UP"' in render
     assert "hasPreheatWindow" in render
     assert 'candidate?.status === "ELIGIBLE_UP_TRANSITION"' not in render
-    assert 'const windowText = hasPreheatWindow(s?.baseline,candidate)' in render
+    assert 'const windowText = hasPreheatWindow(s?.baseline,candidate,room.effective)' in render
     assert "preheatWindows(room,start,now,maxAdvanceMinutes)" in render
     assert "room.progressionSource?.opportunityHistory" in render
     assert "for(const window of preheatWindows(room,start,now,maxAdvanceMinutes))" in render
@@ -131,6 +131,18 @@ def test_future_preheat_preview_uses_honeywell_schedule_and_backend_window_polic
     assert "closesAt <= now" in render
     assert "maxAdvanceMinutes*60000" in render
     assert "room.progressionSource?.opportunityHistory" in render
+    assert "room.effective?.preheatAdvanceAllowed === true" in render
+
+
+def test_effective_honeywell_baseline_overlays_active_overrides():
+    render = RENDER.read_text()
+
+    assert "function effectiveBaselinePoints(room,start,now)" in render
+    assert 'effective.source === "TEMPORARY_OVERRIDE"' in render
+    assert "effective.overrideUntil" in render
+    assert "points:effectiveBaselinePoints(room,start,now)" in render
+    assert "Honeywell effectieve baseline" in render
+    assert "Honeywell modus" in render
 
 
 def test_heating_room_card_distinguishes_current_window_from_future_potential():
