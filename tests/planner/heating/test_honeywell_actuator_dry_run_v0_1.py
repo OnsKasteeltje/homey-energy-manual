@@ -146,6 +146,21 @@ class TestDryRun(unittest.TestCase):
         rooms = self.run_eval(d)
         self.assertEqual(rooms["woonkamer"]["simulatedAction"], "HOLD")
 
+    def test_shadow_keep_requires_unproven_physical_ownership(self):
+        d = documents()
+        d["gate"]["rooms"][0]["command"]["action"] = "WOULD_KEEP_TEMP"
+        rooms = self.run_eval(d)
+        self.assertEqual(rooms["woonkamer"]["simulatedAction"], "HOLD")
+        self.assertIn("V05_KEEP_HAS_NO_PHYSICAL_OWNERSHIP_PROOF",
+                      rooms["woonkamer"]["denialReasons"])
+
+    def test_unexpected_override_until_is_not_normal_schedule(self):
+        d = documents()
+        d["honeywell"]["zones"][0]["overrideUntil"] = LATER
+        rooms = self.run_eval(d)
+        self.assertIn("HONEYWELL_OVERRIDE_UNTIL_UNEXPECTED",
+                      rooms["woonkamer"]["denialReasons"])
+
     def test_missing_and_duplicate_rooms_fail_closed(self):
         d = documents()
         d["gate"]["rooms"].append(copy.deepcopy(d["gate"]["rooms"][0]))
