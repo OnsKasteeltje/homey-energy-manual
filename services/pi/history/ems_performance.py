@@ -183,6 +183,108 @@ def load_easee_meter_window(day, db_path=MEASUREMENTS_DB, now_utc=None):
     }
 
 
+
+def load_energy_interval_accounting(day, db_path=MEASUREMENTS_DB, now_utc=None):
+    """Day KPI from archived energy intervals, never from sampled instantaneous power.
+
+    P1 import/export stays the grid authority. Paired PV/P1 coverage is
+    required for a trustworthy derived PV self-consumption day KPI.
+    """
+    start, end = bounds(day)
+    now_utc = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    effective_end = min(end, now_utc)
+    expected_s = max(0.0, (effective_end - start).total_seconds())
+    unavailable = {
+        "available": False,
+        "status": "UNAVAILABLE",
+        "source": "ems-history.sqlite/house_energy_intervals",
+        "method": "ARCHIVED_CUMULATIVE_ENERGY_INTERVALS",
+        "pvKWh": None, "importKWh": None, "exportKWh": None,
+        "pvSelfConsumedKWh": None, "pvSelfConsumptionRate": None,
+        "p1Coverage": 0.0, "pvCoverage": 0.0, "pairedCoverage": 0.0,
+        "sourceQualityCounts": {"p1": {}, "pv": {}},
+    }
+    if not db_path.exists() or expected_s < 1800:
+        return unavailable
+
+    with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as con:
+        con.execute("PRAGMA query_only=ON")
+        table = con.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' "
+            "AND name='house_energy_intervals'"
+        ).fetchone()
+        if not table:
+            return unavailable
+        rows = con.execute(
+            """SELECT start_ts_utc,end_ts_utc,import_kwh,export_kwh,
+                      pv_total_kwh,quality,p1_quality,pv_quality
+               FROM house_energy_intervals
+               WHERE end_ts_utc > ? AND start_ts_utc < ?
+               ORDER BY start_ts_utc""",
+            (iso_z(start), iso_z(effective_end)),
+        ).fetchall()
+
+    totals = {"pvKWh": 0.0, "importKWh": 0.0, "exportKWh": 0.0}
+    seconds = {"p1": 0.0, "pv": 0.0, "paired": 0.0}
+    source_quality = {"p1": Counter(), "pv": Counter()}
+    for start_text, end_text, imp, exp, pv, quality, p1_quality, pv_quality in rows:
+        row_start = datetime.fromisoformat(start_text.replace("Z", "+00:00"))
+        row_end = datetime.fromisoformat(end_text.replace("Z", "+00:00"))
+        row_seconds = (row_end - row_start).total_seconds()
+        overlap = max(
+            0.0,
+            (min(row_end, effective_end) - max(row_start, start)).total_seconds(),
+        )
+        if overlap <= 0 or row_seconds <= 0 or quality == "discontinuity":
+            continue
+        fraction = overlap / row_seconds
+        p1_ok = p1_quality in {"observed", "held"} and imp is not None and exp is not None
+        pv_ok = pv_quality in {"observed", "held", "estimated"} and pv is not None
+        if p1_ok:
+            totals["importKWh"] += float(imp) * fraction
+            totals["exportKWh"] += float(exp) * fraction
+            seconds["p1"] += overlap
+            source_quality["p1"][p1_quality] += 1
+        if pv_ok:
+            totals["pvKWh"] += float(pv) * fraction
+            seconds["pv"] += overlap
+            source_quality["pv"][pv_quality] += 1
+        if p1_ok and pv_ok:
+            seconds["paired"] += overlap
+
+    coverage = {
+        "p1Coverage": round(min(1.0, seconds["p1"] / expected_s), 4),
+        "pvCoverage": round(min(1.0, seconds["pv"] / expected_s), 4),
+        "pairedCoverage": round(min(1.0, seconds["paired"] / expected_s), 4),
+    }
+    # Do not promote partial/inconsistent accounting into a day KPI.
+    available = (
+        seconds["paired"] / expected_s >= 0.95
+        and totals["pvKWh"] > 0
+        and totals["pvKWh"] + 1e-6 >= totals["exportKWh"]
+    )
+    status = (
+        "GOOD" if available
+        else "INVALID_ENERGY_BALANCE" if totals["pvKWh"] + 1e-6 < totals["exportKWh"]
+        else "INSUFFICIENT_PAIRED_COVERAGE"
+    )
+    direct = max(0.0, totals["pvKWh"] - totals["exportKWh"]) if available else None
+    return {
+        **unavailable,
+        **coverage,
+        "available": available,
+        "status": status,
+        "sourceQualityCounts": {k: dict(v) for k, v in source_quality.items()},
+        "pvKWh": round(totals["pvKWh"], 6) if seconds["pv"] else None,
+        "importKWh": round(totals["importKWh"], 6) if seconds["p1"] else None,
+        "exportKWh": round(totals["exportKWh"], 6) if seconds["p1"] else None,
+        "pvSelfConsumedKWh": round(direct, 6) if direct is not None else None,
+        "pvSelfConsumptionRate": (
+            round(direct / totals["pvKWh"], 4) if available else None
+        ),
+    }
+
+
 def integrate(rows):
     totals = {
         "pv_kwh": 0.0,
@@ -199,6 +301,8 @@ def integrate(rows):
         "flex_pv_capture_kwh": 0.0,
         "flex_grid_energy_kwh": 0.0,
         "pre_flex_surplus_kwh": 0.0,
+        "pv_p1_impossible_export_kwh": 0.0,
+        "pv_p1_impossible_export_intervals": 0,
     }
     integrated_s = 0.0
     surplus_windows = []
@@ -225,6 +329,9 @@ def integrate(rows):
         base = max(0.0, house - flex)
         export = max(0.0, -grid)
         imp = max(0.0, grid)
+        if export > pv:
+            totals["pv_p1_impossible_export_kwh"] += (export - pv) / 1000 * h
+            totals["pv_p1_impossible_export_intervals"] += 1
         direct = min(pv, house)
         available_for_flex = max(0.0, pv - base)
         flex_pv = min(flex, available_for_flex)
@@ -373,6 +480,7 @@ def build_report(
     start_utc, end_utc = bounds(day)
     now_utc = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
     easee_meter = load_easee_meter_window(day, measurement_db, now_utc=now_utc)
+    energy_accounting = load_energy_interval_accounting(day, measurement_db, now_utc=now_utc)
     now_local = now_utc.astimezone(TZ)
     today = now_local.date()
 
@@ -442,8 +550,30 @@ def build_report(
         and planner["snapshotCount"] >= 8
     )
 
-    metrics = {k: round(v, 3) for k, v in totals.items()}
-    metrics["pv_self_consumption_rate"] = None if pv <= 0 else round(direct / pv, 4)
+    power_sample_metrics = {k: round(v, 3) for k, v in totals.items()}
+    power_sample_metrics["pv_self_consumption_rate"] = (
+        None if pv <= 0 else round(direct / pv, 4)
+    )
+    metrics = dict(power_sample_metrics)
+    # Grid boundary is P1. PV and self-consumption are promoted only with
+    # sufficient paired cumulative-energy history; retain sampled integrals
+    # separately for diagnosis and flex-allocation analysis.
+    if energy_accounting["p1Coverage"] >= 0.95:
+        metrics["grid_import_kwh"] = round(energy_accounting["importKWh"], 3)
+        metrics["grid_export_kwh"] = round(energy_accounting["exportKWh"], 3)
+    if energy_accounting["available"]:
+        metrics["pv_kwh"] = round(energy_accounting["pvKWh"], 3)
+        metrics["direct_pv_self_use_kwh"] = round(
+            energy_accounting["pvSelfConsumedKWh"], 3
+        )
+        metrics["pv_self_consumption_rate"] = energy_accounting["pvSelfConsumptionRate"]
+        metrics["house_consumption_kwh"] = round(
+            metrics["pv_kwh"] + metrics["grid_import_kwh"]
+            - metrics["grid_export_kwh"], 3
+        )
+    else:
+        metrics["direct_pv_self_use_kwh"] = None
+        metrics["pv_self_consumption_rate"] = None
     metrics["flex_pv_capture_rate_of_preflex_surplus"] = None if surplus <= 0 else round(captured / surplus, 4)
 
     ev_energy_accounting = {
@@ -533,8 +663,34 @@ def build_report(
             ),
         },
         "metrics": metrics,
+        "energyAccounting": energy_accounting,
+        "sampledPowerMetrics": power_sample_metrics,
+        "powerSampleQuality": {
+            "status": (
+                "REVIEW_PV_P1_TIME_ALIGNMENT"
+                if totals["pv_p1_impossible_export_intervals"] else "NO_IMPOSSIBLE_EXPORT_SAMPLES"
+            ),
+            "impossibleExportIntervals": int(totals["pv_p1_impossible_export_intervals"]),
+            "impossibleExportEnergyKWh": round(totals["pv_p1_impossible_export_kwh"], 3),
+            "interpretation": (
+                "Samples where P1 export exceeds the sum of simultaneously archived "
+                "inverter powers. This is a source-consistency diagnostic, not "
+                "proof of an EMS missed opportunity or an instruction to change P1."
+            ),
+        },
         "evEnergyAccounting": ev_energy_accounting,
         "metricSemantics": {
+            "pv_self_consumption_rate": {
+                "provenanceClass": "DERIVED_FROM_ARCHIVED_ENERGY_INTERVALS",
+                "source": "ems-history.sqlite/house_energy_intervals",
+                "available": energy_accounting["available"],
+                "interpretation": (
+                    "Daily PV self-consumption is PV generated minus P1 export "
+                    "from historical energy intervals with at least 95% paired "
+                    "coverage. Sampled instantaneous inverter/P1 power never "
+                    "supplies the authoritative day KPI."
+                ),
+            },
             "tesla_kwh": {
                 "provenanceClass": "DERIVED_POWER_INTEGRAL",
                 "source": "ems-history.sqlite/measurements tesla electrical_power_w",
@@ -583,6 +739,8 @@ def build_report(
             "plannerHistory is used to explain decisions and will support a later constrained replay optimiser",
             "tesla_kwh is a sampled-power integral, not the authoritative Easee cumulative energy-meter delta",
             "flex_pv_capture_kwh and flex_grid_energy_kwh are derived combined-flex allocations, not directly measured EV source energy",
+            "daily PV self-consumption KPI requires sufficient paired archived energy-interval coverage",
+            "sampledPowerMetrics and powerSampleQuality expose instantaneous PV/P1 mismatch without changing P1 authority",
         ],
     }
     return result
