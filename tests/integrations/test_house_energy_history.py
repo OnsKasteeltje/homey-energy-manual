@@ -163,7 +163,7 @@ def test_rebuild_removes_obsolete_derived_rows(tmp_path):
     assert count == 0
 
 
-def test_held_counter_snapshot_preserves_energy_with_held_quality(tmp_path):
+def test_held_counter_snapshot_redistributes_catchup_with_estimated_quality(tmp_path):
     db = tmp_path / "h.sqlite"
     con = _db(db)
     _snapshot(con, "2026-09-23T10:00:00Z", 100, 50, 1000, 2000, 3000)
@@ -176,30 +176,144 @@ def test_held_counter_snapshot_preserves_energy_with_held_quality(tmp_path):
     _snapshot(con, "2026-09-23T10:10:00Z", 100.2, 50.3, 1000.2, 2000.2, 3000.1)
     con.close()
 
-    _load().build(db)
+    result = _load().build(db)
     con = sqlite3.connect(db)
     rows = con.execute("""
-        SELECT start_ts_utc,end_ts_utc,pv_total_kwh,house_kwh,quality
+        SELECT start_ts_utc,end_ts_utc,pv_solaredge_kwh,
+               pv_goodwe4200_kwh,pv_goodwe2000_kwh,
+               pv_total_kwh,house_kwh,quality,pv_quality
         FROM house_energy_intervals ORDER BY end_ts_utc
     """).fetchall()
     con.close()
 
     assert len(rows) == 2
-    assert rows[0][0] == "2026-09-23T10:00:00Z"
-    assert rows[0][1] == "2026-09-23T10:05:00Z"
-    # KISS: report each raw cumulative counter delta in its measurement
-    # interval rather than spreading sparse inverter readings backward.
-    assert abs(rows[0][2] - 0.1) < 1e-9
-    assert abs(rows[0][3] - 0.0) < 1e-9
-    assert rows[0][4] == "held"
+    assert result["pv_estimated_intervals"] == 2
 
-    assert rows[1][0] == "2026-09-23T10:05:00Z"
-    assert rows[1][1] == "2026-09-23T10:10:00Z"
-    assert abs(rows[1][2] - 0.4) < 1e-9
-    assert abs(rows[1][3] - 0.4) < 1e-9
-    assert rows[1][4] == "held"
-    assert abs(sum(row[2] for row in rows) - 0.50) < 1e-9
-    assert abs(sum(row[3] for row in rows) - 0.40) < 1e-9
+    # SolarEdge was observed at both endpoints, so its native 0.1 kWh
+    # interval deltas stay untouched. Both GoodWe catch-up deltas are spread
+    # evenly over the two five-minute intervals.
+    for row in rows:
+        assert abs(row[2] - 0.1) < 1e-9
+        assert abs(row[3] - 0.1) < 1e-9
+        assert abs(row[4] - 0.05) < 1e-9
+        assert abs(row[5] - 0.25) < 1e-9
+        assert row[7:] == ("estimated", "estimated")
+
+    assert abs(rows[0][6] - 0.15) < 1e-9
+    assert abs(rows[1][6] - 0.25) < 1e-9
+    assert abs(sum(row[5] for row in rows) - 0.50) < 1e-9
+    assert abs(sum(row[6] for row in rows) - 0.40) < 1e-9
+
+
+def test_all_three_pv_inverters_use_same_held_catchup_rule(tmp_path):
+    db = tmp_path / "h.sqlite"
+    con = _db(db)
+    _snapshot(con, "2026-10-12T11:30:00Z", 100.0, 50.0, 1000.0, 2000.0, 3000.0)
+
+    for minute, imp in ((35, 100.1), (40, 100.2)):
+        ts = f"2026-10-12T11:{minute:02d}:00Z"
+        _snapshot(con, ts, imp, 50.0, 1000.0, 2000.0, 3000.0)
+        con.execute(
+            """
+            UPDATE measurements
+            SET quality='held'
+            WHERE ts_utc=? AND device_id IN (2,3,4)
+            """,
+            (ts,),
+        )
+
+    _snapshot(con, "2026-10-12T11:45:00Z", 100.3, 50.0, 1000.3, 2000.6, 3000.9)
+    con.close()
+
+    result = _load().build(db)
+    con = sqlite3.connect(db)
+    rows = con.execute("""
+        SELECT pv_solaredge_kwh,pv_goodwe4200_kwh,pv_goodwe2000_kwh,
+               pv_total_kwh,quality,pv_quality
+        FROM house_energy_intervals
+        ORDER BY end_ts_utc
+    """).fetchall()
+    con.close()
+
+    assert len(rows) == 3
+    assert result["pv_estimated_intervals"] == 3
+
+    for row in rows:
+        assert abs(row[0] - 0.1) < 1e-9
+        assert abs(row[1] - 0.2) < 1e-9
+        assert abs(row[2] - 0.3) < 1e-9
+        assert abs(row[3] - 0.6) < 1e-9
+        assert row[4:] == ("estimated", "estimated")
+
+    assert abs(sum(row[0] for row in rows) - 0.3) < 1e-9
+    assert abs(sum(row[1] for row in rows) - 0.6) < 1e-9
+    assert abs(sum(row[2] for row in rows) - 0.9) < 1e-9
+
+
+def test_solaredge_resume_regression_does_not_create_single_interval_spike(tmp_path):
+    db = tmp_path / "h.sqlite"
+    con = _db(db)
+    _snapshot(con, "2026-10-12T11:30:00Z", 100.0, 50.0, 17646.18, 23980.9, 10803.7)
+
+    # SolarEdge remains stale/held for seven samples while P1 and GoodWe
+    # continue to move. The next observed SolarEdge value contains all energy
+    # produced since the 11:30 baseline.
+    for index, minute in enumerate((35, 40, 45, 50, 55), start=1):
+        ts = f"2026-10-12T11:{minute:02d}:00Z"
+        _snapshot(
+            con, ts,
+            100.0 + index * 0.01,
+            50.0,
+            17646.18,
+            23980.9 + index * 0.1,
+            10803.7 + index * 0.1,
+        )
+        con.execute(
+            "UPDATE measurements SET quality='held' WHERE ts_utc=? AND device_id=2",
+            (ts,),
+        )
+
+    for index, minute in enumerate((0, 5), start=6):
+        ts = f"2026-10-12T12:{minute:02d}:00Z"
+        _snapshot(
+            con, ts,
+            100.0 + index * 0.01,
+            50.0,
+            17646.18,
+            23980.9 + index * 0.1,
+            10803.7 + index * 0.1,
+        )
+        con.execute(
+            "UPDATE measurements SET quality='held' WHERE ts_utc=? AND device_id=2",
+            (ts,),
+        )
+
+    _snapshot(
+        con, "2026-10-12T12:10:00Z",
+        100.08, 50.0,
+        17650.016, 23981.7, 10804.5,
+    )
+    con.close()
+
+    _load().build(db)
+    con = sqlite3.connect(db)
+    rows = con.execute("""
+        SELECT pv_solaredge_kwh,quality,pv_quality
+        FROM house_energy_intervals
+        WHERE start_ts_utc >= '2026-10-12T11:30:00Z'
+          AND end_ts_utc <= '2026-10-12T12:10:00Z'
+        ORDER BY end_ts_utc
+    """).fetchall()
+    con.close()
+
+    assert len(rows) == 8
+    expected = 3.836 / 8.0
+    for se, quality, pv_quality in rows:
+        assert abs(se - expected) < 1e-9
+        assert quality == "estimated"
+        assert pv_quality == "estimated"
+
+    assert abs(sum(row[0] for row in rows) - 3.836) < 1e-9
 
 
 def test_sleeping_pv_counters_do_not_truncate_night_history(tmp_path):
