@@ -136,12 +136,18 @@ def _vendor_map(payload: dict[str, Any], now: datetime) -> dict[str, dict[str, A
         if key in mapping:
             raise IntentError("Honeywell duplicate zone " + key)
         mapping[key] = zone
-    if set(mapping) != ALLOWED_ROOM_KEYS:
-        raise IntentError("Honeywell six-room key set mismatch")
-    for key, zone in mapping.items():
-        if zone.get("homeyDeviceId") != ROOM_DEVICES[key]:
+    # The canonical Resideo collector publishes all eight heating zones.
+    # Only six are EMS preheat candidates; extra baseline-only zones are
+    # expected and MUST NOT become Homey commands or expand authority.
+    missing = ALLOWED_ROOM_KEYS - set(mapping)
+    if missing:
+        raise IntentError(
+            "Honeywell required preheat zones missing: " + ",".join(sorted(missing))
+        )
+    for key in ALLOWED_ROOM_KEYS:
+        if mapping[key].get("homeyDeviceId") != ROOM_DEVICES[key]:
             raise IntentError("Honeywell device ID mismatch for " + key)
-    return mapping
+    return {key: mapping[key] for key in ALLOWED_ROOM_KEYS}
 
 
 def build_intent(source: dict[str, Any], honeywell: dict[str, Any], *, generated_at=None) -> dict[str, Any]:
