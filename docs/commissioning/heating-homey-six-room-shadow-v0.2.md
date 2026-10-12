@@ -22,7 +22,9 @@ Pinned six-room mapping:
 
 ## Guards / no physical authority
 
-Exactly six non-duplicate room keys, exactly these device IDs, current Pi V0.5/read-only Honeywell snapshots, valid SHADOW freshness/order and no-write flags are required. Missing or corrupt sources fail closed with zero commands.
+**Canonical eight-zone collector vs six-room preheat scope:** `collect_honeywell.py` deliberately publishes **eight mapped Honeywell zones** (`EMS_HONEYWELL_STATE_V0.2`). V0.2 validates that **all six required preheat keys** are present with the exact pinned Homey IDs, and selects only these six into SHADOW commands. The two baseline-only zones (`master_bedroom` and `krijn_slaapkamer`) are **expected additional observations**, not an error and never a new preheat permission. Duplicate zone keys (including baseline-only duplicates) remain invalid, as does a missing preheat key or an incorrect ID for any of the six. The resulting intent always has exactly six distinct room commands on success. A Honeywell snapshot with only the six valid required zones is also accepted by the selector, but normal production collection has eight.
+
+Exactly six non-duplicate *preheat* room keys, exactly the six pinned device IDs, current Pi V0.5/read-only Honeywell snapshots, valid SHADOW freshness/order and no-write flags are required. Missing or corrupt sources fail closed with zero commands.
 
 **ONE UNIVERSAL RULE FOR ALL SIX ROOMS, WITHOUT EXCEPTIONS:** any Honeywell zone in permanent_override or temporary_override forces HOLD, with target null, wouldWrite false, holdReason HONEYWELL_OVERRIDE_ACTIVE and no simulated ownership. This always overrides a proposed V0.5 SET, KEEP or RESET, regardless of room identity, zone group or current temperature. Douwe's overrides are only currently observed examples, never room-specific policy. The checks apply identically to woonkamer, eetkamer, keuken, serre, douwe_slaapkamer and erker_douwe. An unknown zone mode, a non-Auto Honeywell system mode, contradictory override end-time or changed target also results in HOLD. A simulated SET/KEEP also requires an upcoming scheduled UP transition. HOLD requires neither a future UP time nor an edge device read. Both new Homey components independently guard the six-ID mapping, the override HOLD rule, freshness and fail-closed semantics.
 
@@ -71,6 +73,10 @@ Optional local runtime evidence (no writes or publisher):
     '
 
 A FAIL_CLOSED result may mean the independent V0.5 and Honeywell polling times do not overlap within their freshness windows. Never invent timestamps or relax controls to force success.
+
+## Live-source acceptance checkpoint — 2026-10-12
+
+A read-only Pi worktree run at `7d806651e` returned `FAIL_CLOSED` with `V0_5_SOURCE_INVALID_HONEYWELL_SIX-ROOM_KEY_SET_MISMATCH`. Root cause: V0.2 mistakenly expected the full Honeywell state `zones` set to equal the six preheat keys; the collector's documented output contains eight. The subset-selection fix changes no preheat eligibility or physical actuation and is guarded by tests for eight/only-six valid zones, unrelated baseline-only rooms, missing required zones and duplicate zones. Run both standalone tests and one fresh Pi-source check on the updated branch before accepting the fix. Nothing deployed or installed as part of this correction.
 
 ## Release boundary
 
