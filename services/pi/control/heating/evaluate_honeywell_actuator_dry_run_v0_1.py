@@ -105,6 +105,172 @@ def check_source(name: str, data: dict, now: datetime) -> str | None:
     return None
 
 
+# Presentation only. Original denialReasons remain untouched and authoritative.
+# Lower rank means a more informative primary explanation, not control priority.
+REASON_INFO = {
+    "HONEYWELL_OVERRIDE_ACTIVE": (10, "Honeywell", "Handmatige Honeywell-override actief",
+                                  "De ruimte volgt nu niet het gewone programma. EMS verandert deze instelling niet.",
+                                  "Alleen een wijziging door de gebruiker naar het normale programma kan dit opheffen."),
+    "HONEYWELL_MODE_UNKNOWN": (5, "Gegevens", "Honeywell-modus is onbekend",
+                              "De huidige thermostaatmodus kan niet veilig worden geïnterpreteerd.",
+                              "Controleer of Honeywell opnieuw geldige modusgegevens levert."),
+    "HONEYWELL_OVERRIDE_UNTIL_UNEXPECTED": (5, "Gegevens", "Honeywell-gegevens spreken elkaar tegen",
+                                           "Honeywell meldt het normale programma maar ook een override-eindtijd.",
+                                           "Controleer de actuele Honeywell-stand; niet automatisch corrigeren."),
+    "HONEYWELL_DEVICE_ID_MISMATCH": (5, "Configuratie", "Thermostaatkoppeling klopt niet",
+                                     "Het Honeywell-apparaat komt niet overeen met de vaste kamerkoppeling.",
+                                     "Controleer de room-to-device mapping."),
+    "ROOM_SOURCE_MISSING": (5, "Gegevens", "Kamergegevens ontbreken",
+                            "De kamer ontbreekt in minimaal één van de benodigde gegevensbronnen.",
+                            "Controleer de beschikbare Heating- en Honeywell-snapshots."),
+    "DUPLICATE_OR_INVALID_ROOM_KEYS": (5, "Gegevens", "Kamerlijst is ongeldig",
+                                       "Een bron bevat ontbrekende of dubbele kamersleutels.",
+                                       "Controleer de bronbestanden en sleutels."),
+    "HONEYWELL_TARGET_MISMATCH": (5, "Gegevens", "Honeywell-target komt niet overeen",
+                                  "De actuele Honeywell-target wijkt af van de target waarmee de planner rekende.",
+                                  "Nieuwe, consistente waarnemingen zijn nodig."),
+    "HONEYWELL_SYSTEM_MODE_MISMATCH": (5, "Gegevens", "Honeywell-systeemmodus verschilt",
+                                       "De twee Honeywell-waarnemingen beschrijven niet dezelfde systeemmodus.",
+                                       "Controleer of de laatste Honeywell-gegevens zijn bijgewerkt."),
+    "P1_GRID_POWER_INVALID": (5, "Gegevens", "P1-vermogen is ongeldig",
+                              "P1-import of -export ontbreekt of bevat een ongeldige waarde.",
+                              "Controleer de P1-meetketen."),
+    "GRANT_EXPIRED": (5, "Gegevens", "Planner-vrijgave is verlopen",
+                      "De geldigheidsduur van de Heating grant is verstreken.",
+                      "Wacht op een nieuwe geldige plannerbeslissing."),
+    "NO_SCHEDULED_UP": (20, "Honeywell-schema", "Geen geplande temperatuurverhoging",
+                        "De volgende Honeywell-programmawisseling is geen verhoging.",
+                        "Geen actie nodig: wacht op een geschikte geplande verhoging."),
+    "SCHEDULED_UP_EXPIRED": (21, "Honeywell-schema", "Geplande verhoging is voorbij",
+                             "Het tijdstip van de beoogde Honeywell-verhoging ligt al in het verleden.",
+                             "Wacht op het volgende geschikte tijdslot."),
+    "HONEYWELL_PREHEAT_NOT_ALLOWED": (30, "Verwarming", "Deze ruimte is nu niet geschikt voor voorverwarmen",
+                                      "De Honeywell- en verwarmingsvoorwaarden staan geen vervroegde stap toe.",
+                                      "Controleer het verwarmingsadvies; behoud de normale regeling."),
+    "INITIAL_STEP_EXCEEDS_0_5C": (24, "Veiligheid", "Temperatuurstap is te groot",
+                                  "De voorgestelde eerste stap is groter dan de toegestane 0,5 °C.",
+                                  "De planner moet een kleinere stap voorstellen."),
+    "TARGET_OUTSIDE_UP_BOUNDS": (65, "Planner-detail", "Geen geldige temperatuurstap",
+                                 "V0.5 heeft geen doel binnen de actuele en de toekomstige Honeywell-target.",
+                                 "Zie de onderliggende planner- en schemavoorwaarden."),
+    "NO_PRODUCTION_HEATING_GRANT": (40, "Planning", "Planner geeft verwarming geen ruimte",
+                                    "De centrale planner heeft preheating op dit moment niet vrijgegeven.",
+                                    "Dit verandert pas bij een nieuwe, geldige plannerbeslissing."),
+    "ROOM_NOT_IN_PRODUCTION_GRANT": (43, "Planning", "Deze kamer is niet geselecteerd",
+                                     "De centrale planner heeft deze ruimte niet opgenomen in de vrijgave.",
+                                     "Wacht op een Heating grant waarin de kamer voorkomt."),
+    "P1_NOT_EXPORTING_WITHOUT_IMPORT": (50, "Energie", "Geen bruikbaar P1-overschot",
+                                        "De P1-meting toont op dit moment geen netto teruglevering zonder afname.",
+                                        "Er is eerst daadwerkelijk export nodig; een momentopname is nog geen stabiele vrijgave."),
+    "UPSTREAM_SIX_ROOM_SCOPE_MIGRATION_REQUIRED": (15, "Integratie", "Kamer valt nog buiten de upstream preheat-scope",
+                                                    "De V0.3-kamerconfiguratie staat deze ruimte nog niet toe.",
+                                                    "Controleer de SHADOW-only scopeconfiguratie."),
+    "V05_SIX_ROOM_SCOPE_MIGRATION_REQUIRED": (15, "Integratie", "Kamer valt nog buiten de V0.5-scope",
+                                              "De V0.5-kamerconfiguratie staat deze ruimte nog niet toe.",
+                                              "Controleer de SHADOW-only scopeconfiguratie."),
+    "V05_KEEP_HAS_NO_PHYSICAL_OWNERSHIP_PROOF": (16, "Veiligheid", "V0.5 wil een stand behouden, zonder eigendomsbewijs",
+                                                "Een SHADOW KEEP bewijst niet dat EMS de thermostaat fysiek heeft ingesteld.",
+                                                "Geen nieuwe actie; eerst een aparte, gecontroleerde actuatorvalidatie."),
+    "V05_NO_NEW_SET_CANDIDATE": (70, "Planner-detail", "V0.5 stelt geen nieuwe verwarmingsstap voor",
+                                "De control gate heeft geen nieuwe temperatuurverhoging vrijgegeven.",
+                                "Controleer eerst de overige voorwaarden."),
+    "V05_ROOM_CHECKS_NOT_ALL_TRUE": (71, "Planner-detail", "V0.5-controles blokkeren",
+                                     "Minimaal één beveiligingscontrole van V0.5 is niet geslaagd.",
+                                     "Bekijk bij behoefte de technische codes en V0.5-checks."),
+    "V05_UPSTREAM_NOT_SAFE": (6, "Gegevens", "V0.5 mist geldige upstream-voorwaarden",
+                              "Een voorafgaande bron is volgens V0.5 niet consistent of actueel.",
+                              "Controleer de freshness/ordering in V0.5."),
+    "V05_SOURCE_EVIDENCE_MISSING": (5, "Gegevens", "V0.5-bronbewijs ontbreekt",
+                                    "De V0.5-keten heeft geen controleerbare herkomstgegevens.",
+                                    "Controleer de V0.5-uitvoer."),
+    "UPSTREAM_HONEYWELL_OVERRIDE_OR_MODE": (67, "Planner-detail", "Override blokkeert al upstream",
+                                            "De planner heeft de Honeywell-modus als blokkade verwerkt.",
+                                            "EMS respecteert deze modus."),
+    "V05_COMMAND_WRITE_CONTRACT_INVALID": (5, "Veiligheid", "V0.5-writebeveiliging klopt niet",
+                                           "Een SHADOW-commando voldoet niet aan de no-write-afspraak.",
+                                           "Stop de evaluatie en controleer het V0.5-contract."),
+    "GRANT_ROOM_LIST_INVALID": (5, "Gegevens", "Planner-kamerlijst ongeldig",
+                                "De Heating grant bevat geen geldige kamerlijst.",
+                                "Controleer de uitvoer van de centrale planner."),
+}
+DERIVED_REASONS = {
+    "UPSTREAM_HONEYWELL_OVERRIDE_OR_MODE",
+    "V05_NO_NEW_SET_CANDIDATE", "V05_ROOM_CHECKS_NOT_ALL_TRUE",
+}
+
+
+def describe_reason(code: str, observed_mode: str | None, observed_target: float | None) -> dict:
+    known = REASON_INFO.get(code)
+    if known is None:
+        if any(flag in code for flag in ("INVALID", "STALE", "UNTIMED", "MISMATCH", "FROM_FUTURE")):
+            known = (4, "Gegevens", "Onvoldoende betrouwbare brongegevens",
+                     "Een noodzakelijke EMS-bron is ontbrekend, onjuist of verouderd.",
+                     "Controleer de technische code en herstel eerst de betreffende bron.")
+        else:
+            known = (60, "Overig", "Aanvullende veiligheidscontrole blokkeert",
+                     "Een EMS-voorwaarde is niet geslaagd.",
+                     "Bekijk de oorspronkelijke technische code voor details.")
+    rank, category, title, explanation, next_step = known
+    if code == "HONEYWELL_OVERRIDE_ACTIVE":
+        if observed_mode == "permanent_override":
+            target = f" op {observed_target:g} °C" if observed_target is not None else ""
+            title = f"Permanente Honeywell-override{target}"
+        elif observed_mode == "temporary_override":
+            title = "Tijdelijke Honeywell-override"
+    return {
+        "code": code, "category": category, "title": title,
+        "explanation": explanation, "nextStep": next_step, "priority": rank,
+    }
+
+
+def diagnose(reasons: list[str], observed_mode: str | None, observed_target: float | None,
+             command_action: str | None) -> dict:
+    if not reasons:
+        return {
+            "headline": "Voorverwarmen lijkt mogelijk (alleen simulatie)",
+            "category": "Simulatie", "advice": "Nog geen fysieke toestemming of apparaatvalidatie.",
+            "primaryCode": None, "otherReasons": [], "technicalOnly": [],
+        }
+    descriptions = [describe_reason(r, observed_mode, observed_target) for r in reasons]
+    descriptions.sort(key=lambda detail: (detail["priority"], detail["code"]))
+    primary = descriptions[0]
+    codes = set(reasons)
+    technical = set(DERIVED_REASONS)
+    if command_action != "WOULD_SET_TEMP":
+        technical.add("TARGET_OUTSIDE_UP_BOUNDS")
+    if "HONEYWELL_OVERRIDE_ACTIVE" in codes:
+        technical.add("HONEYWELL_PREHEAT_NOT_ALLOWED")
+    if "NO_PRODUCTION_HEATING_GRANT" in codes:
+        technical.add("ROOM_NOT_IN_PRODUCTION_GRANT")
+    secondary = [d for d in descriptions[1:] if d["code"] not in technical]
+    return {
+        "headline": primary["title"], "category": primary["category"],
+        "advice": primary["nextStep"], "primaryCode": primary["code"],
+        "otherReasons": [{"code": d["code"], "title": d["title"]} for d in secondary],
+        "technicalOnly": [d["code"] for d in descriptions[1:] if d["code"] in technical],
+    }
+
+
+def human_report(payload: dict) -> str:
+    """Compact Dutch CLI view; JSON remains unchanged without --human."""
+    lines = ["Honeywell preheat | zes kamers | DRY-RUN", "GEEN FYSIEKE AANSTURING"]
+    shared = set(payload.get("globalDenialReasons") or [])
+    if shared:
+        global_titles = sorted((describe_reason(c, None, None) for c in shared),
+                               key=lambda d: (d["priority"], d["code"]))
+        lines.append("Algemeen: " + "; ".join(d["title"] for d in global_titles))
+    for room in payload.get("rooms") or []:
+        diagnosis = obj(room.get("diagnosis"))
+        title = room["key"].replace("_", " ").capitalize()
+        lines.append(f"{title}: {diagnosis.get('headline', 'Onbekend')}")
+        others = [r["title"] for r in diagnosis.get("otherReasons", [])
+                  if r["code"] not in shared]
+        if others:
+            lines.append("  Verder: " + "; ".join(others[:2])
+                         + (f" (+{len(others)-2} meer)" if len(others) > 2 else ""))
+    lines.append("Technische codes staan nog in denialReasons (standaard JSON-uitvoer).")
+    return "\n".join(lines)
+
 def evaluate(docs: dict[str, Any], *, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -209,6 +375,8 @@ def evaluate(docs: dict[str, Any], *, now: datetime | None = None) -> dict:
                 reasons.append("SCHEDULED_UP_EXPIRED")
         reasons = list(dict.fromkeys(reasons))
         candidate = len(reasons) == 0
+        diagnosis = diagnose(reasons, vendor_mode, numeric(v.get("targetTemperature_C")) if v else None,
+                             obj(g.get("command")).get("action") if g else None)
         results.append({
             "key": key, "homeyDeviceId": device_id,
             "observedMode": vendor_mode,
@@ -217,6 +385,7 @@ def evaluate(docs: dict[str, Any], *, now: datetime | None = None) -> dict:
             "simulatedTarget_C": target if candidate else None,
             "simulatedExpiryAt": end.isoformat().replace("+00:00", "Z") if candidate else None,
             "denialReasons": reasons,
+            "diagnosis": diagnosis,
             "liveExecutionAllowed": False,
             "physicalWrite": False,
             "physicalOwnershipProven": False,
@@ -240,6 +409,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     for key, default in DEFAULTS.items():
         parser.add_argument(f"--{key}", type=Path, default=default)
+    parser.add_argument("--human", action="store_true",
+                        help="Toon korte Nederlandstalige blokkadeverklaringen i.p.v. JSON")
     args = parser.parse_args()
     docs = {}
     for key in DEFAULTS:
@@ -248,7 +419,11 @@ def main() -> None:
         except (OSError, ValueError) as error:
             docs[key] = {}
             print(f"WARN: {key}: {type(error).__name__}", file=__import__("sys").stderr)
-    print(json.dumps(evaluate(docs), indent=2, ensure_ascii=False))
+    result = evaluate(docs)
+    if args.human:
+        print(human_report(result))
+    else:
+        print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
