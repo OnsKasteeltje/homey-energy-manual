@@ -193,12 +193,6 @@ REASON_INFO = {
                                 "De Heating grant bevat geen geldige kamerlijst.",
                                 "Controleer de uitvoer van de centrale planner."),
 }
-DERIVED_REASONS = {
-    "UPSTREAM_HONEYWELL_OVERRIDE_OR_MODE",
-    "V05_NO_NEW_SET_CANDIDATE", "V05_ROOM_CHECKS_NOT_ALL_TRUE",
-}
-
-
 def describe_reason(code: str, observed_mode: str | None, observed_target: float | None) -> dict:
     known = REASON_INFO.get(code)
     if known is None:
@@ -250,8 +244,6 @@ def explain_planner(grant: dict) -> dict:
             detail = "Een bron van de energieplanner is niet actueel."
         elif reason.startswith("PRODUCTION_GRANT_"):
             detail = "De plannerreden en de ontbrekende verwarmingsvrijgave zijn niet eenduidig."
-        elif reason == priority_reason and priority_owner in PRIORITY_LABELS:
-            detail = "De energieplanner heeft ruimteverwarming niet geselecteerd."
     if detail is None:
         detail = "Voorverwarmen is momenteel niet ingepland; de precieze plannerreden is nog niet vertaald."
     # Only state the declared owner. An owner is not proof of available PV.
@@ -407,7 +399,7 @@ def evaluate(docs: dict[str, Any], *, now: datetime | None = None) -> dict:
                 reasons.append("HONEYWELL_TARGET_MISMATCH")
             if effective.get("systemMode") != obj(data["honeywell"].get("location")).get("systemMode"):
                 reasons.append("HONEYWELL_SYSTEM_MODE_MISMATCH")
-        # Existing preheatScope indicates the 4-room SHADOW migration state, NOT permanent eligibility.
+        # Upstream six-room preheatScope is observed on Pi; check it independently of Homey egress.
         if h and h.get("preheatScope") is not True:
             reasons.append("UPSTREAM_SIX_ROOM_SCOPE_MIGRATION_REQUIRED")
         if g and g.get("preheatScope") is not True:
