@@ -245,10 +245,13 @@ def build_shadow(
         if room.get("valid") is not True:
             raise ShadowError(f"room invalid: {key}")
         current = _dict(room.get("current"), f"{key}.current")
-        baseline = _dict(room.get("baseline"), f"{key}.baseline")
+        effective = _dict(room.get("effective"), f"{key}.effective")
         actual = _number(current.get("temperature_C"), f"{key}.current.temperature_C")
-        baseline_target = _number(baseline.get("currentTarget_C"), f"{key}.baseline.currentTarget_C")
-        if actual < baseline_target - BASELINE_TOLERANCE_C:
+        effective_target = _number(
+            effective.get("currentTarget_C"),
+            f"{key}.effective.currentTarget_C",
+        )
+        if actual < effective_target - BASELINE_TOLERANCE_C:
             baseline_demand_rooms.append(key)
 
     candidate_policy = _dict(candidate_plan.get("policy"), "candidate policy")
@@ -266,11 +269,19 @@ def build_shadow(
     for key, candidate_room in candidate_rooms.items():
         model_room = model_rooms[key]
         current = _dict(model_room.get("current"), f"{key}.current")
+        effective = _dict(model_room.get("effective"), f"{key}.effective")
         baseline = _dict(model_room.get("baseline"), f"{key}.baseline")
         candidate = _dict(candidate_room.get("candidate"), f"{key}.candidate")
 
         actual = _number(current.get("temperature_C"), f"{key}.current.temperature_C")
-        baseline_target = _number(baseline.get("currentTarget_C"), f"{key}.baseline.currentTarget_C")
+        effective_target = _number(
+            effective.get("currentTarget_C"),
+            f"{key}.effective.currentTarget_C",
+        )
+        scheduled_target = _number(
+            baseline.get("currentTarget_C"),
+            f"{key}.baseline.currentTarget_C",
+        )
         future_target = _number(baseline.get("nextTarget_C"), f"{key}.baseline.nextTarget_C")
         steps = candidate.get("steps_C")
         if not isinstance(steps, list):
@@ -302,10 +313,20 @@ def build_shadow(
             "group": candidate_room.get("group"),
             "current": {
                 "temperature_C": actual,
-                "baselineDemand": actual < baseline_target - BASELINE_TOLERANCE_C,
+                "baselineDemand": actual < effective_target - BASELINE_TOLERANCE_C,
+            },
+            "effective": {
+                "currentTargetTemperature_C": effective_target,
+                "source": effective.get("source"),
+                "systemMode": effective.get("systemMode"),
+                "setpointMode": effective.get("setpointMode"),
+                "overrideUntil": effective.get("overrideUntil"),
+                "preheatAdvanceAllowed": effective.get("preheatAdvanceAllowed") is True,
+                "reason": effective.get("reason"),
             },
             "baseline": {
-                "currentTargetTemperature_C": baseline_target,
+                "currentTargetTemperature_C": effective_target,
+                "scheduledCurrentTargetTemperature_C": scheduled_target,
                 "changeAt": baseline.get("nextChangeAt"),
                 "targetTemperature_C": future_target,
                 "direction": baseline.get("direction"),
