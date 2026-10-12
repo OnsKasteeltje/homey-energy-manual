@@ -34,6 +34,8 @@ ROOM_DEVICES = {
     "erker_douwe": "f9db36cd-8c0f-4beb-aa28-0127597652cf",
 }
 ALLOWED_ROOM_KEYS = set(ROOM_DEVICES)
+# A homeowner override ALWAYS blocks an EMS action, regardless of room identity.
+MANUAL_OVERRIDE_MODES = frozenset({"temporary_override", "permanent_override"})
 ACTION_MAP = {
     "HOLD": "HOLD",
     "WOULD_SET_TEMP": "SET_TEMP",
@@ -248,10 +250,11 @@ def build_intent(source: dict[str, Any], honeywell: dict[str, Any], *, generated
             vendor_mode = str(zone.get("setpointMode") or "").lower()
             vendor_target = _number(zone.get("targetTemperature_C"), key + ".honeywell.targetTemperature_C")
             override_until = zone.get("overrideUntil")
-            # Human authority wins over any hypothetical V0.5 SET, KEEP or RESET.
+            # Universal per-room policy: Honeywell human authority wins over
+            # hypothetical V0.5 SET/KEEP/RESET in EVERY room, never just Douwe.
             # A stale/mismatched target is also a HOLD, never an inferred write.
             hold_reason = None
-            if vendor_mode in {"permanent_override", "temporary_override"}:
+            if vendor_mode in MANUAL_OVERRIDE_MODES:
                 hold_reason = "HONEYWELL_OVERRIDE_ACTIVE"
             elif vendor_mode != "follow_schedule":
                 hold_reason = "HONEYWELL_MODE_UNKNOWN"
