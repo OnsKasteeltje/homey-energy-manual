@@ -5,6 +5,7 @@ control/device write path.
 """
 
 import json
+import math
 import os
 import sqlite3
 import zlib
