@@ -316,6 +316,41 @@ def test_solaredge_resume_regression_does_not_create_single_interval_spike(tmp_p
     assert abs(sum(row[0] for row in rows) - 3.836) < 1e-9
 
 
+def test_observed_solaredge_plateaus_are_redistributed(tmp_path):
+    db = tmp_path / "h.sqlite"
+    con = _db(db)
+
+    samples = [
+        ("2026-10-12T12:10:00Z", 100.00, 50.00, 17650.016, 23982.3, 10804.3),
+        ("2026-10-12T12:15:00Z", 100.01, 50.00, 17650.016, 23982.6, 10804.4),
+        ("2026-10-12T12:20:00Z", 100.02, 50.00, 17650.016, 23982.8, 10804.5),
+        ("2026-10-12T12:25:00Z", 100.03, 50.00, 17650.810, 23982.9, 10804.5),
+        ("2026-10-12T12:30:00Z", 100.04, 50.00, 17650.810, 23983.3, 10804.6),
+        ("2026-10-12T12:35:00Z", 100.05, 50.00, 17650.810, 23983.4, 10804.7),
+        ("2026-10-12T12:40:00Z", 100.06, 50.00, 17651.598, 23983.5, 10804.7),
+    ]
+    for row in samples:
+        _snapshot(con, *row)
+    con.close()
+
+    _load().build(db)
+    con = sqlite3.connect(db)
+    rows = con.execute("""
+        SELECT end_ts_utc,pv_solaredge_kwh,quality,pv_quality
+        FROM house_energy_intervals
+        ORDER BY end_ts_utc
+    """).fetchall()
+    con.close()
+
+    assert len(rows) == 6
+    expected = [0.794 / 3.0] * 3 + [0.788 / 3.0] * 3
+    for row, wanted in zip(rows, expected):
+        assert abs(row[1] - wanted) < 1e-9
+        assert row[2:] == ("estimated", "estimated")
+
+    assert abs(sum(row[1] for row in rows) - (0.794 + 0.788)) < 1e-9
+
+
 def test_sleeping_pv_counters_do_not_truncate_night_history(tmp_path):
     db = tmp_path / "h.sqlite"
     con = _db(db)
