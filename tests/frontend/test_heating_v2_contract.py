@@ -92,7 +92,7 @@ def test_preheat_window_is_derived_from_honeywell_up_transition_not_current_elig
     assert "preheatWindows(room,start,now,maxAdvanceMinutes)" in render
     assert "room.progressionSource?.opportunityHistory" in render
     assert "for(const window of preheatWindows(room,start,now,maxAdvanceMinutes))" in render
-    assert 'if(hasPreheatWindow(room.shadowSource?.baseline,candidate))' in render
+    assert 'if(hasPreheatWindow(room.shadowSource?.baseline,candidate,room.effective))' in render
     assert 'if(candidate?.opportunityOpensAt && candidate?.opportunityClosesAt)' not in render
 
 
