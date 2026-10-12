@@ -16,6 +16,8 @@ NOW = datetime(2026, 10, 12, 12, 30, tzinfo=timezone.utc)
 AT = (NOW - timedelta(seconds=30)).isoformat().replace("+00:00", "Z")
 NEXT = (NOW + timedelta(hours=1)).isoformat().replace("+00:00", "Z")
 ROOMS = tuple(m.ROOM_DEVICES)
+# Sampled current vendor modes; this is test data, NOT room-specific policy.
+OBSERVED_OVERRIDES = frozenset({"douwe_slaapkamer", "erker_douwe"})
 
 
 def source():
@@ -69,7 +71,7 @@ def honeywell():
         "zones": [{
             "key": key,
             "homeyDeviceId": device,
-            "setpointMode": "permanent_override" if "douwe" in key else "follow_schedule",
+            "setpointMode": "permanent_override" if key in OBSERVED_OVERRIDES else "follow_schedule",
             "targetTemperature_C": 16.0,
             "overrideUntil": None,
         } for key, device in m.ROOM_DEVICES.items()],
@@ -99,6 +101,7 @@ def is_denied(intent, fragment):
 
 def main():
     assert len(m.ROOM_DEVICES) == 6
+    assert m.MANUAL_OVERRIDE_MODES == {"temporary_override", "permanent_override"}
     data, vendor = source(), honeywell()
     intent = m.build_intent(data, vendor, generated_at=NOW)
     assert intent["valid"] is True, intent
