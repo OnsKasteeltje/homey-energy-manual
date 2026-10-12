@@ -119,13 +119,20 @@ def _prepare_counter_rows(rows):
             # Walk back over the unchanged cumulative plateau immediately
             # preceding this positive step.
             plateau_start = index - 1
-            while (
-                plateau_start > 0
-                and abs(
+            while plateau_start > 0:
+                same_value = abs(
                     raw_values[plateau_start]
                     - raw_values[plateau_start - 1]
                 ) <= COUNTER_DECREASE_EPSILON_KWH
-            ):
+                sample_gap = (
+                    _parse_utc(prepared[plateau_start]["ts"])
+                    - _parse_utc(prepared[plateau_start - 1]["ts"])
+                ).total_seconds()
+                # Sub-second duplicate snapshots are coalesced later by the
+                # interval builder and must not turn a normal next-sample
+                # counter increment into an estimated plateau.
+                if not same_value or sample_gap < 1.0:
+                    break
                 plateau_start -= 1
 
             # A direct next-sample increment already has precise interval timing.
