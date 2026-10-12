@@ -26,13 +26,15 @@ The evaluator checks schema, source ages, planner grant and validity, V0.5 SHADO
 
 Output schema: `EMS_HEATING_HONEYWELL_ACTUATOR_DRY_RUN_V0.1`. Per room `status` is either `BLOCKED` or `CANDIDATE_ONLY` with `denialReasons`; `simulatedAction` is either `HOLD` or `WOULD_SET_TEMP`. A candidate is a *diagnostic what-if*, not a live-permit: `physicalWrites=0`, `physicalWriteAllowed=false`, `liveExecutionAllowed=false`, `physicalOwnershipProven=false`. `edgeProofMissing` lists the unresolved sustained P1 check, Homey edge read, ACK, independent Honeywell readback, physical ownership and grant-revision binding.
 
-### Leesbare blokkaderedenen (presentation-only)
+### Begrijpelijke voorwaarden op twee niveaus (uitsluitend presentatie)
 
-`--human` toont een compacte Nederlandstalige uitleg per kamer, met gedeelde P1-/plannerblokkades één keer bovenaan. Zonder deze optie blijft het bestaande JSON-contract beschikbaar. Elke kamer heeft daarnaast een JSON-veld `diagnosis` met `headline`, `category`, `advice`, `primaryCode`, `otherReasons` en `technicalOnly`.
+De terminalweergave `--human` toont **ALGEMENE VOORWAARDEN** eenmaal (centrale planner, P1, brondatakwaliteit), vervolgens **PER KAMER** uitsluitend de *aanvullende* kamervoorwaarden (Honeywell override, volgende schemastap, temperatuur/veiligheid, camerakoppeling). Een kamer heeft **geen vaste of unieke blokkadereden**: meerdere voorwaarden kunnen tegelijkertijd gelden, of geen aanvullende kamerbeperkingen naast algemene blokkades.
 
-**De oorspronkelijke `denialReasons` blijven byte-for-byte de autoritatieve technische codes.** Redenen worden uitsluitend voor presentatie gegroepeerd: een ontbrekende planner-grant verklaart vaak `ROOM_NOT_IN_PRODUCTION_GRANT`; een V0.5 HOLD veroorzaakt doorgaans `V05_NO_NEW_SET_CANDIDATE` en een lege target. Die vervolgdetails staan nog in JSON, maar verdringen de hoofdoorzaak niet. Een Honeywell-permanente override heeft, zolang bronkwaliteit geldig is, voor die kamer presentatievoorrang boven algemene weers-/energiecondities. Bronfouten of ongeldige gegevens krijgen voorrang boven normale wachtcondities.
+De algemene melding `NO_PRODUCTION_HEATING_GRANT` wordt **'Voorverwarmen momenteel niet ingepland'**. De uitleg gebruikt rechtstreeks `heating.reason` uit `heating-production-grant-v0.1.json`, waar zinvol aangevuld met het daadwerkelijk gerapporteerde `priorityOwner`. Bekende actuele contractredenen krijgen een specifieke verklaring, waaronder `NO_HEATING_PREHEAT_CANDIDATE`, `DYNAMIC_PLAN_STALE_OR_NOT_CURRENT`, `NO_CURRENT_DYNAMIC_PLAN_SLOT`, `FLEX_PRIORITY_PRE_DATES_HEATING` en `FLEX_PRIORITY_DID_NOT_GRANT_HEATING`. Een **onbekende code wordt niet geraden**: de weergave meldt dat een precieze plannerreden nog niet is vertaald, en bewaart de originele `plannerReasonCode` en `priorityReasonCode` in JSON.
 
-Voorbeelden uit de eerste Pi-observatie: *Geen geplande temperatuurverhoging*, *Planner geeft verwarming geen ruimte*, *Geen bruikbaar P1-overschot*, *Permanente Honeywell-override op 16 °C*. Dit zijn **waargenomen redenen bij een specifiek moment**, geen blijvende toestand.
+Het JSON-resultaat behoudt **ongewijzigd** `globalDenialReasons` en per kamer `denialReasons` (de leidende technische blokkadecodes). Nieuw zijn `generalConditions` met categorie/titel/uitleg en per kamer `roomConditions` plus `technicalOnly`. Afgeleide foutmeldingen zoals `V05_NO_NEW_SET_CANDIDATE` en `V05_ROOM_CHECKS_NOT_ALL_TRUE` blijven zichtbaar als technische details, maar worden niet als onafhankelijke hoofdoorzaak herhaald. Er zijn geen wijzigingen aan de Heating-beslisregels, permissies, device writes of Homey-bridge.
+
+Deze uitleg is een **momentopname**, geen bewijs van stabiel PV-overschot of toestemming voor LIVE-aansturing.
 
 ## Safe manual PI smoke test from an isolated worktree
 
@@ -58,8 +60,10 @@ d = json.load(sys.stdin)
 assert d["roomCount"] == 6
 assert d["physicalWrites"] == 0
 assert d["liveExecutionAllowed"] is False
+assert isinstance(d["generalConditions"], list)
 for room in d["rooms"]:
-    assert room["diagnosis"]["headline"]
+    assert isinstance(room["roomConditions"], list)
+    assert isinstance(room["denialReasons"], list)
 print("PASS: six-room dry-run only, no physical writes")
 '
 
