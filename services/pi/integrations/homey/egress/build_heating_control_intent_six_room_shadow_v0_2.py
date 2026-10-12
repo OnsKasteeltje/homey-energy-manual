@@ -183,7 +183,8 @@ def build_intent(source: dict[str, Any], honeywell: dict[str, Any], *, generated
             raise IntentError("source upstream safety invalid")
 
         vendor = _vendor_map(honeywell, now)
-        system_mode = str((honeywell.get("location") or {}).get("systemMode") or "").lower()
+        location = honeywell.get("location")
+        system_mode = str(location.get("systemMode") or "").lower() if isinstance(location, dict) else ""
         commands = []
         seen = set()
         for room in source.get("rooms") or []:
