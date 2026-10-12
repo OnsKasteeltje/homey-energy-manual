@@ -182,6 +182,29 @@ class TestDryRun(unittest.TestCase):
                          if x["code"] == "NO_PRODUCTION_HEATING_GRANT")
         self.assertNotIn("autoladen", condition["explanation"])
 
+    def test_planner_names_observed_ev_priority_only_when_reported(self):
+        d = documents()
+        d["grant"]["heating"].update(
+            grant="HOLD", reason="FLEX_PRIORITY_DID_NOT_GRANT_HEATING",
+            priorityOwner="EV", priorityReason="OTHER_PRIORITY_REASON",
+        )
+        result = module.evaluate(d, now=NOW)
+        condition = next(x for x in result["generalConditions"]
+                         if x["code"] == "NO_PRODUCTION_HEATING_GRANT")
+        self.assertIn("energieverdeling", condition["explanation"])
+        self.assertIn("autoladen", condition["explanation"])
+        self.assertEqual(condition["priorityOwner"], "EV")
+        self.assertEqual(condition["priorityReasonCode"], "OTHER_PRIORITY_REASON")
+
+    def test_missing_planner_reason_stays_neutral(self):
+        d = documents()
+        d["grant"]["heating"].update(grant="HOLD")
+        general = module.evaluate(d, now=NOW)["generalConditions"]
+        condition = next(x for x in general if x["code"] == "NO_PRODUCTION_HEATING_GRANT")
+        self.assertIn("nog niet vertaald", condition["explanation"])
+        self.assertIsNone(condition["plannerReasonCode"])
+        self.assertNotIn("autoladen", condition["explanation"])
+
     def test_unknown_code_is_kept_in_technical_explanation(self):
         d = module.describe_reason("NEW_SAFETY_REASON", None, None)
         self.assertEqual(d["code"], "NEW_SAFETY_REASON")
