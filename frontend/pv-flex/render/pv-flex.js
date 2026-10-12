@@ -24,20 +24,57 @@ function slotEvidence(slot,nowMs=Date.now()){
  const comparable=!!slot.plan&&!!slot.forecast&&available(slot.forecast.pvForecastW)&&p1&&pv;
  return {phase,p1,pv,comparable};
 }
+function dailySelfUseEvidence(d){
+ // Authoritative daily ratio is projected by the read-only Pi history API,
+ // not recomputed from comparable planner quarters or clamped 15m samples.
+ const q=d.quality||{}, s=d.summary||{};
+ const complete=q.pvSelfUseStatus==="COMPLETE";
+ const provisional=q.pvSelfUseStatus==="PROVISIONAL";
+ const status=complete?"COMPLETE":provisional?"PROVISIONAL":"UNAVAILABLE";
+ const rate=complete?s.pvSelfConsumptionRate:provisional?s.provisionalPvSelfConsumptionRate:null;
+ const used=complete?s.pvSelfConsumedKWh:provisional?s.provisionalPvSelfConsumedKWh:null;
+ const valid=status!=="UNAVAILABLE"&&available(rate)&&available(used)&&
+  available(s.pvKWh)&&s.pvKWh>0&&available(s.exportKWh)&&s.exportKWh>=0&&
+  s.exportKWh<=s.pvKWh+0.000001&&rate>=0&&rate<=1&&
+  available(q.pvSelfUsePairedCoverage)&&q.pvSelfUsePairedCoverage>=MIN_COVERAGE;
+ return valid?{status,rate,used,pv:s.pvKWh,export:s.exportKWh,
+  coverage:q.pvSelfUsePairedCoverage}:null;
+}
+const dailyPct=v=>available(v)?(v*100).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})+"%":"—";
 function summary(d){
  $("day-title").textContent=new Date(d.period.start).toLocaleDateString("nl-NL",{timeZone:"Europe/Amsterdam",weekday:"long",day:"numeric",month:"long",year:"numeric"});
  const matched=d.series.filter(x=>slotEvidence(x).comparable);
  const forecast=matched.length?matched.reduce((sum,x)=>sum+x.forecast.pvForecastW/4000,0):null;
  const actual=matched.length?matched.reduce((sum,x)=>sum+x.actual.pvKWh,0):null;
  $("kpi-forecast").textContent=kwh(forecast);
- $("kpi-pv").textContent=kwh(actual);
  $("kpi-slots").textContent=matched.length+" vergelijkbare kwartieren · "+(d.summary.planSlots||0)+" besluiten";
- $("kpi-pv-note").textContent=matched.length+" kwartieren · zelfde periode als PV-forecast";
- const validatedSelf=matched.filter(x=>available(x.actual.pvSelfConsumedKWh));
- $("kpi-self").textContent=validatedSelf.length? kwh(validatedSelf.reduce((sum,x)=>sum+Math.max(0,x.actual.pvSelfConsumedKWh),0)): "—";
- $("kpi-self-note").textContent=validatedSelf.length+" kwartieren met gevalideerd direct PV-gebruik";
- $("kpi-export").textContent=matched.length?kwh(matched.reduce((sum,x)=>sum+x.actual.exportKWh,0)):"—";
- $("kpi-export-note").textContent=matched.length+" vergelijkbare kwartieren";
+ const daily=dailySelfUseEvidence(d);
+ $("kpi-pv").textContent=daily?kwh(daily.pv):kwh(actual);
+ $("kpi-pv-note").textContent=daily?"Dagproductie · cumulatieve PV-energiemeters":
+  matched.length+" vergelijkbare kwartieren · geen gevalideerd dagtotaal";
+ $("kpi-self").textContent=kwh(daily?.used);
+ $("kpi-self-note").textContent=daily?
+  "P1-netexport afgetrokken van de dagelijkse PV-productie":"Geen betrouwbaar dagtotaal";
+ $("kpi-export").textContent=daily?kwh(daily.export):
+  matched.length?kwh(matched.reduce((sum,x)=>sum+x.actual.exportKWh,0)):"—";
+ $("kpi-export-note").textContent=daily?"Dagteruglevering · cumulatieve P1-energiemeter":
+  matched.length+" vergelijkbare kwartieren · geen gevalideerd dagtotaal";
+ $("kpi-self-rate").textContent=dailyPct(daily?.rate);
+ $("kpi-rate-note").textContent=daily?.status==="PROVISIONAL"?
+  "Voorlopig · dag nog niet afgelopen":daily?"Definitief · ≥95% gezamenlijke P1/PV-dekking":
+  "Niet beschikbaar · onvoldoende of ongeldige energiehistorie";
+ $("daily-pv-conclusion").textContent=daily?
+  (daily.status==="PROVISIONAL"?"Voorlopige dagstand: ":"Dagconclusie: ")+
+  "van "+kwh(daily.pv)+" opgewekte PV is "+kwh(daily.used)+
+  " ("+dailyPct(daily.rate)+") thuis gebruikt en "+kwh(daily.export)+
+  " teruggeleverd. Dit is gemeten energiezelfgebruik, geen bewijs dat alle EMS-beslissingen optimaal waren.":
+  "Geen betrouwbaar PV-zelfgebruikpercentage voor deze dag: "+(
+   d.quality?.pvSelfUseStatus==="INVALID_ENERGY_BALANCE"?
+   "PV- en P1-energietotalen zijn niet consistent.":
+   d.quality?.pvSelfUseStatus==="NO_PV_PRODUCTION"?
+   "nog geen aantoonbare PV-productie.":
+   "gezamenlijke PV/P1-meetdekking onvoldoende (minimaal 95% vereist)."
+  );
  $("quality").textContent="Dekking kalenderdag "+pct(d.quality.actualCoverage);
  $("next").disabled=day>=todayAmsterdam();
  $("archive-status").textContent=d.historicalPlannerAvailable?
