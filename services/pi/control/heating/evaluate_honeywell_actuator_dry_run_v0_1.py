@@ -193,13 +193,53 @@ REASON_INFO = {
                                 "De Heating grant bevat geen geldige kamerlijst.",
                                 "Controleer de uitvoer van de centrale planner."),
 }
+# Source-specific labels for actual check_source() contract errors.
+# Never turn an unknown source error into a generic, apparently known diagnosis.
+SOURCE_LABELS = {
+    "HEATING": "Verwarmingsvoorbereiding (V0.3)",
+    "GATE": "Heating-controle (V0.5)",
+    "GRANT": "Centrale verwarmingsplanner",
+    "HONEYWELL": "Honeywell",
+    "P1": "P1-meter",
+}
+SOURCE_ERROR_SUFFIXES = {
+    "SOURCE_STALE_OR_UNTIMED": ("Niet actueel of ontbrekend meettijdstip",
+                                "De gegevens zijn te oud of hebben geen geldig tijdstip."),
+    "FROM_FUTURE": ("Tijdstip ligt in de toekomst",
+                    "Het brongegeven heeft een tijdstip na het evaluatiemoment."),
+    "SCHEMA_INVALID": ("Ongeldig gegevensformaat",
+                       "De gegevens voldoen niet aan het verwachte EMS-contract."),
+    "MODE_INVALID": ("Ongeldige bronmodus",
+                     "De bron heeft niet de vereiste veilige modus."),
+    "CONTROL_MODE_INVALID": ("Ongeldige Heating-modus",
+                             "De bron is niet de vereiste SHADOW-controle."),
+    "WRITE_GUARD_INVALID": ("Write-beveiliging niet bevestigd",
+                            "De bron voldoet niet aan de verplichte no-write-afspraak."),
+    "BASELINE_AUTHORITY_INVALID": ("Honeywell-autoriteit niet bevestigd",
+                                  "De bron erkent Honeywell niet als basis voor verwarming."),
+    "PLANNER_AUTHORITY_INVALID": ("Planner-autoriteit niet bevestigd",
+                                  "De bron verwijst niet naar de vereiste centrale energieplanner."),
+}
+
+
+def source_error_description(code: str) -> tuple | None:
+    for prefix, source_name in SOURCE_LABELS.items():
+        for suffix, (title, explanation) in SOURCE_ERROR_SUFFIXES.items():
+            if code == prefix + "_" + suffix:
+                return (4, "Gegevens", f"{source_name}: {title}",
+                        explanation, f"Controleer de gegevensbron {source_name} (technische code: {code}).")
+    return None
+
+
 def describe_reason(code: str, observed_mode: str | None, observed_target: float | None) -> dict:
     known = REASON_INFO.get(code)
     if known is None:
+        known = source_error_description(code)
+    if known is None:
         if any(flag in code for flag in ("INVALID", "STALE", "UNTIMED", "MISMATCH", "FROM_FUTURE")):
-            known = (4, "Gegevens", "Onvoldoende betrouwbare brongegevens",
-                     "Een noodzakelijke EMS-bron is ontbrekend, onjuist of verouderd.",
-                     "Controleer de technische code en herstel eerst de betreffende bron.")
+            known = (4, "Gegevens", f"Onvertaalde broncontrole ({code})",
+                     "De broncontrole is niet geslaagd, maar een betrouwbare vertaling ontbreekt.",
+                     "Controleer de oorspronkelijke technische code.")
         else:
             known = (60, "Overig", "Aanvullende veiligheidscontrole blokkeert",
                      "Een EMS-voorwaarde is niet geslaagd.",
