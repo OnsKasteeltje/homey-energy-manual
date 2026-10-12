@@ -134,15 +134,30 @@ def test_future_preheat_preview_uses_honeywell_schedule_and_backend_window_polic
     assert "room.effective?.preheatAdvanceAllowed === true" in render
 
 
-def test_effective_honeywell_baseline_overlays_active_overrides():
+def test_effective_honeywell_baseline_uses_observed_history_and_future_semantics():
     render = RENDER.read_text()
 
-    assert "function effectiveBaselinePoints(room,start,now)" in render
+    assert "function observedTargetPoints(targetSeries,start,now)" in render
+    assert "function effectiveBaselinePoints(room,targetSeries,start,now)" in render
     assert 'effective.source === "TEMPORARY_OVERRIDE"' in render
     assert "effective.overrideUntil" in render
-    assert "points:effectiveBaselinePoints(room,start,now)" in render
+    assert "schedule data is never used to reconstruct past" in render
+    assert "historySource?.targetSeries" in render
+    assert "points:effectiveBaselinePoints(room,historySource?.targetSeries,start,now)" in render
     assert "Honeywell effectieve baseline" in render
     assert "Honeywell modus" in render
+
+
+def test_heating_past_target_has_no_weekly_schedule_fallback():
+    render = RENDER.read_text()
+
+    effective_start = render.index("function effectiveBaselinePoints")
+    effective_end = render.index("async function loadOptional", effective_start)
+    effective_body = render[effective_start:effective_end]
+
+    assert "observedTargetPoints(targetSeries,start,now)" in effective_body
+    assert "scheduled.filter(point => point.m < nowM)" not in effective_body
+    assert "return scheduled" not in effective_body
 
 
 def test_stale_persisted_future_windows_are_hidden_while_override_active():

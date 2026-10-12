@@ -325,6 +325,34 @@ class HeatingTemperatureHistoryResourceTest(unittest.TestCase):
                     energy_wh REAL,
                     quality TEXT
                 );
+                CREATE TABLE semantic_event_state (
+                    state_key TEXT PRIMARY KEY,
+                    domain TEXT NOT NULL,
+                    subject TEXT NOT NULL,
+                    source_name TEXT NOT NULL,
+                    provenance_class TEXT NOT NULL,
+                    value_json TEXT NOT NULL,
+                    source_at_utc TEXT,
+                    first_observed_at_utc TEXT NOT NULL,
+                    last_observed_at_utc TEXT NOT NULL
+                );
+                CREATE TABLE semantic_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_hash TEXT NOT NULL UNIQUE,
+                    ts_utc TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    domain TEXT NOT NULL,
+                    subject TEXT NOT NULL,
+                    state_key TEXT NOT NULL,
+                    provenance_class TEXT NOT NULL,
+                    source_name TEXT NOT NULL,
+                    source_at_utc TEXT,
+                    observed_at_utc TEXT NOT NULL,
+                    before_json TEXT,
+                    after_json TEXT NOT NULL,
+                    details_json TEXT NOT NULL,
+                    created_at_utc TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
             """)
             db.executemany(
                 "INSERT INTO devices(id,device_key) VALUES (?,?)",
@@ -356,6 +384,78 @@ class HeatingTemperatureHistoryResourceTest(unittest.TestCase):
                     ("2026-09-27T06:30:00Z", 6, 1, 18.1, 18.0, 18.2, 8, None, "partial"),
                 ],
             )
+            kitchen_before = json.dumps({
+                "targetTemperature_C": 18.0,
+                "setpointMode": "follow_schedule",
+                "overrideUntil": None,
+                "systemMode": "auto",
+            }, sort_keys=True, separators=(",", ":"))
+            kitchen_after = json.dumps({
+                "targetTemperature_C": 19.0,
+                "setpointMode": "temporary_override",
+                "overrideUntil": "2026-09-27T10:00:00+02:00",
+                "systemMode": "auto",
+            }, sort_keys=True, separators=(",", ":"))
+            db.execute(
+                """
+                INSERT INTO semantic_event_state(
+                    state_key,domain,subject,source_name,provenance_class,
+                    value_json,source_at_utc,first_observed_at_utc,last_observed_at_utc
+                )
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    "heating.honeywell_target.keuken", "HEATING", "keuken",
+                    "honeywell-state.json", "OBSERVED_STATE", kitchen_after,
+                    "2026-09-27T06:30:00Z", "2026-09-27T00:00:00Z",
+                    "2026-09-27T06:31:00Z",
+                ),
+            )
+            db.execute(
+                """
+                INSERT INTO semantic_events(
+                    event_hash,ts_utc,event_type,domain,subject,state_key,
+                    provenance_class,source_name,source_at_utc,observed_at_utc,
+                    before_json,after_json,details_json
+                )
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    "kitchen-change", "2026-09-27T06:30:00Z",
+                    "HEATING_HONEYWELL_TARGET_CHANGED", "HEATING", "keuken",
+                    "heating.honeywell_target.keuken", "OBSERVED_STATE",
+                    "honeywell-state.json", "2026-09-27T06:30:00Z",
+                    "2026-09-27T06:31:00Z", kitchen_before, kitchen_after,
+                    json.dumps({
+                        "schema": "EMS_PI_SEMANTIC_EVENT_ARCHIVE_V0.1",
+                        "historicalBackfill": False,
+                        "firstObservedAt": "2026-09-27T00:00:00Z",
+                        "baselineWasObserved": True,
+                    }),
+                ),
+            )
+
+            douwe_value = json.dumps({
+                "targetTemperature_C": 16.0,
+                "setpointMode": "permanent_override",
+                "overrideUntil": None,
+                "systemMode": "auto",
+            }, sort_keys=True, separators=(",", ":"))
+            db.execute(
+                """
+                INSERT INTO semantic_event_state(
+                    state_key,domain,subject,source_name,provenance_class,
+                    value_json,source_at_utc,first_observed_at_utc,last_observed_at_utc
+                )
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    "heating.honeywell_target.douwe_slaapkamer", "HEATING",
+                    "douwe_slaapkamer", "honeywell-state.json", "OBSERVED_STATE",
+                    douwe_value, "2026-09-27T06:10:00Z",
+                    "2026-09-27T06:10:00Z", "2026-09-27T06:55:00Z",
+                ),
+            )
         return path
 
     def test_temperature_history_projects_only_recent_measured_slots(self):
@@ -366,6 +466,8 @@ class HeatingTemperatureHistoryResourceTest(unittest.TestCase):
         self.assertEqual(result["schema"], "EMS_WEB_HEATING_TEMPERATURE_HISTORY_V1")
         self.assertTrue(result["presentationOnly"])
         self.assertEqual(result["period"]["historyMinutes"], 360)
+        self.assertEqual(result["period"]["targetHistoryDays"], 7)
+        self.assertEqual(result["targetMetric"], "observed_honeywell_target_c")
         self.assertEqual(
             [room["key"] for room in result["rooms"]],
             ["woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"],
@@ -382,6 +484,24 @@ class HeatingTemperatureHistoryResourceTest(unittest.TestCase):
         erker = next(room for room in result["rooms"] if room["key"] == "erker_douwe")
         self.assertEqual([item["avg_C"] for item in douwe["series"]], [17.2])
         self.assertEqual([item["avg_C"] for item in erker["series"]], [18.1])
+
+        keuken = next(room for room in result["rooms"] if room["key"] == "keuken")
+        self.assertEqual(
+            [(item["at"], item["target_C"], item["setpointMode"]) for item in keuken["targetSeries"]],
+            [
+                ("2026-09-27T00:00:00.000Z", 18.0, "follow_schedule"),
+                ("2026-09-27T06:30:00.000Z", 19.0, "temporary_override"),
+            ],
+        )
+        self.assertEqual(
+            keuken["targetSeries"][1]["overrideUntil"],
+            "2026-09-27T10:00:00+02:00",
+        )
+        self.assertEqual(
+            [(item["at"], item["target_C"], item["setpointMode"]) for item in douwe["targetSeries"]],
+            [("2026-09-27T06:10:00.000Z", 16.0, "permanent_override")],
+        )
+        self.assertEqual(erker["targetSeries"], [])
 
 
 

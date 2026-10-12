@@ -29,6 +29,9 @@ EV_DEADLINE_COMMAND_FILE = DATA / "tesla-deadline-command.json"
 EV_DEADLINE_STATE_FILE = DATA / "ev-deadline-shadow-state.json"
 FLEX_PRIORITY_FILE = DATA / "flex-priority-shadow-v0.1.json"
 HEATING_PROGRESSION_FILE = DATA / "heating-preheat-progression-shadow-v0.4.json"
+HONEYWELL_STATE_FILE = Path(
+    "/home/jeroen/ems/runtime/tools/honeywell/output/honeywell-state.json"
+)
 
 SCHEMA = "EMS_PI_SEMANTIC_EVENT_ARCHIVE_V0.1"
 RETENTION_DAYS = 730
@@ -252,6 +255,52 @@ def build_observations(now: datetime | None = None) -> list[dict[str, Any]]:
                 provenance_class="SHADOW_DECISION",
             ))
 
+    honeywell = _load(HONEYWELL_STATE_FILE)
+    if honeywell is not None:
+        at = _source_at(
+            honeywell,
+            (("generatedAt",),),
+            HONEYWELL_STATE_FILE,
+        )
+        location = (
+            honeywell.get("location")
+            if isinstance(honeywell.get("location"), dict)
+            else {}
+        )
+        system_mode = location.get("systemMode")
+        for zone in honeywell.get("zones") or []:
+            if not isinstance(zone, dict):
+                continue
+            key = zone.get("key")
+            target = zone.get("targetTemperature_C")
+            setpoint_mode = zone.get("setpointMode")
+            if not isinstance(key, str) or not key:
+                continue
+            if isinstance(target, bool) or not isinstance(target, (int, float)):
+                continue
+            if not isinstance(setpoint_mode, str) or not setpoint_mode:
+                continue
+
+            override_until = zone.get("overrideUntil")
+            if override_until is not None and _parse_ts(override_until) is None:
+                override_until = None
+
+            value = {
+                "targetTemperature_C": float(target),
+                "setpointMode": setpoint_mode,
+                "overrideUntil": override_until,
+                "systemMode": system_mode if isinstance(system_mode, str) else None,
+            }
+            observations.append(_observation(
+                state_key=f"heating.honeywell_target.{key}",
+                domain="HEATING",
+                subject=key,
+                value=value,
+                source_name="honeywell-state.json",
+                source_at=at,
+                provenance_class="OBSERVED_STATE",
+            ))
+
     progression = _load(HEATING_PROGRESSION_FILE)
     if (
         progression is not None
@@ -404,6 +453,8 @@ def _event_type(state_key: str, before: Any, after: Any) -> str:
 
     if state_key == "flex.priority":
         return "FLEX_PRIORITY_CHANGED"
+    if state_key.startswith("heating.honeywell_target."):
+        return "HEATING_HONEYWELL_TARGET_CHANGED"
     if state_key.startswith("heating.room."):
         return "HEATING_SHADOW_STATE_CHANGED"
     return "SEMANTIC_STATE_CHANGED"

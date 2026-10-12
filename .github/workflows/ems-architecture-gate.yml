@@ -106,7 +106,10 @@ jobs:
             tests/integrations/test_build_15m_history.py \
             tests/integrations/test_history_archive_counters.py \
             tests/integrations/test_house_energy_history.py \
-            tests/integrations/test_web_data_api.py
+            tests/integrations/test_honeywell_target_semantic_history.py \
+            tests/integrations/test_web_data_api.py \
+            tests/frontend/test_heating_v2_contract.py
+          node --check frontend/heating/render/heating.js
 
       - name: Run PV surplus replay validation tests
         run: python tests/replay/test_pv_surplus_absorption_backtest.py
