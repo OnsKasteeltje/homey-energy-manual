@@ -397,6 +397,10 @@ async function refresh(){
   summary(d);chart(d);renderPreheat(h,p,g,isCurrent);
  }catch(e){
   $("quality").textContent="Analyse niet beschikbaar";
+  $("kpi-self-rate").textContent="—";
+  $("kpi-self").textContent="—";
+  $("kpi-rate-note").textContent="Geen gevalideerd dagresultaat";
+  $("daily-pv-conclusion").textContent="Dagelijks PV-zelfgebruik niet beschikbaar: "+e.message;
   $("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;
   renderPreheat(null,null,null,day===todayAmsterdam());
  }
