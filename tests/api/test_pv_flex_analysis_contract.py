@@ -37,6 +37,12 @@ assert 'if self_use_complete else None' in s, "incomplete daily self-use must be
 assert 'p1_valid = p1_quality in {"observed", "held"}' in s, "P1 should use independent quality"
 assert 'pv_valid = pv_quality in {"observed", "estimated", "held"}' in s, "PV should use independent quality"
 assert '"p1Coverage"' in s and '"pvCoverage"' in s, "source coverage must be distinct"
+assert 'def daily_pv_self_use_accounting(' in s
+assert 'paired_covered_seconds' in s
+assert 'totals["pvSelfConsumptionRate"]' in s
+assert 'totals["provisionalPvSelfConsumptionRate"]' in s
+assert '"pvSelfUseStatus": accounting["status"]' in s
+assert '"pvSelfUsePairedCoverage": accounting["pairedCoverage"]' in s
 assert 'pv_total_kwh,house_kwh,quality,p1_quality,pv_quality' in s, "query must fetch separate quality"
 assert 'quality not in {"complete", "partial"}' in s, "15-minute device aggregates must accept canonical complete/partial quality"
 assert 'file:{HISTORY_DB}?mode=ro&immutable=1' not in s, "history readers must honor SQLite WAL"
