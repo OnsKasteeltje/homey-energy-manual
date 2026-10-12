@@ -92,7 +92,7 @@ if(Array.isArray(intent?.commands)){
       unique,
       action:actionOK,
       target:targetOK,
-      schedule:Number.isFinite(scheduleAt),
+      schedule:action==='HOLD'||Number.isFinite(scheduleAt),
       sourceWriteSafe,
       ownershipSafe,
       ownershipSemantics,
