@@ -67,6 +67,7 @@ if(Array.isArray(intent?.commands)){
     const scheduleAt=Date.parse(String(src?.scheduleChangeAt||''));
     const deviceId=ROOM_DEVICES[key]||null;
     const observedMode=String(src?.vendorSetpointMode||'').toLowerCase();
+    const observedSystemMode=String(src?.vendorSystemMode||'').toLowerCase();
     const vendorHold=observedMode==='permanent_override'||observedMode==='temporary_override';
     const actionOK=ALLOWED_ACTIONS.has(action);
     const targetOK=
@@ -97,6 +98,7 @@ if(Array.isArray(intent?.commands)){
       ownershipSafe,
       ownershipSemantics,
       mode: ['follow_schedule','temporary_override','permanent_override'].includes(observedMode),
+      systemMode:action==='HOLD'||observedSystemMode==='auto',
       humanOverrideHold: !vendorHold||(action==='HOLD'&&src?.holdReason==='HONEYWELL_OVERRIDE_ACTIVE'),
       sourceHoldCoherent: !src?.holdReason||(action==='HOLD'&&target===null),
       liveBlocked: intent?.liveExecutionAllowed===false
@@ -108,6 +110,7 @@ if(Array.isArray(intent?.commands)){
       roomKey:key,
       deviceId,
       observedMode,
+      observedSystemMode,
       holdReason:src?.holdReason??null,
       action:errors.length?'HOLD':action,
       requestedTarget_C:errors.length?null:target,
