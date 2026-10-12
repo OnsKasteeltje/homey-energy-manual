@@ -542,6 +542,15 @@ python3 "$FRONTEND_NAV_TEST" || fail "Frontend V2 shared navigation contract fai
 pass "Frontend V2 uses one shared main-navigation source"
 python3 "$FRONTEND_ASSET_TEST" || fail "Frontend V2 local asset contract failed"
 pass "Frontend V2 local CSS/JS references resolve"
+# Daily PV self-use must be proven at the backend energy-accounting boundary,
+# and in the read-only Evaluatie view (including no-data fail-closed paths).
+python3 tests/api/test_pv_flex_analysis_contract.py || fail "PV/Flex API boundary contract failed"
+python3 tests/api/test_pv_flex_daily_self_use.py || fail "daily PV self-use energy contract failed"
+python3 tests/frontend/test_pv_flex_v2_contract.py || fail "Evaluatie frontend contract failed"
+python3 tests/frontend/test_evaluatie_v1_history_contract.py || fail "Evaluatie V1 provenance contract failed"
+node --check frontend/pv-flex/render/pv-flex.js || fail "Evaluatie renderer JS syntax failed"
+node --test tests/frontend/test_evaluatie_interaction.mjs || fail "Evaluatie daily PV and interaction tests failed"
+pass "Evaluatie daily PV self-use is source-gated and control-neutral"
 python3 "$AI_NAV_RESUME_TEST" || fail "AI navigation resume frontend contract failed"
 pass "AI frontend preserves conversation and pending request across V2 navigation"
 

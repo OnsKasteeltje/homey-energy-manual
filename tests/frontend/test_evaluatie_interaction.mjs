@@ -12,6 +12,43 @@ vm.createContext(scope);
 vm.runInContext(pure+picker,scope);
 const evidence=(s,now)=>vm.runInContext("slotEvidence",scope)(s,now);
 const hover=vm.runInContext("closestEvaluationSeries",scope);
+const daily=vm.runInContext("dailySelfUseEvidence",scope);
+function daySample(extra={}){
+ return {
+  summary:{
+   pvKWh:19.488001,exportKWh:4.677998,
+   pvSelfConsumedKWh:14.810003,pvSelfConsumptionRate:.76,
+   provisionalPvSelfConsumedKWh:null,provisionalPvSelfConsumptionRate:null,
+   ...extra.summary
+  },
+  quality:{
+   pvSelfUseStatus:"COMPLETE",pvSelfUsePairedCoverage:1,...extra.quality
+  },
+ };
+}
+test("October 11 daily PV self-use is 76 percent independent of planner slots",()=>{
+ const r=daily({...daySample(),series:[],historicalPlannerAvailable:false});
+ assert.equal(r.status,"COMPLETE");
+ assert.equal(r.rate,.76);
+ assert.ok(Math.abs(r.used-14.810003)<1e-6);
+});
+test("daily PV score is withheld when historian flags low paired coverage",()=>{
+ assert.equal(daily(daySample({quality:{pvSelfUsePairedCoverage:.94}})),null);
+ assert.equal(daily(daySample({quality:{pvSelfUseStatus:"INSUFFICIENT_COVERAGE"}})),null);
+});
+test("daily PV score rejects negative/inconsistent energy balance",()=>{
+ assert.equal(daily(daySample({summary:{pvKWh:2,exportKWh:3}})),null);
+});
+test("in-progress day retains provisional semantics",()=>{
+ const r=daily(daySample({summary:{
+  pvKWh:4,exportKWh:1,
+  pvSelfConsumedKWh:null,pvSelfConsumptionRate:null,
+  provisionalPvSelfConsumedKWh:3,provisionalPvSelfConsumptionRate:.75
+ },quality:{pvSelfUseStatus:"PROVISIONAL"}}));
+ assert.equal(r.status,"PROVISIONAL");
+ assert.equal(r.rate,.75);
+});
+
 const start="2026-10-10T08:30:00Z",end="2026-10-10T08:45:00Z";
 const plan={evPlanW:0,wwPlanW:0,quookerPlanW:0};
 function slot(extra={}){

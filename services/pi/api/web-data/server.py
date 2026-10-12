@@ -5,6 +5,7 @@ control/device write path.
 """
 
 import json
+import math
 import os
 import sqlite3
 import zlib
@@ -709,6 +710,43 @@ def planner_evaluation_resource(value):
     }
 
 
+
+def daily_pv_self_use_accounting(pv_kwh, export_kwh, paired_seconds, expected_seconds, day_complete):
+    """Only validated historical PV/P1 energy deltas may produce a daily ratio.
+
+    Completed day: >=95% paired energy coverage; in-progress day: >=95% of
+    elapsed time, explicitly provisional. Never turn gaps into zero PV or
+    clamp a negative energy balance into a plausible percentage.
+    """
+    coverage = (
+        min(1.0, paired_seconds / expected_seconds)
+        if expected_seconds > 0 else 0.0
+    )
+    status = "INSUFFICIENT_COVERAGE"
+    rate = None
+    used = None
+    if (expected_seconds >= 1800 and coverage >= 0.95
+            and isinstance(pv_kwh, (int, float))
+            and isinstance(export_kwh, (int, float))
+            and math.isfinite(pv_kwh) and math.isfinite(export_kwh)):
+        if pv_kwh <= 0:
+            status = "NO_PV_PRODUCTION"
+        elif export_kwh < 0 or export_kwh > pv_kwh + 1e-6:
+            status = "INVALID_ENERGY_BALANCE"
+        else:
+            used = round(max(0.0, pv_kwh - export_kwh), 6)
+            rate = round(used / pv_kwh, 4)
+            status = "COMPLETE" if day_complete else "PROVISIONAL"
+    return {
+        "status": status,
+        "pairedCoverage": round(coverage, 6),
+        "selfConsumedKWh": used,
+        "rate": rate,
+        "source": "house_energy_intervals:PV_cumulative_minus_P1_export",
+        "readOnly": True,
+    }
+
+
 def pv_flex_analysis_resource(value):
     """Return read-only 15-minute PV/flex evidence for one Amsterdam calendar day.
 
@@ -793,6 +831,7 @@ def pv_flex_analysis_resource(value):
 
     p1_covered_seconds = {key: 0.0 for key in slots}
     pv_covered_seconds = {key: 0.0 for key in slots}
+    paired_covered_seconds = {key: 0.0 for key in slots}
     gap_count = 0
     discontinuity_count = 0
     for row in actual_rows:
@@ -830,8 +869,10 @@ def pv_flex_analysis_resource(value):
                 if pv_valid and row[5] is not None:
                     item["actual"]["pvKWh"] += float(row[5]) * fraction
                     pv_covered_seconds[key] += seconds
-                if p1_valid and pv_valid and row[6] is not None:
-                    item["actual"]["houseKWh"] += float(row[6]) * fraction
+                if p1_valid and pv_valid:
+                    paired_covered_seconds[key] += seconds
+                    if row[6] is not None:
+                        item["actual"]["houseKWh"] += float(row[6]) * fraction
             segment_start = segment_end
 
     for key, item in slots.items():
@@ -977,15 +1018,36 @@ def pv_flex_analysis_resource(value):
         name: round(sum(slot["actual"][name] for slot in series), 6)
         for name in ("pvKWh", "houseKWh", "importKWh", "exportKWh")
     }
-    # Direct-use totals require complete, simultaneous P1 and PV evidence.
-    # A partial day must never masquerade as a full-day self-use result.
-    required_seconds = max(1.0, (end_utc_dt-start_utc_dt).total_seconds())
-    p1_day_complete = sum(p1_covered_seconds.values()) >= required_seconds - 1.0
-    pv_day_complete = sum(pv_covered_seconds.values()) >= required_seconds - 1.0
-    self_use_complete = p1_day_complete and pv_day_complete
+    # Daily KPI is independent of historical planner availability and forecast.
+    # Reuse the same 95%-paired-coverage and PV-minus-P1-export contract as
+    # ems-performance. The API retains its existing day summary keys.
+    now_utc = datetime.now(timezone.utc)
+    day_complete = now_utc >= end_utc_dt
+    required_seconds = max(1.0, (end_utc_dt - start_utc_dt).total_seconds())
+    elapsed_seconds = max(
+        0.0, (min(now_utc, end_utc_dt) - start_utc_dt).total_seconds()
+    )
+    paired_seconds = sum(paired_covered_seconds.values())
+    accounting = daily_pv_self_use_accounting(
+        totals["pvKWh"], totals["exportKWh"], paired_seconds,
+        required_seconds if day_complete else elapsed_seconds,
+        day_complete,
+    )
+    self_use_complete = accounting["status"] == "COMPLETE"
     totals["pvSelfConsumedKWh"] = (
         round(max(0.0, totals["pvKWh"] - totals["exportKWh"]), 6)
         if self_use_complete else None
+    )
+    totals["pvSelfConsumptionRate"] = (
+        accounting["rate"] if self_use_complete else None
+    )
+    # A running day is never represented as a completed daily observation.
+    totals["provisionalPvSelfConsumedKWh"] = (
+        accounting["selfConsumedKWh"]
+        if accounting["status"] == "PROVISIONAL" else None
+    )
+    totals["provisionalPvSelfConsumptionRate"] = (
+        accounting["rate"] if accounting["status"] == "PROVISIONAL" else None
     )
     forecast_energy = sum(
         slot["forecast"]["pvForecastW"] * 0.25 / 1000.0
@@ -1025,6 +1087,10 @@ def pv_flex_analysis_resource(value):
             },
         },
         "quality": {
+            "pvSelfUseStatus": accounting["status"],
+            "pvSelfUsePairedCoverage": accounting["pairedCoverage"],
+            "pvSelfUseMethod": accounting["source"],
+            "pvSelfUseCompleteDay": day_complete,
             "actualCoverage": round(sum(min(p1_covered_seconds[k], pv_covered_seconds[k]) for k in slots) / max(1.0, (end_utc_dt-start_utc_dt).total_seconds()), 6),
             "p1Coverage": round(sum(p1_covered_seconds.values()) / max(1.0, (end_utc_dt-start_utc_dt).total_seconds()), 6),
             "pvCoverage": round(sum(pv_covered_seconds.values()) / max(1.0, (end_utc_dt-start_utc_dt).total_seconds()), 6),
