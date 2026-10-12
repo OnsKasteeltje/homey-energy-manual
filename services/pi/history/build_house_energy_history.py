@@ -120,14 +120,15 @@ def _prepare_counter_rows(rows):
 
                 if elapsed > 0 and end_value >= start_value:
                     delta = end_value - start_value
-                    for fill_index in range(previous_observed_index + 1, index + 1):
-                        fill = prepared[fill_index]
-                        fraction = (
-                            (_parse_utc(fill["ts"]) - start_time).total_seconds()
-                            / elapsed
-                        )
-                        fill["values"][value_index] = start_value + delta * fraction
-                        fill["pv_estimated_interval"] = True
+                    if delta > COUNTER_DECREASE_EPSILON_KWH:
+                        for fill_index in range(previous_observed_index + 1, index + 1):
+                            fill = prepared[fill_index]
+                            fraction = (
+                                (_parse_utc(fill["ts"]) - start_time).total_seconds()
+                                / elapsed
+                            )
+                            fill["values"][value_index] = start_value + delta * fraction
+                            fill["pv_estimated_interval"] = True
 
             previous_observed_index = index
 
