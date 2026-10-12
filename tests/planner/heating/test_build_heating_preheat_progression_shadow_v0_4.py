@@ -13,7 +13,8 @@ NOW = datetime(2026, 9, 26, 12, 0, tzinfo=timezone.utc)
 
 def room(key="woonkamer", actual=17.2, future=19.0, state="PREHEAT_READY_FOR_GRANT",
          reason="AWAITING_CENTRAL_PV_PRIORITY", next_step=17.5, group="living_area",
-         close="2026-09-26T15:00:00Z", preheat_allowed=True):
+         close="2026-09-26T15:00:00Z", preheat_allowed=True,
+         effective_source=None, override_until=None):
     return {
         "key": key,
         "displayName": key.title(),
@@ -22,12 +23,28 @@ def room(key="woonkamer", actual=17.2, future=19.0, state="PREHEAT_READY_FOR_GRA
         "current": {"temperature_C": actual, "baselineDemand": False},
         "effective": {
             "currentTargetTemperature_C": 15.5,
-            "source": "SCHEDULE" if preheat_allowed else "PERMANENT_OVERRIDE",
+            "source": (
+                effective_source
+                if effective_source is not None
+                else ("SCHEDULE" if preheat_allowed else "PERMANENT_OVERRIDE")
+            ),
             "systemMode": "auto",
-            "setpointMode": "follow_schedule" if preheat_allowed else "permanent_override",
-            "overrideUntil": None,
+            "setpointMode": (
+                "follow_schedule"
+                if preheat_allowed
+                else "temporary_override"
+                if effective_source == "TEMPORARY_OVERRIDE"
+                else "permanent_override"
+            ),
+            "overrideUntil": override_until,
             "preheatAdvanceAllowed": preheat_allowed,
-            "reason": "FOLLOW_SCHEDULE" if preheat_allowed else "HONEYWELL_PERMANENT_OVERRIDE_ACTIVE",
+            "reason": (
+                "FOLLOW_SCHEDULE"
+                if preheat_allowed
+                else "HONEYWELL_TEMPORARY_OVERRIDE_ACTIVE"
+                if effective_source == "TEMPORARY_OVERRIDE"
+                else "HONEYWELL_PERMANENT_OVERRIDE_ACTIVE"
+            ),
         },
         "baseline": {
             "currentTargetTemperature_C": 15.5,
@@ -209,6 +226,78 @@ def test_active_honeywell_override_does_not_create_opportunity_history():
     assert r["opportunityHistory"] == []
     assert r["progression"]["state"] == "INACTIVE"
     assert r["progression"]["reason"] == "HONEYWELL_PERMANENT_OVERRIDE_ACTIVE"
+
+
+def test_active_permanent_override_prunes_future_but_preserves_closed_history():
+    history = [
+        {
+            "opportunityId": "woonkamer|2026-09-26T11:30:00Z|18.000",
+            "opensAt": "2026-09-26T10:30:00Z",
+            "closesAt": "2026-09-26T11:30:00Z",
+            "target_C": 18.0,
+        },
+        {
+            "opportunityId": "woonkamer|2026-09-26T15:00:00Z|19.000",
+            "opensAt": "2026-09-26T12:00:00Z",
+            "closesAt": "2026-09-26T15:00:00Z",
+            "target_C": 19.0,
+        },
+    ]
+    prev = previous(previous_room(opportunity_history=history))
+    overridden = room(
+        state="NOT_ELIGIBLE",
+        reason="HONEYWELL_PERMANENT_OVERRIDE_ACTIVE",
+        next_step=None,
+        preheat_allowed=False,
+    )
+    overridden["candidate"]["status"] = "NOT_ELIGIBLE"
+    overridden["candidate"]["reason"] = "HONEYWELL_PERMANENT_OVERRIDE_ACTIVE"
+
+    out = build(
+        h=heating(overridden),
+        g=planner_grant(grant=False, ready=[], reason="NO_HEATING_GRANT"),
+        prev=prev,
+    )
+    r = next(r for r in out["rooms"] if r["key"] == "woonkamer")
+
+    assert r["opportunityHistory"] == [history[0]]
+
+
+def test_temporary_override_prunes_overlap_but_keeps_post_expiry_future_window():
+    history = [
+        {
+            "opportunityId": "woonkamer|2026-09-26T13:00:00Z|18.000",
+            "opensAt": "2026-09-26T11:30:00Z",
+            "closesAt": "2026-09-26T13:00:00Z",
+            "target_C": 18.0,
+        },
+        {
+            "opportunityId": "woonkamer|2026-09-26T16:00:00Z|19.000",
+            "opensAt": "2026-09-26T14:00:00Z",
+            "closesAt": "2026-09-26T16:00:00Z",
+            "target_C": 19.0,
+        },
+    ]
+    prev = previous(previous_room(opportunity_history=history))
+    overridden = room(
+        state="NOT_ELIGIBLE",
+        reason="HONEYWELL_TEMPORARY_OVERRIDE_ACTIVE",
+        next_step=None,
+        preheat_allowed=False,
+        effective_source="TEMPORARY_OVERRIDE",
+        override_until="2026-09-26T13:30:00Z",
+    )
+    overridden["candidate"]["status"] = "NOT_ELIGIBLE"
+    overridden["candidate"]["reason"] = "HONEYWELL_TEMPORARY_OVERRIDE_ACTIVE"
+
+    out = build(
+        h=heating(overridden),
+        g=planner_grant(grant=False, ready=[], reason="NO_HEATING_GRANT"),
+        prev=prev,
+    )
+    r = next(r for r in out["rooms"] if r["key"] == "woonkamer")
+
+    assert r["opportunityHistory"] == [history[1]]
 
 
 def test_opportunity_window_survives_after_honeywell_moves_to_next_transition():
