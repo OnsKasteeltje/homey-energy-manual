@@ -99,10 +99,22 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
             raise PlanError(f"room is not valid: {key}")
 
         current = _require_dict(room.get("current"), f"{key}.current")
+        effective = _require_dict(room.get("effective"), f"{key}.effective")
         baseline = _require_dict(room.get("baseline"), f"{key}.baseline")
         actual = _number(current.get("temperature_C"), f"{key}.current.temperature_C")
-        current_target = _number(baseline.get("currentTarget_C"), f"{key}.baseline.currentTarget_C")
+        effective_target = _number(
+            effective.get("currentTarget_C"),
+            f"{key}.effective.currentTarget_C",
+        )
+        scheduled_current_target = _number(
+            baseline.get("currentTarget_C"),
+            f"{key}.baseline.currentTarget_C",
+        )
         future_target = _number(baseline.get("nextTarget_C"), f"{key}.baseline.nextTarget_C")
+        advance_allowed = effective.get("preheatAdvanceAllowed") is True
+        effective_reason = effective.get("reason")
+        if not isinstance(effective_reason, str) or not effective_reason:
+            raise PlanError(f"{key}.effective.reason missing")
         direction = baseline.get("direction")
         if direction not in {"UP", "DOWN", "NONE"}:
             raise PlanError(f"invalid baseline direction for {key}: {direction}")
@@ -115,6 +127,8 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
 
         if not in_scope:
             status, reason = "NOT_ELIGIBLE", "ROOM_OUT_OF_PREHEAT_SCOPE"
+        elif not advance_allowed:
+            status, reason = "NOT_ELIGIBLE", effective_reason
         elif direction != "UP":
             status, reason = "NOT_ELIGIBLE", f"BASELINE_{direction}"
         elif not within_window:
@@ -124,7 +138,7 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
         else:
             status, reason = "ELIGIBLE_UP_TRANSITION", "AWAITING_PV_OPPORTUNITY_EVALUATION"
 
-        steps = _candidate_steps(current_target, future_target, actual) if status == "ELIGIBLE_UP_TRANSITION" else []
+        steps = _candidate_steps(effective_target, future_target, actual) if status == "ELIGIBLE_UP_TRANSITION" else []
         group = next((name for name, members in ROOM_GROUPS.items() if key in members), None)
         rooms.append({
             "key": key,
@@ -132,8 +146,18 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
             "preheatScope": in_scope,
             "group": group,
             "current": {"temperature_C": actual},
+            "effective": {
+                "currentTargetTemperature_C": effective_target,
+                "source": effective.get("source"),
+                "systemMode": effective.get("systemMode"),
+                "setpointMode": effective.get("setpointMode"),
+                "overrideUntil": effective.get("overrideUntil"),
+                "preheatAdvanceAllowed": advance_allowed,
+                "reason": effective_reason,
+            },
             "baseline": {
-                "currentTargetTemperature_C": current_target,
+                "currentTargetTemperature_C": effective_target,
+                "scheduledCurrentTargetTemperature_C": scheduled_current_target,
                 "changeAt": baseline.get("nextChangeAt"),
                 "targetTemperature_C": future_target,
                 "direction": direction,
