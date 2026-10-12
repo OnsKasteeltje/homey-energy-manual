@@ -44,6 +44,7 @@ function buildIntent(){
       reason:overridden?'HONEYWELL_OVERRIDE_ACTIVE':'TEST',
       holdReason:overridden?'HONEYWELL_OVERRIDE_ACTIVE':null,
       vendorSetpointMode:overridden?'permanent_override':'follow_schedule',
+      vendorSystemMode:'auto',
       vendorTarget_C:16,
       vendorOverrideUntil:null,
       wouldWrite:roomKey==='woonkamer',
