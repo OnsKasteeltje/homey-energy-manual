@@ -58,6 +58,7 @@ HEATING_TEMPERATURE_HISTORY_API_SCHEMA = "EMS_WEB_HEATING_TEMPERATURE_HISTORY_V1
 HEATING_PREHEAT_SHADOW_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_SHADOW_V1"
 HEATING_PREHEAT_PROGRESSION_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1"
 FLEX_PRIORITY_SHADOW_API_SCHEMA = "EMS_WEB_FLEX_PRIORITY_SHADOW_V1"
+HEATING_TARGET_HISTORY_DAYS = 7
 MOBILE_OVERVIEW_API_SCHEMA = "EMS_MOBILE_OVERVIEW_V1"
 HONEYWELL_SCHEDULE_FILE = os.environ.get("EMS_HONEYWELL_SCHEDULE_FILE", "/home/jeroen/ems/runtime/tools/honeywell/output/honeywell-schedule.json")
 HEATING_ROOM_MODEL_FILE = os.environ.get(
@@ -1328,17 +1329,140 @@ def heating_schedule_resource():
         "rooms": rooms,
     }
 
-def heating_temperature_history_resource(*, generated_at=None):
-    """Return the last six hours of canonical Honeywell room-temperature history.
+def _heating_target_value(raw):
+    try:
+        value = json.loads(raw) if isinstance(raw, str) else raw
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(value, dict):
+        return None
 
-    Presentation-only. No interpolation, control policy or planner decision is
-    introduced here; only complete/partial 15-minute observations are exposed.
+    target = value.get("targetTemperature_C")
+    setpoint_mode = value.get("setpointMode")
+    system_mode = value.get("systemMode")
+    override_until = value.get("overrideUntil")
+
+    if isinstance(target, bool) or not isinstance(target, (int, float)):
+        return None
+    if not isinstance(setpoint_mode, str) or not setpoint_mode:
+        return None
+    if system_mode is not None and not isinstance(system_mode, str):
+        return None
+    if override_until is not None and parse_timestamp(override_until) is None:
+        return None
+
+    return {
+        "target_C": float(target),
+        "setpointMode": setpoint_mode,
+        "overrideUntil": override_until,
+        "systemMode": system_mode,
+    }
+
+
+def _heating_target_history(db, allowed_rooms, start, end):
+    """Project observed Honeywell target changes without schedule reconstruction."""
+    out = {key: [] for key in allowed_rooms}
+    start_text = _utc_text(start)
+    end_text = _utc_text(end)
+
+    for key in allowed_rooms:
+        state_key = f"heating.honeywell_target.{key}"
+        prior = db.execute(
+            """
+            SELECT ts_utc,after_json
+            FROM semantic_events
+            WHERE state_key=? AND ts_utc <= ?
+            ORDER BY ts_utc DESC
+            LIMIT 1
+            """,
+            (state_key, start_text),
+        ).fetchone()
+        events = db.execute(
+            """
+            SELECT ts_utc,before_json,after_json,details_json
+            FROM semantic_events
+            WHERE state_key=? AND ts_utc > ? AND ts_utc <= ?
+            ORDER BY ts_utc
+            """,
+            (state_key, start_text, end_text),
+        ).fetchall()
+
+        anchor_at = None
+        anchor_value = None
+
+        if prior is not None:
+            anchor_value = _heating_target_value(prior[1])
+            if anchor_value is not None:
+                anchor_at = start
+        elif events:
+            first_ts, before_json, _after_json, details_json = events[0]
+            anchor_value = _heating_target_value(before_json)
+            first_observed = None
+            try:
+                details = json.loads(details_json) if isinstance(details_json, str) else {}
+            except json.JSONDecodeError:
+                details = {}
+            if isinstance(details, dict):
+                first_observed = parse_timestamp(details.get("firstObservedAt"))
+            first_event = parse_timestamp(first_ts)
+            if (
+                anchor_value is not None
+                and first_observed is not None
+                and first_event is not None
+                and first_observed <= first_event
+            ):
+                anchor_at = max(start, first_observed)
+        else:
+            state = db.execute(
+                """
+                SELECT value_json,first_observed_at_utc
+                FROM semantic_event_state
+                WHERE state_key=?
+                """,
+                (state_key,),
+            ).fetchone()
+            if state is not None:
+                anchor_value = _heating_target_value(state[0])
+                first_observed = parse_timestamp(state[1])
+                if (
+                    anchor_value is not None
+                    and first_observed is not None
+                    and first_observed <= end
+                ):
+                    anchor_at = max(start, first_observed)
+
+        if anchor_at is not None and anchor_value is not None:
+            out[key].append({
+                "at": _utc_text(anchor_at),
+                **anchor_value,
+            })
+
+        for ts_utc, _before_json, after_json, _details_json in events:
+            event_at = parse_timestamp(ts_utc)
+            value = _heating_target_value(after_json)
+            if event_at is None or value is None:
+                continue
+            out[key].append({
+                "at": _utc_text(event_at),
+                **value,
+            })
+
+    return out
+
+
+def heating_temperature_history_resource(*, generated_at=None):
+    """Return measured room temperatures plus observed Honeywell target history.
+
+    Room temperature is a six-hour 15-minute measurement projection. Honeywell
+    target history is sparse observed semantic evidence for the last seven
+    days. No historical target is reconstructed from the weekly schedule.
     """
     now = generated_at or datetime.now(timezone.utc)
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("HEATING_TEMPERATURE_HISTORY_TIME_INVALID")
     now = now.astimezone(timezone.utc)
     start = now - timedelta(hours=6)
+    target_start = now - timedelta(days=HEATING_TARGET_HISTORY_DAYS)
 
     allowed_rooms = ("woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe")
     device_keys = tuple(f"honeywell_{key}" for key in allowed_rooms)
@@ -1360,12 +1484,19 @@ def heating_temperature_history_resource(*, generated_at=None):
             """,
             (_utc_text(start), _utc_text(now), *device_keys),
         ).fetchall()
+        target_history = _heating_target_history(
+            db,
+            allowed_rooms,
+            target_start,
+            now,
+        )
 
     room_map = {
         key: {
             "key": key,
             "displayName": key.replace("_", " ").title(),
             "series": [],
+            "targetSeries": target_history[key],
         }
         for key in allowed_rooms
     }
@@ -1390,12 +1521,15 @@ def heating_temperature_history_resource(*, generated_at=None):
         "generatedAt": _utc_text(now),
         "mode": "READ_ONLY",
         "presentationOnly": True,
-        "source": "measurements_15m",
+        "source": "measurements_15m+semantic_events",
         "metric": "room_temperature_c",
+        "targetMetric": "observed_honeywell_target_c",
         "period": {
             "timezone": "Europe/Amsterdam",
             "historyMinutes": 360,
+            "targetHistoryDays": HEATING_TARGET_HISTORY_DAYS,
             "start": _utc_text(start),
+            "targetStart": _utc_text(target_start),
             "end": _utc_text(now),
         },
         "rooms": [room_map[key] for key in allowed_rooms],
