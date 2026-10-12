@@ -83,8 +83,10 @@ for(const cmd of Array.isArray(adapter?.commands)?adapter.commands:[]){
   if(key)seen.add(key);
   const pinnedId=!!expectedId&&cmd?.deviceId===expectedId;
   const observedMode=String(cmd?.observedMode||'').toLowerCase();
+  const observedSystemMode=String(cmd?.observedSystemMode||'').toLowerCase();
   const overridden=observedMode==='permanent_override'||observedMode==='temporary_override';
-  const modeSafe=observedMode==='follow_schedule'||(overridden&&action==='HOLD'&&cmd?.holdReason==='HONEYWELL_OVERRIDE_ACTIVE');
+  const modeSafe=(observedMode==='follow_schedule'||(overridden&&action==='HOLD'&&cmd?.holdReason==='HONEYWELL_OVERRIDE_ACTIVE'))&&
+    (action==='HOLD'||observedSystemMode==='auto');
   if(!unique)commandErrors.push(key+':DUPLICATE_ROOM');
   if(!pinnedId)commandErrors.push(key+':DEVICE_ID_MISMATCH');
   if(!modeSafe)commandErrors.push(key+':HONEYWELL_MODE_INVALID');
@@ -139,6 +141,7 @@ for(const cmd of Array.isArray(adapter?.commands)?adapter.commands:[]){
     roomKey:cmd?.roomKey??null,
     deviceId:cmd?.deviceId??null,
     observedMode,
+    observedSystemMode,
     holdReason:cmd?.holdReason??null,
     action:commandSafe?action:'HOLD',
     requestedTarget_C:commandSafe?cmd?.requestedTarget_C:null,
