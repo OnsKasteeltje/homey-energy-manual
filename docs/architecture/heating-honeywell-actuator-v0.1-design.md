@@ -28,7 +28,7 @@ A new LIVE permit is a **separate, explicitly versioned contract**, not an impli
 
 ### Six-room target scope versus staged activation
 
-The existing six-room Honeywell monitoring/dashboard/history does not automatically expand the four-room preheat/SHADOW execution contracts. The future actuator interface must support **all six** canonical room keys with validated, deterministic device mapping:
+The six-room Honeywell monitoring/dashboard/history is now independently confirmed by the live Pi dry-run. The same dry-run found no `UPSTREAM_SIX_ROOM_SCOPE_MIGRATION_REQUIRED` or `V05_SIX_ROOM_SCOPE_MIGRATION_REQUIRED` for any room: in the observed snapshot V0.3 and V0.5 already flag all six rooms as `preheatScope=true`. This does **not** expand the existing four-room Pi -> Homey SHADOW publisher, adapter or gate. The future actuator interface must support **all six** canonical room keys with validated, deterministic device mapping:
 
 | Room key | Observed Homey thermostat ID | Current scope interpretation |
 | --- | --- | --- |
@@ -41,7 +41,11 @@ The existing six-room Honeywell monitoring/dashboard/history does not automatica
 
 The state-based eligibility policy applies uniformly to all six rooms; the canary allowlist is a separate, narrow *rollout* decision. A room that is not in the canary or whose mode is not `follow_schedule` remains `HOLD`. Neither permanent overrides nor human temporary overrides may be cleared just to make a room eligible.
 
-Migration prerequisite: inspect and explicitly update the canonical `preheatScope`/candidate configuration, six-room room/group semantics, Pi publisher allowlist, Homey device mapping, command-cardinality checks and tests **as a separate SHADOW-only change**, with every new room still denied for a physical action until all guards pass. Do not treat six monitoring series or existence of Homey Flow action cards as an already commissioned six-room write path.
+Migration prerequisite: **preserve the already-observed six-room V0.3/V0.5 `preheatScope`**, check that every upstream room/group and opportunity is handled consistently, and separately update the **four-room Pi publisher allowlist**, Homey device mapping, command-cardinality checks and tests **as a separate SHADOW-only change**. Do not alter Honeywell user overrides, enable the publisher timer, or interpret existing upstream scope as a commissioned six-room write path.
+
+### Runtime acceptance evidence — 2026-10-12
+
+User-operated isolated-worktree smoke test of PR #244 on the Pi passed 18/18 `unittest` regressions and printed `PASS: six-room dry-run, no physical writes`. All six rooms were `BLOCKED`: the production Heating grant was `HOLD`, P1 was not exporting without import, and V0.5 proposed no new SET. Both Douwe rooms were observed in `permanent_override` and explicitly rejected as `HONEYWELL_OVERRIDE_ACTIVE`. None of the six rooms had a scope-migration denial in this sample. This **validates fail-closed observation**, not a positive candidate under real PV conditions and not physical actuation.
 
 ## 3. Required guards before every SET or progression increment
 
