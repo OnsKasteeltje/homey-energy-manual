@@ -19,6 +19,9 @@ for token in ('"SAME_AS_VALID_PLAN_DECISION"','"quookerOpportunityAllowed"',
     assert token in api,token
 assert "12 uur vooraf" not in html
 assert "kwartieren met voldoende P1/PV-dekking" in render
+assert "dailySelfUseEvidence(d)" in render
+assert "pvSelfConsumptionRate" in render
+assert "provisionalPvSelfConsumptionRate" in render
 assert "Nog geen beoordeling: kwartier niet afgesloten" in render
 assert "Onvoldoende meetgegevens: P1/PV-dekking onvolledig" in render
 assert "renderEvidence(x)" not in render
