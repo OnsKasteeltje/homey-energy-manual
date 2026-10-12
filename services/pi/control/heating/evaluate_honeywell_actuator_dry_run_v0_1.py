@@ -158,6 +158,8 @@ def evaluate(docs: dict[str, Any], *, now: datetime | None = None) -> dict:
         vendor_mode = str(v.get("setpointMode") or "").lower() if v else None
         effective = obj(h.get("effective")) if h else {}
         effective_mode = str(effective.get("setpointMode") or "").lower()
+        if v and vendor_mode == "follow_schedule" and v.get("overrideUntil") not in (None, ""):
+            reasons.append("HONEYWELL_OVERRIDE_UNTIL_UNEXPECTED")
         if v and vendor_mode != "follow_schedule":
             reasons.append("HONEYWELL_OVERRIDE_ACTIVE" if vendor_mode in ("permanent_override", "temporary_override")
                            else "HONEYWELL_MODE_UNKNOWN")
@@ -177,8 +179,10 @@ def evaluate(docs: dict[str, Any], *, now: datetime | None = None) -> dict:
             reasons.append("UPSTREAM_SIX_ROOM_SCOPE_MIGRATION_REQUIRED")
         if g and g.get("preheatScope") is not True:
             reasons.append("V05_SIX_ROOM_SCOPE_MIGRATION_REQUIRED")
-        if g and obj(g.get("command")).get("action") not in ("WOULD_SET_TEMP", "WOULD_KEEP_TEMP"):
-            reasons.append("V05_NO_SET_OR_KEEP_CANDIDATE")
+        if g and obj(g.get("command")).get("action") == "WOULD_KEEP_TEMP":
+            reasons.append("V05_KEEP_HAS_NO_PHYSICAL_OWNERSHIP_PROOF")
+        elif g and obj(g.get("command")).get("action") != "WOULD_SET_TEMP":
+            reasons.append("V05_NO_NEW_SET_CANDIDATE")
         if g and (not isinstance(g.get("checks"), dict) or not all(val is True for val in g["checks"].values())):
             reasons.append("V05_ROOM_CHECKS_NOT_ALL_TRUE")
         if g and obj(g.get("command")).get("physicalWrite") is not False:
@@ -226,6 +230,7 @@ def evaluate(docs: dict[str, Any], *, now: datetime | None = None) -> dict:
         "globalDenialReasons": list(dict.fromkeys(global_reasons)),
         "edgeProofMissing": ["SUSTAINED_P1_EXPORT_UNPROVEN", "HOMEY_EDGE_READ_UNPROVEN",
                              "TEMPORARY_OVERRIDE_ACK_UNPROVEN", "INDEPENDENT_HONEYWELL_READBACK_UNPROVEN",
+                             "GRANT_REVISION_NOT_BOUND_TO_V05",
                              "PHYSICAL_OWNERSHIP_UNPROVEN"],
         "source": "PI_LOCAL_JSON_ONLY",
     }
