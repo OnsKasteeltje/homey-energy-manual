@@ -65,6 +65,7 @@ def honeywell():
     return {
         "schema": m.VENDOR_SCHEMA, "mode": "READ_ONLY",
         "generatedAt": AT,
+        "location": {"systemMode": "auto"},
         "zones": [{
             "key": key,
             "homeyDeviceId": device,
@@ -149,6 +150,21 @@ def main():
     zone(mismatch, "woonkamer")["targetTemperature_C"] = 17.5
     assert command(m.build_intent(data, mismatch, generated_at=NOW),
                    "woonkamer")["holdReason"] == "HONEYWELL_TARGET_MISMATCH"
+
+    not_auto = honeywell()
+    not_auto["location"]["systemMode"] = "off"
+    system_block = m.build_intent(data, not_auto, generated_at=NOW)
+    assert system_block["valid"] is True
+    assert command(system_block, "woonkamer")["action"] == "HOLD"
+    assert command(system_block, "woonkamer")["holdReason"] == "HONEYWELL_SYSTEM_MODE_NOT_AUTO"
+
+    no_up = source()
+    room(no_up, "woonkamer")["baseline"]["direction"] = "DOWN"
+    is_denied(m.build_intent(no_up, vendor, generated_at=NOW), "NON-UP")
+
+    expired_up = source()
+    room(expired_up, "woonkamer")["baseline"]["changeAt"] = AT
+    is_denied(m.build_intent(expired_up, vendor, generated_at=NOW), "EXPIRED")
 
     # Missing or duplicate canonical rooms, stale vendor and wrong mapping fail closed.
     missing = source()
