@@ -205,6 +205,44 @@ class TestDryRun(unittest.TestCase):
         self.assertIsNone(condition["plannerReasonCode"])
         self.assertNotIn("autoladen", condition["explanation"])
 
+    def test_stale_source_diagnosis_names_each_actual_source(self):
+        for prefix, name in module.SOURCE_LABELS.items():
+            with self.subTest(prefix=prefix):
+                detail = module.describe_reason(
+                    prefix + "_SOURCE_STALE_OR_UNTIMED", None, None
+                )
+                self.assertIn(name, detail["title"])
+                self.assertIn("meettijdstip", detail["title"])
+                self.assertEqual(detail["category"], "Gegevens")
+
+    def test_invalid_source_contract_names_source_and_problem(self):
+        for prefix, name in module.SOURCE_LABELS.items():
+            with self.subTest(prefix=prefix):
+                detail = module.describe_reason(
+                    prefix + "_SCHEMA_INVALID", None, None
+                )
+                self.assertIn(name, detail["title"])
+                self.assertIn("gegevensformaat", detail["title"])
+
+    def test_p1_missing_sample_is_specific_and_still_blocks(self):
+        d = documents()
+        d["p1"]["meta"].pop("source_sample_at")
+        result = module.evaluate(d, now=NOW)
+        condition = next(c for c in result["generalConditions"]
+                         if c["code"] == "P1_SOURCE_STALE_OR_UNTIMED")
+        self.assertIn("P1-meter:", condition["title"])
+        self.assertIn("tijdstip", condition["explanation"])
+        report = module.human_report(result)
+        self.assertIn("P1-meter:", report)
+        self.assertIn("P1_SOURCE_STALE_OR_UNTIMED",
+                      result["globalDenialReasons"])
+        self.assertEqual(result["physicalWrites"], 0)
+
+    def test_unknown_source_error_displays_code_not_misleading_generic(self):
+        detail = module.describe_reason("GATE_NEW_INVALID", None, None)
+        self.assertIn("GATE_NEW_INVALID", detail["title"])
+        self.assertIn("vertaling ontbreekt", detail["explanation"])
+
     def test_unknown_code_is_kept_in_technical_explanation(self):
         d = module.describe_reason("NEW_SAFETY_REASON", None, None)
         self.assertEqual(d["code"], "NEW_SAFETY_REASON")
