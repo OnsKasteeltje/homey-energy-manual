@@ -189,6 +189,23 @@ def main():
                       "_publish_logic", "HOMEY_CLI"):
         assert forbidden not in text, forbidden
 
+    # Guard against future mapping/schema drift between Pi, Homey adapter, and gate.
+    adapter_path = ROOT / "src/homey/adapters/heating-control/heating-control-v0.2.six-room.shadow.js"
+    gate_path = ROOT / "src/homey/validation/heating-control-adapter-gate-v0.2.six-room.shadow.js"
+    adapter_js = adapter_path.read_text(encoding="utf-8")
+    gate_js = gate_path.read_text(encoding="utf-8")
+    for key, device_id in m.ROOM_DEVICES.items():
+        assert key + ":'" + device_id + "'" in adapter_js, ("adapter", key)
+        assert key + ":'" + device_id + "'" in gate_js, ("gate", key)
+    assert "EMS_HEATING_CONTROL_INTENT_V0.2" in adapter_js
+    assert "EMS_HEATING_CONTROL_INTENT_V0.2" in gate_js
+    assert "EMS_HEATING_CONTROL_ADAPTER_SHADOW_V0.2" in gate_js
+    for js in (adapter_js, gate_js):
+        assert "const IDS=__EMS_HEATING_IDS__;" in js
+        assert "length===6" in js
+        for forbidden in ("setCapabilityValue(", "setCapabilityValues(", "runFlowCardAction("):
+            assert forbidden not in js, forbidden
+
     print("PASS: six-room Pi -> Homey V0.2 SHADOW intent, overrides HOLD, no publisher")
 
 
