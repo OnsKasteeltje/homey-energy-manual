@@ -101,39 +101,96 @@ function valueAtStep(points,m){
   return value;
 }
 
-function effectiveBaselinePoints(room,start,now){
+function observedTargetPoints(targetSeries,start,now){
+  const parsed = (targetSeries || [])
+    .map(item => ({
+      at:new Date(item?.at),
+      t:Number(item?.target_C),
+      setpointMode:item?.setpointMode || null,
+    }))
+    .filter(item => Number.isFinite(item.at.getTime()) && Number.isFinite(item.t))
+    .sort((a,b)=>a.at-b.at);
+
+  const out = [];
+  const before = parsed.filter(item => item.at <= start).at(-1);
+  if(before){
+    out.push({m:0,t:before.t,source:"observed"});
+  }
+
+  for(const item of parsed){
+    if(item.at <= start || item.at > now) continue;
+    const m = minuteAt(item.at,start);
+    if(m < 0 || m > HORIZON_MIN) continue;
+    out.push({m,t:item.t,source:"observed"});
+  }
+
+  return out;
+}
+
+function pushBaselinePoint(points,m,t,source){
+  if(!Number.isFinite(m) || !Number.isFinite(t)) return;
+  const bounded = clamp(m,0,HORIZON_MIN);
+  const last = points.at(-1);
+  if(last && Math.abs(last.m-bounded) < 0.001){
+    last.t = t;
+    last.source = source;
+    return;
+  }
+  points.push({m:bounded,t,source});
+}
+
+function effectiveBaselinePoints(room,targetSeries,start,now){
   const scheduled = schedulePoints(room.weeklySchedule,start);
   const effective = room?.effective;
-  if(!effective || effective.preheatAdvanceAllowed === true) return scheduled;
-
-  const target = Number(effective.currentTarget_C);
-  if(!Number.isFinite(target) || !scheduled.length) return scheduled;
-
   const nowM = clamp(minuteAt(now,start),0,HORIZON_MIN);
-  const out = scheduled.filter(point => point.m < nowM);
-  out.push({m:nowM,t:target});
+  const out = observedTargetPoints(targetSeries,start,now);
+
+  const target = Number(effective?.currentTarget_C);
+  if(!Number.isFinite(target)){
+    return out;
+  }
+
+  // Current Honeywell state is observed truth. It closes the historical
+  // evidence line at "now"; schedule data is never used to reconstruct past.
+  pushBaselinePoint(out,nowM,target,"current");
 
   if(effective.source === "TEMPORARY_OVERRIDE" && effective.overrideUntil){
     const until = new Date(effective.overrideUntil);
     const untilM = minuteAt(until,start);
-    if(Number.isFinite(untilM) && until > now && untilM <= HORIZON_MIN){
+    if(Number.isFinite(until.getTime()) && until > now && untilM <= HORIZON_MIN){
       const boundedUntil = clamp(untilM,nowM,HORIZON_MIN);
-      out.push({m:boundedUntil,t:target});
       const scheduledAfter = valueAtStep(scheduled,boundedUntil);
       if(Number.isFinite(scheduledAfter)){
-        out.push({m:boundedUntil,t:scheduledAfter});
+        pushBaselinePoint(out,boundedUntil,scheduledAfter,"schedule");
+      }else{
+        pushBaselinePoint(out,HORIZON_MIN,target,"current");
+        return out;
       }
       for(const point of scheduled){
-        if(point.m > boundedUntil) out.push(point);
+        if(point.m > boundedUntil){
+          pushBaselinePoint(out,point.m,point.t,"schedule");
+        }
       }
       if(out.at(-1)?.m !== HORIZON_MIN){
-        out.push({m:HORIZON_MIN,t:valueAtStep(scheduled,HORIZON_MIN)});
+        pushBaselinePoint(out,HORIZON_MIN,valueAtStep(scheduled,HORIZON_MIN),"schedule");
       }
       return out;
     }
   }
 
-  if(nowM < HORIZON_MIN) out.push({m:HORIZON_MIN,t:target});
+  if(effective.preheatAdvanceAllowed !== true){
+    pushBaselinePoint(out,HORIZON_MIN,target,"current");
+    return out;
+  }
+
+  for(const point of scheduled){
+    if(point.m > nowM){
+      pushBaselinePoint(out,point.m,point.t,"schedule");
+    }
+  }
+  if(out.at(-1)?.m !== HORIZON_MIN){
+    pushBaselinePoint(out,HORIZON_MIN,target,"current");
+  }
   return out;
 }
 
@@ -374,12 +431,13 @@ async function load(){
     .filter(r => ROOM_KEYS.includes(r.key))
     .sort((a,b)=>ROOM_KEYS.indexOf(a.key)-ROOM_KEYS.indexOf(b.key))
     .map((room,index) => {
+      const historySource = historyMap.get(room.key) || null;
       const shadowSource = shadowMap.get(room.key) || null;
       return {
         ...room,
         color:COLORS[index],
-        points:effectiveBaselinePoints(room,start,now),
-        actual:buildActualSeries(historyMap.get(room.key),shadowSource,start,now),
+        points:effectiveBaselinePoints(room,historySource?.targetSeries,start,now),
+        actual:buildActualSeries(historySource,shadowSource,start,now),
         shadowSource,
         progressionSource:progressionMap.get(room.key) || null,
       };
