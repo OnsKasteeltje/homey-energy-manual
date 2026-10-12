@@ -183,6 +183,7 @@ def build_intent(source: dict[str, Any], honeywell: dict[str, Any], *, generated
             raise IntentError("source upstream safety invalid")
 
         vendor = _vendor_map(honeywell, now)
+        system_mode = str((honeywell.get("location") or {}).get("systemMode") or "").lower()
         commands = []
         seen = set()
         for room in source.get("rooms") or []:
@@ -230,6 +231,10 @@ def build_intent(source: dict[str, Any], honeywell: dict[str, Any], *, generated
 
             raw_target = command.get("target_C")
             if action in {"SET_TEMP", "KEEP_TEMP"}:
+                if baseline.get("direction") != "UP":
+                    raise IntentError(f"{key} non-UP Heating SET/KEEP candidate")
+                if schedule_change_at is None or _aware(schedule_change_at, f"{key}.changeAt") <= now:
+                    raise IntentError(f"{key} Heating UP opportunity expired or missing")
                 target = _number(raw_target, f"{key}.command.target_C")
                 if not (target > current_target and target <= future_target + 1e-9):
                     raise IntentError(f"{key} target outside Honeywell baseline/future bounds")
@@ -251,6 +256,8 @@ def build_intent(source: dict[str, Any], honeywell: dict[str, Any], *, generated
                 hold_reason = "HONEYWELL_MODE_UNKNOWN"
             elif override_until not in (None, ""):
                 hold_reason = "HONEYWELL_OVERRIDE_UNTIL_UNEXPECTED"
+            elif system_mode != "auto":
+                hold_reason = "HONEYWELL_SYSTEM_MODE_NOT_AUTO"
             elif abs(vendor_target - current_target) > 0.01:
                 hold_reason = "HONEYWELL_TARGET_MISMATCH"
 
@@ -274,6 +281,7 @@ def build_intent(source: dict[str, Any], honeywell: dict[str, Any], *, generated
                 "reason": hold_reason or command.get("reason"),
                 "holdReason": hold_reason,
                 "vendorSetpointMode": vendor_mode,
+                "vendorSystemMode": system_mode,
                 "vendorTarget_C": vendor_target,
                 "vendorOverrideUntil": override_until,
                 "wouldWrite": hold_reason is None and action in {"SET_TEMP", "RESET_TO_SCHEDULE"},
