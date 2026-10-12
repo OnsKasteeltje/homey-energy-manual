@@ -51,7 +51,7 @@ class HeldPvTests(unittest.TestCase):
           FROM house_energy_intervals ORDER BY end_ts_utc
         """).fetchall()
 
-    def test_held_counter_no_synthetic_interpolation(self):
+    def test_held_counter_catchup_is_redistributed_over_elapsed_intervals(self):
         self.sample("10:00",0,1000.0,"observed")
         self.sample("10:05",1,1000.0,"held")
         self.sample("10:10",2,1000.0,"held")
@@ -59,10 +59,13 @@ class HeldPvTests(unittest.TestCase):
         self.sample("10:20",4,1000.4,"observed")
         rows=self.build_rows()
         self.assertEqual(len(rows),4)
-        self.assertEqual([round(x[0],6) for x in rows],[0,0,0,0.4])
-        self.assertEqual([round(x[1],6) for x in rows],[0.15,0.15,0.15,0.55])
+        self.assertEqual([round(x[0],6) for x in rows],[0.1,0.1,0.1,0.1])
+        self.assertEqual([round(x[1],6) for x in rows],[0.25,0.25,0.25,0.25])
         self.assertTrue(all(abs(x[2]-0.05)<1e-7 for x in rows))
-        self.assertEqual([r[3] for r in rows],["held","held","held","held"])
+        self.assertEqual([r[3] for r in rows],["estimated"]*4)
+        self.assertEqual([r[4] for r in rows],["observed"]*4)
+        self.assertEqual([r[5] for r in rows],["estimated"]*4)
+        self.assertAlmostEqual(sum(x[0] for x in rows),0.4,places=6)
 
     def test_observed_plateau_keeps_counter_increment_timing(self):
         # Regression based on SolarEdge 14:40-15:40: identical 'observed'
@@ -80,7 +83,7 @@ class HeldPvTests(unittest.TestCase):
         self.assertAlmostEqual(sum(x[0] for x in rows),1.018,places=6)
         self.assertTrue(all(x[3]=="observed" for x in rows))
 
-    def test_long_plateau_preserves_counter_delta(self):
+    def test_long_plateau_preserves_counter_delta_without_last_interval_spike(self):
         self.sample("07:00",0,1000,"observed")
         for i in range(1,49):
             minutes=7*60+5*i
@@ -89,10 +92,12 @@ class HeldPvTests(unittest.TestCase):
                         "held" if i<48 else "observed")
         rows=self.build_rows()
         self.assertEqual(rows[-1][4],"observed")
-        self.assertEqual(rows[-1][5],"held")
+        self.assertEqual(rows[-1][5],"estimated")
         self.assertAlmostEqual(rows[-1][2],0.05)
-        self.assertAlmostEqual(rows[-1][0],2.0)
-        self.assertAlmostEqual(rows[-1][1],2.15)
+        self.assertAlmostEqual(rows[-1][0],2.0/48.0)
+        self.assertAlmostEqual(rows[-1][1],0.15 + 2.0/48.0)
+        self.assertAlmostEqual(sum(r[0] for r in rows),2.0,places=6)
+        self.assertTrue(all(r[3]=="estimated" for r in rows))
 
     def test_p1_independent_of_late_pv(self):
         self.sample("07:00",0,1000,"observed")
@@ -103,9 +108,9 @@ class HeldPvTests(unittest.TestCase):
                         "held" if i < 48 else "observed")
         rows=self.build_rows()
         self.assertEqual(rows[-1][4],"observed")
-        self.assertEqual(rows[-1][5],"held")
+        self.assertEqual(rows[-1][5],"estimated")
         self.assertGreater(rows[-1][2],0)
-        self.assertAlmostEqual(rows[-1][1],2.15)
+        self.assertAlmostEqual(rows[-1][1],0.15 + 2.0/48.0)
 
     def test_no_spurious_pv_for_held_zero_generation(self):
         self.sample("18:00",0,1000,"observed")
