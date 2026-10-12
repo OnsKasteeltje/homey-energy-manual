@@ -90,10 +90,15 @@ class HistoryKissTest(unittest.TestCase):
             self.assertAlmostEqual(sum(r[0] for r in rows), 10.2)
             self.assertAlmostEqual(sum(r[1] for r in rows), .966)
             self.assertAlmostEqual(sum(r[2] for r in rows), 11.166)
-            self.assertTrue(all(r[3:] == ("observed", "observed") for r in rows))
-            # Late PV increment lands in the observed counter interval.
-            self.assertAlmostEqual(rows[48][1], .01)
-            self.assertAlmostEqual(rows[49][1], .466)
+            self.assertTrue(all(r[3] == "observed" for r in rows))
+            self.assertTrue(all(r[4] == "estimated" for r in rows[:50]))
+            self.assertEqual(rows[50][4], "observed")
+            # The delayed SolarEdge counter step is distributed across the
+            # repeated observed plateau; P1 and total energy stay unchanged.
+            expected_plateau_pv = .01 + (.456 / 50.0)
+            self.assertAlmostEqual(rows[48][1], expected_plateau_pv)
+            self.assertAlmostEqual(rows[49][1], expected_plateau_pv)
+            self.assertAlmostEqual(rows[50][1], .01)
 
     def test_hourly_api_restores_simple_house_balance(self):
         with tempfile.TemporaryDirectory() as d:

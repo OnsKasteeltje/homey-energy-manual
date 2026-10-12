@@ -67,9 +67,9 @@ class HeldPvTests(unittest.TestCase):
         self.assertEqual([r[5] for r in rows],["estimated"]*4)
         self.assertAlmostEqual(sum(x[0] for x in rows),0.4,places=6)
 
-    def test_observed_plateau_keeps_counter_increment_timing(self):
-        # Regression based on SolarEdge 14:40-15:40: identical 'observed'
-        # readings precede multi-interval delayed counter increments.
+    def test_observed_plateau_is_redistributed_without_single_interval_spike(self):
+        # Regression based on SolarEdge observed plateaus: identical fresh
+        # counter readings precede a delayed cumulative increment.
         self.sample("14:40",0,1000.000,"observed")
         self.sample("14:45",1,1000.000,"observed")
         self.sample("14:50",2,1000.000,"observed")
@@ -79,9 +79,16 @@ class HeldPvTests(unittest.TestCase):
         self.sample("15:10",6,1001.018,"observed")
         rows=self.build_rows()
         self.assertEqual(len(rows),6)
-        self.assertEqual([round(x[0],6) for x in rows],[0,0,0.556,0,0,0.462])
+        expected=[
+            0.556/3.0,0.556/3.0,0.556/3.0,
+            0.462/3.0,0.462/3.0,0.462/3.0,
+        ]
+        for row,wanted in zip(rows,expected):
+            self.assertAlmostEqual(row[0],wanted,places=6)
+            self.assertEqual(row[3],"estimated")
+            self.assertEqual(row[4],"observed")
+            self.assertEqual(row[5],"estimated")
         self.assertAlmostEqual(sum(x[0] for x in rows),1.018,places=6)
-        self.assertTrue(all(x[3]=="observed" for x in rows))
 
     def test_long_plateau_preserves_counter_delta_without_last_interval_spike(self):
         self.sample("07:00",0,1000,"observed")
@@ -120,6 +127,30 @@ class HeldPvTests(unittest.TestCase):
         rows=self.build_rows()
         self.assertTrue(all(r[0]==0 for r in rows))
         self.assertTrue(all(r[2]>0 for r in rows))
+
+
+    def test_observed_plateau_does_not_smear_across_local_midnight(self):
+        samples=(
+            ("2026-10-08T21:55:00Z",0,1000.0),
+            ("2026-10-08T22:00:00Z",1,1000.0),
+            ("2026-10-08T22:05:00Z",2,1000.0),
+            ("2026-10-08T22:10:00Z",3,1000.2),
+        )
+        for ts,index,se in samples:
+            data=((1,1,100 + 0.05*index,"observed"),
+                  (1,2,50 + 0.01*index,"observed"),
+                  (2,3,se,"observed"),
+                  (3,3,200 + 0.1*index,"observed"),
+                  (4,3,300 + 0.05*index,"observed"))
+            for dev,metric,value,quality in data:
+                self.db.execute(
+                    "INSERT INTO measurements VALUES (?,?,?,?,?,?)",
+                    (ts,dev,metric,value,300,quality),
+                )
+
+        rows=self.build_rows()
+        self.assertEqual([round(r[0],6) for r in rows],[0,0,0.2])
+        self.assertEqual([r[5] for r in rows],["observed"]*3)
 
 
 if __name__=="__main__":
