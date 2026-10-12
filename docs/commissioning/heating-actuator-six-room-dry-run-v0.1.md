@@ -28,7 +28,7 @@ Output schema: `EMS_HEATING_HONEYWELL_ACTUATOR_DRY_RUN_V0.1`. Per room `status` 
 
 ### Begrijpelijke voorwaarden op twee niveaus (uitsluitend presentatie)
 
-De terminalweergave `--human` toont **ALGEMENE VOORWAARDEN** eenmaal (centrale planner, P1, brondatakwaliteit), vervolgens **PER KAMER** uitsluitend de *aanvullende* kamervoorwaarden (Honeywell override, volgende schemastap, temperatuur/veiligheid, camerakoppeling). Een kamer heeft **geen vaste of unieke blokkadereden**: meerdere voorwaarden kunnen tegelijkertijd gelden, of geen aanvullende kamerbeperkingen naast algemene blokkades.
+De terminalweergave `--human` toont **ALGEMENE VOORWAARDEN** eenmaal (centrale planner, P1, brondatakwaliteit), vervolgens **PER KAMER** uitsluitend de *aanvullende* kamervoorwaarden (Honeywell override, volgende schemastap, temperatuur/veiligheid, kamerkoppeling). Een kamer heeft **geen vaste of unieke blokkadereden**: meerdere voorwaarden kunnen tegelijkertijd gelden, of geen aanvullende kamerbeperkingen naast algemene blokkades.
 
 De algemene melding `NO_PRODUCTION_HEATING_GRANT` wordt **'Voorverwarmen momenteel niet ingepland'**. De uitleg gebruikt rechtstreeks `heating.reason` uit `heating-production-grant-v0.1.json`, waar zinvol aangevuld met het daadwerkelijk gerapporteerde `priorityOwner`. Bekende actuele contractredenen krijgen een specifieke verklaring, waaronder `NO_HEATING_PREHEAT_CANDIDATE`, `DYNAMIC_PLAN_STALE_OR_NOT_CURRENT`, `NO_CURRENT_DYNAMIC_PLAN_SLOT`, `FLEX_PRIORITY_PRE_DATES_HEATING` en `FLEX_PRIORITY_DID_NOT_GRANT_HEATING`. Een **onbekende code wordt niet geraden**: de weergave meldt dat een precieze plannerreden nog niet is vertaald, en bewaart de originele `plannerReasonCode` en `priorityReasonCode` in JSON.
 
