@@ -86,6 +86,83 @@ class TestDryRun(unittest.TestCase):
             self.assertIn("HONEYWELL_OVERRIDE_ACTIVE", rooms[room]["denialReasons"])
             self.assertIn("UPSTREAM_SIX_ROOM_SCOPE_MIGRATION_REQUIRED", rooms[room]["denialReasons"])
 
+    def test_douwe_headline_is_permanent_override_with_target(self):
+        rooms = self.run_eval(documents())
+        for key in ("douwe_slaapkamer", "erker_douwe"):
+            explanation = rooms[key]["diagnosis"]
+            self.assertEqual(explanation["primaryCode"], "HONEYWELL_OVERRIDE_ACTIVE")
+            self.assertEqual(explanation["category"], "Honeywell")
+            self.assertIn("15 °C", explanation["headline"])
+            self.assertIn("programma", explanation["advice"])
+            self.assertIn("HONEYWELL_OVERRIDE_ACTIVE", rooms[key]["denialReasons"])
+            self.assertIn("UPSTREAM_HONEYWELL_OVERRIDE_OR_MODE", explanation["technicalOnly"])
+
+    def test_no_grant_has_human_explanation_and_preserves_code(self):
+        d = documents()
+        d["grant"]["heating"]["grant"] = "HOLD"
+        rooms = self.run_eval(d)
+        explanation = rooms["keuken"]["diagnosis"]
+        self.assertEqual(explanation["primaryCode"], "NO_PRODUCTION_HEATING_GRANT")
+        self.assertIn("Planner", explanation["headline"])
+        self.assertIn("NO_PRODUCTION_HEATING_GRANT", rooms["keuken"]["denialReasons"])
+        self.assertIn("ROOM_NOT_IN_PRODUCTION_GRANT",
+                      explanation["technicalOnly"] if
+                      "ROOM_NOT_IN_PRODUCTION_GRANT" in rooms["keuken"]["denialReasons"] else [])
+
+    def test_no_scheduled_up_is_clearer_than_secondary_v05_symptom(self):
+        d = documents()
+        g = d["gate"]["rooms"][0]
+        g["baseline"]["direction"] = "DOWN"
+        g["command"] = {"action": "HOLD", "target_C": None, "physicalWrite": False}
+        explanation = self.run_eval(d)["woonkamer"]["diagnosis"]
+        self.assertEqual(explanation["primaryCode"], "NO_SCHEDULED_UP")
+        self.assertIn("Honeywell", explanation["headline"] + " " + explanation["category"])
+        self.assertIn("TARGET_OUTSIDE_UP_BOUNDS", explanation["technicalOnly"])
+        self.assertIn("V05_NO_NEW_SET_CANDIDATE", explanation["technicalOnly"])
+
+    def test_override_has_priority_over_missing_pv_or_grant(self):
+        d = documents()
+        d["p1"]["grid"].update(export_w=0, import_w=200)
+        d["grant"]["heating"]["grant"] = "HOLD"
+        explanation = self.run_eval(d)["douwe_slaapkamer"]["diagnosis"]
+        self.assertEqual(explanation["primaryCode"], "HONEYWELL_OVERRIDE_ACTIVE")
+        self.assertIn("NO_PRODUCTION_HEATING_GRANT",
+                      [x["code"] for x in explanation["otherReasons"]])
+
+    def test_stale_source_is_not_hidden_by_normal_blockers(self):
+        d = documents()
+        d["p1"]["meta"]["source_sample_at"] = (NOW - timedelta(minutes=5)).isoformat()
+        d["gate"]["rooms"][0]["baseline"]["direction"] = "DOWN"
+        explanation = self.run_eval(d)["woonkamer"]["diagnosis"]
+        self.assertEqual(explanation["primaryCode"], "P1_SOURCE_STALE_OR_UNTIMED")
+        self.assertEqual(explanation["category"], "Gegevens")
+
+    def test_unknown_code_is_shown_not_suppressed(self):
+        detail = module.describe_reason("NEW_SAFETY_REASON", None, None)
+        self.assertEqual(detail["code"], "NEW_SAFETY_REASON")
+        self.assertIn("veiligheidscontrole", detail["title"].lower())
+
+    def test_human_output_has_shared_blockers_once(self):
+        d = documents()
+        d["p1"]["grid"].update(export_w=0, import_w=100)
+        d["grant"]["heating"]["grant"] = "HOLD"
+        result = module.evaluate(d, now=NOW)
+        report = module.human_report(result)
+        self.assertIn("GEEN FYSIEKE AANSTURING", report)
+        self.assertIn("Algemeen:", report)
+        self.assertIn("Douwe slaapkamer: Permanente Honeywell-override", report)
+        self.assertEqual(report.count("Algemeen:"), 1)
+        self.assertEqual(len(result["rooms"]), 6)
+        self.assertTrue(all(x["diagnosis"]["headline"] for x in result["rooms"]))
+        self.assertEqual(result["physicalWrites"], 0)
+
+    def test_candidate_human_explanation_does_not_claim_live_approval(self):
+        result = module.evaluate(documents(), now=NOW)
+        explanation = next(x for x in result["rooms"] if x["key"] == "woonkamer")["diagnosis"]
+        self.assertIsNone(explanation["primaryCode"])
+        self.assertIn("alleen simulatie", explanation["headline"])
+        self.assertIn("geen fysieke toestemming", explanation["advice"].lower())
+
     def test_current_p1_import_fails_closed(self):
         d = documents()
         d["p1"]["grid"].update(export_w=0, import_w=500)
