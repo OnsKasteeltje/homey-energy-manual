@@ -11,7 +11,7 @@ The standalone evaluator `services/pi/control/heating/evaluate_honeywell_actuato
 It reports exactly six Honeywell Heating rooms:
 `woonkamer`, `eetkamer`, `keuken`, `serre`, `douwe_slaapkamer`, `erker_douwe`.
 
-Every room stays visible even when blocked. In particular, the currently observed **permanent overrides** for both Douwe rooms result in `HOLD` and `HONEYWELL_OVERRIDE_ACTIVE`. They are not permanent scope exclusions. Current upstream `preheatScope=false` is shown separately as `SIX_ROOM_SCOPE_MIGRATION_REQUIRED`; this prototype deliberately does **not** modify V0.3, V0.5, Homey intent room allowlists, device maps, or command cardinality.
+Every room stays visible even when blocked. In particular, the currently observed **permanent overrides** for both Douwe rooms result in `HOLD` and `HONEYWELL_OVERRIDE_ACTIVE`. They are not permanent scope exclusions. An upstream `preheatScope=false` would be shown separately as `SIX_ROOM_SCOPE_MIGRATION_REQUIRED`. In the accepted live Pi smoke test, **none** of the six rooms had this denial: observed V0.3 and V0.5 already cover all six. This prototype deliberately does **not** modify V0.3, V0.5, the still-four-room Homey intent allowlist, Homey device map or command cardinality.
 
 The local input snapshots are:
 - `/home/jeroen/ems/data/heating-preheat-shadow-v0.3.json`
@@ -55,8 +55,18 @@ git worktree remove "$WT"
 
 If the process is run outside the normal 5-minute Heating/P1 freshness windows, **all rooms may legitimately report `BLOCKED`**. This is a fail-closed result, not evidence of a defect. The first live-snapshot smoke test must report all six room keys, no physical writes, and the two Douwe overrides as blockers if they are still present. A missing source file or malformed schema must never be patched over with synthetic production data.
 
+## Live Pi smoke-test result — 2026-10-12
+
+- Isolated worktree at `4e0bf1b9b`; **18/18 tests PASS**.
+- Six rooms reported, `physicalWrites=0`, `liveExecutionAllowed=false`; Python printed `PASS: six-room dry-run, no physical writes`.
+- All six rooms `BLOCKED` at the time of observation: `NO_PRODUCTION_HEATING_GRANT`, `P1_NOT_EXPORTING_WITHOUT_IMPORT`, and `V05_NO_NEW_SET_CANDIDATE`; some additionally reported no upcoming `UP` or target bound failure.
+- `douwe_slaapkamer` and `erker_douwe`: vendor mode `permanent_override`, with `HONEYWELL_OVERRIDE_ACTIVE`; both visible and never commanded.
+- No `UPSTREAM_SIX_ROOM_SCOPE_MIGRATION_REQUIRED` or `V05_SIX_ROOM_SCOPE_MIGRATION_REQUIRED` on any room. Thus no upstream `preheatScope` extension has been demonstrated as necessary; the remaining known four-room boundary is Pi/ Homey SHADOW egress.
+
+A **positive** `CANDIDATE_ONLY` case under actual PV export is still **not** demonstrated. This observation does not validate physical write, sustained export or independent edge-readback.
+
 ## Future integration gates (not in this PR)
 
-1. Extend canonical V0.3 preheatScope / candidate model **and** Pi/Homey SHADOW four-room allowlists, room-to-device mapping, checks and tests to six, remaining read-only.
+1. Keep the observed six-room V0.3/V0.5 scope intact; validate room/group consistency, and extend only the still-four-room Pi/Homey SHADOW egress allowlist, room-to-device mapping, command-cardinality checks and tests to six in a **separate read-only change**.
 2. Add evidence-based P1 stability and executive-edge checks, allowlist/time-limited canary, authoritative revision-binding, durable owned temporary override with acknowledgement and independent readback, then watchdog-safe release. These must be distinct reviewed changes.
 3. No automatic publisher or actuator installation and no LIVE permission until separately approved. Physical Honeywell changes remain **strictly forbidden** during this increment.
