@@ -5,8 +5,10 @@ import argparse
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 DB = Path("/home/jeroen/ems/data/ems-history.sqlite")
+LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 MAX_NORMAL_GAP_SECONDS = 900
 COUNTER_DECREASE_EPSILON_KWH = 1e-6
 GAP_MULTIPLIER = 1.5
@@ -69,12 +71,17 @@ def _parse_utc(value):
 
 
 def _prepare_counter_rows(rows):
-    """Normalize complete counter snapshots and redistribute stale PV catch-up.
+    """Normalize complete counter snapshots and redistribute PV plateaus.
 
-    For each inverter independently, a run of held cumulative values followed
-    by the next observed value is linearly interpolated over the elapsed
-    timestamps. Total cumulative energy is preserved exactly; only its unknown
-    timing is estimated.
+    For each inverter independently, repeated identical cumulative readings
+    followed by a positive counter step are treated as delayed counter timing.
+    The exact energy delta is preserved and spread linearly over the existing
+    timestamps of that plateau. This applies regardless of whether the repeated
+    source samples were labelled observed or held.
+
+    Redistribution never crosses an Amsterdam calendar-day boundary. That keeps
+    a genuine overnight zero-production plateau from smearing the next morning's
+    first production backward into the night.
     """
     value_count = len(COUNTERS)
     pv_count = len(PV_COUNTERS)
@@ -99,38 +106,63 @@ def _prepare_counter_rows(rows):
     # Values 0..1 are P1 import/export; PV values start at index 2.
     for pv_offset in range(pv_count):
         value_index = 2 + pv_offset
-        previous_observed_index = None
+        raw_values = [item["values"][value_index] for item in prepared]
 
-        for index, item in enumerate(prepared):
-            if item["pv_held"][pv_offset]:
+        for index in range(1, len(prepared)):
+            previous_value = raw_values[index - 1]
+            current_value = raw_values[index]
+            delta = current_value - previous_value
+
+            if delta <= COUNTER_DECREASE_EPSILON_KWH:
                 continue
 
-            if previous_observed_index is None:
-                previous_observed_index = index
+            # Walk back over the unchanged cumulative plateau immediately
+            # preceding this positive step.
+            plateau_start = index - 1
+            while (
+                plateau_start > 0
+                and abs(
+                    raw_values[plateau_start]
+                    - raw_values[plateau_start - 1]
+                ) <= COUNTER_DECREASE_EPSILON_KWH
+            ):
+                plateau_start -= 1
+
+            # A direct next-sample increment already has precise interval timing.
+            if index <= plateau_start + 1:
                 continue
 
-            if index > previous_observed_index + 1:
-                first = prepared[previous_observed_index]
-                last = item
-                start_value = first["values"][value_index]
-                end_value = last["values"][value_index]
-                start_time = _parse_utc(first["ts"])
-                end_time = _parse_utc(last["ts"])
-                elapsed = (end_time - start_time).total_seconds()
+            first = prepared[plateau_start]
+            last = prepared[index]
+            start_time = _parse_utc(first["ts"])
+            end_time = _parse_utc(last["ts"])
 
-                if elapsed > 0 and end_value >= start_value:
-                    delta = end_value - start_value
-                    if delta > COUNTER_DECREASE_EPSILON_KWH:
-                        for fill_index in range(previous_observed_index + 1, index + 1):
-                            fill = prepared[fill_index]
-                            fraction = (
-                                (_parse_utc(fill["ts"]) - start_time).total_seconds()
-                                / elapsed
-                            )
-                            fill["values"][value_index] = start_value + delta * fraction
-                            fill["pv_estimated_interval"] = True
+            # Do not smear sunrise production backward across an overnight
+            # constant counter plateau.
+            if (
+                start_time.astimezone(LOCAL_TZ).date()
+                != end_time.astimezone(LOCAL_TZ).date()
+            ):
+                continue
 
-            previous_observed_index = index
+            elapsed = (end_time - start_time).total_seconds()
+            if elapsed <= 0:
+                continue
+
+            start_value = raw_values[plateau_start]
+            end_value = current_value
+            total_delta = end_value - start_value
+
+            for fill_index in range(plateau_start + 1, index + 1):
+                fill = prepared[fill_index]
+                fraction = (
+                    (_parse_utc(fill["ts"]) - start_time).total_seconds()
+                    / elapsed
+                )
+                fill["values"][value_index] = (
+                    start_value + total_delta * fraction
+                )
+                fill["pv_estimated_interval"] = True
 
     return prepared
 
@@ -217,10 +249,9 @@ def build(db_path=DB):
                 if elapsed_seconds > expected_resolution * GAP_MULTIPLIER:
                     quality = "gap"
                 elif pv_estimated_interval:
-                    # At least one inverter resumed after held cumulative values.
-                    # Energy is known from the observed endpoints, but its exact
-                    # timing is not; the interval therefore remains usable as an
-                    # explicit estimate instead of a false catch-up spike.
+                    # At least one inverter had a repeated cumulative plateau
+                    # whose next positive counter step was redistributed.
+                    # Energy is known, exact intra-plateau timing is estimated.
                     quality = "estimated"
                 elif prev_has_held_input or bool(has_held_input):
                     # Tail held values without a later observed endpoint cannot
