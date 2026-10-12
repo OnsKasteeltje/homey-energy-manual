@@ -40,7 +40,7 @@ function buildIntent(){
       target_C:roomKey==='woonkamer'?16.5:null,
       baselineCurrentTarget_C:16,
       futureHoneywellTarget_C:18,
-      scheduleChangeAt:isoOffset(3600000),
+      scheduleChangeAt:overridden?null:isoOffset(3600000),
       reason:overridden?'HONEYWELL_OVERRIDE_ACTIVE':'TEST',
       holdReason:overridden?'HONEYWELL_OVERRIDE_ACTIVE':null,
       vendorSetpointMode:overridden?'permanent_override':'follow_schedule',
