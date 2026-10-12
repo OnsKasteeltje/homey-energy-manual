@@ -10,6 +10,8 @@ const ROOM_IDS={
   douwe_slaapkamer:'f74252a1-2879-4967-ba2d-41f56364e39b',
   erker_douwe:'f9db36cd-8c0f-4beb-aa28-0127597652cf'
 };
+// Fixture reflects today's Honeywell state; enforcement is tested on every room below.
+const OBSERVED_HONEYWELL_OVERRIDES=new Set(['douwe_slaapkamer','erker_douwe']);
 const render=p=>fs.readFileSync(p,'utf8').replace(
   'const IDS=__EMS_HEATING_IDS__;',
   'const IDS='+JSON.stringify(IDS)+';'
@@ -29,7 +31,7 @@ const now=Date.now();
 const isoOffset=ms=>new Date(now+ms).toISOString();
 function buildIntent(){
   const commands=Object.entries(ROOM_IDS).map(([roomKey,homeyDeviceId])=>{
-    const overridden=roomKey.includes('douwe');
+    const overridden=OBSERVED_HONEYWELL_OVERRIDES.has(roomKey);
     return {
       roomKey,homeyDeviceId,
       displayName:roomKey,
@@ -131,16 +133,73 @@ assert(gate.commands.filter(c=>c.roomKey.includes('douwe')).every(c=>c.edgeReadb
 assert.equal(gate.commands.find(c=>c.roomKey==='woonkamer').edgeReadback.status,'OBSERVED');
 assert.equal(logicWrites,2); // Two SHADOW Logic outputs, no device writes
 
-const fake=JSON.parse(JSON.stringify(intent));
-fake.commands.find(c=>c.roomKey==='douwe_slaapkamer').action='SET_TEMP';
-fake.commands.find(c=>c.roomKey==='douwe_slaapkamer').target_C=16.5;
-assert.equal(await runAdapter(fake),false);
-let blocked=JSON.parse(vars.adapter.value);
-assert.equal(blocked.valid,false);
-assert(blocked.commands.every(c=>c.action==='HOLD'));
-assert(blocked.errors.some(e=>e.includes('HUMANOVERRIDEHOLD')));
-assert.equal(await gateRun(Homey),false);
-assert.equal(JSON.parse(vars.gate.value).finalStatus,'FAIL');
+// The override rule is universal: six rooms x two manual override modes.
+// A correctly normalized override is always HOLD, regardless of which room.
+let normalizedCases=0;
+let blockedForgedActions=0;
+for(const [roomKey,deviceId] of Object.entries(ROOM_IDS)){
+  for(const mode of ['temporary_override','permanent_override']){
+    const safe=buildIntent();
+    const cmd=safe.commands.find(c=>c.roomKey===roomKey);
+    cmd.vendorSetpointMode=mode;
+    cmd.action='HOLD';
+    cmd.sourceShadowAction='SET_TEMP';
+    cmd.target_C=null;
+    cmd.reason='HONEYWELL_OVERRIDE_ACTIVE';
+    cmd.holdReason='HONEYWELL_OVERRIDE_ACTIVE';
+    cmd.wouldWrite=false;
+    cmd.shadowOwnership.wouldOwnOverride=false;
+    cmd.shadowOwnership.simulatedRollback=false;
+    assert.equal(await runAdapter(safe),true,roomKey+':'+mode);
+    const output=JSON.parse(vars.adapter.value);
+    const translated=output.commands.find(c=>c.roomKey===roomKey);
+    assert.equal(translated.action,'HOLD');
+    assert.equal(translated.requestedTarget_C,null);
+    assert.equal(translated.holdReason,'HONEYWELL_OVERRIDE_ACTIVE');
+    assert.equal(translated.physicalWrite,false);
+    readIds=[];
+    assert.equal(await gateRun(Homey),true,roomKey+':'+mode);
+    const edge=JSON.parse(vars.gate.value);
+    const gated=edge.commands.find(c=>c.roomKey===roomKey);
+    assert.equal(gated.action,'HOLD');
+    assert.equal(gated.physicalWrite,false);
+    assert.equal(gated.edgeReadback.status,'NOT_REQUIRED');
+    assert(!readIds.includes(deviceId));
+    assert.equal(edge.liveExecutionAllowed,false);
+    normalizedCases++;
+
+    // A malicious or mismatched intent may not override the same homeowner mode.
+    for(const action of ['SET_TEMP','KEEP_TEMP','RESET_TO_SCHEDULE']){
+      const forged=buildIntent();
+      const change=forged.commands.find(c=>c.roomKey===roomKey);
+      change.vendorSetpointMode=mode;
+      change.holdReason='HONEYWELL_OVERRIDE_ACTIVE';
+      change.reason='HONEYWELL_OVERRIDE_ACTIVE';
+      change.action=action;
+      change.sourceShadowAction=action;
+      change.target_C=action==='RESET_TO_SCHEDULE'?null:16.5;
+      change.wouldWrite=true;
+      change.shadowOwnership.wouldOwnOverride=action!=='RESET_TO_SCHEDULE';
+      change.shadowOwnership.simulatedRollback=action==='RESET_TO_SCHEDULE';
+      assert.equal(await runAdapter(forged),false,roomKey+':'+mode+':'+action);
+      const fail=JSON.parse(vars.adapter.value);
+      assert.equal(fail.valid,false);
+      assert(fail.commands.every(c=>c.action==='HOLD'));
+      assert(fail.commands.every(c=>c.physicalWrite===false));
+      assert(fail.errors.some(e=>e.includes('HUMANOVERRIDEHOLD')),
+             roomKey+':'+mode+':'+action);
+      readIds=[];
+      assert.equal(await gateRun(Homey),false);
+      const gateFail=JSON.parse(vars.gate.value);
+      assert.equal(gateFail.finalStatus,'FAIL');
+      assert(gateFail.commands.every(c=>c.physicalWrite===false));
+      assert(!readIds.includes(deviceId));
+      blockedForgedActions++;
+    }
+  }
+}
+assert.equal(normalizedCases,12);
+assert.equal(blockedForgedActions,36);
 
 const missing=JSON.parse(JSON.stringify(intent));
 missing.commands.pop();
@@ -167,4 +226,4 @@ live.liveExecutionAllowed=true;
 assert.equal(await runAdapter(live),false);
 assert(JSON.parse(vars.adapter.value).commands.every(c=>c.physicalWrite===false));
 
-console.log('PASS: Homey six-room Heating Adapter/Gate V0.2 SHADOW, six IDs, Douwe HOLD, no device writes');
+console.log('PASS: Homey six-room SHADOW V0.2, 12 universal override HOLD cases, 36 forged actions blocked, no device writes');
