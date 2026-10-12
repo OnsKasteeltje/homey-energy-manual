@@ -121,6 +121,28 @@ class EmsPerformanceEnergyAccountingTest(unittest.TestCase):
             self.assertEqual(power["pv_p1_impossible_export_intervals"], 13)
             self.assertAlmostEqual(power["pv_p1_impossible_export_kwh"], 0.890, places=3)
 
+            report = ems.build_report(
+                DAY, db, Path(tmp) / "missing-planner.sqlite",
+                now_utc=datetime(2026, 10, 12, tzinfo=timezone.utc),
+            )
+            m = report["metrics"]
+            self.assertEqual(report["quality"]["status"], "GOOD")
+            self.assertEqual(report["energyAccounting"]["status"], "GOOD")
+            self.assertEqual(m["pv_kwh"], 19.488)
+            self.assertEqual(m["grid_export_kwh"], 4.678)
+            self.assertEqual(m["grid_import_kwh"], 13.252)
+            self.assertEqual(m["direct_pv_self_use_kwh"], 14.810)
+            self.assertEqual(m["pv_self_consumption_rate"], 0.76)
+            self.assertEqual(report["powerSampleQuality"]["impossibleExportIntervals"], 13)
+            self.assertEqual(report["powerSampleQuality"]["impossibleExportEnergyKWh"], 0.890)
+            self.assertNotEqual(
+                report["sampledPowerMetrics"]["pv_self_consumption_rate"],
+                m["pv_self_consumption_rate"],
+            )
+            self.assertFalse(
+                report["evEnergyAccounting"]["derivedSourceAllocation"]["measuredDirectly"]
+            )
+
     def test_incomplete_paired_history_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "ems-history.sqlite"
