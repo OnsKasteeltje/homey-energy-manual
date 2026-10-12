@@ -44,7 +44,18 @@ def main():
                 "current": {
                     "temperature_C": 17.2,
                     "targetTemperature_C": 15.5,
-                    "setpointMode": "FOLLOW_SCHEDULE",
+                    "setpointMode": "follow_schedule",
+                    "overrideUntil": None,
+                },
+                "effective": {
+                    "currentTarget_C": 15.5,
+                    "source": "SCHEDULE",
+                    "systemMode": "auto",
+                    "setpointMode": "follow_schedule",
+                    "overrideUntil": None,
+                    "scheduleAligned": True,
+                    "preheatAdvanceAllowed": True,
+                    "reason": "FOLLOW_SCHEDULE",
                 },
                 "baseline": {
                     "currentTarget_C": 15.5,
