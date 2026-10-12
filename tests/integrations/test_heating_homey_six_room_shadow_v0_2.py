@@ -18,6 +18,8 @@ NEXT = (NOW + timedelta(hours=1)).isoformat().replace("+00:00", "Z")
 ROOMS = tuple(m.ROOM_DEVICES)
 # Sampled current vendor modes; this is test data, NOT room-specific policy.
 OBSERVED_OVERRIDES = frozenset({"douwe_slaapkamer", "erker_douwe"})
+# Honeywell publishes eight mapped rooms, but EMS preheat may nominate only six.
+BASELINE_ONLY_ROOMS = ("master_bedroom", "krijn_slaapkamer")
 
 
 def source():
@@ -74,7 +76,17 @@ def honeywell():
             "setpointMode": "permanent_override" if key in OBSERVED_OVERRIDES else "follow_schedule",
             "targetTemperature_C": 16.0,
             "overrideUntil": None,
-        } for key, device in m.ROOM_DEVICES.items()],
+        } for key, device in m.ROOM_DEVICES.items()] + [
+            {
+                "key": key,
+                "homeyDeviceId": "baseline-only-device-" + key,
+                "setpointMode": "follow_schedule",
+                "targetTemperature_C": None,
+                "overrideUntil": None,
+            }
+            for key in BASELINE_ONLY_ROOMS
+        ],
+        "zoneCount": 8,
     }
 
 
@@ -103,10 +115,20 @@ def main():
     assert len(m.ROOM_DEVICES) == 6
     assert m.MANUAL_OVERRIDE_MODES == {"temporary_override", "permanent_override"}
     data, vendor = source(), honeywell()
+    assert vendor["zoneCount"] == 8
+    assert len(vendor["zones"]) == 8
+    assert all(key not in m.ALLOWED_ROOM_KEYS for key in BASELINE_ONLY_ROOMS)
     intent = m.build_intent(data, vendor, generated_at=NOW)
     assert intent["valid"] is True, intent
     assert intent["roomCount"] == 6
     assert set(c["roomKey"] for c in intent["commands"]) == set(ROOMS)
+    assert not set(BASELINE_ONLY_ROOMS).intersection(c["roomKey"] for c in intent["commands"])
+    # Non-preheat rooms may be absent or have unknown targets: neither creates
+    # control permission nor invalidates a fully verified six-room subset.
+    only_six = honeywell()
+    only_six["zones"] = [z for z in only_six["zones"] if z["key"] in ROOMS]
+    only_six["zoneCount"] = len(only_six["zones"])
+    assert m.build_intent(data, only_six, generated_at=NOW)["valid"] is True
     assert intent["schema"] == "EMS_HEATING_CONTROL_INTENT_V0.2"
     assert intent["controlRevision"].startswith("hcs2-")
     assert all(c["physicalWrite"] is False for c in intent["commands"])
@@ -193,12 +215,23 @@ def main():
     duplicate = source()
     duplicate["rooms"].append(copy.deepcopy(duplicate["rooms"][0]))
     is_denied(m.build_intent(duplicate, vendor, generated_at=NOW), "DUPLICATE")
-    missing_zone = honeywell()
-    missing_zone["zones"].pop()
-    is_denied(m.build_intent(data, missing_zone, generated_at=NOW), "SIX-ROOM_KEY_SET_MISMATCH")
-    duplicate_zone = honeywell()
-    duplicate_zone["zones"].append(copy.deepcopy(duplicate_zone["zones"][0]))
-    is_denied(m.build_intent(data, duplicate_zone, generated_at=NOW), "DUPLICATE_ZONE")
+    # Loss of a baseline-only zone does not invalidate six-room preheat.
+    missing_baseline_only = honeywell()
+    missing_baseline_only["zones"].pop()
+    assert m.build_intent(data, missing_baseline_only, generated_at=NOW)["valid"] is True
+    # Loss of any one of the six REQUIRED preheat zones must fail closed.
+    for required_key in ROOMS:
+        missing_zone = honeywell()
+        missing_zone["zones"] = [z for z in missing_zone["zones"] if z["key"] != required_key]
+        is_denied(
+            m.build_intent(data, missing_zone, generated_at=NOW),
+            "REQUIRED_PREHEAT_ZONES_MISSING",
+        )
+    # Duplicates of ANY source-zone key fail closed, including baseline-only.
+    for duplicate_key in (*ROOMS, *BASELINE_ONLY_ROOMS):
+        duplicate_zone = honeywell()
+        duplicate_zone["zones"].append(copy.deepcopy(zone(duplicate_zone, duplicate_key)))
+        is_denied(m.build_intent(data, duplicate_zone, generated_at=NOW), "DUPLICATE_ZONE")
     wrong = honeywell()
     zone(wrong, "erker_douwe")["homeyDeviceId"] = "incorrect-id"
     is_denied(m.build_intent(data, wrong, generated_at=NOW), "DEVICE_ID_MISMATCH")
