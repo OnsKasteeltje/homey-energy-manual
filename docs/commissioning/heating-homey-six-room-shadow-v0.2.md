@@ -24,7 +24,7 @@ Pinned six-room mapping:
 
 Exactly six non-duplicate room keys, exactly these device IDs, current Pi V0.5/read-only Honeywell snapshots, valid SHADOW freshness/order and no-write flags are required. Missing or corrupt sources fail closed with zero commands.
 
-For ANY zone in permanent_override or temporary_override, the Pi builder forces a HOLD with target null, wouldWrite false, holdReason HONEYWELL_OVERRIDE_ACTIVE and no simulated ownership even if V0.5 suggests SET/KEEP/RESET. An unknown zone mode, a non-Auto Honeywell system mode, contradictory override end-time or changed target also results in HOLD. A simulated SET/KEEP also requires an upcoming scheduled UP transition. HOLD requires neither a future UP time nor an edge device read. Both new Homey components independently guard the six-ID mapping, the override HOLD rule, freshness and fail-closed semantics.
+**ONE UNIVERSAL RULE FOR ALL SIX ROOMS, WITHOUT EXCEPTIONS:** any Honeywell zone in permanent_override or temporary_override forces HOLD, with target null, wouldWrite false, holdReason HONEYWELL_OVERRIDE_ACTIVE and no simulated ownership. This always overrides a proposed V0.5 SET, KEEP or RESET, regardless of room identity, zone group or current temperature. Douwe's overrides are only currently observed examples, never room-specific policy. The checks apply identically to woonkamer, eetkamer, keuken, serre, douwe_slaapkamer and erker_douwe. An unknown zone mode, a non-Auto Honeywell system mode, contradictory override end-time or changed target also results in HOLD. A simulated SET/KEEP also requires an upcoming scheduled UP transition. HOLD requires neither a future UP time nor an edge device read. Both new Homey components independently guard the six-ID mapping, the override HOLD rule, freshness and fail-closed semantics.
 
 The fields wouldWrite / sourceShadowAction describe hypothetical, legacy V0.5 SHADOW semantics, never an actuator permit. All V0.2 contracts retain physicalWrite=false, deviceWrites=false, physicalWriteAllowed=false, liveExecutionAllowed=false, physicalOwnershipProven=false, plannerAuthority=SHADOW_ONLY and executor=HOMEY_SHADOW. No readback in this phase proves a physical override, actuator ACK or ownership.
 
@@ -32,7 +32,7 @@ The fields wouldWrite / sourceShadowAction describe hypothetical, legacy V0.5 SH
 
 ## Safe standalone Pi test
 
-Run ONLY in an isolated worktree. This uses Python unittest-style asserts and Node test mocks, never Homey.
+Run ONLY in an isolated worktree. This uses Python unittest-style asserts and Node test mocks, never Homey. The Python test covers 6 rooms x 2 override modes x 4 V0.5 action classes = **48** universal HOLD scenarios. The Homey mock suite covers 12 valid override HOLD combinations plus 36 forged SET/KEEP/RESET actions which must fail closed. Each scenario is checked for no physical writes.
 
     set -euo pipefail
     cd /home/jeroen/ems/repo/homey-energy-manual
@@ -60,8 +60,10 @@ Optional local runtime evidence (no writes or publisher):
         assert len(d["commands"])==6
         for c in d["commands"]:
             assert c["physicalWrite"] is False
-            if c["roomKey"] in ("douwe_slaapkamer","erker_douwe") and c["vendorSetpointMode"] in ("permanent_override","temporary_override"):
+            if c["vendorSetpointMode"] in ("permanent_override","temporary_override"):
                 assert c["action"]=="HOLD"
+                assert c["target_C"] is None
+                assert c["wouldWrite"] is False
         print("PASS: six-room local SHADOW contract")
     else:
         assert d["commands"]==[]
