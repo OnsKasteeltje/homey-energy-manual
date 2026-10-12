@@ -223,53 +223,120 @@ def describe_reason(code: str, observed_mode: str | None, observed_target: float
     }
 
 
-def diagnose(reasons: list[str], observed_mode: str | None, observed_target: float | None,
-             command_action: str | None) -> dict:
-    if not reasons:
-        return {
-            "headline": "Voorverwarmen lijkt mogelijk (alleen simulatie)",
-            "category": "Simulatie", "advice": "Nog geen fysieke toestemming of apparaatvalidatie.",
-            "primaryCode": None, "otherReasons": [], "technicalOnly": [],
-        }
-    descriptions = [describe_reason(r, observed_mode, observed_target) for r in reasons]
-    descriptions.sort(key=lambda detail: (detail["priority"], detail["code"]))
-    primary = descriptions[0]
-    codes = set(reasons)
-    technical = set(DERIVED_REASONS)
-    if command_action != "WOULD_SET_TEMP":
-        technical.add("TARGET_OUTSIDE_UP_BOUNDS")
-    if "HONEYWELL_OVERRIDE_ACTIVE" in codes:
-        technical.add("HONEYWELL_PREHEAT_NOT_ALLOWED")
-    if "NO_PRODUCTION_HEATING_GRANT" in codes:
-        technical.add("ROOM_NOT_IN_PRODUCTION_GRANT")
-    secondary = [d for d in descriptions[1:] if d["code"] not in technical]
+# These translations are based on the actual reason contract in
+# build_heating_production_grant_v0_1.py. Unknown priority codes are not guessed.
+PLANNER_EXPLANATIONS = {
+    "NO_HEATING_PREHEAT_CANDIDATE": "Er is op dit moment geen ruimte die voldoet aan de voorwaarden voor vervroegd opwarmen.",
+    "DYNAMIC_PLAN_STALE_OR_NOT_CURRENT": "De centrale energieplanning is niet actueel of niet geldig.",
+    "NO_CURRENT_DYNAMIC_PLAN_SLOT": "Er is geen geldig planningsinterval voor dit moment.",
+    "FLEX_PRIORITY_PRE_DATES_HEATING": "De energieprioriteiten zijn ouder dan de verwarmingsinformatie.",
+    "FLEX_PRIORITY_DID_NOT_GRANT_HEATING": "De centrale energieverdeling heeft voorverwarmen niet geselecteerd.",
+}
+PRIORITY_LABELS = {
+    "EV": "autoladen", "WW": "warm water", "QUOOKER": "Quooker",
+    "HEATING": "ruimteverwarming",
+}
+
+
+def explain_planner(grant: dict) -> dict:
+    """Report the documented planner decision, never infer priority from P1 alone."""
+    heating = obj(grant.get("heating"))
+    reason = heating.get("reason")
+    priority_reason = heating.get("priorityReason")
+    priority_owner = heating.get("priorityOwner")
+    detail = PLANNER_EXPLANATIONS.get(reason)
+    if detail is None and isinstance(reason, str):
+        if reason.endswith("_STALE") or "STALE" in reason:
+            detail = "Een bron van de energieplanner is niet actueel."
+        elif reason.startswith("PRODUCTION_GRANT_"):
+            detail = "De plannerreden en de ontbrekende verwarmingsvrijgave zijn niet eenduidig."
+        elif reason == priority_reason and priority_owner in PRIORITY_LABELS:
+            detail = "De energieplanner heeft ruimteverwarming niet geselecteerd."
+    if detail is None:
+        detail = "Voorverwarmen is momenteel niet ingepland; de precieze plannerreden is nog niet vertaald."
+    # Only state the declared owner. An owner is not proof of available PV.
+    if reason not in {"NO_HEATING_PREHEAT_CANDIDATE", "DYNAMIC_PLAN_STALE_OR_NOT_CURRENT",
+                      "NO_CURRENT_DYNAMIC_PLAN_SLOT", "FLEX_PRIORITY_PRE_DATES_HEATING"}:
+        owner_label = PRIORITY_LABELS.get(priority_owner)
+        if owner_label and priority_owner != "HEATING":
+            detail += f" De planner registreert {owner_label} als huidige prioriteit."
     return {
-        "headline": primary["title"], "category": primary["category"],
-        "advice": primary["nextStep"], "primaryCode": primary["code"],
-        "otherReasons": [{"code": d["code"], "title": d["title"]} for d in secondary],
-        "technicalOnly": [d["code"] for d in descriptions[1:] if d["code"] in technical],
+        "code": "NO_PRODUCTION_HEATING_GRANT",
+        "category": "Planning",
+        "title": "Voorverwarmen momenteel niet ingepland",
+        "explanation": detail,
+        "plannerReasonCode": reason if isinstance(reason, str) else None,
+        "priorityReasonCode": priority_reason if isinstance(priority_reason, str) else None,
+        "priorityOwner": priority_owner if isinstance(priority_owner, str) else None,
     }
 
 
+# Diagnostic consequences are deliberately retained in raw denialReasons.
+# They do not become duplicate human-facing conditions.
+DERIVED_ROOM = {
+    "UPSTREAM_HONEYWELL_OVERRIDE_OR_MODE", "V05_NO_NEW_SET_CANDIDATE",
+    "V05_ROOM_CHECKS_NOT_ALL_TRUE",
+}
+
+
+def general_conditions(reasons: list[str], grant: dict) -> list[dict]:
+    conditions = []
+    for code in reasons:
+        if code == "NO_PRODUCTION_HEATING_GRANT":
+            conditions.append(explain_planner(grant))
+        else:
+            d = describe_reason(code, None, None)
+            conditions.append({
+                "code": code, "category": d["category"], "title": d["title"],
+                "explanation": d["explanation"],
+            })
+    return conditions
+
+
+def room_conditions(reasons: list[str], shared: list[str],
+                    observed_mode: str | None, observed_target: float | None,
+                    command_action: str | None) -> tuple[list[dict], list[str]]:
+    """Split local conditions and derived details; do not pick a primary room reason."""
+    unique = [code for code in reasons if code not in shared]
+    suppressed = set(DERIVED_ROOM)
+    if command_action != "WOULD_SET_TEMP":
+        suppressed.add("TARGET_OUTSIDE_UP_BOUNDS")
+    if "HONEYWELL_OVERRIDE_ACTIVE" in unique:
+        suppressed.add("HONEYWELL_PREHEAT_NOT_ALLOWED")
+    if "NO_PRODUCTION_HEATING_GRANT" in shared:
+        suppressed.add("ROOM_NOT_IN_PRODUCTION_GRANT")
+    visible = [describe_reason(code, observed_mode, observed_target)
+               for code in unique if code not in suppressed]
+    visible.sort(key=lambda d: (d["priority"], d["code"]))
+    return ([{"code": d["code"], "category": d["category"],
+              "title": d["title"], "explanation": d["explanation"]}
+             for d in visible],
+            [code for code in unique if code in suppressed])
+
+
 def human_report(payload: dict) -> str:
-    """Compact Dutch CLI view; JSON remains unchanged without --human."""
-    lines = ["Honeywell preheat | zes kamers | DRY-RUN", "GEEN FYSIEKE AANSTURING"]
-    shared = set(payload.get("globalDenialReasons") or [])
-    if shared:
-        global_titles = sorted((describe_reason(c, None, None) for c in shared),
-                               key=lambda d: (d["priority"], d["code"]))
-        lines.append("Algemeen: " + "; ".join(d["title"] for d in global_titles))
+    """Read-only Dutch CLI rendering. Original raw denialReasons stay in JSON."""
+    lines = ["Honeywell preheat | zes kamers | DRY-RUN", "GEEN FYSIEKE AANSTURING",
+             "", "ALGEMENE VOORWAARDEN"]
+    general = payload.get("generalConditions") or []
+    if not general:
+        lines.append("Geen algemene blokkades in deze momentopname.")
+    for cond in general:
+        lines.append(f"- {cond['title']}: {cond['explanation']}")
+    lines += ["", "PER KAMER (aanvullend op algemene voorwaarden)"]
     for room in payload.get("rooms") or []:
-        diagnosis = obj(room.get("diagnosis"))
         title = room["key"].replace("_", " ").capitalize()
-        lines.append(f"{title}: {diagnosis.get('headline', 'Onbekend')}")
-        others = [r["title"] for r in diagnosis.get("otherReasons", [])
-                  if r["code"] not in shared]
-        if others:
-            lines.append("  Verder: " + "; ".join(others[:2])
-                         + (f" (+{len(others)-2} meer)" if len(others) > 2 else ""))
-    lines.append("Technische codes staan nog in denialReasons (standaard JSON-uitvoer).")
+        lines.append(f"{title}:")
+        local = room.get("roomConditions") or []
+        if not local:
+            lines.append("  Geen aanvullende kamerblokkades.")
+        else:
+            for cond in local:
+                lines.append(f"  - {cond['title']}")
+    lines += ["", "Technische codes: denialReasons in de standaard JSON-uitvoer.",
+              "Dit overzicht verleent GEEN toestemming voor fysieke aansturing."]
     return "\n".join(lines)
+
 
 def evaluate(docs: dict[str, Any], *, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
@@ -375,8 +442,11 @@ def evaluate(docs: dict[str, Any], *, now: datetime | None = None) -> dict:
                 reasons.append("SCHEDULED_UP_EXPIRED")
         reasons = list(dict.fromkeys(reasons))
         candidate = len(reasons) == 0
-        diagnosis = diagnose(reasons, vendor_mode, numeric(v.get("targetTemperature_C")) if v else None,
-                             obj(g.get("command")).get("action") if g else None)
+        local_conditions, derived_details = room_conditions(
+            reasons, global_reasons, vendor_mode,
+            numeric(v.get("targetTemperature_C")) if v else None,
+            obj(g.get("command")).get("action") if g else None,
+        )
         results.append({
             "key": key, "homeyDeviceId": device_id,
             "observedMode": vendor_mode,
@@ -385,7 +455,8 @@ def evaluate(docs: dict[str, Any], *, now: datetime | None = None) -> dict:
             "simulatedTarget_C": target if candidate else None,
             "simulatedExpiryAt": end.isoformat().replace("+00:00", "Z") if candidate else None,
             "denialReasons": reasons,
-            "diagnosis": diagnosis,
+            "roomConditions": local_conditions,
+            "technicalOnly": derived_details,
             "liveExecutionAllowed": False,
             "physicalWrite": False,
             "physicalOwnershipProven": False,
@@ -397,6 +468,7 @@ def evaluate(docs: dict[str, Any], *, now: datetime | None = None) -> dict:
         "physicalWrites": 0, "deviceReads": 0, "networkCalls": 0,
         "rooms": results, "roomCount": len(results),
         "globalDenialReasons": list(dict.fromkeys(global_reasons)),
+        "generalConditions": general_conditions(list(dict.fromkeys(global_reasons)), data["grant"]),
         "edgeProofMissing": ["SUSTAINED_P1_EXPORT_UNPROVEN", "HOMEY_EDGE_READ_UNPROVEN",
                              "TEMPORARY_OVERRIDE_ACK_UNPROVEN", "INDEPENDENT_HONEYWELL_READBACK_UNPROVEN",
                              "GRANT_REVISION_NOT_BOUND_TO_V05",
