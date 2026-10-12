@@ -123,6 +123,10 @@ def main():
         module.EV_DEADLINE_STATE_FILE = root / "ev-deadline-shadow-state.json"
         module.FLEX_PRIORITY_FILE = root / "flex-priority-shadow-v0.1.json"
         module.HEATING_PROGRESSION_FILE = root / "heating-preheat-progression-shadow-v0.4.json"
+        # Keep this generic semantic-history contract isolated from any live
+        # Honeywell runtime artifact on the host. Honeywell target history has
+        # its own dedicated regression test.
+        module.HONEYWELL_STATE_FILE = root / "missing-honeywell-state.json"
 
         fixtures(root, changed=False)
         baseline = module.archive(
