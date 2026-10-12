@@ -113,29 +113,46 @@ def main():
     assert intent["liveExecutionAllowed"] is False
     assert command(intent, "woonkamer")["action"] == "SET_TEMP"
 
-    # A human override on either Douwe room remains HOLD even if V0.5 proposes SET.
-    for key in ("douwe_slaapkamer", "erker_douwe"):
-        d = source()
-        r = room(d, key)
-        r["command"].update(action="WOULD_SET_TEMP", target_C=16.5)
-        r["shadowOwnership"]["wouldOwnOverride"] = True
-        blocked = m.build_intent(d, vendor, generated_at=NOW)
-        cmd = command(blocked, key)
-        assert blocked["valid"] is True
-        assert cmd["action"] == "HOLD"
-        assert cmd["sourceShadowAction"] == "SET_TEMP"
-        assert cmd["target_C"] is None
-        assert cmd["wouldWrite"] is False
-        assert cmd["holdReason"] == "HONEYWELL_OVERRIDE_ACTIVE"
-        assert cmd["shadowOwnership"]["wouldOwnOverride"] is False
-        assert cmd["physicalWrite"] is False
-
-    # A temporary human override must receive the same protection.
-    other = honeywell()
-    zone(other, "keuken")["setpointMode"] = "temporary_override"
-    temporary = m.build_intent(data, other, generated_at=NOW)
-    assert command(temporary, "keuken")["action"] == "HOLD"
-    assert command(temporary, "keuken")["holdReason"] == "HONEYWELL_OVERRIDE_ACTIVE"
+    # Universal property: for every room, every manual override mode wins over
+    # every hypothetical V0.5 action, including a simulated RESET.
+    actions = {
+        "HOLD": ("HOLD", None, False, False),
+        "WOULD_SET_TEMP": ("SET_TEMP", 16.5, True, False),
+        "WOULD_KEEP_TEMP": ("KEEP_TEMP", 16.5, True, False),
+        "WOULD_RESET_TO_SCHEDULE": ("RESET_TO_SCHEDULE", None, False, True),
+    }
+    covered = 0
+    for key in ROOMS:
+        for override_mode in ("temporary_override", "permanent_override"):
+            for raw_action, (mapped, target, would_own, rollback) in actions.items():
+                d = source()
+                v = honeywell()
+                zone(v, key)["setpointMode"] = override_mode
+                r = room(d, key)
+                r["command"].update(action=raw_action, target_C=target)
+                r["shadowOwnership"].update(
+                    wouldOwnOverride=would_own,
+                    simulatedRollback=rollback,
+                    physicalOwnershipProven=False,
+                )
+                result = m.build_intent(d, v, generated_at=NOW)
+                assert result["valid"] is True, (key, override_mode, raw_action, result)
+                assert result["roomCount"] == 6
+                cmd = command(result, key)
+                assert cmd["sourceShadowAction"] == mapped, (key, raw_action)
+                assert cmd["action"] == "HOLD", (key, override_mode, raw_action)
+                assert cmd["holdReason"] == "HONEYWELL_OVERRIDE_ACTIVE"
+                assert cmd["vendorSetpointMode"] == override_mode
+                assert cmd["target_C"] is None
+                assert cmd["wouldWrite"] is False
+                assert cmd["physicalWrite"] is False
+                assert cmd["shadowOwnership"]["wouldOwnOverride"] is False
+                assert cmd["shadowOwnership"]["simulatedRollback"] is False
+                assert cmd["shadowOwnership"]["physicalOwnershipProven"] is False
+                assert result["liveExecutionAllowed"] is False
+                assert result["physicalWriteAllowed"] is False
+                covered += 1
+    assert covered == 6 * 2 * 4
 
     # Unknown/contradictory/mismatched vendor mode or target -> only HOLD.
     uncertain = honeywell()
@@ -222,7 +239,7 @@ def main():
         for forbidden in ("setCapabilityValue(", "setCapabilityValues(", "runFlowCardAction("):
             assert forbidden not in js, forbidden
 
-    print("PASS: six-room Pi -> Homey V0.2 SHADOW intent, overrides HOLD, no publisher")
+    print("PASS: six-room Pi -> Homey V0.2 SHADOW intent, 48 override/action cases HOLD, no publisher")
 
 
 if __name__ == "__main__":
