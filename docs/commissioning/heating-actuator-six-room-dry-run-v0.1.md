@@ -26,6 +26,14 @@ The evaluator checks schema, source ages, planner grant and validity, V0.5 SHADO
 
 Output schema: `EMS_HEATING_HONEYWELL_ACTUATOR_DRY_RUN_V0.1`. Per room `status` is either `BLOCKED` or `CANDIDATE_ONLY` with `denialReasons`; `simulatedAction` is either `HOLD` or `WOULD_SET_TEMP`. A candidate is a *diagnostic what-if*, not a live-permit: `physicalWrites=0`, `physicalWriteAllowed=false`, `liveExecutionAllowed=false`, `physicalOwnershipProven=false`. `edgeProofMissing` lists the unresolved sustained P1 check, Homey edge read, ACK, independent Honeywell readback, physical ownership and grant-revision binding.
 
+### Leesbare blokkaderedenen (presentation-only)
+
+`--human` toont een compacte Nederlandstalige uitleg per kamer, met gedeelde P1-/plannerblokkades één keer bovenaan. Zonder deze optie blijft het bestaande JSON-contract beschikbaar. Elke kamer heeft daarnaast een JSON-veld `diagnosis` met `headline`, `category`, `advice`, `primaryCode`, `otherReasons` en `technicalOnly`.
+
+**De oorspronkelijke `denialReasons` blijven byte-for-byte de autoritatieve technische codes.** Redenen worden uitsluitend voor presentatie gegroepeerd: een ontbrekende planner-grant verklaart vaak `ROOM_NOT_IN_PRODUCTION_GRANT`; een V0.5 HOLD veroorzaakt doorgaans `V05_NO_NEW_SET_CANDIDATE` en een lege target. Die vervolgdetails staan nog in JSON, maar verdringen de hoofdoorzaak niet. Een Honeywell-permanente override heeft, zolang bronkwaliteit geldig is, voor die kamer presentatievoorrang boven algemene weers-/energiecondities. Bronfouten of ongeldige gegevens krijgen voorrang boven normale wachtcondities.
+
+Voorbeelden uit de eerste Pi-observatie: *Geen geplande temperatuurverhoging*, *Planner geeft verwarming geen ruimte*, *Geen bruikbaar P1-overschot*, *Permanente Honeywell-override op 16 °C*. Dit zijn **waargenomen redenen bij een specifiek moment**, geen blijvende toestand.
+
 ## Safe manual PI smoke test from an isolated worktree
 
 Run these commands **on the Pi**. They only read runtime JSON and use a separate temporary worktree: `main` and deployed services remain untouched.
@@ -38,6 +46,11 @@ WT="/tmp/ems-heating-dryrun-$(date +%s)"
 git worktree add --detach "$WT" FETCH_HEAD
 
 python3 "$WT/tests/planner/heating/test_honeywell_actuator_dry_run_v0_1.py"
+
+# Leesbaar overzicht, zonder de technische codes:
+python3 "$WT/services/pi/control/heating/evaluate_honeywell_actuator_dry_run_v0_1.py" --human
+
+# Machineleesbaar resultaat inclusief alle technische blokkades:
 python3 "$WT/services/pi/control/heating/evaluate_honeywell_actuator_dry_run_v0_1.py" |
 python3 -c '
 import json, sys
@@ -45,8 +58,8 @@ d = json.load(sys.stdin)
 assert d["roomCount"] == 6
 assert d["physicalWrites"] == 0
 assert d["liveExecutionAllowed"] is False
-for r in d["rooms"]:
-    print(r["key"], r["status"], r["observedMode"], ",".join(r["denialReasons"]) or "-")
+for room in d["rooms"]:
+    assert room["diagnosis"]["headline"]
 print("PASS: six-room dry-run only, no physical writes")
 '
 
