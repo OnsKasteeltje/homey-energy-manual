@@ -19,21 +19,35 @@ COUNTERS = (
     ("pv_goodwe2000", "energy_produced_kwh", "pv_goodwe2000_kwh"),
 )
 
+PV_COUNTERS = COUNTERS[2:]
+
 
 def _counter_rows(con):
-    parts = []
+    value_parts = []
+    quality_parts = []
     args = []
+
     for device_key, metric_key, alias in COUNTERS:
-        parts.append(
+        value_parts.append(
             """MAX(CASE WHEN d.device_key=? AND m.metric_key=?
                      THEN x.value_real END) AS %s""" % alias
         )
         args.extend((device_key, metric_key))
+
+    for device_key, metric_key, alias in PV_COUNTERS:
+        quality_parts.append(
+            """MAX(CASE WHEN d.device_key=? AND m.metric_key=?
+                     THEN CASE WHEN x.quality='held' THEN 1 ELSE 0 END END)
+               AS %s_held""" % alias
+        )
+        args.extend((device_key, metric_key))
+
     sql = f"""
         SELECT x.ts_utc,
                MAX(x.source_resolution_seconds),
                MAX(CASE WHEN x.quality='held' THEN 1 ELSE 0 END) AS has_held_input,
-               {", ".join(parts)}
+               {", ".join(value_parts)},
+               {", ".join(quality_parts)}
         FROM measurements x
         JOIN devices d ON d.id=x.device_id
         JOIN metrics m ON m.id=x.metric_id
@@ -52,6 +66,72 @@ def _counter_rows(con):
 
 def _parse_utc(value):
     return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+
+
+def _prepare_counter_rows(rows):
+    """Normalize complete counter snapshots and redistribute stale PV catch-up.
+
+    For each inverter independently, a run of held cumulative values followed
+    by the next observed value is linearly interpolated over the elapsed
+    timestamps. Total cumulative energy is preserved exactly; only its unknown
+    timing is estimated.
+    """
+    value_count = len(COUNTERS)
+    pv_count = len(PV_COUNTERS)
+    prepared = []
+
+    for row in rows:
+        ts, source_resolution_seconds, has_held_input, *rest = row
+        values = rest[:value_count]
+        pv_held = rest[value_count:value_count + pv_count]
+        if any(value is None for value in values):
+            continue
+
+        prepared.append({
+            "ts": ts,
+            "source_resolution_seconds": source_resolution_seconds,
+            "has_held_input": bool(has_held_input),
+            "values": [float(value) for value in values],
+            "pv_held": [bool(value) for value in pv_held],
+            "pv_estimated_interval": False,
+        })
+
+    # Values 0..1 are P1 import/export; PV values start at index 2.
+    for pv_offset in range(pv_count):
+        value_index = 2 + pv_offset
+        previous_observed_index = None
+
+        for index, item in enumerate(prepared):
+            if item["pv_held"][pv_offset]:
+                continue
+
+            if previous_observed_index is None:
+                previous_observed_index = index
+                continue
+
+            if index > previous_observed_index + 1:
+                first = prepared[previous_observed_index]
+                last = item
+                start_value = first["values"][value_index]
+                end_value = last["values"][value_index]
+                start_time = _parse_utc(first["ts"])
+                end_time = _parse_utc(last["ts"])
+                elapsed = (end_time - start_time).total_seconds()
+
+                if elapsed > 0 and end_value >= start_value:
+                    delta = end_value - start_value
+                    for fill_index in range(previous_observed_index + 1, index + 1):
+                        fill = prepared[fill_index]
+                        fraction = (
+                            (_parse_utc(fill["ts"]) - start_time).total_seconds()
+                            / elapsed
+                        )
+                        fill["values"][value_index] = start_value + delta * fraction
+                        fill["pv_estimated_interval"] = True
+
+            previous_observed_index = index
+
+    return prepared
 
 
 def build(db_path=DB):
@@ -88,23 +168,27 @@ def build(db_path=DB):
         """)
 
         rows = _counter_rows(con)
+        prepared_rows = _prepare_counter_rows(rows)
         # Fully derived: rebuild transactionally so obsolete intervals from
         # older derivation semantics cannot survive a corrected rebuild.
         con.execute("DELETE FROM house_energy_intervals")
         written = 0
         previous = None
 
-        for row in rows:
-            ts, source_resolution_seconds, has_held_input, *values = row
-            if any(value is None for value in values):
-                # Cumulative counters permit bridging incomplete intermediate snapshots.
-                # Retain the last complete baseline; the next complete point forms the
-                # interval and is quality-marked as a gap when it exceeds 1.5x the expected source resolution.
-                continue
-            values = tuple(float(value) for value in values)
+        for row in prepared_rows:
+            ts = row["ts"]
+            source_resolution_seconds = row["source_resolution_seconds"]
+            has_held_input = row["has_held_input"]
+            values = tuple(row["values"])
+            pv_estimated_interval = row["pv_estimated_interval"]
 
             if previous is None:
-                previous = (ts, source_resolution_seconds, bool(has_held_input), values)
+                previous = (
+                    ts,
+                    source_resolution_seconds,
+                    bool(has_held_input),
+                    values,
+                )
                 continue
 
             prev_ts, prev_resolution, prev_has_held_input, prev_values = previous
@@ -131,11 +215,15 @@ def build(db_path=DB):
                 expected_resolution = max(MAX_NORMAL_GAP_SECONDS, int(source_resolution_seconds or prev_resolution or MAX_NORMAL_GAP_SECONDS))
                 if elapsed_seconds > expected_resolution * GAP_MULTIPLIER:
                     quality = "gap"
+                elif pv_estimated_interval:
+                    # At least one inverter resumed after held cumulative values.
+                    # Energy is known from the observed endpoints, but its exact
+                    # timing is not; the interval therefore remains usable as an
+                    # explicit estimate instead of a false catch-up spike.
+                    quality = "estimated"
                 elif prev_has_held_input or bool(has_held_input):
-                    # Cumulative counters are monotonic state. A sleeping/stale
-                    # inverter may keep exposing an unchanged total as "held".
-                    # Keep the household interval instead of truncating history,
-                    # but do not label the counter endpoints as freshly observed.
+                    # Tail held values without a later observed endpoint cannot
+                    # be redistributed yet. Preserve them without inventing data.
                     quality = "held"
 
             if reason:
@@ -144,7 +232,13 @@ def build(db_path=DB):
 
             imp, exp, se, gw42, gw20 = output
             p1_quality = "discontinuity" if reason else "gap" if quality == "gap" else "observed"
-            pv_quality = "discontinuity" if reason else "gap" if quality == "gap" else "held" if quality == "held" else "observed"
+            pv_quality = (
+                "discontinuity" if reason else
+                "gap" if quality == "gap" else
+                "estimated" if quality == "estimated" else
+                "held" if quality == "held" else
+                "observed"
+            )
             pv_total = None if se is None else se + gw42 + gw20
             house = None if imp is None else imp + pv_total - exp
 
@@ -177,7 +271,14 @@ def build(db_path=DB):
             previous = (ts, source_resolution_seconds, bool(has_held_input), values)
 
         con.commit()
-        return {"rows": written, "counter_snapshots": len(rows)}
+        estimated_intervals = sum(
+            1 for row in prepared_rows if row["pv_estimated_interval"]
+        )
+        return {
+            "rows": written,
+            "counter_snapshots": len(rows),
+            "pv_estimated_intervals": estimated_intervals,
+        }
     finally:
         con.close()
 
@@ -187,7 +288,12 @@ def main():
     parser.add_argument("--db", default=str(DB))
     args = parser.parse_args()
     result = build(Path(args.db))
-    print(f"PASS: house_energy_intervals={result['rows']} counter_snapshots={result['counter_snapshots']}")
+    print(
+        "PASS: "
+        f"house_energy_intervals={result['rows']} "
+        f"counter_snapshots={result['counter_snapshots']} "
+        f"pv_estimated_intervals={result['pv_estimated_intervals']}"
+    )
 
 
 if __name__ == "__main__":
