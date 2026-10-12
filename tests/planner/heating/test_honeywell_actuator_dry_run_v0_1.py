@@ -100,14 +100,13 @@ class TestDryRun(unittest.TestCase):
     def test_no_grant_has_human_explanation_and_preserves_code(self):
         d = documents()
         d["grant"]["heating"]["grant"] = "HOLD"
+        d["grant"]["heating"]["readyRooms"].remove("keuken")
         rooms = self.run_eval(d)
         explanation = rooms["keuken"]["diagnosis"]
         self.assertEqual(explanation["primaryCode"], "NO_PRODUCTION_HEATING_GRANT")
         self.assertIn("Planner", explanation["headline"])
         self.assertIn("NO_PRODUCTION_HEATING_GRANT", rooms["keuken"]["denialReasons"])
-        self.assertIn("ROOM_NOT_IN_PRODUCTION_GRANT",
-                      explanation["technicalOnly"] if
-                      "ROOM_NOT_IN_PRODUCTION_GRANT" in rooms["keuken"]["denialReasons"] else [])
+        self.assertIn("ROOM_NOT_IN_PRODUCTION_GRANT", explanation["technicalOnly"])
 
     def test_no_scheduled_up_is_clearer_than_secondary_v05_symptom(self):
         d = documents()
