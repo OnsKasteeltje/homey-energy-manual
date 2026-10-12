@@ -33,16 +33,23 @@ def schedule(next_target=15.5, status="OK"):
     }
 
 
-def state(actual_target=20.0):
+def state(
+    actual_target=19.0,
+    mode="follow_schedule",
+    override_until=None,
+    system_mode="auto",
+):
     return {
         "schema": "EMS_HONEYWELL_STATE_V0.2",
         "generatedAt": "2026-09-15T19:48:00Z",
+        "location": {"systemMode": system_mode},
         "zones": [{
             "key": "woonkamer",
             "displayName": "Woonkamer",
             "roomTemperature_C": 18.4,
             "targetTemperature_C": actual_target,
-            "setpointMode": "TEMPORARY_OVERRIDE",
+            "setpointMode": mode,
+            "overrideUntil": override_until,
         }],
     }
 
@@ -69,11 +76,59 @@ def test_validated_woonkamer_transition_is_down_and_local_time_is_preserved():
     }
 
 
-def test_actual_override_does_not_rewrite_baseline_transition():
-    room = build(st=state(actual_target=21.0))["rooms"][0]
+def test_temporary_override_becomes_effective_target_without_rewriting_schedule():
+    room = build(st=state(
+        actual_target=21.0,
+        mode="temporary_override",
+        override_until="2026-09-15T22:30:00+02:00",
+    ))["rooms"][0]
     assert room["current"]["targetTemperature_C"] == 21.0
+    assert room["current"]["setpointMode"] == "temporary_override"
+    assert room["effective"] == {
+        "currentTarget_C": 21.0,
+        "source": "TEMPORARY_OVERRIDE",
+        "systemMode": "auto",
+        "setpointMode": "temporary_override",
+        "overrideUntil": "2026-09-15T22:30:00+02:00",
+        "scheduleAligned": False,
+        "preheatAdvanceAllowed": False,
+        "reason": "HONEYWELL_TEMPORARY_OVERRIDE_ACTIVE",
+    }
     assert room["baseline"]["currentTarget_C"] == 19.0
     assert room["baseline"]["direction"] == "DOWN"
+
+
+def test_permanent_override_blocks_schedule_preheat_semantics():
+    room = build(st=state(actual_target=16.0, mode="permanent_override"))["rooms"][0]
+    assert room["effective"]["currentTarget_C"] == 16.0
+    assert room["effective"]["source"] == "PERMANENT_OVERRIDE"
+    assert room["effective"]["overrideUntil"] is None
+    assert room["effective"]["preheatAdvanceAllowed"] is False
+    assert room["effective"]["reason"] == "HONEYWELL_PERMANENT_OVERRIDE_ACTIVE"
+
+
+def test_follow_schedule_aligned_target_allows_schedule_preheat_semantics():
+    room = build(st=state(actual_target=19.0, mode="follow_schedule"))["rooms"][0]
+    assert room["effective"]["source"] == "SCHEDULE"
+    assert room["effective"]["scheduleAligned"] is True
+    assert room["effective"]["preheatAdvanceAllowed"] is True
+    assert room["effective"]["reason"] == "FOLLOW_SCHEDULE"
+
+
+def test_follow_schedule_target_mismatch_fails_closed_for_preheat():
+    room = build(st=state(actual_target=18.5, mode="follow_schedule"))["rooms"][0]
+    assert room["effective"]["source"] == "SCHEDULE"
+    assert room["effective"]["scheduleAligned"] is False
+    assert room["effective"]["preheatAdvanceAllowed"] is False
+    assert room["effective"]["reason"] == "FOLLOW_SCHEDULE_TARGET_MISMATCH"
+
+
+def test_non_auto_system_mode_fails_closed_for_preheat():
+    room = build(st=state(actual_target=16.0, mode="follow_schedule", system_mode="away"))["rooms"][0]
+    assert room["effective"]["source"] == "SYSTEM_MODE"
+    assert room["effective"]["systemMode"] == "away"
+    assert room["effective"]["preheatAdvanceAllowed"] is False
+    assert room["effective"]["reason"] == "HONEYWELL_SYSTEM_MODE_ACTIVE"
 
 
 def test_up_and_none_are_classified_from_schedule_only():
@@ -98,3 +153,12 @@ def test_naive_schedule_generated_at_is_rejected():
     s["generatedAt"] = "2026-09-15T19:49:03"
     with pytest.raises(module.ModelError, match="offset-aware"):
         build(s=s)
+
+
+def test_naive_temporary_override_until_is_rejected():
+    with pytest.raises(module.ModelError, match="offset-aware"):
+        build(st=state(
+            actual_target=20.0,
+            mode="temporary_override",
+            override_until="2026-09-15T22:30:00",
+        ))
