@@ -197,6 +197,13 @@ def _record_opportunity_window(history: list[dict[str, Any]], room: dict[str, An
     if baseline.get("direction") != "UP":
         return
 
+    # V0.3 may still expose the raw scheduled UP transition while Honeywell is
+    # actively overriding that schedule. Such a transition is source context,
+    # not a usable EMS preheat opportunity.
+    effective = room.get("effective")
+    if isinstance(effective, dict) and effective.get("preheatAdvanceAllowed") is not True:
+        return
+
     candidate = _dict(room.get("candidate"), "room.candidate")
     opportunity_id = _opportunity_id(room)
     opens_dt = _aware(candidate.get("opportunityOpensAt"), "candidate.opportunityOpensAt")

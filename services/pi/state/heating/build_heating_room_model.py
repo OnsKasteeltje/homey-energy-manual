@@ -66,6 +66,18 @@ def _number(value: Any, label: str) -> float:
     return float(value)
 
 
+def _normalize_mode(value: Any) -> str:
+    if value is None:
+        return "unknown"
+    return str(value).strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _optional_aware(value: Any, label: str) -> datetime | None:
+    if value is None:
+        return None
+    return _parse_aware(value, label)
+
+
 def _transition(current: float, nxt: float) -> str:
     if nxt > current:
         return "UP"
@@ -206,6 +218,10 @@ def build_model(schedule: dict[str, Any], state: dict[str, Any], *, generated_at
 
     schedule_generated = _parse_aware(schedule.get("generatedAt"), "schedule.generatedAt")
     state_generated = _parse_aware(state.get("generatedAt"), "state.generatedAt")
+    state_location = state.get("location")
+    system_mode = _normalize_mode(
+        state_location.get("systemMode") if isinstance(state_location, dict) else None
+    )
     schedule_rooms = _require_rooms(schedule, "schedule")
     state_rooms = _require_rooms(state, "state")
 
@@ -235,9 +251,42 @@ def build_model(schedule: dict[str, Any], state: dict[str, Any], *, generated_at
         st = state_rooms[key]
         temperature = _number(st.get("roomTemperature_C"), f"{key}.roomTemperature_C")
         actual_target = _number(st.get("targetTemperature_C"), f"{key}.targetTemperature_C")
-        setpoint_mode = st.get("setpointMode")
-        if not isinstance(setpoint_mode, str) or not setpoint_mode:
+        raw_setpoint_mode = st.get("setpointMode")
+        if not isinstance(raw_setpoint_mode, str) or not raw_setpoint_mode:
             raise ModelError(f"{key}.setpointMode missing")
+        setpoint_mode = _normalize_mode(raw_setpoint_mode)
+
+        override_until_dt = _optional_aware(
+            st.get("overrideUntil"),
+            f"{key}.overrideUntil",
+        )
+        override_until = override_until_dt.isoformat() if override_until_dt else None
+        schedule_aligned = abs(actual_target - current_baseline) <= 1e-9
+
+        if system_mode != "auto":
+            effective_source = "SYSTEM_MODE"
+            preheat_advance_allowed = False
+            effective_reason = "HONEYWELL_SYSTEM_MODE_ACTIVE"
+        elif setpoint_mode == "temporary_override":
+            effective_source = "TEMPORARY_OVERRIDE"
+            preheat_advance_allowed = False
+            effective_reason = "HONEYWELL_TEMPORARY_OVERRIDE_ACTIVE"
+        elif setpoint_mode == "permanent_override":
+            effective_source = "PERMANENT_OVERRIDE"
+            preheat_advance_allowed = False
+            effective_reason = "HONEYWELL_PERMANENT_OVERRIDE_ACTIVE"
+        elif setpoint_mode == "follow_schedule":
+            effective_source = "SCHEDULE"
+            preheat_advance_allowed = schedule_aligned
+            effective_reason = (
+                "FOLLOW_SCHEDULE"
+                if schedule_aligned
+                else "FOLLOW_SCHEDULE_TARGET_MISMATCH"
+            )
+        else:
+            effective_source = "UNKNOWN"
+            preheat_advance_allowed = False
+            effective_reason = "HONEYWELL_SETPOINT_MODE_UNSUPPORTED"
 
         rooms.append({
             "key": key,
@@ -247,6 +296,17 @@ def build_model(schedule: dict[str, Any], state: dict[str, Any], *, generated_at
                 "temperature_C": temperature,
                 "targetTemperature_C": actual_target,
                 "setpointMode": setpoint_mode,
+                "overrideUntil": override_until,
+            },
+            "effective": {
+                "currentTarget_C": actual_target,
+                "source": effective_source,
+                "systemMode": system_mode,
+                "setpointMode": setpoint_mode,
+                "overrideUntil": override_until,
+                "scheduleAligned": schedule_aligned,
+                "preheatAdvanceAllowed": preheat_advance_allowed,
+                "reason": effective_reason,
             },
             "baseline": {
                 "currentTarget_C": current_baseline,
@@ -264,6 +324,7 @@ def build_model(schedule: dict[str, Any], state: dict[str, Any], *, generated_at
         "generatedAt": now.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
         "timezone": HOME_TZ_NAME,
         "baselineAuthority": "HONEYWELL",
+        "systemMode": system_mode,
         "valid": True,
         "sources": {
             "scheduleSchema": SCHEDULE_SCHEMA,

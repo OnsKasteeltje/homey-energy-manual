@@ -13,13 +13,22 @@ NOW = datetime(2026, 9, 26, 12, 0, tzinfo=timezone.utc)
 
 def room(key="woonkamer", actual=17.2, future=19.0, state="PREHEAT_READY_FOR_GRANT",
          reason="AWAITING_CENTRAL_PV_PRIORITY", next_step=17.5, group="living_area",
-         close="2026-09-26T15:00:00Z"):
+         close="2026-09-26T15:00:00Z", preheat_allowed=True):
     return {
         "key": key,
         "displayName": key.title(),
         "preheatScope": True,
         "group": group,
         "current": {"temperature_C": actual, "baselineDemand": False},
+        "effective": {
+            "currentTargetTemperature_C": 15.5,
+            "source": "SCHEDULE" if preheat_allowed else "PERMANENT_OVERRIDE",
+            "systemMode": "auto",
+            "setpointMode": "follow_schedule" if preheat_allowed else "permanent_override",
+            "overrideUntil": None,
+            "preheatAdvanceAllowed": preheat_allowed,
+            "reason": "FOLLOW_SCHEDULE" if preheat_allowed else "HONEYWELL_PERMANENT_OVERRIDE_ACTIVE",
+        },
         "baseline": {
             "currentTargetTemperature_C": 15.5,
             "changeAt": close,
@@ -179,6 +188,27 @@ def test_up_opportunity_window_is_persisted_even_without_planner_grant():
         "closesAt": "2026-09-26T15:00:00Z",
         "target_C": 19.0,
     }]
+
+
+def test_active_honeywell_override_does_not_create_opportunity_history():
+    overridden = room(
+        state="NOT_ELIGIBLE",
+        reason="HONEYWELL_PERMANENT_OVERRIDE_ACTIVE",
+        next_step=None,
+        preheat_allowed=False,
+    )
+    overridden["candidate"]["status"] = "NOT_ELIGIBLE"
+    overridden["candidate"]["reason"] = "HONEYWELL_PERMANENT_OVERRIDE_ACTIVE"
+
+    out = build(
+        h=heating(overridden),
+        g=planner_grant(grant=False, ready=[], reason="NO_HEATING_GRANT"),
+    )
+    r = next(r for r in out["rooms"] if r["key"] == "woonkamer")
+
+    assert r["opportunityHistory"] == []
+    assert r["progression"]["state"] == "INACTIVE"
+    assert r["progression"]["reason"] == "HONEYWELL_PERMANENT_OVERRIDE_ACTIVE"
 
 
 def test_opportunity_window_survives_after_honeywell_moves_to_next_transition():

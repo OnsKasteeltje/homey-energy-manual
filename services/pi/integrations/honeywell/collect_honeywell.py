@@ -60,6 +60,7 @@ async def main() -> None:
                             "roomTemperature_C": jsonable(zone.temperature),
                             "targetTemperature_C": jsonable(zone.target_heat_temperature),
                             "setpointMode": jsonable(zone.mode),
+                            "overrideUntil": jsonable(getattr(zone, "until", None)),
                         }
 
     missing = [zid for zid in zone_map if zid not in found]

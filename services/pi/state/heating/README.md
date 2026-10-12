@@ -13,7 +13,7 @@ and emits `EMS_HEATING_ROOM_MODEL_V0.1`.
 
 The builder is deliberately pure with respect to external systems: it does not contact Honeywell, Homey or devices and contains no PV/preheat or actuator decision.
 
-The actual Honeywell target from the state snapshot remains separate from the scheduled baseline. Transition direction is derived only from the scheduled current and next switchpoints, so a temporary/manual override cannot rewrite the comfort baseline.
+The model keeps the raw weekly schedule separate from the **effective Honeywell target**. `follow_schedule` may use the scheduled transition only when the current vendor target is aligned with the active schedule and the Honeywell system is in normal `auto` mode. `temporary_override` and `permanent_override` make the current vendor target authoritative for comfort demand and block EMS preheat advancement while the override is active. Temporary override expiry is preserved as `overrideUntil`; the weekly schedule remains available as reference and resumes only after Honeywell reports schedule-following state again.
 
 All switchpoint timestamps at the EMS boundary are offset-aware and normalized to `Europe/Amsterdam`. Invalid schemas, room-key mismatches, duplicate keys, non-OK schedules, missing values and naive timestamps fail closed.
 

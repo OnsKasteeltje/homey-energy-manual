@@ -35,7 +35,7 @@ const temp = value => numeric(value) ? value.toFixed(1) + " °C" : "—";
 const clock = value => value ? timeFmt.format(new Date(value)) : "—";
 const minuteAt = (value,start) => (new Date(value).getTime() - start.getTime()) / 60000;
 const clamp = (v,min,max) => Math.max(min,Math.min(max,v));
-const hasPreheatWindow = (baseline,candidate) => baseline?.direction === "UP" && candidate?.opportunityOpensAt && candidate?.opportunityClosesAt;
+const hasPreheatWindow = (baseline,candidate,effective) => effective?.preheatAdvanceAllowed === true && baseline?.direction === "UP" && candidate?.opportunityOpensAt && candidate?.opportunityClosesAt;
 
 const progressionLabels = {
   INACTIVE:"Inactief",
@@ -99,6 +99,42 @@ function valueAtStep(points,m){
     else break;
   }
   return value;
+}
+
+function effectiveBaselinePoints(room,start,now){
+  const scheduled = schedulePoints(room.weeklySchedule,start);
+  const effective = room?.effective;
+  if(!effective || effective.preheatAdvanceAllowed === true) return scheduled;
+
+  const target = Number(effective.currentTarget_C);
+  if(!Number.isFinite(target) || !scheduled.length) return scheduled;
+
+  const nowM = clamp(minuteAt(now,start),0,HORIZON_MIN);
+  const out = scheduled.filter(point => point.m < nowM);
+  out.push({m:nowM,t:target});
+
+  if(effective.source === "TEMPORARY_OVERRIDE" && effective.overrideUntil){
+    const until = new Date(effective.overrideUntil);
+    const untilM = minuteAt(until,start);
+    if(Number.isFinite(untilM) && until > now && untilM <= HORIZON_MIN){
+      const boundedUntil = clamp(untilM,nowM,HORIZON_MIN);
+      out.push({m:boundedUntil,t:target});
+      const scheduledAfter = valueAtStep(scheduled,boundedUntil);
+      if(Number.isFinite(scheduledAfter)){
+        out.push({m:boundedUntil,t:scheduledAfter});
+      }
+      for(const point of scheduled){
+        if(point.m > boundedUntil) out.push(point);
+      }
+      if(out.at(-1)?.m !== HORIZON_MIN){
+        out.push({m:HORIZON_MIN,t:valueAtStep(scheduled,HORIZON_MIN)});
+      }
+      return out;
+    }
+  }
+
+  if(nowM < HORIZON_MIN) out.push({m:HORIZON_MIN,t:target});
+  return out;
 }
 
 async function loadOptional(url,schema){
@@ -211,7 +247,7 @@ function preheatWindows(room,start,now,maxAdvanceMinutes){
   }
 
   const candidate = room.shadowSource?.candidate;
-  if(hasPreheatWindow(room.shadowSource?.baseline,candidate)){
+  if(hasPreheatWindow(room.shadowSource?.baseline,candidate,room.effective)){
     addWindow({
       opportunityId:room.progressionSource?.opportunityId || null,
       opensAt:candidate.opportunityOpensAt,
@@ -221,7 +257,7 @@ function preheatWindows(room,start,now,maxAdvanceMinutes){
     });
   }
 
-  if(numeric(maxAdvanceMinutes) && maxAdvanceMinutes > 0){
+  if(room.effective?.preheatAdvanceAllowed === true && numeric(maxAdvanceMinutes) && maxAdvanceMinutes > 0){
     for(let i=1;i<room.points.length;i++){
       const previous = room.points[i-1];
       const transition = room.points[i];
@@ -252,7 +288,7 @@ function renderStatus(shadow,progression,rooms,start,now,maxAdvanceMinutes){
   ].join("");
 
   $("#signal-legend").innerHTML = [
-    '<span><i class="sample baseline-sample"></i>Honeywell baseline</span>',
+    '<span><i class="sample baseline-sample"></i>Honeywell effectieve baseline</span>',
     '<span><i class="sample actual-sample"></i>Gemeten temperatuur</span>',
     '<span><i class="sample shadow-sample"></i>EMS shadow-target</span>',
     '<span><i class="sample rail-sample"></i>Preheat-window</span>',
@@ -267,7 +303,7 @@ function renderStatus(shadow,progression,rooms,start,now,maxAdvanceMinutes){
     const candidate = s?.candidate;
     const open = candidate?.opportunityOpensAt;
     const close = candidate?.opportunityClosesAt;
-    const windowText = hasPreheatWindow(s?.baseline,candidate) ? `${clock(open)}–${clock(close)}` : "—";
+    const windowText = hasPreheatWindow(s?.baseline,candidate,room.effective) ? `${clock(open)}–${clock(close)}` : "—";
     const nextPotential = preheatWindows(room,start,now,maxAdvanceMinutes)
       .find(window => !window.current && new Date(window.closesAt) > now);
     const nextPotentialText = nextPotential
@@ -279,7 +315,8 @@ function renderStatus(shadow,progression,rooms,start,now,maxAdvanceMinutes){
       <header><i style="background:${room.color}"></i><b>${room.displayName}</b></header>
       <dl>
         <div><dt>Nu</dt><dd>${temp(s?.current?.temperature_C ?? p?.currentTemperature_C)}</dd></div>
-        <div><dt>Honeywell baseline</dt><dd>${temp(s?.baseline?.currentTargetTemperature_C)}</dd></div>
+        <div><dt>Honeywell effectief</dt><dd>${temp(s?.baseline?.currentTargetTemperature_C)}</dd></div>
+        <div><dt>Honeywell modus</dt><dd>${room.effective?.setpointMode || "—"}</dd></div>
         <div><dt>Preheat-window</dt><dd>${windowText}</dd></div>
         ${nextPotentialText ? `<div><dt>Volgende potentieel</dt><dd>${nextPotentialText}</dd></div>` : ""}
         <div><dt>Poortwachter</dt><dd>${eligibility}</dd></div>
@@ -322,7 +359,7 @@ async function load(){
       return {
         ...room,
         color:COLORS[index],
-        points:schedulePoints(room.weeklySchedule,start),
+        points:effectiveBaselinePoints(room,start,now),
         actual:buildActualSeries(historyMap.get(room.key),shadowSource,start,now),
         shadowSource,
         progressionSource:progressionMap.get(room.key) || null,
@@ -555,7 +592,7 @@ function render(rooms,start,now,maxAdvanceMinutes){
       let meta = "";
 
       if(target.kind === "baseline"){
-        label = "Honeywell baseline";
+        label = "Honeywell effectieve baseline";
         value = valueAtStep(target.room.points,m);
         meta = tipTimeFmt.format(hoverTime);
       }else if(target.kind === "actual"){

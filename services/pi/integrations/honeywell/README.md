@@ -68,8 +68,8 @@ The library exposes access-token, expiry and refresh-token state. The EMS persis
 
 The cloud workload is deliberately split:
 
-- `collect_honeywell.py` is the state collector. Intended cadence: every 5 minutes. It calls `update()` and records current zone temperature, target and setpoint mode. It does **not** fetch schedules.
-- `collect_honeywell_schedule.py` is the schedule collector. Intended cadence: every 6 hours, with an optional explicit refresh after a detected schedule/configuration change. It calls `get_schedule()` per mapped zone and records current/next switchpoints plus the complete Honeywell weekly schedule for every mapped room.
+- `collect_honeywell.py` is the state collector. Intended cadence: every 5 minutes. It calls `update()` and records current zone temperature, target, setpoint mode and the vendor-provided override expiry (`overrideUntil`) when present. It does **not** fetch schedules.
+- `collect_honeywell_schedule.py` is the schedule collector. Production cadence is hourly at `:07`, with an optional explicit refresh after a detected schedule/configuration change. It calls `get_schedule()` per mapped zone and records current/next switchpoints plus the complete Honeywell weekly schedule for every mapped room.
 
 The weekly schedule from this existing collector is the canonical baseline for the room-heating planner. The website must not maintain a separate hand-authored schedule source.
 

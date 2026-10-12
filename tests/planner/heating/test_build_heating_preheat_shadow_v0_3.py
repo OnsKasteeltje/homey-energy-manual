@@ -12,7 +12,19 @@ spec.loader.exec_module(module)
 NOW = datetime(2026, 9, 26, 12, 0, tzinfo=timezone.utc)
 
 
-def room_model(actual=17.2, baseline=15.5, future=19.0, key="woonkamer"):
+def room_model(
+    actual=17.2,
+    baseline=15.5,
+    future=19.0,
+    key="woonkamer",
+    effective_target=None,
+    preheat_allowed=True,
+    effective_reason="FOLLOW_SCHEDULE",
+    effective_source="SCHEDULE",
+    setpoint_mode="follow_schedule",
+    override_until=None,
+):
+    effective_target = baseline if effective_target is None else effective_target
     return {
         "schema": "EMS_HEATING_ROOM_MODEL_V0.1",
         "mode": "READ_ONLY",
@@ -27,8 +39,19 @@ def room_model(actual=17.2, baseline=15.5, future=19.0, key="woonkamer"):
             "valid": True,
             "current": {
                 "temperature_C": actual,
-                "targetTemperature_C": baseline,
-                "setpointMode": "FOLLOW_SCHEDULE",
+                "targetTemperature_C": effective_target,
+                "setpointMode": setpoint_mode,
+                "overrideUntil": override_until,
+            },
+            "effective": {
+                "currentTarget_C": effective_target,
+                "source": effective_source,
+                "systemMode": "auto",
+                "setpointMode": setpoint_mode,
+                "overrideUntil": override_until,
+                "scheduleAligned": abs(effective_target - baseline) <= 1e-9,
+                "preheatAdvanceAllowed": preheat_allowed,
+                "reason": effective_reason,
             },
             "baseline": {
                 "currentTarget_C": baseline,
@@ -118,6 +141,31 @@ def test_normal_baseline_heating_blocks_new_preheat_but_is_not_cv_fault():
     assert result["house"]["baselineDemandRooms"] == ["woonkamer"]
     assert r["shadow"]["state"] == "BASELINE_HEATING"
     assert r["shadow"]["reason"] == "BASELINE_HEATING_DEMAND_PRESENT"
+
+
+def test_house_baseline_demand_uses_effective_override_target_not_schedule_target():
+    model = room_model(
+        actual=16.0,
+        baseline=15.0,
+        effective_target=17.0,
+        preheat_allowed=False,
+        effective_reason="HONEYWELL_PERMANENT_OVERRIDE_ACTIVE",
+        effective_source="PERMANENT_OVERRIDE",
+        setpoint_mode="permanent_override",
+    )
+    plan = candidate(
+        status="NOT_ELIGIBLE",
+        reason="HONEYWELL_PERMANENT_OVERRIDE_ACTIVE",
+        steps=[],
+    )
+    result = build(model=model, plan=plan)
+    r = result["rooms"][0]
+    assert result["house"]["baselineHeatingDemandPresent"] is True
+    assert result["house"]["baselineDemandRooms"] == ["woonkamer"]
+    assert r["current"]["baselineDemand"] is True
+    assert r["baseline"]["currentTargetTemperature_C"] == 17.0
+    assert r["baseline"]["scheduledCurrentTargetTemperature_C"] == 15.0
+    assert r["effective"]["source"] == "PERMANENT_OVERRIDE"
 
 
 def test_cv_assist_during_pure_preheat_blocks_further_preheat():

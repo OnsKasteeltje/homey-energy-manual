@@ -11,13 +11,41 @@ assert spec.loader
 spec.loader.exec_module(module)
 
 
-def room(key="woonkamer", direction="UP", current_temp=17.2, current_target=15.5, target=19.0,
-         change_at="2026-09-16T17:30:00+02:00"):
+def room(
+    key="woonkamer",
+    direction="UP",
+    current_temp=17.2,
+    current_target=15.5,
+    target=19.0,
+    change_at="2026-09-16T17:30:00+02:00",
+    effective_target=None,
+    preheat_allowed=True,
+    effective_reason="FOLLOW_SCHEDULE",
+    effective_source="SCHEDULE",
+    setpoint_mode="follow_schedule",
+    override_until=None,
+):
+    effective_target = current_target if effective_target is None else effective_target
     return {
         "key": key,
         "displayName": key.title(),
         "valid": True,
-        "current": {"temperature_C": current_temp, "targetTemperature_C": current_target, "setpointMode": "FOLLOW_SCHEDULE"},
+        "current": {
+            "temperature_C": current_temp,
+            "targetTemperature_C": effective_target,
+            "setpointMode": setpoint_mode,
+            "overrideUntil": override_until,
+        },
+        "effective": {
+            "currentTarget_C": effective_target,
+            "source": effective_source,
+            "systemMode": "auto",
+            "setpointMode": setpoint_mode,
+            "overrideUntil": override_until,
+            "scheduleAligned": abs(effective_target - current_target) <= 1e-9,
+            "preheatAdvanceAllowed": preheat_allowed,
+            "reason": effective_reason,
+        },
         "baseline": {
             "currentTarget_C": current_target,
             "currentSince": "2026-09-16T08:00:00+02:00",
@@ -57,6 +85,42 @@ def test_v02_eligible_up_inside_three_hour_window_with_heat_demand():
     assert r["candidate"]["earliestStartAt"] == "2026-09-16T14:30:00+02:00"
     assert r["candidate"]["startAt"] is None
     assert r["candidate"]["reason"] == "AWAITING_PV_OPPORTUNITY_EVALUATION"
+    assert r["effective"]["preheatAdvanceAllowed"] is True
+
+
+@pytest.mark.parametrize(
+    ("mode", "source", "reason"),
+    [
+        ("temporary_override", "TEMPORARY_OVERRIDE", "HONEYWELL_TEMPORARY_OVERRIDE_ACTIVE"),
+        ("permanent_override", "PERMANENT_OVERRIDE", "HONEYWELL_PERMANENT_OVERRIDE_ACTIVE"),
+    ],
+)
+def test_active_honeywell_override_blocks_preheat(mode, source, reason):
+    r = build(room_model([room(
+        direction="UP",
+        effective_target=18.0,
+        preheat_allowed=False,
+        effective_reason=reason,
+        effective_source=source,
+        setpoint_mode=mode,
+        override_until="2026-09-16T18:00:00+02:00" if mode == "temporary_override" else None,
+    )]))["rooms"][0]
+    assert r["candidate"]["status"] == "NOT_ELIGIBLE"
+    assert r["candidate"]["reason"] == reason
+    assert r["candidate"]["steps_C"] == []
+    assert r["baseline"]["currentTargetTemperature_C"] == 18.0
+    assert r["baseline"]["scheduledCurrentTargetTemperature_C"] == 15.5
+
+
+def test_follow_schedule_target_mismatch_blocks_preheat():
+    r = build(room_model([room(
+        effective_target=16.0,
+        preheat_allowed=False,
+        effective_reason="FOLLOW_SCHEDULE_TARGET_MISMATCH",
+    )]))["rooms"][0]
+    assert r["candidate"]["status"] == "NOT_ELIGIBLE"
+    assert r["candidate"]["reason"] == "FOLLOW_SCHEDULE_TARGET_MISMATCH"
+    assert r["candidate"]["steps_C"] == []
 
 
 def test_actual_temperature_at_or_above_future_target_blocks_preheat():

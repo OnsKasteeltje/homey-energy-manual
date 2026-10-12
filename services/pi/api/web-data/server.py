@@ -60,6 +60,10 @@ HEATING_PREHEAT_PROGRESSION_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1
 FLEX_PRIORITY_SHADOW_API_SCHEMA = "EMS_WEB_FLEX_PRIORITY_SHADOW_V1"
 MOBILE_OVERVIEW_API_SCHEMA = "EMS_MOBILE_OVERVIEW_V1"
 HONEYWELL_SCHEDULE_FILE = os.environ.get("EMS_HONEYWELL_SCHEDULE_FILE", "/home/jeroen/ems/runtime/tools/honeywell/output/honeywell-schedule.json")
+HEATING_ROOM_MODEL_FILE = os.environ.get(
+    "EMS_HEATING_ROOM_MODEL_FILE",
+    "/home/jeroen/ems/data/heating-room-model.json",
+)
 HEATING_PREHEAT_SHADOW_FILE = os.environ.get(
     "EMS_HEATING_PREHEAT_SHADOW_FILE",
     "/home/jeroen/ems/data/heating-preheat-shadow-v0.3.json",
@@ -1239,30 +1243,78 @@ def pv_forecast_resource():
 
 
 def heating_schedule_resource():
-    """Return an allowlisted read-only projection of the canonical Honeywell schedule."""
+    """Return Honeywell schedule plus canonical effective target semantics."""
     source = load_json(HONEYWELL_SCHEDULE_FILE)
     if source.get("schema") != "EMS_HONEYWELL_SCHEDULE_V0.2":
         raise ValueError("HEATING_SCHEDULE_SOURCE_INVALID")
-    generated_at = source.get("generatedAt")
-    if parse_timestamp(generated_at) is None:
+    schedule_generated_at = source.get("generatedAt")
+    if parse_timestamp(schedule_generated_at) is None:
         raise ValueError("HEATING_SCHEDULE_SOURCE_INVALID")
+
+    room_model = load_json(HEATING_ROOM_MODEL_FILE)
+    if room_model.get("schema") != "EMS_HEATING_ROOM_MODEL_V0.1":
+        raise ValueError("HEATING_ROOM_MODEL_SOURCE_INVALID")
+    if room_model.get("mode") != "READ_ONLY" or room_model.get("controlMode") != "SHADOW":
+        raise ValueError("HEATING_ROOM_MODEL_MODE_INVALID")
+    if room_model.get("baselineAuthority") != "HONEYWELL":
+        raise ValueError("HEATING_ROOM_MODEL_AUTHORITY_INVALID")
+    model_generated_at = room_model.get("generatedAt")
+    if parse_timestamp(model_generated_at) is None:
+        raise ValueError("HEATING_ROOM_MODEL_TIME_INVALID")
+
+    model_rooms = {
+        room.get("key"): room
+        for room in room_model.get("rooms", [])
+        if isinstance(room, dict) and isinstance(room.get("key"), str)
+    }
+
     allowed_keys = {"woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"}
     rooms = []
     for zone in source.get("zones", []):
-        if zone.get("key") not in allowed_keys:
+        key = zone.get("key")
+        if key not in allowed_keys:
             continue
         if zone.get("scheduleStatus") != "OK" or not isinstance(zone.get("weeklySchedule"), list):
             continue
+
+        model_room = model_rooms.get(key)
+        if not isinstance(model_room, dict) or model_room.get("valid") is not True:
+            raise ValueError("HEATING_ROOM_MODEL_ROOMS_INVALID")
+        current = model_room.get("current")
+        effective = model_room.get("effective")
+        if not isinstance(current, dict) or not isinstance(effective, dict):
+            raise ValueError("HEATING_ROOM_MODEL_ROOMS_INVALID")
+
+        effective_target = effective.get("currentTarget_C")
+        if isinstance(effective_target, bool) or not isinstance(effective_target, (int, float)):
+            raise ValueError("HEATING_EFFECTIVE_TARGET_INVALID")
+        override_until = effective.get("overrideUntil")
+        if override_until is not None and parse_timestamp(override_until) is None:
+            raise ValueError("HEATING_OVERRIDE_UNTIL_INVALID")
+        if not isinstance(effective.get("preheatAdvanceAllowed"), bool):
+            raise ValueError("HEATING_EFFECTIVE_PREHEAT_FLAG_INVALID")
+
         rooms.append({
-            "key": zone["key"],
-            "displayName": zone.get("displayName") or zone["key"],
+            "key": key,
+            "displayName": zone.get("displayName") or key,
             "weeklySchedule": zone["weeklySchedule"],
+            "effective": {
+                "currentTarget_C": float(effective_target),
+                "source": effective.get("source"),
+                "systemMode": effective.get("systemMode"),
+                "setpointMode": effective.get("setpointMode"),
+                "overrideUntil": override_until,
+                "preheatAdvanceAllowed": effective.get("preheatAdvanceAllowed"),
+                "reason": effective.get("reason"),
+            },
         })
+
     if {room["key"] for room in rooms} != allowed_keys:
         raise ValueError("HEATING_SCHEDULE_ROOMS_INVALID")
     return {
         "schema": HEATING_SCHEDULE_API_SCHEMA,
-        "generatedAt": generated_at,
+        "generatedAt": model_generated_at,
+        "scheduleGeneratedAt": schedule_generated_at,
         "readOnly": True,
         "baselineAuthority": "HONEYWELL",
         "source": "CANONICAL_HONEYWELL_RUNTIME",
@@ -1275,7 +1327,6 @@ def heating_schedule_resource():
         },
         "rooms": rooms,
     }
-
 
 def heating_temperature_history_resource(*, generated_at=None):
     """Return the last six hours of canonical Honeywell room-temperature history.
