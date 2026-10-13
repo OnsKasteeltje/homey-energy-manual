@@ -3,7 +3,6 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var store = OverviewStore()
-    @StateObject private var deadlineStore = DeadlineStore()
     @AppStorage("emsBaseURL") private var baseURL = ""
 
     var body: some View {
@@ -29,7 +28,6 @@ struct ContentView: View {
             .tabItem { Label("Instellingen", systemImage: "slider.horizontal.3") }
         }
         .environmentObject(store)
-        .environmentObject(deadlineStore)
         .task {
             if !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 await store.refresh(baseURLText: baseURL)
@@ -287,53 +285,60 @@ private struct FlexWarningCard: View {
     }
 }
 
+private enum DeadlineConfirmation: String, Identifiable {
+    case submit
+    case cancel
+
+    var id: String { rawValue }
+}
+
 private struct DeadlineScreen: View {
     @EnvironmentObject private var overviewStore: OverviewStore
-    @EnvironmentObject private var deadlineStore: DeadlineStore
 
     let baseURL: String
 
+    @State private var current: TeslaDeadlineCommandState?
     @State private var currentSocText = ""
     @State private var targetSocText = ""
     @State private var deadline = Date().addingTimeInterval(4 * 60 * 60)
     @State private var maxA = 11
-    @State private var hasControlPIN = false
-    @State private var localError: String?
-    @State private var confirmSubmit = false
-    @State private var confirmCancel = false
+    @State private var isLoading = false
+    @State private var isSubmitting = false
+    @State private var statusMessage: String?
+    @State private var errorMessage: String?
+    @State private var confirmation: DeadlineConfirmation?
+    @State private var controlPIN = ""
+    @State private var retryFingerprint: String?
+    @State private var retryRequestId: UUID?
 
+    private let client = TeslaDeadlineClient()
     private let amsterdamTimeZone = TimeZone(identifier: "Europe/Amsterdam")!
 
     var body: some View {
         Form {
-            Section("Deadline-opdracht op Pi") {
-                if deadlineStore.isLoading {
+            Section("Actuele opdracht") {
+                if isLoading {
                     ProgressView()
-                } else if let current = deadlineStore.current, current.active {
+                } else if let current, current.active {
                     if overviewStore.overview?.ev.deadlineActive == true {
                         Label("Actief in EMS", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     } else {
-                        Label("Opdracht geaccepteerd · uitvoering nog niet actief", systemImage: "clock")
+                        Label("Opdracht geaccepteerd · nog niet actief", systemImage: "clock")
                             .foregroundStyle(.secondary)
                     }
+
                     LabeledContent(
                         "SOC",
                         value: "\(current.currentSoc ?? 0)% → \(current.targetSoc ?? 0)%"
                     )
-                    LabeledContent(
-                        "Klaar om",
-                        value: displayDeadline(current.deadline)
-                    )
-                    LabeledContent(
-                        "Max",
-                        value: current.maxA.map { "\($0) A" } ?? "—"
-                    )
+                    LabeledContent("Klaar om", value: displayDeadline(current.deadline))
+                    LabeledContent("Max", value: current.maxA.map { "\($0) A" } ?? "—")
 
                     Button("Deadline annuleren", role: .destructive) {
-                        confirmCancel = true
+                        confirmation = .cancel
                     }
-                    .disabled(deadlineStore.isSubmitting || !hasControlPIN)
+                    .disabled(isSubmitting)
                 } else {
                     Text("Geen actieve deadline")
                         .foregroundStyle(.secondary)
@@ -350,7 +355,6 @@ private struct DeadlineScreen: View {
                 DatePicker(
                     "Klaar om",
                     selection: $deadline,
-                    in: Date().addingTimeInterval(61)...,
                     displayedComponents: [.date, .hourAndMinute]
                 )
                 .environment(\.timeZone, amsterdamTimeZone)
@@ -361,39 +365,28 @@ private struct DeadlineScreen: View {
                     in: 6...16
                 )
 
-                Text("Deadline wordt geïnterpreteerd als Nederlandse tijd.")
+                Text("Tijd wordt als Europe/Amsterdam naar de Pi gestuurd. De Pi valideert de opdracht opnieuw.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Button {
-                    confirmSubmit = true
-                } label: {
-                    if deadlineStore.isSubmitting {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Text("Deadline instellen")
-                            .frame(maxWidth: .infinity)
-                    }
+                Button("Deadline instellen") {
+                    confirmation = .submit
                 }
-                .disabled(!canSubmit || deadlineStore.isSubmitting)
-            } footer: {
-                if !hasControlPIN {
-                    Text("Sla eerst de Tesla control-PIN veilig op bij Instellingen.")
-                }
+                .frame(maxWidth: .infinity)
+                .disabled(!canSubmit || isSubmitting)
             }
 
-            if let message = deadlineStore.statusMessage {
+            if let statusMessage {
                 Section("Status") {
-                    Text(message)
+                    Text(statusMessage)
                 }
             }
 
-            if let error = localError ?? deadlineStore.errorMessage {
+            if let errorMessage {
                 Section("Fout") {
-                    Text(error)
+                    Text(errorMessage)
                         .foregroundStyle(.red)
                 }
             }
@@ -404,29 +397,55 @@ private struct DeadlineScreen: View {
                 Button {
                     Task { await refresh() }
                 } label: {
-                    Image(systemName: "arrow.clockwise")
+                    if isLoading {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
                 }
+                .disabled(isSubmitting)
             }
         }
         .task {
-            refreshPINState()
             await refresh()
         }
-        .alert("Deadline instellen?", isPresented: $confirmSubmit) {
-            Button("Annuleren", role: .cancel) {}
-            Button("Bevestigen") {
-                Task { await submit() }
+        .sheet(item: $confirmation, onDismiss: {
+            controlPIN = ""
+        }) { action in
+            NavigationStack {
+                Form {
+                    Section("Opdracht") {
+                        Text(action == .submit ? submitSummary : cancelSummary)
+                    }
+
+                    Section("Bevestigen") {
+                        SecureField("Tesla control-PIN", text: $controlPIN)
+                            .textContentType(.password)
+
+                        Text("De PIN wordt alleen voor deze opdracht gebruikt en niet door de app bewaard.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .navigationTitle(action == .submit ? "Deadline instellen" : "Deadline annuleren")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Terug") {
+                            confirmation = nil
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(action == .submit ? "Bevestigen" : "Annuleren") {
+                            let pin = controlPIN
+                            confirmation = nil
+                            controlPIN = ""
+                            Task { await perform(action, pin: pin) }
+                        }
+                        .disabled(controlPIN.trimmingCharacters(in: .whitespacesAndNewlines).count < 8)
+                    }
+                }
             }
-        } message: {
-            Text(submitSummary)
-        }
-        .alert("Deadline annuleren?", isPresented: $confirmCancel) {
-            Button("Behouden", role: .cancel) {}
-            Button("Annuleren", role: .destructive) {
-                Task { await cancel() }
-            }
-        } message: {
-            Text("De actieve EV-laaddeadline wordt ingetrokken. De normale PV-opportunitylogica blijft daarna gelden.")
+            .presentationDetents([.medium])
         }
     }
 
@@ -440,7 +459,6 @@ private struct DeadlineScreen: View {
 
     private var canSubmit: Bool {
         guard !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              hasControlPIN,
               let current = parsedCurrentSoc,
               let target = parsedTargetSoc
         else {
@@ -451,84 +469,121 @@ private struct DeadlineScreen: View {
             && (1...100).contains(target)
             && target > current
             && (6...16).contains(maxA)
-            && deadline.timeIntervalSinceNow > 60
     }
 
     private var submitSummary: String {
         guard let current = parsedCurrentSoc, let target = parsedTargetSoc else {
             return "Controleer de SOC-waarden."
         }
-        return "Van \(current)% naar \(target)% · klaar \(displayDate(deadline)) · maximaal \(maxA) A. De Pi valideert de opdracht opnieuw."
+        return "Van \(current)% naar \(target)% · klaar \(displayDate(deadline)) · maximaal \(maxA) A."
     }
 
-    private func refreshPINState() {
-        do {
-            hasControlPIN = try TeslaControlPINStore.load() != nil
-            localError = nil
-        } catch {
-            hasControlPIN = false
-            localError = error.localizedDescription
-        }
+    private var cancelSummary: String {
+        "De actieve EV-laaddeadline wordt ingetrokken. Daarna geldt weer de normale EMS/PV-logica."
     }
 
     private func refresh() async {
-        await deadlineStore.loadCurrent(baseURLText: baseURL)
-        if let current = deadlineStore.current, current.active {
-            if let soc = current.currentSoc {
-                currentSocText = String(soc)
+        guard !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !isLoading
+        else {
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            current = try await client.fetchCurrent(baseURLText: baseURL).tesla
+            errorMessage = nil
+
+            if let current, current.active {
+                if let soc = current.currentSoc {
+                    currentSocText = String(soc)
+                }
+                if let target = current.targetSoc {
+                    targetSocText = String(target)
+                }
+                if let amps = current.maxA {
+                    maxA = amps
+                }
+                if let date = amsterdamDeadlineDate(current.deadline) {
+                    deadline = date
+                }
             }
-            if let target = current.targetSoc {
-                targetSocText = String(target)
-            }
-            if let amps = current.maxA {
-                maxA = amps
-            }
-            if let date = amsterdamDeadlineDate(current.deadline) {
-                deadline = date
-            }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
-    private func submit() async {
-        localError = nil
-        do {
-            guard let pin = try TeslaControlPINStore.load() else {
-                localError = "Tesla control-PIN ontbreekt."
-                hasControlPIN = false
-                return
-            }
-            guard let current = parsedCurrentSoc, let target = parsedTargetSoc else {
-                localError = "Controleer de SOC-waarden."
+    private func perform(_ action: DeadlineConfirmation, pin: String) async {
+        guard !isSubmitting else { return }
+
+        let submission: TeslaDeadlineSubmission
+        if action == .submit {
+            guard let currentSoc = parsedCurrentSoc,
+                  let targetSoc = parsedTargetSoc
+            else {
+                errorMessage = "Controleer de SOC-waarden."
                 return
             }
 
-            await deadlineStore.submit(
-                currentSoc: current,
-                targetSoc: target,
-                deadline: deadline,
-                maxA: maxA,
-                baseURLText: baseURL,
-                pin: pin
+            submission = .activate(
+                currentSoc: currentSoc,
+                targetSoc: targetSoc,
+                deadline: amsterdamDeadlineText(deadline),
+                maxA: maxA
             )
-            await overviewStore.refresh(baseURLText: baseURL)
-        } catch {
-            localError = error.localizedDescription
+        } else {
+            submission = .cancel
         }
-    }
 
-    private func cancel() async {
-        localError = nil
+        let fingerprint = [
+            submission.active ? "1" : "0",
+            submission.currentSoc.map(String.init) ?? "",
+            submission.targetSoc.map(String.init) ?? "",
+            submission.deadline,
+            String(submission.maxA)
+        ].joined(separator: "|")
+
+        let requestId: UUID
+        if retryFingerprint == fingerprint, let retryRequestId {
+            requestId = retryRequestId
+        } else {
+            requestId = UUID()
+            retryFingerprint = fingerprint
+            retryRequestId = requestId
+        }
+
+        isSubmitting = true
+        defer { isSubmitting = false }
+
         do {
-            guard let pin = try TeslaControlPINStore.load() else {
-                localError = "Tesla control-PIN ontbreekt."
-                hasControlPIN = false
-                return
+            let response = try await client.submit(
+                baseURLText: baseURL,
+                pin: pin,
+                submission: submission,
+                clientRequestId: requestId
+            )
+
+            current = try await client.fetchCurrent(baseURLText: baseURL).tesla
+            retryFingerprint = nil
+            retryRequestId = nil
+            errorMessage = nil
+
+            switch response.derivedState {
+            case "UPDATED":
+                statusMessage = submission.active
+                    ? "Deadline verwerkt door de Pi."
+                    : "Deadline geannuleerd op de Pi."
+            case "ALREADY_ACCEPTED":
+                statusMessage = "Deze opdracht was al door de Pi geaccepteerd."
+            default:
+                statusMessage = "Opdracht geaccepteerd; verwerking volgt via de bestaande watchdog."
             }
 
-            await deadlineStore.cancel(baseURLText: baseURL, pin: pin)
             await overviewStore.refresh(baseURLText: baseURL)
         } catch {
-            localError = error.localizedDescription
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -596,10 +651,6 @@ private struct SettingsScreen: View {
     @EnvironmentObject private var store: OverviewStore
     @Binding var baseURL: String
 
-    @State private var newControlPIN = ""
-    @State private var hasControlPIN = false
-    @State private var pinMessage: String?
-
     var body: some View {
         Form {
             Section("EMS API") {
@@ -625,71 +676,12 @@ private struct SettingsScreen: View {
                 }
             }
 
-            Section("Tesla deadline") {
-                SecureField("Control-PIN", text: $newControlPIN)
-                    .textContentType(.password)
-
-                Button("PIN veilig opslaan") {
-                    savePIN()
-                }
-                .disabled(newControlPIN.trimmingCharacters(in: .whitespacesAndNewlines).count < 8)
-
-                if hasControlPIN {
-                    Label("PIN opgeslagen in iOS Keychain", systemImage: "lock.fill")
-                        .foregroundStyle(.secondary)
-
-                    Button("PIN verwijderen", role: .destructive) {
-                        deletePIN()
-                    }
-                }
-
-                if let pinMessage {
-                    Text(pinMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
             Section("Boundary") {
-                Text("Dashboard en Mobile API V1 blijven read-only. v0.2 heeft één bounded write-pad: een EV-laaddeadline via de bestaande Tailscale/Pi command-ingang. Geen directe Homey- of device-writes.")
+                Text("Mobile API V1 blijft read-only. Alleen de Deadline-tab mag via de bestaande Tailscale/Pi command-ingang een EV-laaddeadline instellen of annuleren. Geen directe Homey- of device-writes.")
                     .font(.footnote)
             }
         }
         .navigationTitle("Instellingen")
-        .onAppear {
-            refreshPINState()
-        }
-    }
-
-    private func refreshPINState() {
-        do {
-            hasControlPIN = try TeslaControlPINStore.load() != nil
-        } catch {
-            hasControlPIN = false
-            pinMessage = error.localizedDescription
-        }
-    }
-
-    private func savePIN() {
-        do {
-            try TeslaControlPINStore.save(newControlPIN)
-            newControlPIN = ""
-            hasControlPIN = true
-            pinMessage = "Control-PIN veilig opgeslagen."
-        } catch {
-            pinMessage = error.localizedDescription
-        }
-    }
-
-    private func deletePIN() {
-        do {
-            try TeslaControlPINStore.delete()
-            newControlPIN = ""
-            hasControlPIN = false
-            pinMessage = "Control-PIN verwijderd."
-        } catch {
-            pinMessage = error.localizedDescription
-        }
     }
 }
 
