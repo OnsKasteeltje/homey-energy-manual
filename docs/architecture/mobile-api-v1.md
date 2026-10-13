@@ -79,6 +79,31 @@ Mobile V1 contains only fields required for a first native dashboard:
 
 No command endpoint is part of Mobile V1.
 
+## Native EV deadline command boundary
+
+The SwiftUI v0.2 client may issue an EV deadline, but this does **not** make Mobile
+API V1 writable. Command traffic uses the existing, separately governed private
+command ingress:
+
+`POST /web/commands/tesla`
+
+The write path is:
+
+`SwiftUI -> Tailscale-only Caddy -> localhost Status API -> canonical Tesla command file -> existing Pi deadline-state builder -> normal Pi/Homey execution chain`
+
+The native client must not call Homey or Easee directly and must not introduce a
+generic command/write API. Its deadline client is limited to this one route.
+
+The existing ingress remains authoritative for validation and safety: control PIN,
+loopback-only upstream access, SOC/deadline/max-current validation, UUID
+idempotency, atomic persistence and the existing derived-state builder. The iOS app
+stores the PIN only in iOS Keychain and never commits it or stores it in
+`AppStorage`.
+
+Readback uses `GET /web/commands/current` plus Mobile V1 refresh. An accepted
+command whose derived state is still pending must be presented as pending rather
+than as confirmed active.
+
 ## Network exposure
 
 The Web Data API continues to bind to localhost by default. Native mobile access
@@ -106,8 +131,8 @@ python3 tests/integrations/test_web_data_api.py
 bash ./scripts/ems_architecture_gate.sh
 ```
 
-## Next step
+## Current native-client state
 
-After Pi deployment and local validation of `/api/mobile/v1/overview`, build the
-first SwiftUI client as read-only. Authentication and remote access are a separate
-security step and should precede any future mobile command capability.
+SwiftUI v0.1 validated the read-only Mobile V1 path end-to-end. v0.2 adds only the
+bounded EV deadline command path described above. All other mobile control
+capabilities remain out of scope.
