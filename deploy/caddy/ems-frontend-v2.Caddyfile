@@ -13,6 +13,9 @@ http://100.127.130.0 {
     bind 100.127.130.0
     root * /var/www/ems-frontend-v2
 
+    @root path /
+    redir @root /live/ 302
+
     # Restrict command writes to encrypted Tailscale transport.
     @tailnet remote_ip 100.64.0.0/10
     handle /web/commands/tesla {
