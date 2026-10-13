@@ -21,6 +21,7 @@ homey-energy-manual/
 ├── apps/
 │   ├── homey/
 │   ├── website/
+│   ├── ios/
 │   └── cloudflare/
 │
 ├── services/
@@ -94,7 +95,8 @@ The target structure follows the operational ownership model:
 - **Pi API** exposes bounded machine interfaces such as health, state ingest and planner/control status without changing the underlying runtime ownership boundaries.
 - **Pi health evidence** lives under `services/pi/health/` and is a reusable read-only operational evidence capability, not an AI-specific implementation detail.
 - **Pi commissioning** lives under `services/pi/commissioning/` for deliberately operator-invoked, guarded setup/cutover/recovery helpers that interact with live Pi/Homey boundaries but are not continuously running production services. Such helpers must fail closed and must not become a second control owner.
-- **Website** owns presentation and human-facing observability.
+- **Website** owns browser-based presentation and human-facing observability.
+- **iOS** under `apps/ios/` owns native mobile presentation clients. Mobile clients consume bounded Pi APIs and do not become planner, control, Homey or physical-write owners.
 - **docs/** contains architecture, component documentation, decisions, commissioning records and operational runbooks, not production runtime implementation.
 - **deploy/** contains installation, migration and runtime-service definitions.
 - **config/** contains declarative configuration and schemas, not runtime business logic.
