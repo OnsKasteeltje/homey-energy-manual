@@ -306,10 +306,17 @@ private struct DeadlineScreen: View {
 
     var body: some View {
         Form {
-            Section("Actuele deadline") {
+            Section("Deadline-opdracht op Pi") {
                 if deadlineStore.isLoading {
                     ProgressView()
                 } else if let current = deadlineStore.current, current.active {
+                    if overviewStore.overview?.ev.deadlineActive == true {
+                        Label("Actief in EMS", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Label("Opdracht geaccepteerd · uitvoering nog niet actief", systemImage: "clock")
+                            .foregroundStyle(.secondary)
+                    }
                     LabeledContent(
                         "SOC",
                         value: "\(current.currentSoc ?? 0)% → \(current.targetSoc ?? 0)%"
