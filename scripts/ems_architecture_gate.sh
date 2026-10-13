@@ -650,19 +650,10 @@ python3 "$AI_RESUME_TEST" || fail "AI resumable request contract failed"
 if grep -q '/control/current' "$AI_ANALYSIS"; then fail "AI analysis API must not call Pi control endpoint"; fi
 grep -q 'EMS_AI_HOST=127.0.0.1' "$AI_ANALYSIS_UNIT" || fail "AI analysis API must bind loopback"
 grep -q 'EnvironmentFile=-/etc/ems/ai-agent.env' "$AI_ANALYSIS_UNIT" || fail "AI analysis secret boundary missing"
-grep -q 'handle /api/mobile/\*' "$FRONTEND_CADDY" || fail "private Mobile V1 Caddy route missing"
-python3 - "$FRONTEND_CADDY" <<'PY' || fail "Mobile V1 Caddy route must target Web Data API loopback"
-from pathlib import Path
-import sys
+if grep -q '/api/mobile/' "$FRONTEND_CADDY"; then fail "retired native Mobile V1 Caddy route must stay absent"; fi
+if grep -q 'EMS_MOBILE_OVERVIEW_V1' services/pi/api/web-data/server.py; then fail "retired native Mobile V1 API must stay absent"; fi
+pass "native Mobile V1 path retired; mobile access uses private V2 web app"
 
-text = Path(sys.argv[1]).read_text()
-needle = """handle /api/mobile/* {
-        reverse_proxy 127.0.0.1:3200
-    }"""
-if needle not in text:
-    raise SystemExit(1)
-PY
-pass "Mobile V1 remains on private Tailscale Caddy ingress to loopback Web Data API"
 
 grep -q 'handle /agent/\*' "$FRONTEND_CADDY" || fail "private AI analysis Caddy route missing"
 grep -q 'reverse_proxy 127.0.0.1:3210' "$FRONTEND_CADDY" || fail "AI analysis Caddy route must target loopback"
