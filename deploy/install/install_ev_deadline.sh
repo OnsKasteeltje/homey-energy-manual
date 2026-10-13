@@ -8,8 +8,6 @@ for unit in \
   ems-ev-deadline-state.service \
   ems-ev-deadline-state.path \
   ems-ev-deadline-state.timer \
-  ems-ev-deadline-command.service \
-  ems-ev-deadline-command.timer \
   ems-ev-deadline-command.path
 do
   sudo install -m 644 -o root -g root "$UNIT_DIR/$unit" "/etc/systemd/system/$unit"

@@ -1,11 +1,7 @@
-# GitHub integration
+# GitHub-integratie — historische grens
 
-This directory contains the remaining Pi-side GitHub integration used for the authenticated Tesla deadline command transfer.
+Sinds de lokale Pi EV Deadline Ingress V1.1-cutover op 9 oktober 2026 heeft `services/pi/integrations/github/` **geen actieve Tesla-commandfetcher** meer.
 
-## Active scope
+De productie-Invoer V2 schrijft rechtstreeks via de private Pi Status API (`services/pi/api/status/tesla_command_ingest.py`) naar `/home/jeroen/ems/data/tesla-deadline-command.json`. De lokale deadline-statebuilder en Homey-executor blijven ongewijzigd.
 
-- `ev/fetch_deadline_command.py` retrieves the accepted Tesla deadline command from the existing GitHub command-transfer boundary.
-- GitHub is **not** a runtime transport dependency for Homey → Pi state or Pi → Homey control.
-- The former Pi energy-state publisher was retired from production and removed from the repository on 2026-09-26 after the private Pi-hosted Frontend V2 cutover to `GET /web/state/current`.
-
-No energy-state publication service or timer is supported here.
+Het bestaande Cloudflare/GitHub-kanaal voor **EMS-instellingen** is een afzonderlijke legacy-compatibiliteitsroute en wordt niet door deze opruiming verwijderd. GitHub is bron voor software en documentatie, niet voor de live Homey↔Pi-besturing of Tesla-deadlinecommands.

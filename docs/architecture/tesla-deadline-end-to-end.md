@@ -4,17 +4,15 @@
 
 Dit document beschrijft de **actuele productie-keten** voor een Tesla-deadline: welke component eigenaar is van command lifecycle, afgeleide deadline-state, realtime execution en fysieke Easee-writes.
 
-De gecontroleerde keten is:
+De **actuele LIVE-keten sinds 9 oktober 2026** is:
 
 ```text
-Website / Invoer V2
-  ↓ POST + control-PIN
-Cloudflare Worker
-  ↓ GitHub Contents API PUT
-GitHub main: docs/data/tesla-deadline-command.json
-  ↓ Pi command fetcher (60 s)
-Pi: /home/jeroen/ems/data/tesla-deadline-command.json
-  ↓ OnSuccess / watchdog
+Private EMS Invoer V2 (Tailscale)
+  ↓ POST /web/commands/tesla + control-PIN
+Caddy → Pi Status API 127.0.0.1:3100/commands/tesla
+  ↓ validatie, idempotency en atomaire opslag
+/home/jeroen/ems/data/tesla-deadline-command.json
+  ↓ directe afleiding + lokale watchdog
 Pi deadline derived-state builder
   ↓
 /home/jeroen/ems/data/ev-deadline-shadow-state.json
@@ -23,92 +21,32 @@ Pi /control/current
   ↓
 Homey PI Dynamic Planner Bridge v1.5.9
   ↓
-EM2_Power_Intent
+EV Power Adapter v0.2.0 → EV Gate v0.3.0
   ↓
-EV Power Adapter v0.2.0
-  ↓
-EV Gate v0.3.0
-  ↓
-EV Power writer v0.4.5 [LIVE]
+EV Power writer v0.4.6 [LIVE]
   ↓
 Easee / Tesla
 ```
 
+De historische Cloudflare Worker → GitHub → Pi-fetchroute is sinds de V1.1-cutover geen productie-ingress meer. Het oude GitHub-commandbestand kan nog bestaan voor legacy-doeleinden, maar mag de lokale Pi-commandstate nooit overschrijven.
+
 Pi is deadline lifecycle/planning authority. Homey remains realtime executor/safety boundary and the guarded EV writer is the sole automatic physical Easee writer.
 
-## 1. Website → Cloudflare Worker
+## 1. Website → lokale Pi-ingress (LIVE)
 
-De private Invoer V2 gebruikt de bestaande authenticated Worker-write route. De browser bevat geen GitHub-token. De Worker source staat canoniek onder:
+De private Invoer V2 is uitsluitend via Tailscale bereikbaar. De browser stuurt een JSON-POST naar `/web/commands/tesla` met `X-Tesla-Control-Pin` en een `clientRequestId` voor idempotente retries. Caddy routeert deze uitsluitend op het Pi-tailnet-adres naar de loopback-gebonden Status API. De PIN wordt geverifieerd via het host-lokale bestand `/etc/ems/tesla-control.pin` en staat nooit in Git.
 
-`apps/cloudflare/tesla-deadline-worker.js`
+De broncode is `frontend/settings/control/tesla-deadline.js` (browser), `deploy/caddy/ems-frontend-v2.Caddyfile` (private ingress) en `services/pi/api/status/tesla_command_ingest.py` (enige actieve deadline-commandwriter).
 
-De request bevat minimaal:
+## 2. Lokale commandbron (LIVE)
 
-```json
-{
-  "active": true,
-  "deadline": "YYYY-MM-DDTHH:MM",
-  "currentSoc": 27,
-  "targetSoc": 40,
-  "maxA": 8
-}
-```
+De Pi valideert tijd, SoC, `maxA` en het berekende doel met kalibratie 0,62 kWh per SoC-procent. Hij genereert server-side `requestId` en schrijft de geaccepteerde opdracht atomair naar `/home/jeroen/ems/data/tesla-deadline-command.json`. Ongeldige opdrachten overschrijven nooit de vorige geldige command. De input-SoC is geen live Tesla-telemetrie.
 
-De PIN wordt meegestuurd als `X-Tesla-Control-Pin`. De Worker valideert input, genereert een nieuwe `requestId`, gebruikt de operationele `calibrationKWhPerPercent` en berekent:
+`GET /web/commands/current` leest dezelfde Pi-runtimecommand als de afgeleide deadline-statebuilder. De bestaande `ems-ev-deadline-command.path` en `ems-ev-deadline-state.timer/.path/.service` verzorgen lokale triggers en herstel zonder GitHub-polling.
 
-`goalKWh = (targetSoc - currentSoc) × calibrationKWhPerPercent`
+## 3. Uitgefaseerde GitHub-commandfetch (historisch)
 
-De command-SOC is input-only. Er is geen live Tesla-SOC telemetry in deze keten.
-
-## 2. Cloudflare Worker → GitHub command
-
-De Worker schrijft via de GitHub Contents API naar:
-
-`docs/data/tesla-deadline-command.json`
-
-Het bestand is tijdens de huidige migratiefase de duurzame commandbron voor de Pi. Belangrijke velden zijn:
-
-- `schema=2`
-- `requestId`
-- `requestedAt`
-- `active`
-- `deadline`
-- `currentSoc`
-- `targetSoc`
-- `calibrationKWhPerPercent`
-- `goalKWh`
-- `maxA`
-
-## 3. GitHub command → Pi runtime command
-
-De actieve consumer is:
-
-`services/pi/integrations/github/ev/fetch_deadline_command.py`
-
-Systemd:
-
-- `ems-ev-deadline-command.timer` — 60-seconden cadence;
-- `ems-ev-deadline-command.service` — fetch/validate/atomic replace;
-- succesvolle service-runs triggeren `ems-ev-deadline-state.service` via `OnSuccess=`.
-
-Runtime command:
-
-`/home/jeroen/ems/data/tesla-deadline-command.json`
-
-De fetcher valideert schema, request identity, timestamp, SoC-bounds, `goalKWh`, calibratie en `maxA`. Een fetch- of validatiefout vervangt nooit de laatst geldige runtime command.
-
-### Bekende transportbeperking — 2026-10-01
-
-De huidige fetcher leest nog de branch-URL op `raw.githubusercontent.com`. Live evidence op 2026-10-01 liet zien dat een nieuwe GitHub commit om circa 22:08 pas om 22:12 door de Pi werd gezien, ondanks correcte 60-seconden polling. De command lifecycle, Pi derived state en Homey execution reageerden daarna direct correct.
-
-Daarom geldt:
-
-- sneller pollen alleen lost deze latency niet betrouwbaar op;
-- de raw branch-URL is geen geschikte langetermijn transportkeuze voor tijdkritische deadline-commands;
-- migratie naar een cache-onafhankelijke GitHub Contents REST read is technische schuld / geplande follow-up;
-- totdat die migratie is uitgevoerd blijft GitHub command latency onderdeel van deadline feasibility.
-
-Dit is uitsluitend de **website → Pi command-transfer**. De live Homey ↔ Pi state/control transport blijft LAN-lokaal en is niet afhankelijk van GitHub.
+Tot de cutover van **9 oktober 2026** liep de route via Cloudflare Worker → GitHub Contents API → `docs/data/tesla-deadline-command.json` → 60-seconden Pi GitHub-fetcher. Op 1 oktober trad daarbij aantoonbare cachevertraging op. Sinds 9 oktober is de GitHub-fetchservice gestopt en de timer uitgeschakeld; dit blijft historische context, **niet** de actuele commandbron. De overgebleven Worker kan nog een apart EMS-instellingencommand verwerken. Zie sectie 12 voor cutover- en live-validatiebewijs.
 
 ## 4. Pi deadline derived state
 
@@ -256,79 +194,35 @@ Feasibility hangt af van:
 - `remainingKWh`;
 - request-specifieke `maxA`;
 - werkelijke Easee/Tesla beschikbaarheid;
-- command-transfer latency;
+- lokale command-ingress- en verwerkingslatentie;
 - eventuele fysieke veiligheidsbegrenzing.
 
 Wanneer een request pas ná `latestStartAt` wordt ingevoerd of ontvangen, moet de executor direct maximaal toegestaan deadline-laden aanvragen, maar dat kan een reeds onhaalbare deadline niet alsnog haalbaar maken.
 
-## 9. Diagnosevolgorde
+## 9. Diagnosevolgorde (LIVE)
 
-Bij een ontbrekende of foutieve deadline altijd links naar rechts controleren:
+1. Controleer browser-POST `/web/commands/tesla` via het Tailscale-adres, PIN-beveiliging en serverantwoord (200/202).
+2. Controleer de lokaal opgeslagen command `/home/jeroen/ems/data/tesla-deadline-command.json`: requestId, deadline, SoC en `maxA`.
+3. Controleer `/home/jeroen/ems/data/ev-deadline-shadow-state.json` en `GET /control/current`: identieke requestId, `TRACKING`, freshness, deadline.valid en authority PI.
+4. Controleer Homey Bridge v1.5.9, Adapter v0.2.0 en Gate v0.3.0 op executor-evidence.
+5. Controleer de enige fysieke EV writer v0.4.6 en de Easee-readback (stroom, fasen, vermogen).
 
-```text
-1. GitHub command
-   docs/data/tesla-deadline-command.json
-   - nieuwe requestId?
-   - requestedAt/deadline/SOC/maxA correct?
+GitHub-commits en de voormalige fetchstatus zijn **geen** stappen in de huidige deadline-diagnose.
 
-2. Pi runtime command
-   /home/jeroen/ems/data/tesla-deadline-command.json
-   - dezelfde requestId?
-   - fetch status UPDATED/UNCHANGED?
-   - command-transfer latency?
-
-3. Pi derived state
-   /home/jeroen/ems/data/ev-deadline-shadow-state.json
-   - status TRACKING?
-   - remainingKWh?
-   - latestStartAt?
-   - telemetry fresh?
-
-4. /control/current
-   - deadline.valid?
-   - deadline.active?
-   - authority PI?
-   - maxA correct?
-
-5. Homey PI Bridge
-   - deadlineGuard.active?
-   - deadlineGuard.applied?
-   - connected?
-   - forceFromAt bereikt?
-   - phase command 3P + maxA?
-
-6. Adapter / Gate / writer
-   - Adapter EXECUTABLE?
-   - Gate PASS?
-   - writer LIVE / write result?
-
-7. Easee / Tesla
-   - plugged_in_paused of plugged_in_charging?
-   - offered A?
-   - target A?
-   - 3-fase stroom?
-   - werkelijk vermogen?
-```
-
-Deze volgorde voorkomt dat een upstream command-latency als planner- of actuatorprobleem wordt behandeld.
-
-## 10. Verantwoordelijkheden
+## 10. Verantwoordelijkheden (LIVE)
 
 ```text
-Website          = gebruikersinvoer
-Worker           = authenticatie + duurzame GitHub command-write
-GitHub command   = tijdelijke duurzame overdrachtsbron website → Pi
-Pi fetcher       = command-ingress + validatie + atomic runtime publication
-Pi deadline state= lifecycle/progress/latestStart
-Pi Planner/API   = planning + deadline execution contract
-Homey Bridge     = realtime executor guard + canonical Power Intent
-EV Adapter/Gate  = vertaling + validatie
-EV writer        = enige automatische fysieke Easee-write
-Easee/Equalizer  = lokale elektrische safety
+Invoer V2         = gebruikersintentie via Tailscale
+Pi Status API     = PIN-authenticatie, validatie, command-ingress en atomaire opslag
+Pi deadline state = lifecycle, voortgang en latestStart
+Pi Planner/API    = planning + deadline-executioncontract
+Homey Bridge      = realtime executor guard + canonical Power Intent
+EV Adapter/Gate   = vertaling + veiligheidsvalidatie
+EV writer         = enige automatische fysieke Easee-write
+Easee/Equalizer   = lokale elektrische safety
 ```
 
-Er is één planner/deadline authority (Pi) en één automatische fysieke writer (Homey EV writer). Dual ownership is verboden.
-
+Er is één lokale deadline-commandbron, één planner/deadline-authority (Pi) en één automatische fysieke EV-writer (Homey). Legacy GitHub-commandfetch mag deze bron niet vervangen.
 
 ## 11. Planner-onafhankelijke deadline-uitvoering — PR #212 (LIVE sinds 2026-10-09)
 
@@ -361,7 +255,7 @@ Regressiebewijs: `tests/control/test_ev_deadline_planner_independence.py`, `test
 
 ## 12. Local Pi EV Deadline Command Ingress V1.1 — LIVE (2026-10-09)
 
-Source: merged PR #213, `6b2a2de8da64d542232c1cb42c0658e6eb50fc07`. On 2026-10-09 the Pi deployed the V1.1 Status API, Web Data API, website and private Caddy configuration. The old `ems-ev-deadline-command.timer` and command fetch service were explicitly disabled/stopped. The Pi command file is now the sole runtime source; the existing Homey Bridge/Gate/Actuator are untouched. A **new valid website command and resulting Easee physical behavior have not yet been tested end to end**.
+Source: merged PR #213, `6b2a2de8da64d542232c1cb42c0658e6eb50fc07`. On 2026-10-09 the Pi deployed the V1.1 Status API, Web Data API, website and private Caddy configuration. The old `ems-ev-deadline-command.timer` and command fetch service were explicitly disabled/stopped. The Pi command file is now the sole runtime source; the existing Homey Bridge/Gate/Actuator are untouched. The initial live website→Pi→Easee test on 2026-10-09 is recorded below; exact per-request Homey Bridge/Gate provenance remains open.
 
 Private command chain:
 

@@ -42,6 +42,11 @@ RETIRED_FORECAST_UNITS=(
     "${RETIRED_FORECAST_TIMERS[@]}"
     "${RETIRED_FORECAST_SERVICES[@]}"
 )
+# Old GitHub EV fetch is retired. Local ems-ev-deadline-command.path remains active.
+RETIRED_EV_DEADLINE_FETCH_UNITS=(
+    "ems-ev-deadline-command.timer"
+    "ems-ev-deadline-command.service"
+)
 RETIRED_RUNTIME_FILES=(
     "publisher/publish_planner_shadow.py"
     "publisher/publish_dynamic_planner_shadow.py"
@@ -93,7 +98,7 @@ for f in "$SYSTEMD"/*; do
 done
 # Retiring units are no longer in Git, so preserve any still-installed copies
 # explicitly in this deployment backup before removing them from the host.
-for unit in "${RETIRED_FORECAST_UNITS[@]}"; do
+for unit in "${RETIRED_FORECAST_UNITS[@]}" "${RETIRED_EV_DEADLINE_FETCH_UNITS[@]}"; do
     cp -a "/etc/systemd/system/$unit" "$BACKUP/" 2>/dev/null || true
 done
 
@@ -426,6 +431,13 @@ for unit in "${RETIRED_FORECAST_UNITS[@]}"; do
 done
 
 echo
+echo "=== RETIRE LEGACY GITHUB EV COMMAND FETCH UNITS ==="
+systemctl disable --now ems-ev-deadline-command.timer >/dev/null 2>&1 || true
+systemctl stop ems-ev-deadline-command.service >/dev/null 2>&1 || true
+for unit in "${RETIRED_EV_DEADLINE_FETCH_UNITS[@]}"; do
+    rm -f "/etc/systemd/system/$unit"
+done
+
 echo "=== SYSTEMD RELOAD ==="
 systemctl daemon-reload
 
@@ -438,6 +450,13 @@ for unit in "${RETIRED_FORECAST_UNITS[@]}"; do
 done
 
 echo
+for unit in "${RETIRED_EV_DEADLINE_FETCH_UNITS[@]}"; do
+    if [[ -e "/etc/systemd/system/$unit" ]]; then
+        echo "ERROR: retired GitHub EV fetch unit still installed: $unit"
+        exit 1
+    fi
+done
+
 echo "=== VALIDATE ==="
 bash "$REPO/scripts/ems_pi_drift_check.sh"
 
@@ -451,4 +470,4 @@ echo "Backup: $BACKUP"
 echo "Deployment marker: $COMMIT"
 echo "Performance command: $PERFORMANCE_COMMAND"
 echo "Health command: $HEALTH_COMMAND"
-echo "NOTE: Long-running services were NOT restarted; legacy standalone forecast services/timers were retired from systemd."
+echo "NOTE: Long-running services were NOT restarted; retired forecast and GitHub EV fetch units were removed."

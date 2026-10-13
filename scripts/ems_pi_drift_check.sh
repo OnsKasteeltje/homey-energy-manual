@@ -34,6 +34,12 @@ RETIRED_FORECAST_UNITS=(
     "ems-pv-forecast.service"
 )
 
+# Local command.path is intentionally retained; only network fetch units are retired.
+RETIRED_EV_DEADLINE_FETCH_UNITS=(
+    "ems-ev-deadline-command.timer"
+    "ems-ev-deadline-command.service"
+)
+
 echo "=== EMS PI DRIFT CHECK ==="
 echo "Repo:      $REPO"
 echo "Source:    $SOURCE"
@@ -393,6 +399,16 @@ done
 echo
 echo "=== RETIRED FORECAST SYSTEMD UNITS ==="
 for unit in "${RETIRED_FORECAST_UNITS[@]}"; do
+    if [[ -e "/etc/systemd/system/$unit" ]]; then
+        echo "STALE RETIRED UNIT: $unit"
+        FAIL=1
+    else
+        echo "PASS: retired unit absent: $unit"
+    fi
+done
+
+echo "=== RETIRED GITHUB EV FETCH UNITS ==="
+for unit in "${RETIRED_EV_DEADLINE_FETCH_UNITS[@]}"; do
     if [[ -e "/etc/systemd/system/$unit" ]]; then
         echo "STALE RETIRED UNIT: $unit"
         FAIL=1

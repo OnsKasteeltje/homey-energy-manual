@@ -1,4 +1,6 @@
-# EV deadline Pi ownership — migration preparation
+# EV deadline Pi ownership — historical migration preparation
+
+> **Historisch document (september 2026).** De hier beschreven GitHub-fetchingress is sinds 9 oktober 2026 opgevolgd door de lokale Pi Ingress V1.1. Raadpleeg [Tesla deadline — end-to-end keten](tesla-deadline-end-to-end.md) voor de actuele productiearchitectuur.
 
 Status: **AUTHORITY CUTOVER COMPLETE — PI DEADLINE OWNER, HOMEY EXECUTOR/SAFETY**
 

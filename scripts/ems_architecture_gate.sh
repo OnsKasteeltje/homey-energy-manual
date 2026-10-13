@@ -230,6 +230,24 @@ do
 done
 pass "legacy planner GitHub publication source and rolling snapshot artifacts are absent"
 
+for retired_ev_fetch in \
+  services/pi/integrations/github/ev/fetch_deadline_command.py \
+  deploy/systemd/ems-ev-deadline-command.timer \
+  deploy/systemd/ems-ev-deadline-command.service \
+  tests/integrations/ev/test_ev_deadline_command_ingress.py; do
+  [[ ! -e "$retired_ev_fetch" ]] || fail "retired GitHub EV deadline fetcher returned: $retired_ev_fetch"
+done
+for local_ev_path in \
+  deploy/systemd/ems-ev-deadline-command.path \
+  deploy/systemd/ems-ev-deadline-state.path \
+  deploy/systemd/ems-ev-deadline-state.service \
+  deploy/systemd/ems-ev-deadline-state.timer \
+  services/pi/api/status/tesla_command_ingest.py \
+  tests/integrations/ev/test_ev_deadline_local_ingress.py; do
+  [[ -f "$local_ev_path" ]] || fail "missing canonical local EV deadline component: $local_ev_path"
+done
+pass "retired GitHub command fetcher absent, local Pi deadline chain preserved"
+
 [[ ! -e docs/data/energy-day-v2.json ]] || fail "legacy Homey Day Series GitHub runtime artifact must remain retired: docs/data/energy-day-v2.json"
 pass "legacy Homey Day Series GitHub runtime publication artifact is absent"
 
