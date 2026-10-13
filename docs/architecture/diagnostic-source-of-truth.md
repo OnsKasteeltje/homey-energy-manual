@@ -39,7 +39,7 @@ The private EMS website uses the Pi's read-only `GET /web/*` resources via its T
 **Tesla deadline (LIVE since 2026-10-09):**
 
 ```text
-Private Invoer V2 OR native SwiftUI Deadline UI
+Private Invoer V2 (desktop or iPhone home-screen web app)
  → Tailscale Caddy POST /web/commands/tesla
  → Pi Status API /commands/tesla (loopback, PIN/idempotency validation)
  → /home/jeroen/ems/data/tesla-deadline-command.json (atomic)
@@ -102,9 +102,9 @@ A troubleshooting task is not architecturally complete at "root cause found". It
 ```
 
 GitHub command JSON and GitHub Pages are no longer checkpoints in the live Tesla deadline chain.
-The browser and native app are alternative user interfaces only; neither is a
-control authority. Diagnose both from the same Pi command file onward. The native
-client asks for the control PIN per command and does not persist it.
+Desktop Safari and the iPhone home-screen web app are the same private V2 browser
+interface; neither is a control authority. Diagnose both from the same Pi command
+file onward.
 
 ### Historical diagnostic lesson — 2026-09-19 (pre-local-ingress)
 
@@ -193,37 +193,12 @@ Shortest safe recurrence check:
 
 If step 2 succeeds but step 4 returns HTTP 400, inspect URL construction before changing API, Caddy, renderer or runtime state.
 
-## 6.1 Native Mobile V1 ingress diagnostic sequence
+### iPhone home-screen web app
 
-The native read-only mobile path is:
-
-```text
-SwiftUI / tailnet client
- -> Tailscale address on Pi
- -> Caddy handle /api/mobile/*
- -> loopback Web Data API 127.0.0.1:3200
- -> GET /api/mobile/v1/overview
- -> canonical Pi runtime projections
-```
-
-The Web Data API must remain loopback-only. A failed request to the Pi LAN address
-(`192.168.x.x:80/443`) is not evidence that Mobile V1 is down when Caddy is
-intentionally bound only to the Tailscale interface. Verify listeners before changing
-the API or opening a LAN/public port.
-
-Shortest safe recurrence check:
-
-```text
-1. Pi: curl http://127.0.0.1:3200/api/mobile/v1/overview
-2. Pi: verify Caddy listens only on the Tailscale address
-3. Tailnet client: curl http://<tailscale-ip>/api/mobile/v1/overview
-4. Compare /etc/caddy/Caddyfile with deploy/caddy/ems-frontend-v2.Caddyfile
-```
-
-A 200 response at step 1 combined with failure at step 3 localizes the problem to
-private ingress/Tailscale/Caddy, not to Mobile V1 runtime data. The canonical Caddy
-source must contain `handle /api/mobile/* { reverse_proxy 127.0.0.1:3200 }`.
-Do not fix ingress by exposing port 3200 or by adding a wildcard/LAN listener.
+The iPhone home-screen experience is the same private V2 website described above:
+`http://100.127.130.0/` redirects to `/live/`, and all data/command traffic stays on
+the existing Tailscale-only Caddy `/web/*` boundary. There is no separate native
+Mobile V1 API to diagnose.
 
 ## 7. Private V2 command-Worker diagnostic sequence
 
