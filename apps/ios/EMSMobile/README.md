@@ -1,71 +1,106 @@
-# EMS Mobile v0.1
+# EMS Mobile v0.2
 
-Native SwiftUI read-only client for the Pi Mobile API V1.
+Native SwiftUI client for private EMS observability plus one bounded EV deadline command.
 
 ## Scope
 
-- reads only `GET /api/mobile/v1/overview`;
-- no Homey calls;
-- no planner/control writes;
-- no physical writes;
-- manual/pull-to-refresh only in v0.1.
+The app has two deliberately separate paths:
 
-## Xcode bootstrap
+- **observability:** `GET /api/mobile/v1/overview`, read-only;
+- **EV deadline:** `GET /web/commands/current` plus the single bounded write
+  `POST /web/commands/tesla`.
 
-1. On the Mac, open Xcode and create a new **iOS App** project.
-2. Product name: `EMSMobile`.
-3. Interface: **SwiftUI**.
-4. Language: **Swift**.
-5. Deployment target: iOS 17 or newer.
-6. Replace the generated app/content source with the files in this folder and add:
-   - `Models/MobileOverview.swift`
-   - `Services/EMSAPIClient.swift`
-   - `Store/OverviewStore.swift`
-7. Build once in the Simulator.
+It does **not**:
 
-The app stores its API base URL in `@AppStorage("emsBaseURL")`. The initial value is intentionally empty. On first launch, enter the private
-EMS gateway base URL under **Instellingen**. Do not commit site-specific
-addresses, access tokens, or credentials to this public repository.
+- call Homey directly;
+- write Easee or another physical device directly;
+- own planner/control policy;
+- add a generic HTTP write client;
+- store the Tesla control-PIN in source code or `UserDefaults` / `AppStorage`.
 
-The app itself always appends:
+The Pi remains command and validation authority.
 
-`/api/mobile/v1/overview`
+## Canonical Xcode project
 
-## LAN networking
+Open:
 
-The Pi Web Data API itself remains intentionally bound to `127.0.0.1:3200`.
-The iPhone must therefore use the existing private gateway/reverse-proxy boundary,
-not port 3200 directly.
+`apps/ios/EMSMobile/EMS.xcodeproj`
 
-Before device testing, verify that `GET /api/mobile/v1/overview` is reachable
-through the private Tailscale gateway from a tailnet client; do not publish that API
-to the internet.
+The project is repository-relative and contains no site-specific base URL or control
+credential.
 
-If the private gateway uses another scheme/host, enter that base URL under
-**Instellingen** in the app.
+The API base URL remains operator-configured in
+`@AppStorage("emsBaseURL")`. The Tesla control-PIN is stored separately in the
+iOS Keychain with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`.
 
-For the current private Tailscale path, the app uses the operator-configured private
-tailnet gateway. The transport remains inside the encrypted tailnet, but iOS App
-Transport Security does not infer that when the Caddy layer uses plain HTTP. For v0.1 device testing, add the development-only
-Info.plist setting `NSAppTransportSecurity -> NSAllowsArbitraryLoads = YES`. Keep
-this scoped to the current private read-only prototype. A later hardened release
-should move the app endpoint to trusted HTTPS over the tailnet and remove this
-allowance. Port 3200 must never be exposed directly.
+## Network boundary
 
-## First UI
+The Pi Web Data API remains bound to loopback. Native mobile access uses the
+existing private Tailscale-only Caddy ingress.
 
-The first native dashboard shows:
+Observability path:
+
+`SwiftUI -> Tailscale -> Caddy /api/mobile/* -> 127.0.0.1:3200`
+
+Deadline path:
+
+`SwiftUI -> Tailscale -> Caddy /web/commands/tesla -> 127.0.0.1:3100 -> existing Pi deadline builder/control chain`
+
+Caddy restricts the write route to the tailnet. The Pi command ingress additionally:
+
+- accepts the route only from its loopback reverse proxy;
+- requires `X-Tesla-Control-Pin`;
+- validates SOC, deadline and max current server-side;
+- requires a UUID `clientRequestId`;
+- applies idempotency handling;
+- persists the command atomically;
+- invokes the existing Pi deadline-state builder;
+- performs no direct physical write itself.
+
+The iOS client keeps the same `clientRequestId` when retrying an ambiguous failed
+submission with unchanged intent.
+
+## Deadline UX
+
+v0.2 adds a dedicated **Deadline** tab.
+
+The user enters:
+
+- current SOC;
+- target SOC;
+- deadline date/time;
+- maximum charge current (6–16 A).
+
+Deadline time is encoded explicitly as **Europe/Amsterdam** local time, matching the
+canonical Pi ingress contract even if the phone is used from another timezone.
+
+Before submission the app shows an explicit confirmation. After submission it reads
+back `/web/commands/current` and refreshes Mobile V1. A Pi response of
+`PENDING_WATCHDOG` is shown as accepted/pending rather than falsely labelled as
+already active.
+
+Cancellation is a separate destructive action with its own confirmation.
+
+## Dashboard
+
+The dashboard continues to show:
 
 - signed grid state plus explicit import/export;
 - PV power and other-house load when available;
 - EV connected/charging/current/deadline semantics;
-- warm-water card only when the effective source is `BOILER`; it is hidden for `CV` or unknown source;
+- warm-water card only when the effective source is `BOILER`;
 - Heating SHADOW state;
-- Flex status, including `STALE` / `INCONSISTENT`;
-- manager status;
-- explicit read-only / no-write capabilities.
+- Flex freshness/consistency;
+- manager state.
 
-The UI deliberately suppresses missing values rather than inventing them.
+Missing values are suppressed rather than invented.
 
+## Transport hardening
 
-The overview header formats `generatedAt` as local device time rather than exposing the raw ISO timestamp.
+The current tailnet path is private but uses HTTP at the Caddy layer. The app
+therefore still uses the existing development ATS allowance while commissioning.
+The transport itself remains inside encrypted Tailscale.
+
+A later hardened release should move the private endpoint to trusted HTTPS and
+remove the arbitrary-load ATS allowance. Port 3100 and port 3200 must never be
+published directly.
