@@ -40,8 +40,11 @@ assert 'const MOBILE_PRIMARY = ["live", "settings", "history"]' in nav
 assert 'ems-nav-mobile' in nav
 assert 'ems-mobile-more-toggle' in nav
 assert 'ems-mobile-more-sheet' in nav
+assert 'document.body.append(dock, sheet)' in nav
 assert 'env(safe-area-inset-bottom)' in shell
 assert 'position:fixed' in shell
+assert '.ems-mobile-dock' in shell
+assert '.topbar nav.ems-main-nav{display:none}' in shell
 assert '.ems-nav-desktop{display:none}' in shell
 assert '@root path /' in caddy
 assert 'redir @root /live/ 302' in caddy
