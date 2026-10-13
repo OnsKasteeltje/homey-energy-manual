@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 enum EMSAPIError: LocalizedError {
     case invalidBaseURL
@@ -56,85 +55,6 @@ struct EMSAPIClient {
         }
 
         return try JSONDecoder().decode(MobileOverview.self, from: data)
-    }
-}
-
-enum TeslaControlPINStore {
-    private static let service = "nl.onskasteeltje.EMS.tesla-control"
-    private static let account = "control-pin"
-
-    static func save(_ pin: String) throws {
-        let normalized = pin.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard normalized.count >= 8 else {
-            throw PINError.tooShort
-        }
-
-        let base: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-
-        SecItemDelete(base as CFDictionary)
-
-        var attributes = base
-        attributes[kSecValueData as String] = Data(normalized.utf8)
-        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-
-        let status = SecItemAdd(attributes as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw PINError.keychain(status)
-        }
-    }
-
-    static func load() throws -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-
-        if status == errSecItemNotFound {
-            return nil
-        }
-        guard status == errSecSuccess,
-              let data = item as? Data,
-              let pin = String(data: data, encoding: .utf8)
-        else {
-            throw PINError.keychain(status)
-        }
-        return pin
-    }
-
-    static func delete() throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw PINError.keychain(status)
-        }
-    }
-
-    enum PINError: LocalizedError {
-        case tooShort
-        case keychain(OSStatus)
-
-        var errorDescription: String? {
-            switch self {
-            case .tooShort:
-                return "De control-PIN moet minimaal 8 tekens bevatten."
-            case .keychain(let status):
-                return "Keychain-fout \(status)."
-            }
-        }
     }
 }
 
