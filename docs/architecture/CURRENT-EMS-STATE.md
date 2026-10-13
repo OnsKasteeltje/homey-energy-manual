@@ -5,7 +5,7 @@
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
 **Status date:** 2026-10-13
-**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-07 Mobile API V1 read-only commissioning/freshness hardening  
+**Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
 
@@ -13,7 +13,7 @@ Detailed bidirectional runtime chain: `docs/architecture/homey-pi-runtime-datafl
 
 Canonical diagnostic source-of-truth and mandatory root-cause documentation rule: `docs/architecture/diagnostic-source-of-truth.md`. End-to-end troubleshooting MUST first identify the canonical source at each boundary; when root cause is established, reusable chain knowledge MUST be captured there before the investigation is considered architecturally complete.
 
-- `apps/cloudflare/` contains the legacy authenticated command Worker, still relevant to the separate GitHub-backed EMS **settings** command. Its old Tesla GitHub-write route is **not** Pi deadline ingress since 2026-10-09. The private Tesla command route is Private Invoer V2 (and the native SwiftUI Deadline UI after v0.2 commissioning) → the same Tailscale Caddy → Pi Status API ingress. GitHub Pages now publishes only a static landing page; operational runtime snapshots must never be republished to `docs/data/`. See `docs/architecture/public-data-boundary.md`.
+- `apps/cloudflare/` contains the legacy authenticated command Worker, still relevant to the separate GitHub-backed EMS **settings** command. Its old Tesla GitHub-write route is **not** Pi deadline ingress since 2026-10-09. The private Tesla command route is Private Invoer V2, including the iPhone home-screen web app: Tailscale Caddy → Pi Status API ingress. GitHub Pages now publishes only a static landing page; operational runtime snapshots must never be republished to `docs/data/`. See `docs/architecture/public-data-boundary.md`.
 
 ## 1. Source of truth
 
@@ -34,32 +34,11 @@ Canonical diagnostic source-of-truth and mandatory root-cause documentation rule
 Operational energy history follows the canonical Homey → Pi state direction. Accepted Core state pushes are archived locally on the Pi; automatic Pi polling of Homey Insights is not a production history transport.
 
 
-### 1.1 Mobile API V1 — native presentation boundary
+### Mobile access — private V2 web app
 
-The native-mobile presentation boundary is served by the existing Pi Web Data API at `GET /api/mobile/v1/overview`, schema `EMS_MOBILE_OVERVIEW_V1`. It is a read-only aggregation layer only: `readOnly=true`, `presentationOnly=true`, `controlWrites=false` and `physicalWrites=false` are part of the contract. It makes no planner decision, creates no Homey/device write path and does not reintroduce GitHub as a runtime transport dependency.
+Mobile access uses the existing private EMS V2 website through the Tailscale-only Caddy ingress. On iPhone the site is installed with Safari **Zet op beginscherm** and uses the same `/web/*` read resources and the same PIN-protected `/web/commands/tesla` command ingress as desktop Safari. There is no separate mobile planner, control owner or physical writer.
 
-The canonical Live V2 Pi energy-state projection is mandatory for Mobile V1. Secondary presentation evidence such as WW seasonal advice and Flex Priority SHADOW is best-effort and must never be promoted to live authority merely because it can be read. Failure of the canonical live energy state fails the endpoint closed; failure of a secondary resource degrades only that section.
-
-Mobile V1 applies explicit presentation freshness/consistency semantics to Flex Priority SHADOW. Its `generatedAt` is compared with the canonical Live V2 state time, and the Flex EV `deadlineActive` flag is compared with the canonical live EV deadline state. A Flex source older than 75 minutes is exposed as `STALE`; a semantic deadline-state mismatch is exposed as `INCONSISTENT`. In either case Flex priority owner / EV role / reason and Heating grant fields are suppressed rather than presented as current facts. These checks are presentation guards only and do not alter planner, Gate, actuator or physical-control behavior.
-
-Inactive EV deadline state must not expose an old deadline timestamp or stale remaining-kWh value through Mobile V1. Warm-water mode is normalized at the mobile boundary to `CV`, `BOILER` or `null`; the underlying canonical runtime boolean/source contract is unchanged. The Web Data API remains loopback-bound by default on `127.0.0.1:3200`; direct internet exposure of port 3200 is forbidden. Native iPhone reads use the same private Tailscale-only Caddy ingress as the private EMS website. Mobile V1 remains read-only; the separate PIN-protected Tesla deadline command route does not make Mobile V1 writable.
-
-
-EV downstream execution observability now extends beyond the EMS control target.
-Homey EV Device Health v0.4 performs targeted read-only reads of the Easee
-charger and Equalizer and publishes requested/offered current, actual Easee
-phase currents/power, target circuit current and Equalizer phase currents/power.
-The existing EV Control Pi Push transports that Logic snapshot without device
-writes. Pi EV control ingest stores a normalized `downstream_json` projection
-inside `ev_control_events`, ensuring offered-current/Equalizer changes create
-durable historical evidence even when Gate/Actuator state itself is unchanged.
-The AI may therefore distinguish an EMS target mismatch from downstream
-charger/load-balancing curtailment; Equalizer attribution remains qualified
-unless explicit evidence proves causation.
-
-Household-energy history is derived from cumulative P1/PV counters in `house_energy_intervals`. Cumulative counter rows with quality `held` remain valid monotonic state and must not truncate the timeline when a PV inverter sleeps or becomes stale. For each of the three PV inverter counters independently (SolarEdge, GoodWe 4200 and GoodWe 2000), repeated identical cumulative readings followed by the next positive counter step are treated as timing-uncertain delayed counter publication, regardless of whether the repeated source samples were labelled `held` or `observed`. The exact cumulative delta is preserved but distributed linearly over the elapsed stored timestamps of that plateau; reconstructed intervals are marked `quality=estimated` / `pv_quality=estimated`. Redistribution never crosses a Europe/Amsterdam calendar-day boundary, preventing overnight zero-production plateaus from smearing the next morning's production backward. A trailing held sequence without a later increase remains `held`. P1 import/export derivation is unchanged. Counter decreases remain discontinuities and true timing gaps remain `gap`. This removes false single-interval PV/house-load spikes without changing PV energy totals. The Web History/PV-Flex projection already accepts `pv_quality=estimated` as usable derived PV evidence.
-
-**Daily PV accounting correction (PR #235, source prepared; Pi deployment still required, 2026-10-12).** The read-only `ems-performance` daily PV self-consumption and P1 import/export KPIs now prefer validated `house_energy_intervals` energy deltas, not time-integrated instantaneous inverter/P1 powers. A PV self-consumption KPI is eligible only with at least 95% paired P1/PV coverage on the Europe/Amsterdam reporting day and a nonnegative aggregate PV-minus-export balance; otherwise `metrics.pv_self_consumption_rate` and `metrics.direct_pv_self_use_kwh` fail closed to null. The historical P1 grid energy is the import/export authority; synchronous power samples remain available separately as `sampledPowerMetrics` for EV/boiler flex allocation and diagnostics. `powerSampleQuality` identifies intervals where recorded P1 export exceeds the simultaneous sum of inverter powers and reports the energy discrepancy, without treating it as missed EV opportunity or correcting P1. On 2026-10-11, cumulative history showed 19.488001 kWh PV, 4.677998 kWh P1 export and 76.0% PV self-consumption, while the former sampled-power day ratio was 80.41%; 13 inconsistent samples contributed ~0.890 kWh of false clamped balance. Source freshness/timestamp alignment remains a diagnostic hypothesis, not a proven cause. The benchmark and PV allocation remain derived and unconstrained; Constrained Replay remains `EV_EXPORT_ONLY` and unchanged. See `docs/commissioning/pv-daily-accounting-quality-2026-10-12.md` for evidence, acceptance and Pi cutover; no Homey/device control, live planner, publisher, heating or Quooker writes are introduced.
+The experimental native SwiftUI client and its dedicated read-only Mobile V1 endpoint were retired on 2026-10-13 after the browser/home-screen route was validated. No `/api/mobile/*` Caddy route or `EMS_MOBILE_OVERVIEW_V1` endpoint remains. Git history is sufficient for historical reference; the native client is not an active rollback path.
 
 ### 1.1 Ruimteverwarming — Honeywell baseline, PV-voorverwarming and Thermal Learning
 
@@ -825,14 +804,13 @@ the live operational history.
 
 ### EV Deadline Local Ingress V1.1 — LIVE (2026-10-09)
 
-The command ingress is shared by user interfaces. Private Invoer V2 is the live browser UI;
-the native SwiftUI v0.2 Deadline UI is a candidate second UI over the same ingress and must
-not create a second command source. Its control PIN is requested per submit/cancel action and
-is not persisted by the app. Pi validation, command persistence, deadline derivation,
-`/control/current`, Homey Bridge/Adapter/Gate and the sole Easee writer remain unchanged.
+Private Invoer V2 is the single live user command UI, used from desktop and from the iPhone
+home-screen web app. It uses the existing PIN-protected ingress and does not create a second
+command source. Pi validation, command persistence, deadline derivation, `/control/current`,
+Homey Bridge/Adapter/Gate and the sole Easee writer remain unchanged.
 PR #213 merged to `main` at `6b2a2de8da64d542232c1cb42c0658e6eb50fc07`. Pi runtime deployed: only the Tailscale-hosted website on `100.127.130.0:80`; restricted-PIN local Pi Tesla command ingress; a common runtime command file now used by `/web/commands/current` and Pi deadline derivation. Runtime backup `/home/jeroen/ems/backup/ev-ingress-v11-20261009-222745`. Preflight 18/18 PASS, architecture gate PASS, `caddy validate` valid; API negative auth/deadline tests HTTP 401/400 and no command mutation. GitHub fetch timer disabled, fetch service stopped, and existing derived-state timer/API services remain active. One physical Homey Easee writer and Pi plan authority unchanged. The old GitHub/Worker path must never be reintroduced as a concurrent command source.
 
-**First live validation 2026-10-09:** request `e7f60e72-526f-49b6-b89a-12eb4544dbd6`, user 40%→60%, 12.4kWh, maxA10. Pi request persisted at `20:38:47.502Z`, derived-state same ID and `TRACKING` at `20:38:47.595Z` (93ms); `/control/current` `READY/PLANNER` with `deadline.valid=true`, `active=true`. Homey Insights Easee `evcharger_charging` changed to true at `20:39:16.701Z` (29.199s from request), Homey device showed Charging at 5,467 W with 10 A target/offered. This is strong end-to-end timing evidence, though individual Bridge/Gate requestId correlation is still pending. Compared with prior 4m39s, response improved ~89.5%. Submitted deadline 23:15 CEST was not physically feasible: 12.4kWh at 3×10A needs ~108min with only ~36min available. Open validation: cancellation, exact Homey Bridge/Gate trace, iPhone/mobile-data access and SwiftUI ATS/PWA behavior. Private HTTP is carried inside Tailscale WireGuard, not HTTPS.
+**First live validation 2026-10-09:** request `e7f60e72-526f-49b6-b89a-12eb4544dbd6`, user 40%→60%, 12.4kWh, maxA10. Pi request persisted at `20:38:47.502Z`, derived-state same ID and `TRACKING` at `20:38:47.595Z` (93ms); `/control/current` `READY/PLANNER` with `deadline.valid=true`, `active=true`. Homey Insights Easee `evcharger_charging` changed to true at `20:39:16.701Z` (29.199s from request), Homey device showed Charging at 5,467 W with 10 A target/offered. This is strong end-to-end timing evidence, though individual Bridge/Gate requestId correlation is still pending. Compared with prior 4m39s, response improved ~89.5%. Submitted deadline 23:15 CEST was not physically feasible: 12.4kWh at 3×10A needs ~108min with only ~36min available. Open validation: cancellation and exact Homey Bridge/Gate trace. The iPhone home-screen website was validated on 2026-10-13 through the same private Tailscale HTTP ingress; no native SwiftUI/ATS path remains.
 
 
 ### History / PV-source quality and CI compatibility (PR #215 — prepared, not deployed)

@@ -59,7 +59,6 @@ HEATING_PREHEAT_SHADOW_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_SHADOW_V1"
 HEATING_PREHEAT_PROGRESSION_API_SCHEMA = "EMS_WEB_HEATING_PREHEAT_PROGRESSION_V1"
 FLEX_PRIORITY_SHADOW_API_SCHEMA = "EMS_WEB_FLEX_PRIORITY_SHADOW_V1"
 HEATING_TARGET_HISTORY_DAYS = 7
-MOBILE_OVERVIEW_API_SCHEMA = "EMS_MOBILE_OVERVIEW_V1"
 HONEYWELL_SCHEDULE_FILE = os.environ.get("EMS_HONEYWELL_SCHEDULE_FILE", "/home/jeroen/ems/runtime/tools/honeywell/output/honeywell-schedule.json")
 HEATING_ROOM_MODEL_FILE = os.environ.get(
     "EMS_HEATING_ROOM_MODEL_FILE",
@@ -193,134 +192,6 @@ def state_current_resource():
     }
     return result
 
-
-
-def _optional_mobile_resource(builder):
-    """Read an optional presentation resource without making Mobile V1 brittle."""
-    try:
-        return {"status": "OK", "data": builder()}
-    except (OSError, json.JSONDecodeError, ValueError, sqlite3.Error):
-        return {"status": "UNAVAILABLE", "data": None}
-
-
-def mobile_overview_resource():
-    """Aggregate existing read-only projections for a native mobile client.
-
-    Mobile V1 adds no EMS policy and no write capability. The canonical live
-    energy state is mandatory; secondary presentation resources degrade to an
-    explicit UNAVAILABLE status.
-    """
-    state = state_current_resource()
-    meta = state.get("meta") if isinstance(state.get("meta"), dict) else {}
-    grid = state.get("grid") if isinstance(state.get("grid"), dict) else {}
-    pv = state.get("pv") if isinstance(state.get("pv"), dict) else {}
-    budget = state.get("energy_budget") if isinstance(state.get("energy_budget"), dict) else {}
-    tesla = state.get("tesla") if isinstance(state.get("tesla"), dict) else {}
-    hot_water = state.get("hot_water") if isinstance(state.get("hot_water"), dict) else {}
-    manager = state.get("manager") if isinstance(state.get("manager"), dict) else {}
-    balance = state.get("balance") if isinstance(state.get("balance"), dict) else {}
-    gate = balance.get("control_gate") if isinstance(balance.get("control_gate"), dict) else {}
-
-    grid_w = grid.get("power_w")
-    grid_import_w = None
-    grid_export_w = None
-    if isinstance(grid_w, (int, float)) and not isinstance(grid_w, bool):
-        grid_import_w = max(0, float(grid_w))
-        grid_export_w = max(0, -float(grid_w))
-
-    seasonal = _optional_mobile_resource(seasonal_advice_resource)
-    flex = _optional_mobile_resource(flex_priority_shadow_resource)
-
-    state_generated = parse_timestamp(meta.get("generated_at"))
-    flex_data = flex.get("data") if isinstance(flex.get("data"), dict) else {}
-    flex_generated = parse_timestamp(flex_data.get("generatedAt")) if flex_data else None
-    flex_age_sec = None
-    if state_generated is not None and flex_generated is not None:
-        flex_age_sec = max(0, int(round((state_generated - flex_generated).total_seconds())))
-
-    flex_ev = flex_data.get("ev") if isinstance(flex_data.get("ev"), dict) else {}
-    heating = flex_data.get("heating") if isinstance(flex_data.get("heating"), dict) else {}
-    flex_decision = flex_data.get("decision") if isinstance(flex_data.get("decision"), dict) else {}
-
-    deadline_active = tesla.get("deadline_active") is True
-    flex_status = flex.get("status")
-    flex_consistent = None
-    if flex_status == "OK":
-        flex_consistent = flex_ev.get("deadlineActive") is deadline_active
-        if flex_age_sec is None or flex_age_sec > 4500:
-            flex_status = "STALE"
-        elif not flex_consistent:
-            flex_status = "INCONSISTENT"
-
-    expose_flex_decision = flex_status == "OK"
-    hot_water_mode = hot_water.get("mode")
-    if hot_water_mode not in ALLOWED_MODES:
-        hot_water_mode = None
-
-    return {
-        "schema": MOBILE_OVERVIEW_API_SCHEMA,
-        "generatedAt": meta.get("generated_at"),
-        "readOnly": True,
-        "presentationOnly": True,
-        "energy": {
-            "gridPowerW": grid_w,
-            "gridImportW": grid_import_w,
-            "gridExportW": grid_export_w,
-            "pvPowerW": pv.get("total_w"),
-            "otherHouseLoadW": budget.get("other_house_load_w"),
-            "stateAgeSec": meta.get("state_age_sec"),
-            "gridMeasurementValid": gate.get("grid_measurement_valid"),
-        },
-        "ev": {
-            "connected": tesla.get("connected"),
-            "charging": tesla.get("charging"),
-            "powerW": tesla.get("power_w"),
-            "requestedA": tesla.get("requested_a"),
-            "deadlineAt": tesla.get("deadline_at") if deadline_active else None,
-            "deadlineActive": deadline_active,
-            "need": tesla.get("need"),
-            "remainingKWh": tesla.get("remaining_kwh") if deadline_active else None,
-        },
-        "hotWater": {
-            "mode": hot_water_mode,
-            "boilerOn": hot_water.get("boiler_on"),
-            "boilerPowerW": hot_water.get("boiler_power_w"),
-            "action": (
-                hot_water.get("control", {}).get("action")
-                if isinstance(hot_water.get("control"), dict) else None
-            ),
-            "seasonalAdvice": seasonal,
-        },
-        "heating": {
-            "readyRooms": (
-                heating.get("readyRooms")
-                if expose_flex_decision and isinstance(heating.get("readyRooms"), list)
-                else []
-            ),
-            "earliestOpportunityClosesAt": (
-                heating.get("earliestOpportunityClosesAt") if expose_flex_decision else None
-            ),
-            "shadowGrant": flex_decision.get("heatingShadowGrant") if expose_flex_decision else None,
-        },
-        "flex": {
-            "status": flex_status,
-            "sourceGeneratedAt": flex_data.get("generatedAt") if flex_data else None,
-            "ageSec": flex_age_sec,
-            "consistentWithLiveEvDeadline": flex_consistent,
-            "priorityOwner": flex_decision.get("priorityOwner") if expose_flex_decision else None,
-            "evRole": flex_decision.get("evRole") if expose_flex_decision else None,
-            "reason": flex_decision.get("reason") if expose_flex_decision else None,
-        },
-        "manager": {
-            "decision": manager.get("decision"),
-            "reason": manager.get("reason"),
-            "priority": manager.get("priority"),
-        },
-        "capabilities": {
-            "controlWrites": False,
-            "physicalWrites": False,
-        },
-    }
 
 
 def commands_current_resource():
@@ -2077,17 +1948,6 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 200, pv_forecast_resource())
             except (OSError, json.JSONDecodeError, ValueError):
                 send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
-            return
-
-        if path.path == "/api/mobile/v1/overview":
-            try:
-                send_json(self, 200, mobile_overview_resource())
-            except (OSError, json.JSONDecodeError, ValueError, sqlite3.Error):
-                send_json(self, 503, {
-                    "schema": "EMS_WEB_ERROR_V1",
-                    "status": "UNAVAILABLE",
-                    "reason": "RESOURCE_UNAVAILABLE",
-                })
             return
 
         if path.path == "/web/state/current":
