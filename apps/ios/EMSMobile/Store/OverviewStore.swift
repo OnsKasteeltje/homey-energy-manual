@@ -24,3 +24,22 @@ final class OverviewStore: ObservableObject {
         }
     }
 }
+
+func amsterdamDeadlineText(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(identifier: "Europe/Amsterdam")
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+    return formatter.string(from: date)
+}
+
+func amsterdamDeadlineDate(_ value: String?) -> Date? {
+    guard let value, !value.isEmpty else { return nil }
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(identifier: "Europe/Amsterdam")
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+    return formatter.date(from: value)
+}

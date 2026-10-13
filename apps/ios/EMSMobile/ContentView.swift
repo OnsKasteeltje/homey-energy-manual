@@ -13,6 +13,11 @@ struct ContentView: View {
             .tabItem { Label("Overzicht", systemImage: "house.fill") }
 
             NavigationStack {
+                DeadlineScreen(baseURL: baseURL)
+            }
+            .tabItem { Label("Deadline", systemImage: "clock.fill") }
+
+            NavigationStack {
                 SystemScreen()
             }
             .tabItem { Label("Systeem", systemImage: "gearshape.2.fill") }
@@ -280,6 +285,323 @@ private struct FlexWarningCard: View {
     }
 }
 
+private enum DeadlineConfirmation: String, Identifiable {
+    case submit
+    case cancel
+
+    var id: String { rawValue }
+}
+
+private struct DeadlineScreen: View {
+    @EnvironmentObject private var overviewStore: OverviewStore
+
+    let baseURL: String
+
+    @State private var current: TeslaDeadlineCommandState?
+    @State private var currentSocText = ""
+    @State private var targetSocText = ""
+    @State private var deadline = Date().addingTimeInterval(4 * 60 * 60)
+    @State private var maxA = 11
+    @State private var isLoading = false
+    @State private var isSubmitting = false
+    @State private var statusMessage: String?
+    @State private var errorMessage: String?
+    @State private var confirmation: DeadlineConfirmation?
+    @State private var controlPIN = ""
+    @State private var retryFingerprint: String?
+    @State private var retryRequestId: UUID?
+
+    private let client = TeslaDeadlineClient()
+    private let amsterdamTimeZone = TimeZone(identifier: "Europe/Amsterdam")!
+
+    var body: some View {
+        Form {
+            Section("Actuele opdracht") {
+                if isLoading {
+                    ProgressView()
+                } else if let current, current.active {
+                    if overviewStore.overview?.ev.deadlineActive == true {
+                        Label("Actief in EMS", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Label("Opdracht geaccepteerd · nog niet actief", systemImage: "clock")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    LabeledContent(
+                        "SOC",
+                        value: "\(current.currentSoc ?? 0)% → \(current.targetSoc ?? 0)%"
+                    )
+                    LabeledContent("Klaar om", value: displayDeadline(current.deadline))
+                    LabeledContent("Max", value: current.maxA.map { "\($0) A" } ?? "—")
+
+                    Button("Deadline annuleren", role: .destructive) {
+                        confirmation = .cancel
+                    }
+                    .disabled(isSubmitting)
+                } else {
+                    Text("Geen actieve deadline")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Nieuwe deadline") {
+                TextField("Huidige SOC (%)", text: $currentSocText)
+                    .keyboardType(.numberPad)
+
+                TextField("Doel SOC (%)", text: $targetSocText)
+                    .keyboardType(.numberPad)
+
+                DatePicker(
+                    "Klaar om",
+                    selection: $deadline,
+                    displayedComponents: [.date, .hourAndMinute]
+                )
+                .environment(\.timeZone, amsterdamTimeZone)
+
+                Stepper(
+                    "Max laadstroom: \(maxA) A",
+                    value: $maxA,
+                    in: 6...16
+                )
+
+                Text("Tijd wordt als Europe/Amsterdam naar de Pi gestuurd. De Pi valideert de opdracht opnieuw.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Button("Deadline instellen") {
+                    confirmation = .submit
+                }
+                .frame(maxWidth: .infinity)
+                .disabled(!canSubmit || isSubmitting)
+            }
+
+            if let statusMessage {
+                Section("Status") {
+                    Text(statusMessage)
+                }
+            }
+
+            if let errorMessage {
+                Section("Fout") {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .navigationTitle("Laaddeadline")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await refresh() }
+                } label: {
+                    if isLoading {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                }
+                .disabled(isSubmitting)
+            }
+        }
+        .task {
+            await refresh()
+        }
+        .sheet(item: $confirmation, onDismiss: {
+            controlPIN = ""
+        }) { action in
+            NavigationStack {
+                Form {
+                    Section("Opdracht") {
+                        Text(action == .submit ? submitSummary : cancelSummary)
+                    }
+
+                    Section("Bevestigen") {
+                        SecureField("Tesla control-PIN", text: $controlPIN)
+                            .textContentType(.password)
+
+                        Text("De PIN wordt alleen voor deze opdracht gebruikt en niet door de app bewaard.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .navigationTitle(action == .submit ? "Deadline instellen" : "Deadline annuleren")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Terug") {
+                            confirmation = nil
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(action == .submit ? "Bevestigen" : "Annuleren") {
+                            let pin = controlPIN
+                            confirmation = nil
+                            controlPIN = ""
+                            Task { await perform(action, pin: pin) }
+                        }
+                        .disabled(controlPIN.trimmingCharacters(in: .whitespacesAndNewlines).count < 8)
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
+    }
+
+    private var parsedCurrentSoc: Int? {
+        Int(currentSocText)
+    }
+
+    private var parsedTargetSoc: Int? {
+        Int(targetSocText)
+    }
+
+    private var canSubmit: Bool {
+        guard !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let current = parsedCurrentSoc,
+              let target = parsedTargetSoc
+        else {
+            return false
+        }
+
+        return (0...99).contains(current)
+            && (1...100).contains(target)
+            && target > current
+            && (6...16).contains(maxA)
+    }
+
+    private var submitSummary: String {
+        guard let current = parsedCurrentSoc, let target = parsedTargetSoc else {
+            return "Controleer de SOC-waarden."
+        }
+        return "Van \(current)% naar \(target)% · klaar \(displayDate(deadline)) · maximaal \(maxA) A."
+    }
+
+    private var cancelSummary: String {
+        "De actieve EV-laaddeadline wordt ingetrokken. Daarna geldt weer de normale EMS/PV-logica."
+    }
+
+    private func refresh() async {
+        guard !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !isLoading
+        else {
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            current = try await client.fetchCurrent(baseURLText: baseURL).tesla
+            errorMessage = nil
+
+            if let current, current.active {
+                if let soc = current.currentSoc {
+                    currentSocText = String(soc)
+                }
+                if let target = current.targetSoc {
+                    targetSocText = String(target)
+                }
+                if let amps = current.maxA {
+                    maxA = amps
+                }
+                if let date = amsterdamDeadlineDate(current.deadline) {
+                    deadline = date
+                }
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func perform(_ action: DeadlineConfirmation, pin: String) async {
+        guard !isSubmitting else { return }
+
+        let submission: TeslaDeadlineSubmission
+        if action == .submit {
+            guard let currentSoc = parsedCurrentSoc,
+                  let targetSoc = parsedTargetSoc
+            else {
+                errorMessage = "Controleer de SOC-waarden."
+                return
+            }
+
+            submission = .activate(
+                currentSoc: currentSoc,
+                targetSoc: targetSoc,
+                deadline: amsterdamDeadlineText(deadline),
+                maxA: maxA
+            )
+        } else {
+            submission = .cancel
+        }
+
+        let fingerprint = [
+            submission.active ? "1" : "0",
+            submission.currentSoc.map(String.init) ?? "",
+            submission.targetSoc.map(String.init) ?? "",
+            submission.deadline,
+            String(submission.maxA)
+        ].joined(separator: "|")
+
+        let requestId: UUID
+        if retryFingerprint == fingerprint, let retryRequestId {
+            requestId = retryRequestId
+        } else {
+            requestId = UUID()
+            retryFingerprint = fingerprint
+            retryRequestId = requestId
+        }
+
+        isSubmitting = true
+        defer { isSubmitting = false }
+
+        do {
+            let response = try await client.submit(
+                baseURLText: baseURL,
+                pin: pin,
+                submission: submission,
+                clientRequestId: requestId
+            )
+
+            current = try await client.fetchCurrent(baseURLText: baseURL).tesla
+            retryFingerprint = nil
+            retryRequestId = nil
+            errorMessage = nil
+
+            switch response.derivedState {
+            case "UPDATED":
+                statusMessage = submission.active
+                    ? "Deadline verwerkt door de Pi."
+                    : "Deadline geannuleerd op de Pi."
+            case "ALREADY_ACCEPTED":
+                statusMessage = "Deze opdracht was al door de Pi geaccepteerd."
+            default:
+                statusMessage = "Opdracht geaccepteerd; verwerking volgt via de bestaande watchdog."
+            }
+
+            await overviewStore.refresh(baseURLText: baseURL)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func displayDeadline(_ value: String?) -> String {
+        guard let date = amsterdamDeadlineDate(value) else { return "—" }
+        return displayDate(date)
+    }
+
+    private func displayDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "nl_NL")
+        formatter.timeZone = amsterdamTimeZone
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+}
+
 private struct SystemScreen: View {
     @EnvironmentObject private var store: OverviewStore
 
@@ -355,7 +677,7 @@ private struct SettingsScreen: View {
             }
 
             Section("Boundary") {
-                Text("v0.1 is uitsluitend read-only. De app bevat geen Homey-, planner- of device-writepad.")
+                Text("Mobile API V1 blijft read-only. Alleen de Deadline-tab mag via de bestaande Tailscale/Pi command-ingang een EV-laaddeadline instellen of annuleren. Geen directe Homey- of device-writes.")
                     .font(.footnote)
             }
         }

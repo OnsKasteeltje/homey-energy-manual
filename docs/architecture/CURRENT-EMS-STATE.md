@@ -4,7 +4,7 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-10-12
+**Status date:** 2026-10-13
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-07 Mobile API V1 read-only commissioning/freshness hardening  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
@@ -13,7 +13,7 @@ Detailed bidirectional runtime chain: `docs/architecture/homey-pi-runtime-datafl
 
 Canonical diagnostic source-of-truth and mandatory root-cause documentation rule: `docs/architecture/diagnostic-source-of-truth.md`. End-to-end troubleshooting MUST first identify the canonical source at each boundary; when root cause is established, reusable chain knowledge MUST be captured there before the investigation is considered architecturally complete.
 
-- `apps/cloudflare/` contains the legacy authenticated command Worker, still relevant to the separate GitHub-backed EMS **settings** command. Its old Tesla GitHub-write route is **not** Pi deadline ingress since 2026-10-09. The private Tesla command route is Invoer V2 → Tailscale Caddy → Pi Status API. GitHub Pages now publishes only a static landing page; operational runtime snapshots must never be republished to `docs/data/`. See `docs/architecture/public-data-boundary.md`.
+- `apps/cloudflare/` contains the legacy authenticated command Worker, still relevant to the separate GitHub-backed EMS **settings** command. Its old Tesla GitHub-write route is **not** Pi deadline ingress since 2026-10-09. The private Tesla command route is Private Invoer V2 (and the native SwiftUI Deadline UI after v0.2 commissioning) → the same Tailscale Caddy → Pi Status API ingress. GitHub Pages now publishes only a static landing page; operational runtime snapshots must never be republished to `docs/data/`. See `docs/architecture/public-data-boundary.md`.
 
 ## 1. Source of truth
 
@@ -42,7 +42,7 @@ The canonical Live V2 Pi energy-state projection is mandatory for Mobile V1. Sec
 
 Mobile V1 applies explicit presentation freshness/consistency semantics to Flex Priority SHADOW. Its `generatedAt` is compared with the canonical Live V2 state time, and the Flex EV `deadlineActive` flag is compared with the canonical live EV deadline state. A Flex source older than 75 minutes is exposed as `STALE`; a semantic deadline-state mismatch is exposed as `INCONSISTENT`. In either case Flex priority owner / EV role / reason and Heating grant fields are suppressed rather than presented as current facts. These checks are presentation guards only and do not alter planner, Gate, actuator or physical-control behavior.
 
-Inactive EV deadline state must not expose an old deadline timestamp or stale remaining-kWh value through Mobile V1. Warm-water mode is normalized at the mobile boundary to `CV`, `BOILER` or `null`; the underlying canonical runtime boolean/source contract is unchanged. The Web Data API remains loopback-bound by default on `127.0.0.1:3200`; direct internet exposure of port 3200 is forbidden. Remote iPhone access must terminate at the separate hardened private HTTPS/authentication boundary.
+Inactive EV deadline state must not expose an old deadline timestamp or stale remaining-kWh value through Mobile V1. Warm-water mode is normalized at the mobile boundary to `CV`, `BOILER` or `null`; the underlying canonical runtime boolean/source contract is unchanged. The Web Data API remains loopback-bound by default on `127.0.0.1:3200`; direct internet exposure of port 3200 is forbidden. Native iPhone reads use the same private Tailscale-only Caddy ingress as the private EMS website. Mobile V1 remains read-only; the separate PIN-protected Tesla deadline command route does not make Mobile V1 writable.
 
 
 EV downstream execution observability now extends beyond the EMS control target.
@@ -825,6 +825,11 @@ the live operational history.
 
 ### EV Deadline Local Ingress V1.1 — LIVE (2026-10-09)
 
+The command ingress is shared by user interfaces. Private Invoer V2 is the live browser UI;
+the native SwiftUI v0.2 Deadline UI is a candidate second UI over the same ingress and must
+not create a second command source. Its control PIN is requested per submit/cancel action and
+is not persisted by the app. Pi validation, command persistence, deadline derivation,
+`/control/current`, Homey Bridge/Adapter/Gate and the sole Easee writer remain unchanged.
 PR #213 merged to `main` at `6b2a2de8da64d542232c1cb42c0658e6eb50fc07`. Pi runtime deployed: only the Tailscale-hosted website on `100.127.130.0:80`; restricted-PIN local Pi Tesla command ingress; a common runtime command file now used by `/web/commands/current` and Pi deadline derivation. Runtime backup `/home/jeroen/ems/backup/ev-ingress-v11-20261009-222745`. Preflight 18/18 PASS, architecture gate PASS, `caddy validate` valid; API negative auth/deadline tests HTTP 401/400 and no command mutation. GitHub fetch timer disabled, fetch service stopped, and existing derived-state timer/API services remain active. One physical Homey Easee writer and Pi plan authority unchanged. The old GitHub/Worker path must never be reintroduced as a concurrent command source.
 
 **First live validation 2026-10-09:** request `e7f60e72-526f-49b6-b89a-12eb4544dbd6`, user 40%→60%, 12.4kWh, maxA10. Pi request persisted at `20:38:47.502Z`, derived-state same ID and `TRACKING` at `20:38:47.595Z` (93ms); `/control/current` `READY/PLANNER` with `deadline.valid=true`, `active=true`. Homey Insights Easee `evcharger_charging` changed to true at `20:39:16.701Z` (29.199s from request), Homey device showed Charging at 5,467 W with 10 A target/offered. This is strong end-to-end timing evidence, though individual Bridge/Gate requestId correlation is still pending. Compared with prior 4m39s, response improved ~89.5%. Submitted deadline 23:15 CEST was not physically feasible: 12.4kWh at 3×10A needs ~108min with only ~36min available. Open validation: cancellation, exact Homey Bridge/Gate trace, iPhone/mobile-data access and SwiftUI ATS/PWA behavior. Private HTTP is carried inside Tailscale WireGuard, not HTTPS.

@@ -39,7 +39,8 @@ The private EMS website uses the Pi's read-only `GET /web/*` resources via its T
 **Tesla deadline (LIVE since 2026-10-09):**
 
 ```text
-Private Invoer V2 → Tailscale Caddy POST /web/commands/tesla
+Private Invoer V2 OR native SwiftUI Deadline UI
+ → Tailscale Caddy POST /web/commands/tesla
  → Pi Status API /commands/tesla (loopback, PIN/idempotency validation)
  → /home/jeroen/ems/data/tesla-deadline-command.json (atomic)
  → derived deadline state → GET /control/current
@@ -81,7 +82,8 @@ A troubleshooting task is not architecturally complete at "root cause found". It
 ## 5. Tesla deadline diagnostic sequence (live local ingress)
 
 ```text
-1. POST /web/commands/tesla on private Tailscale site
+1. POST /web/commands/tesla through the private Tailscale ingress
+   (from Invoer V2 or the native Deadline UI)
    verify PIN validation, server acceptance and requestId
 2. /home/jeroen/ems/data/tesla-deadline-command.json
    verify the same requestId, target SoC, deadline and maxA
@@ -100,6 +102,9 @@ A troubleshooting task is not architecturally complete at "root cause found". It
 ```
 
 GitHub command JSON and GitHub Pages are no longer checkpoints in the live Tesla deadline chain.
+The browser and native app are alternative user interfaces only; neither is a
+control authority. Diagnose both from the same Pi command file onward. The native
+client asks for the control PIN per command and does not persist it.
 
 ### Historical diagnostic lesson — 2026-09-19 (pre-local-ingress)
 
