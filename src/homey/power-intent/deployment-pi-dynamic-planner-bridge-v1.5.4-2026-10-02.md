@@ -1,5 +1,8 @@
 # PI Dynamic Planner Bridge v1.5.4 — phase/current deployment
 
+> **Historisch deploymentverslag (2026-10-02).** De toenmalige V1.5.4-bron is in de repository-opschoning van 13 oktober 2026 uit de actuele tree verwijderd en blijft terug te halen uit de Git-geschiedenis. De huidige actieve Homey-bridge is V1.5.9; V1.5.8 blijft de onmiddellijke broncode-rollback. Dit verslag is geen instructie om V1.5.4 opnieuw te activeren.
+
+
 Date: 2026-10-02
 
 Status: **DEPLOYED / LIVE — natural PV acceptance open**
