@@ -59,10 +59,13 @@ The first native dashboard shows:
 - signed grid state plus explicit import/export;
 - PV power and other-house load when available;
 - EV connected/charging/current/deadline semantics;
-- warm-water mode, boiler state and seasonal advice;
+- warm-water card only when the effective source is `BOILER`; it is hidden for `CV` or unknown source;
 - Heating SHADOW state;
 - Flex status, including `STALE` / `INCONSISTENT`;
 - manager status;
 - explicit read-only / no-write capabilities.
 
 The UI deliberately suppresses missing values rather than inventing them.
+
+
+The overview header formats `generatedAt` as local device time rather than exposing the raw ISO timestamp.
