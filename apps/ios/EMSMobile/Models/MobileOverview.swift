@@ -86,3 +86,54 @@ struct MobileOverview: Decodable {
         let physicalWrites: Bool
     }
 }
+
+
+struct TeslaDeadlineCurrentResponse: Decodable {
+    let tesla: TeslaDeadlineCommandState
+}
+
+struct TeslaDeadlineCommandState: Decodable {
+    let active: Bool
+    let currentSoc: Int?
+    let targetSoc: Int?
+    let deadline: String?
+    let maxA: Int?
+    let requestId: String
+}
+
+struct TeslaDeadlineSubmission: Equatable {
+    let active: Bool
+    let currentSoc: Int?
+    let targetSoc: Int?
+    let deadline: String
+    let maxA: Int
+
+    static func activate(
+        currentSoc: Int,
+        targetSoc: Int,
+        deadline: String,
+        maxA: Int
+    ) -> TeslaDeadlineSubmission {
+        TeslaDeadlineSubmission(
+            active: true,
+            currentSoc: currentSoc,
+            targetSoc: targetSoc,
+            deadline: deadline,
+            maxA: maxA
+        )
+    }
+
+    static let cancel = TeslaDeadlineSubmission(
+        active: false,
+        currentSoc: nil,
+        targetSoc: nil,
+        deadline: "",
+        maxA: 11
+    )
+}
+
+struct TeslaDeadlineCommandResponse: Decodable {
+    let ok: Bool
+    let derivedState: String
+    let duplicate: Bool?
+}
