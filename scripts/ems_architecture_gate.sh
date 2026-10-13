@@ -652,7 +652,10 @@ grep -q 'EMS_AI_HOST=127.0.0.1' "$AI_ANALYSIS_UNIT" || fail "AI analysis API mus
 grep -q 'EnvironmentFile=-/etc/ems/ai-agent.env' "$AI_ANALYSIS_UNIT" || fail "AI analysis secret boundary missing"
 if grep -q '/api/mobile/' "$FRONTEND_CADDY"; then fail "retired native Mobile V1 Caddy route must stay absent"; fi
 if grep -q 'EMS_MOBILE_OVERVIEW_V1' services/pi/api/web-data/server.py; then fail "retired native Mobile V1 API must stay absent"; fi
-pass "native Mobile V1 path retired; mobile access uses private V2 web app"
+[[ ! -d apps/ios/EMSMobile ]] || fail "retired native iOS client directory must stay absent"
+[[ ! -e docs/architecture/mobile-api-v1.md ]] || fail "retired Mobile V1 architecture document must stay absent"
+[[ ! -e tests/integrations/test_mobile_api_v1.py ]] || fail "retired Mobile V1 regression must stay absent"
+pass "native iOS/Mobile V1 path retired; mobile access uses private V2 web app"
 
 
 grep -q 'handle /agent/\*' "$FRONTEND_CADDY" || fail "private AI analysis Caddy route missing"
