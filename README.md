@@ -1,26 +1,14 @@
 # Homey Energy Manual
 
-## GitHub Pages
+## Publieke GitHub Pages
 
-De echte GitHub Actions workflow staat in:
+De vroegere publieke EMS-website is uitgefaseerd. De Pages-workflow
+`.github/workflows/pages.yml` publiceert uitsluitend een neutrale landingspagina.
+Er worden geen runtime-JSON, historische meetdata, dashboards of
+bedieningsfuncties meer in het Pages-artefact opgenomen.
 
-`.github/workflows/pages.yml`
+De productie-EMS-website draait privé op de Pi. GitHub blijft de
+source-of-truth voor broncode en de nog in gebruik zijnde commandokoppelingen.
 
-Let op: op macOS zijn mappen die met een punt beginnen standaard verborgen.
-Druk in Finder op **Cmd + Shift + .** om verborgen bestanden te tonen.
-
-Er staat ook een zichtbare kopie in de hoofdmap:
-`pages-workflow-reference.yml`
-
-Die zichtbare kopie is alleen ter controle; GitHub Actions gebruikt uitsluitend het bestand in `.github/workflows/`.
-
-
-
-## Dynamische status
-
-De actuele Flow-status wordt lokaal door Homey iedere 15 minuten naar
-`docs/data/homey-status.json` geschreven.
-
-Zie `LOCAL_STATUS_SETUP.md`.
-
-De oude GitHub→Homey polling-workflow is verwijderd.
+Let op: dit beperkt de Pages-publicatie, maar maakt bestanden of
+historische commits in deze publieke GitHub-repository niet privé.
