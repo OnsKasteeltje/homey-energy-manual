@@ -63,6 +63,14 @@ function renderNavigation() {
   const desktop = document.createElement("div");
   desktop.className = "ems-nav-desktop";
   desktop.replaceChildren(...ITEMS.map((item) => desktopItem(item, active)));
+  nav.replaceChildren(desktop);
+
+  document.querySelector(".ems-mobile-dock")?.remove();
+  document.querySelector(".ems-mobile-more-sheet")?.remove();
+
+  const dock = document.createElement("nav");
+  dock.className = "ems-mobile-dock";
+  dock.setAttribute("aria-label", "Mobiele hoofdnavigatie");
 
   const mobile = document.createElement("div");
   mobile.className = "ems-nav-mobile";
@@ -79,6 +87,7 @@ function renderNavigation() {
   if (MOBILE_MORE.includes(active)) moreButton.classList.add("active");
 
   mobile.replaceChildren(...primary, moreButton);
+  dock.appendChild(mobile);
 
   const sheet = document.createElement("div");
   sheet.id = "ems-mobile-more-sheet";
@@ -116,14 +125,13 @@ function renderNavigation() {
     sheet.hidden = !opening;
     moreButton.setAttribute("aria-expanded", String(opening));
   });
-  document.addEventListener("click", (event) => {
-    if (!nav.contains(event.target)) closeSheet();
-  });
+  sheet.addEventListener("click", (event) => event.stopPropagation());
+  document.addEventListener("click", closeSheet);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeSheet();
   });
 
-  nav.replaceChildren(desktop, mobile, sheet);
+  document.body.append(dock, sheet);
 }
 
 renderNavigation();
