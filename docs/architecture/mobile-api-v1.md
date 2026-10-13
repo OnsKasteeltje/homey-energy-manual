@@ -81,9 +81,15 @@ No command endpoint is part of Mobile V1.
 
 ## Network exposure
 
-The Web Data API continues to bind to localhost by default. Remote iPhone access
-must be implemented separately through the hardened HTTPS gateway/authentication
-boundary. Do not expose port 3200 directly to the internet.
+The Web Data API continues to bind to localhost by default. Native mobile access
+uses the same private Tailscale-only Caddy ingress as the private EMS frontend:
+`/api/mobile/*` is reverse-proxied to the loopback Web Data API on
+`127.0.0.1:3200`. Do not add a LAN/wildcard/public listener and do not expose
+port 3200 directly.
+
+The current tailnet transport is private but HTTP at the Caddy layer. SwiftUI may
+use a development ATS allowance while commissioning; a hardened future release
+should use trusted HTTPS on the private tailnet and remove that allowance.
 
 ## Validation
 

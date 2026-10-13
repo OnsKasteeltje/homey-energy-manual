@@ -4,7 +4,7 @@
 # - serve exactly one website address on the Pi Tailscale interface;
 # - no LAN, wildcard, Wi-Fi, Docker, or public website listener;
 # - serve the Pi-local V2 build;
-# - proxy read-only /web/* requests to the localhost Web Data API.
+# - proxy read-only /web/* and /api/mobile/* requests to the localhost Web Data API.
 #
 # The same tailnet URL is used at home and away, by browser and SwiftUI app.
 # No public ingress, router port-forward, Tailscale Serve, or Tailscale Funnel is permitted.
@@ -23,6 +23,10 @@ http://100.127.130.0 {
         handle {
             respond "Tailscale required for command writes" 403
         }
+    }
+
+    handle /api/mobile/* {
+        reverse_proxy 127.0.0.1:3200
     }
 
     handle /web/* {

@@ -188,6 +188,38 @@ Shortest safe recurrence check:
 
 If step 2 succeeds but step 4 returns HTTP 400, inspect URL construction before changing API, Caddy, renderer or runtime state.
 
+## 6.1 Native Mobile V1 ingress diagnostic sequence
+
+The native read-only mobile path is:
+
+```text
+SwiftUI / tailnet client
+ -> Tailscale address on Pi
+ -> Caddy handle /api/mobile/*
+ -> loopback Web Data API 127.0.0.1:3200
+ -> GET /api/mobile/v1/overview
+ -> canonical Pi runtime projections
+```
+
+The Web Data API must remain loopback-only. A failed request to the Pi LAN address
+(`192.168.x.x:80/443`) is not evidence that Mobile V1 is down when Caddy is
+intentionally bound only to the Tailscale interface. Verify listeners before changing
+the API or opening a LAN/public port.
+
+Shortest safe recurrence check:
+
+```text
+1. Pi: curl http://127.0.0.1:3200/api/mobile/v1/overview
+2. Pi: verify Caddy listens only on the Tailscale address
+3. Tailnet client: curl http://<tailscale-ip>/api/mobile/v1/overview
+4. Compare /etc/caddy/Caddyfile with deploy/caddy/ems-frontend-v2.Caddyfile
+```
+
+A 200 response at step 1 combined with failure at step 3 localizes the problem to
+private ingress/Tailscale/Caddy, not to Mobile V1 runtime data. The canonical Caddy
+source must contain `handle /api/mobile/* { reverse_proxy 127.0.0.1:3200 }`.
+Do not fix ingress by exposing port 3200 or by adding a wildcard/LAN listener.
+
 ## 7. Private V2 command-Worker diagnostic sequence
 
 The authenticated Tesla/EMS command path begins:
