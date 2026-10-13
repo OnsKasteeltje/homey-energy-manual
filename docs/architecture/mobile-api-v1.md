@@ -96,9 +96,10 @@ generic command/write API. Its deadline client is limited to this one route.
 
 The existing ingress remains authoritative for validation and safety: control PIN,
 loopback-only upstream access, SOC/deadline/max-current validation, UUID
-idempotency, atomic persistence and the existing derived-state builder. The iOS app
-stores the PIN only in iOS Keychain and never commits it or stores it in
-`AppStorage`.
+idempotency, atomic persistence and the existing derived-state builder. The native
+client asks for the existing control PIN only in the explicit submit/cancel
+confirmation and clears it immediately after that request; it does not persist the
+PIN.
 
 Readback uses `GET /web/commands/current` plus Mobile V1 refresh. An accepted
 command whose derived state is still pending must be presented as pending rather
