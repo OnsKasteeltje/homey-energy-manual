@@ -239,7 +239,7 @@ private struct HeatingCard: View {
     let overview: MobileOverview
 
     var body: some View {
-        EMSCard(title: "Verwarming", systemImage: "radiator") {
+        EMSCard(title: "Verwarming", systemImage: "flame.fill") {
             Text(
                 overview.heating.readyRooms.isEmpty
                 ? "Geen actieve preheat-kandidaten"
