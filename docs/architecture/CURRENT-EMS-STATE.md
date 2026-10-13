@@ -13,7 +13,7 @@ Detailed bidirectional runtime chain: `docs/architecture/homey-pi-runtime-datafl
 
 Canonical diagnostic source-of-truth and mandatory root-cause documentation rule: `docs/architecture/diagnostic-source-of-truth.md`. End-to-end troubleshooting MUST first identify the canonical source at each boundary; when root cause is established, reusable chain knowledge MUST be captured there before the investigation is considered architecturally complete.
 
-- The Tesla/EMS authenticated command Worker source is canonical under `apps/cloudflare/` (migrated from legacy top-level `cloudflare/` under the repository “touch it, place it correctly” rule). Its explicit browser-origin allowlist contains the transitional GitHub Pages origin and the private LAN V2 origin `http://192.168.1.42`; wildcard CORS is forbidden. Cloudflare Git build configuration must use root directory `/apps/cloudflare` and include/watch only `apps/cloudflare/**`, so generated `docs/data/*` runtime-publication commits cannot consume Worker build capacity.
+- `apps/cloudflare/` contains the legacy authenticated command Worker, still relevant to the separate GitHub-backed EMS **settings** command. Its old Tesla GitHub-write route is **not** Pi deadline ingress since 2026-10-09. The private Tesla command route is Invoer V2 → Tailscale Caddy → Pi Status API. GitHub Pages now publishes only a static landing page; operational runtime snapshots must never be republished to `docs/data/`. See `docs/architecture/public-data-boundary.md`.
 
 ## 1. Source of truth
 
@@ -22,7 +22,7 @@ Canonical diagnostic source-of-truth and mandatory root-cause documentation rule
 - Pi repository checkout: `/home/jeroen/ems/repo/homey-energy-manual`.
 - SQLite `/home/jeroen/ems/data/ems-history.sqlite` is the canonical operational measurement history.
 - SQLite `/home/jeroen/ems/data/planner-history.sqlite` is the canonical planner decision/replay history.
-- JSON under `/home/jeroen/ems/data/` and `docs/data/` is derived state, cache or publication output.
+- Runtime JSON and measurement history are Pi-local under `/home/jeroen/ems/data/` and SQLite. The public `docs/data/` directory is **not** a runtime-state mirror and permits only the explicitly listed schema, modelling and temporary command/config compatibility exceptions in `docs/architecture/public-data-boundary.md`.
 - Homey Logic variable `EM2_Planner_Authority` is the sole runtime selector between Homey and Pi planner authority.
 - Electrical warm-water flex in every Pi planner, including the active Dynamic Pi Planner, is gated by canonical `energy-state-v2.json -> hot_water.mode`: `true` = BOILER and eligible; `false` = CV and ineligible; missing/ambiguous = UNKNOWN and fail closed. CV/UNKNOWN must produce `wwPlanW = 0` and must not reduce residual PV available to other flexloads.
 - GitHub is **not** a runtime transport dependency for live Homey ↔ Pi state or control.

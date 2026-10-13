@@ -248,6 +248,36 @@ for local_ev_path in \
 done
 pass "retired GitHub command fetcher absent, local Pi deadline chain preserved"
 
+# Public-data boundary: no historical household telemetry or unreviewed JSON in docs/data/.
+for public_data in docs/data/*.json; do
+  case "$public_data" in
+    docs/data/energy-state-v2.schema.json|\
+    docs/data/ems-settings-command.json|\
+    docs/data/tesla-control-config.json|\
+    docs/data/tesla-deadline-command.json|\
+    docs/data/business-case-calibration-v1.json|\
+    docs/data/business-case-capex-v1.json|\
+    docs/data/business-case-scenarios-v2.json) ;;
+    *) fail "unreviewed public JSON artifact: $public_data" ;;
+  esac
+done
+for canonical_public_contract in \
+  docs/data/energy-state-v2.schema.json \
+  docs/data/ems-settings-command.json \
+  docs/data/tesla-control-config.json \
+  docs/data/tesla-deadline-command.json; do
+  [[ -f "$canonical_public_contract" ]] || fail "required compatibility contract missing: $canonical_public_contract"
+done
+for retired_public_pipeline in \
+  .github/workflows/build-core-v0.10.15.yml \
+  .github/workflows/runtime-data-validation.yml \
+  scripts/recover_energy_history.py \
+  scripts/build_status.py; do
+  [[ ! -e "$retired_public_pipeline" ]] || fail "retired public pipeline returned: $retired_public_pipeline"
+done
+[[ -f docs/architecture/public-data-boundary.md ]] || fail "public-data inventory missing"
+pass "public docs/data JSON allowlist and legacy pipeline retirement enforced"
+
 [[ ! -e docs/data/energy-day-v2.json ]] || fail "legacy Homey Day Series GitHub runtime artifact must remain retired: docs/data/energy-day-v2.json"
 pass "legacy Homey Day Series GitHub runtime publication artifact is absent"
 

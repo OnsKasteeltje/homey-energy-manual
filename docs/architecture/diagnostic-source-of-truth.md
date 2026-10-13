@@ -12,45 +12,41 @@ This document defines which source is authoritative when diagnosing each EMS lay
 ### Runtime state
 
 ```text
-Homey devices -> Homey Core / EM2_Public_State
- -> direct Homey -> Pi state push -> POST /state/energy
- -> /home/jeroen/ems/data/energy-state-v2.json -> Pi planner/runtime
+Homey devices → Homey Core / EM2_Public_State → direct Homey→Pi push
+ → Pi Status API POST /state/energy
+ → /home/jeroen/ems/data/energy-state-v2.json
+ → Pi planner/history and private Web Data API
 ```
 
-For runtime conclusions, `/home/jeroen/ems/data/energy-state-v2.json` is the canonical Pi-side state artifact.
-
-`docs/data/energy-state-v2.json` is website/publication output and MUST NOT be used to conclude that live runtime state has or has not changed. It may legitimately lag behind runtime.
+The Pi-local state is authoritative for runtime conclusions. Former `docs/data/energy-state-v2.json` GitHub publication was retired in September 2026; it is **not** a current or lagging runtime mirror.
 
 ### Control
 
 ```text
-Pi planner -> hardened validator -> GET /control/current
- -> Homey PI Dynamic Planner Bridge -> EM2_Power_Intent
- -> device adapter -> validation gate -> actuator -> physical device
+Pi planner → GET /control/current
+ → Homey PI Dynamic Planner Bridge → EM2_Power_Intent
+ → device adapter → validation gate → sole actuator → physical device
 ```
 
-Do not diagnose a downstream actuator before upstream intent and gate state are verified.
+Do not diagnose an actuator before checking intent and Gate evidence.
 
 ### Website observability
 
-Artifacts under `docs/data/` are derived publication/UI artifacts unless explicitly documented otherwise. They diagnose the website publication layer, not live runtime. The target remains a dedicated read-only Pi web-data boundary.
+The private EMS website uses the Pi's read-only `GET /web/*` resources via its Tailscale-only frontend. GitHub Pages serves only a neutral static landing page. Historical `docs/data/` JSON files do not establish current runtime or website state.
 
 ### User command input
 
-User commands currently have an explicit transitional exception where GitHub command JSON is part of the route. Tesla deadline:
+**Tesla deadline (LIVE since 2026-10-09):**
 
 ```text
-V2 frontend -> authenticated Cloudflare Worker
- -> docs/data/tesla-deadline-command.json
- -> Pi ems-ev-deadline-command.service
- -> /home/jeroen/ems/data/tesla-deadline-command.json
- -> Pi derived deadline state
- -> /control/current
- -> Homey PI Bridge -> Adapter -> Gate -> EV writer
- -> Easee / Tesla
+Private Invoer V2 → Tailscale Caddy POST /web/commands/tesla
+ → Pi Status API /commands/tesla (loopback, PIN/idempotency validation)
+ → /home/jeroen/ems/data/tesla-deadline-command.json (atomic)
+ → derived deadline state → GET /control/current
+ → Homey Bridge → Adapter → Gate → sole EV writer → Easee
 ```
 
-The GitHub command JSON proves only that the submitted command reached the durable command-transfer boundary. Canonical deadline lifecycle/progress is Pi-owned after command ingress; the disabled legacy Homey EV Deadline Goal Adapter is not part of the active chain.
+`docs/data/tesla-deadline-command.json` is **not** a Pi command-ingress authority. The old GitHub fetcher was retired; never restart it. The separate EMS settings path still reads a GitHub-backed `ems-settings-command.json` exception and must be diagnosed separately.
 
 ## 3. Mandatory diagnostic method
 
@@ -82,38 +78,30 @@ Do not turn this document into a chronological incident log. Record reusable dia
 
 A troubleshooting task is not architecturally complete at "root cause found". It is complete only after reusable chain knowledge is captured here and affected component/runbook documentation is aligned.
 
-## 5. Tesla deadline diagnostic sequence
+## 5. Tesla deadline diagnostic sequence (live local ingress)
 
 ```text
-1. docs/data/tesla-deadline-command.json
-   prove submitted command/requestId at command-transfer boundary
-
+1. POST /web/commands/tesla on private Tailscale site
+   verify PIN validation, server acceptance and requestId
 2. /home/jeroen/ems/data/tesla-deadline-command.json
-   prove Pi accepted the same requestId; measure command-transfer latency
-
+   verify the same requestId, target SoC, deadline and maxA
 3. /home/jeroen/ems/data/ev-deadline-shadow-state.json
-   prove Pi-owned lifecycle/progress/latestStart state
-
-4. Pi planner and /control/current
-   prove planning/allocation, realtime envelope and deadline execution contract
-
-5. Homey PI Bridge -> EM2_Power_Intent
-   prove executor intent including authoritative OFF/1P/3P phase control
-
-6. EV adapter -> gate
-   prove translation, exact phase-power mapping and Gate PASS/FAIL
-
-7. EM2_EV_Actuator_Status
-   prove writer decision, phase transition stage and any command/auth failure
-
-8. Easee / Tesla
-   prove physical phase, target current, offered current and delivered power
-
-9. website/publication artifacts
-   diagnose presentation/publication only after runtime correctness is known
+   verify derived lifecycle, remainingKWh and latestStart
+4. /control/current
+   verify PI authority, planner/execution status and deadline contract
+5. Homey Bridge → EM2_Power_Intent
+   verify executor intent and authoritative OFF/1P/3P phase control
+6. EV Adapter → Gate → EM2_EV_Actuator_Status
+   verify final validation and single writer decision
+7. Easee/Tesla physical readback
+   verify offered current, phase and delivered power
+8. Private /web/commands/current and /web/state/current
+   verify presentation only after authoritative runtime checks
 ```
 
-### Verified diagnostic lesson - 2026-09-19
+GitHub command JSON and GitHub Pages are no longer checkpoints in the live Tesla deadline chain.
+
+### Historical diagnostic lesson — 2026-09-19 (pre-local-ingress)
 
 A V2 Tesla command for 38% -> 51%, local deadline 10:00 Europe/Amsterdam and max 7 A was correct at the command boundary. GitHub-published `docs/data/energy-state-v2.json` still showed an older deadline and initially appeared to indicate failed ingestion.
 
@@ -121,7 +109,7 @@ Canonical Pi runtime proved ingestion was already correct: `deadline_active=true
 
 Root cause of the apparent mismatch: a lagging GitHub website-publication artifact was consulted as though it were canonical runtime state.
 
-Reusable rule: after the Tesla command-transfer boundary, validate the active Pi-owned deadline chain against the Pi runtime command, derived deadline state and `/control/current`. Do not use `docs/data/energy-state-v2.json` to decide whether the current Pi deadline command was accepted.
+Reusable rule: never infer current Pi deadline acceptance from historical GitHub publication. Since 2026-10-09, diagnose local API acceptance, the canonical Pi command and derived state, then `/control/current` and Homey/Easee.
 
 ### Verified diagnostic lesson — Easee phase authentication
 

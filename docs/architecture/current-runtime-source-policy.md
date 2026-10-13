@@ -6,46 +6,32 @@ This policy prevents historical Homey preparation, candidate, patch, smoke, roll
 
 ## Authority order
 
-For current-state architecture and control documentation, use sources in this order:
+1. `docs/architecture/CURRENT-EMS-STATE.md`: canonical current responsibilities and source.
+2. Exact **live Homey Advanced Flow** readback (stable Flow ID, enabled, broken, executable script) and current Pi runtime/contract readback for operational assertions.
+3. `main` source under `apps/homey/`, `src/homey/`, `services/pi/` and `src/pi/ems-runtime/`, plus dated commissioning evidence for promotion.
+4. Dated Homey baselines, candidate patches, historical smoke/rollback notes: **historical evidence**, never current authority without reconciliation.
 
-1. `docs/architecture/CURRENT-EMS-STATE.md` for canonical architecture and responsibility split.
-2. `docs/architecture/homey-runtime-baseline-2026-09-12.md` for current Homey planner-authority and EV/WW execution identities.
-3. Exact live Homey flow readback for the named stable Flow IDs when validating runtime behavior.
-4. Current Pi runtime source on GitHub `main` for version-controlled Pi behavior.
-5. Older baselines/design/preparation Markdown only for historical rationale or explicitly future work.
-
-The previous `homey-runtime-baseline-2026-09-04.md` and `homey-runtime-baseline-2026-08-30.md` are historical audit evidence and are no longer current runtime authority for planner ownership or EV/WW flow versions.
-
-If historical material conflicts with the current canonical state, 2026-09-12 baseline or exact live runtime, the current sources win.
+The 2026-09-12 and earlier Homey runtime baselines no longer define the current EV versions. `src/homey/core/README.md` documents the preserved Core V0.11n rollback and active V0.11p identity. A filename containing `candidate` or `live` does not supersede the exact current Homey flow.
 
 ## Planner authority
 
-The sole runtime HOMEY↔PI authority selector is Homey Logic variable:
+The single Homey selector remains `EM2_Planner_Authority`. Pi owns current planning and EV deadline lifecycle; Homey remains executor/safety. The current Homey Bridge is:
 
-`EM2_Planner_Authority`
+- Flow `8bf53fdb-76f4-47db-8ccb-773ac515f06e`, **PI Dynamic Planner Bridge V1.5.9**, enabled and not broken at the 2026-10-13 Homey readback.
+- Canonical V1.5.9 source: `apps/homey/control/ev/pi-dynamic-planner-bridge-v1.5.9.adaptive-upscale.js`.
+- Historical V1.5.8 source remains a bounded rollback/comparison baseline.
 
-Current production value after the controlled cutover is `PI`.
-
-The active Pi bridge is:
-
-- Flow ID `8bf53fdb-76f4-47db-8ccb-773ac515f06e`;
-- `EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.2.4 AUTHORITY-GUARD [READY]`.
-
-The guarded Homey producer is the rollback path when the selector is returned to `HOMEY`.
-
-`planner/control-authority.json` is configuration/diagnostic context and is not a second live authority gate.
+`planner/control-authority.json` is configuration/diagnostic context, not a second live selector.
 
 ## Current EV chain
 
-Current EV ownership is defined by the 2026-09-12 baseline:
+- Adapter: V0.2.0, Flow `953e9b18-3576-4557-b940-ed4a64eb2516`.
+- Gate: V0.3.0, Flow `ec5e5d34-8205-4cf0-a661-7bf744feb6e0`.
+- **Single physical Easee writer:** V0.4.6, Flow `fea23193-a03f-49dd-9780-7e72ee48747d`, enabled and not broken at 2026-10-13 readback.
+- EV Device Health V0.4 is observability only, not a control owner.
+- Tesla deadline ingress since 2026-10-09: private Invoer V2 → Tailscale/Caddy → Pi Status API `/commands/tesla` → local Pi command file. The GitHub fetcher/service/timer were retired.
 
-- Adapter: `EV Power v0.1.4 DEADLINE-CAP OPPORTUNITY16 START7 RUN6`, Flow ID `953e9b18-3576-4557-b940-ed4a64eb2516`.
-- Gate: `EV Power Adapter Gate v0.2.5 OBSERVABILITY-ONLY HEALTH`, Flow ID `ec5e5d34-8205-4cf0-a661-7bf744feb6e0`.
-- Physical writer: `EV Power v0.2.6 START7 RUN6 LIVE + EASEE SESSION`, Flow ID `fea23193-a03f-49dd-9780-7e72ee48747d`.
-- Device health observer: `EM v2 | 81 Observability | EV Device Health v0.3 OBSERVABILITY-ONLY`, Advanced Flow ID `18a99261-421c-4c5f-a771-36a626b7496a`. It is enabled and has no physical-write or control-authority role; device health is diagnostic context only.
-- EV observability: Flow ID `f6edba38-ddf1-45e5-890e-c183aa2055d5`.
-
-Older EV v0.1.2 / gate v0.2.2 / actuator v0.2.3 files remain historical until explicitly reconciled or replaced by current exact live source captures.
+Older EV source and tests may remain as intentionally retained regressions or rollback evidence. Do not reinstate any former GitHub publisher or second writer.
 
 ## Current WW chain
 
@@ -59,7 +45,7 @@ The Pi plans WW; Homey remains the sole physical boiler writer.
 
 Current version-controlled Pi status API source is:
 
-`src/pi/ems-runtime/status-api/server.py`
+`services/pi/api/status/server.py` (deployed Pi Status API source; `src/pi/ems-runtime/` retains related runtime modules)
 
 The endpoint `/control/current` is a technical readiness/command interface. It validates the Pi plan, fixed ENGIE contract and execution context, but runtime planner authority is enforced by Homey `EM2_Planner_Authority`.
 
@@ -70,7 +56,7 @@ Any branch/runtime copy that still requires `control-authority.json` itself to s
 Every process diagram labelled current, live, implemented, production or as-is must be derived from:
 
 - `CURRENT-EMS-STATE.md`;
-- the 2026-09-12 runtime baseline;
+- current Homey exact flow readback and dated commissioning evidence;
 - exact live flow/source evidence for the component being described.
 
 Historical/candidate diagrams must be explicitly labelled historical, candidate, future or validation.
