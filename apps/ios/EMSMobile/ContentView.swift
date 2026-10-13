@@ -347,12 +347,10 @@ private struct DeadlineScreen: View {
 
             Section("Nieuwe deadline") {
                 TextField("Huidige SOC (%)", text: $currentSocText)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    .keyboardType(.numberPad)
 
                 TextField("Doel SOC (%)", text: $targetSocText)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    .keyboardType(.numberPad)
 
                 DatePicker(
                     "Klaar om",
