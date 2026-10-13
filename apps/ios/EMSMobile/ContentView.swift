@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var store = OverviewStore()
+    @StateObject private var deadlineStore = DeadlineStore()
     @AppStorage("emsBaseURL") private var baseURL = ""
 
     var body: some View {
@@ -11,6 +12,11 @@ struct ContentView: View {
                 OverviewScreen(baseURL: baseURL)
             }
             .tabItem { Label("Overzicht", systemImage: "house.fill") }
+
+            NavigationStack {
+                DeadlineScreen(baseURL: baseURL)
+            }
+            .tabItem { Label("Deadline", systemImage: "clock.fill") }
 
             NavigationStack {
                 SystemScreen()
@@ -23,6 +29,7 @@ struct ContentView: View {
             .tabItem { Label("Instellingen", systemImage: "slider.horizontal.3") }
         }
         .environmentObject(store)
+        .environmentObject(deadlineStore)
         .task {
             if !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 await store.refresh(baseURLText: baseURL)
@@ -280,6 +287,259 @@ private struct FlexWarningCard: View {
     }
 }
 
+private struct DeadlineScreen: View {
+    @EnvironmentObject private var overviewStore: OverviewStore
+    @EnvironmentObject private var deadlineStore: DeadlineStore
+
+    let baseURL: String
+
+    @State private var currentSocText = ""
+    @State private var targetSocText = ""
+    @State private var deadline = Date().addingTimeInterval(4 * 60 * 60)
+    @State private var maxA = 11
+    @State private var hasControlPIN = false
+    @State private var localError: String?
+    @State private var confirmSubmit = false
+    @State private var confirmCancel = false
+
+    private let amsterdamTimeZone = TimeZone(identifier: "Europe/Amsterdam")!
+
+    var body: some View {
+        Form {
+            Section("Actuele deadline") {
+                if deadlineStore.isLoading {
+                    ProgressView()
+                } else if let current = deadlineStore.current, current.active {
+                    LabeledContent(
+                        "SOC",
+                        value: "\(current.currentSoc ?? 0)% → \(current.targetSoc ?? 0)%"
+                    )
+                    LabeledContent(
+                        "Klaar om",
+                        value: displayDeadline(current.deadline)
+                    )
+                    LabeledContent(
+                        "Max",
+                        value: current.maxA.map { "\($0) A" } ?? "—"
+                    )
+
+                    Button("Deadline annuleren", role: .destructive) {
+                        confirmCancel = true
+                    }
+                    .disabled(deadlineStore.isSubmitting || !hasControlPIN)
+                } else {
+                    Text("Geen actieve deadline")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Nieuwe deadline") {
+                TextField("Huidige SOC (%)", text: $currentSocText)
+                    .keyboardType(.numberPad)
+
+                TextField("Doel SOC (%)", text: $targetSocText)
+                    .keyboardType(.numberPad)
+
+                DatePicker(
+                    "Klaar om",
+                    selection: $deadline,
+                    in: Date().addingTimeInterval(61)...,
+                    displayedComponents: [.date, .hourAndMinute]
+                )
+                .environment(\.timeZone, amsterdamTimeZone)
+
+                Stepper(
+                    "Max laadstroom: \(maxA) A",
+                    value: $maxA,
+                    in: 6...16
+                )
+
+                Text("Deadline wordt geïnterpreteerd als Nederlandse tijd.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Button {
+                    confirmSubmit = true
+                } label: {
+                    if deadlineStore.isSubmitting {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Text("Deadline instellen")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .disabled(!canSubmit || deadlineStore.isSubmitting)
+            } footer: {
+                if !hasControlPIN {
+                    Text("Sla eerst de Tesla control-PIN veilig op bij Instellingen.")
+                }
+            }
+
+            if let message = deadlineStore.statusMessage {
+                Section("Status") {
+                    Text(message)
+                }
+            }
+
+            if let error = localError ?? deadlineStore.errorMessage {
+                Section("Fout") {
+                    Text(error)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .navigationTitle("Laaddeadline")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await refresh() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+            }
+        }
+        .task {
+            refreshPINState()
+            await refresh()
+        }
+        .alert("Deadline instellen?", isPresented: $confirmSubmit) {
+            Button("Annuleren", role: .cancel) {}
+            Button("Bevestigen") {
+                Task { await submit() }
+            }
+        } message: {
+            Text(submitSummary)
+        }
+        .alert("Deadline annuleren?", isPresented: $confirmCancel) {
+            Button("Behouden", role: .cancel) {}
+            Button("Annuleren", role: .destructive) {
+                Task { await cancel() }
+            }
+        } message: {
+            Text("De actieve EV-laaddeadline wordt ingetrokken. De normale PV-opportunitylogica blijft daarna gelden.")
+        }
+    }
+
+    private var parsedCurrentSoc: Int? {
+        Int(currentSocText)
+    }
+
+    private var parsedTargetSoc: Int? {
+        Int(targetSocText)
+    }
+
+    private var canSubmit: Bool {
+        guard !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              hasControlPIN,
+              let current = parsedCurrentSoc,
+              let target = parsedTargetSoc
+        else {
+            return false
+        }
+
+        return (0...99).contains(current)
+            && (1...100).contains(target)
+            && target > current
+            && (6...16).contains(maxA)
+            && deadline.timeIntervalSinceNow > 60
+    }
+
+    private var submitSummary: String {
+        guard let current = parsedCurrentSoc, let target = parsedTargetSoc else {
+            return "Controleer de SOC-waarden."
+        }
+        return "Van \(current)% naar \(target)% · klaar \(displayDate(deadline)) · maximaal \(maxA) A. De Pi valideert de opdracht opnieuw."
+    }
+
+    private func refreshPINState() {
+        do {
+            hasControlPIN = try TeslaControlPINStore.load() != nil
+            localError = nil
+        } catch {
+            hasControlPIN = false
+            localError = error.localizedDescription
+        }
+    }
+
+    private func refresh() async {
+        await deadlineStore.loadCurrent(baseURLText: baseURL)
+        if let current = deadlineStore.current, current.active {
+            if let soc = current.currentSoc {
+                currentSocText = String(soc)
+            }
+            if let target = current.targetSoc {
+                targetSocText = String(target)
+            }
+            if let amps = current.maxA {
+                maxA = amps
+            }
+            if let date = amsterdamDeadlineDate(current.deadline) {
+                deadline = date
+            }
+        }
+    }
+
+    private func submit() async {
+        localError = nil
+        do {
+            guard let pin = try TeslaControlPINStore.load() else {
+                localError = "Tesla control-PIN ontbreekt."
+                hasControlPIN = false
+                return
+            }
+            guard let current = parsedCurrentSoc, let target = parsedTargetSoc else {
+                localError = "Controleer de SOC-waarden."
+                return
+            }
+
+            await deadlineStore.submit(
+                currentSoc: current,
+                targetSoc: target,
+                deadline: deadline,
+                maxA: maxA,
+                baseURLText: baseURL,
+                pin: pin
+            )
+            await overviewStore.refresh(baseURLText: baseURL)
+        } catch {
+            localError = error.localizedDescription
+        }
+    }
+
+    private func cancel() async {
+        localError = nil
+        do {
+            guard let pin = try TeslaControlPINStore.load() else {
+                localError = "Tesla control-PIN ontbreekt."
+                hasControlPIN = false
+                return
+            }
+
+            await deadlineStore.cancel(baseURLText: baseURL, pin: pin)
+            await overviewStore.refresh(baseURLText: baseURL)
+        } catch {
+            localError = error.localizedDescription
+        }
+    }
+
+    private func displayDeadline(_ value: String?) -> String {
+        guard let date = amsterdamDeadlineDate(value) else { return "—" }
+        return displayDate(date)
+    }
+
+    private func displayDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "nl_NL")
+        formatter.timeZone = amsterdamTimeZone
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+}
+
 private struct SystemScreen: View {
     @EnvironmentObject private var store: OverviewStore
 
@@ -329,6 +589,10 @@ private struct SettingsScreen: View {
     @EnvironmentObject private var store: OverviewStore
     @Binding var baseURL: String
 
+    @State private var newControlPIN = ""
+    @State private var hasControlPIN = false
+    @State private var pinMessage: String?
+
     var body: some View {
         Form {
             Section("EMS API") {
@@ -354,12 +618,71 @@ private struct SettingsScreen: View {
                 }
             }
 
+            Section("Tesla deadline") {
+                SecureField("Control-PIN", text: $newControlPIN)
+                    .textContentType(.password)
+
+                Button("PIN veilig opslaan") {
+                    savePIN()
+                }
+                .disabled(newControlPIN.trimmingCharacters(in: .whitespacesAndNewlines).count < 8)
+
+                if hasControlPIN {
+                    Label("PIN opgeslagen in iOS Keychain", systemImage: "lock.fill")
+                        .foregroundStyle(.secondary)
+
+                    Button("PIN verwijderen", role: .destructive) {
+                        deletePIN()
+                    }
+                }
+
+                if let pinMessage {
+                    Text(pinMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Boundary") {
-                Text("v0.1 is uitsluitend read-only. De app bevat geen Homey-, planner- of device-writepad.")
+                Text("Dashboard en Mobile API V1 blijven read-only. v0.2 heeft één bounded write-pad: een EV-laaddeadline via de bestaande Tailscale/Pi command-ingang. Geen directe Homey- of device-writes.")
                     .font(.footnote)
             }
         }
         .navigationTitle("Instellingen")
+        .onAppear {
+            refreshPINState()
+        }
+    }
+
+    private func refreshPINState() {
+        do {
+            hasControlPIN = try TeslaControlPINStore.load() != nil
+        } catch {
+            hasControlPIN = false
+            pinMessage = error.localizedDescription
+        }
+    }
+
+    private func savePIN() {
+        do {
+            try TeslaControlPINStore.save(newControlPIN)
+            newControlPIN = ""
+            hasControlPIN = true
+            pinMessage = "Control-PIN veilig opgeslagen."
+        } catch {
+            pinMessage = error.localizedDescription
+        }
+    }
+
+    private func deletePIN() {
+        do {
+            try TeslaControlPINStore.delete()
+            newControlPIN = ""
+            hasControlPIN = false
+            pinMessage = "Control-PIN verwijderd."
+        } catch {
+            pinMessage = error.localizedDescription
+        }
     }
 }
 
