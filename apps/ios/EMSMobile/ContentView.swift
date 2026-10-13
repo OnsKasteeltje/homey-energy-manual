@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct ContentView: View {
@@ -41,7 +42,9 @@ private struct OverviewScreen: View {
                     LiveHeader(overview: overview)
                     EnergyCard(overview: overview)
                     EVCard(overview: overview)
-                    HotWaterCard(overview: overview)
+                    if effectiveHotWaterMode(overview) == "BOILER" {
+                        HotWaterCard(overview: overview)
+                    }
                     HeatingCard(overview: overview)
 
                     if overview.flex.status != "OK" {
@@ -97,7 +100,7 @@ private struct LiveHeader: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Energieoverzicht")
                     .font(.headline)
-                Text(overview.generatedAt)
+                Text("Bijgewerkt \(localTime(overview.generatedAt))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -208,7 +211,7 @@ private struct HotWaterCard: View {
         EMSCard(title: "Warm water", systemImage: "drop.fill") {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(overview.hotWater.mode ?? "Bron onbekend")
+                    Text("Elektrische boiler")
                         .font(.title3.bold())
                     Text(overview.hotWater.boilerOn == true ? "Boiler aan" : "Boiler uit")
                         .foregroundStyle(.secondary)
@@ -402,6 +405,33 @@ private struct Metric: View {
                 .foregroundStyle(.secondary)
         }
     }
+}
+
+private func effectiveHotWaterMode(_ overview: MobileOverview) -> String? {
+    if let mode = overview.hotWater.mode, mode == "CV" || mode == "BOILER" {
+        return mode
+    }
+
+    if let mode = overview.hotWater.seasonalAdvice?.data?.currentMode,
+       mode == "CV" || mode == "BOILER" {
+        return mode
+    }
+
+    return nil
+}
+
+private func localTime(_ value: String) -> String {
+    let fractional = ISO8601DateFormatter()
+    fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+    let standard = ISO8601DateFormatter()
+    standard.formatOptions = [.withInternetDateTime]
+
+    guard let date = fractional.date(from: value) ?? standard.date(from: value) else {
+        return value
+    }
+
+    return date.formatted(date: .omitted, time: .shortened)
 }
 
 private func power(_ value: Double?) -> String {
