@@ -44,6 +44,13 @@ a future live actuator still requires **physical** ownership/readback and
 a separately proved reset/watchdog path. An overridden room is reevaluated
 only after return to schedule plus a fresh planner grant.
 
+V0.4 `living_area` coordination counts only *currently granted* rooms, not
+former members retaining an active shadow step from the prior cycle. If an
+individual living-area room receives an override, its granted sibling can
+progress after its own measured step is reached; group arbitration cannot
+turn that individual override into a broader implicit HOLD. Two explicit
+reached-step tests cover both directions of this case.
+
 The offline parametrized six-room cross-layer test suite covers both override
 kinds, mid-step takeover, reentry and global Honeywell system-mode safety.
 No Homey Heating publisher timer, thermostat write, device control or
