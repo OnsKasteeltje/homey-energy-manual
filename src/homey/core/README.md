@@ -4,7 +4,14 @@
 
 - Homey Advanced Flow: `227f8d3b-7551-46dd-837d-1b8c69add824`.
 - Actief, `enabled=true`, `broken=false`: **Core V0.11p** (pinned source).
-- Repositoryversie: `src/homey/core/core-v0.11p.candidate-homey.js` (oorspronkelijke bestandsnaam uit staging). Een nieuwe byte-exacte source-vergelijking met Homey is **niet** onderdeel van deze opschoning.
+- Repositoryversie: `src/homey/core/core-v0.11p.candidate-homey.js` (oorspronkelijke bestandsnaam uit staging).
+- **2026-10-14:** bestaande cron-trigger gewijzigd van 5 naar **2 minuten**
+  als Live-freshnessproef. De actieve 59.064-teken HomeyScript-bron is
+  vooraf byte-exact met de repository vergeleken. De post-update readback
+  bevestigde: alleen `args.n` (5→2) gewijzigd, bestaande scripts, kaarten en
+  verbindingen gelijk, `enabled=true`, `broken=false`. De 5-minuten
+  rollback is dezelfde trigger terugzetten, niet de rollback-Core activeren.
+  Nieuwe Pi-snapshotfrequentie is nog niet als runtimebewijs gemeten.
 - Uitgeschakelde, behouden rollback-flow: **Core V0.11n**, met `core-v0.11n.live-homey.js` als historische source.
 - Productie-Core is een observer/publisher; de Homey EV/WW-actuators blijven afzonderlijke fysieke control owners.
 
