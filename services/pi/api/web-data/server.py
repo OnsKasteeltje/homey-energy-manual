@@ -5,6 +5,7 @@ control/device write path.
 """
 
 import json
+import logging
 import math
 import os
 import sqlite3
@@ -2047,6 +2048,10 @@ class Handler(BaseHTTPRequestHandler):
                     "schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "HISTORY_PERIOD_INVALID",
                 })
             except (OSError, sqlite3.Error):
+                # This endpoint has intermittently returned 503 while its
+                # direct read-only projection succeeds. Preserve the public
+                # error contract; keep cause/traceback private in journald.
+                logging.exception("PV & Flex 503 while reading day %s", parts[4])
                 send_json(self, 503, {
                     "schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "RESOURCE_UNAVAILABLE",
                 })
