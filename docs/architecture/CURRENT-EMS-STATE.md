@@ -15,6 +15,30 @@ Canonical diagnostic source-of-truth and mandatory root-cause documentation rule
 
 - `apps/cloudflare/` contains the legacy authenticated command Worker, still relevant to the separate GitHub-backed EMS **settings** command. Its old Tesla GitHub-write route is **not** Pi deadline ingress since 2026-10-09. The private Tesla command route is Private Invoer V2, including the iPhone home-screen web app: Tailscale Caddy → Pi Status API ingress. GitHub Pages now publishes only a static landing page; operational runtime snapshots must never be republished to `docs/data/`. See `docs/architecture/public-data-boundary.md`.
 
+### Easee token-authentication incident and proposed recovery (14 October 2026)
+
+**Current production remains unchanged:** Homey Advanced Flow
+`fea23193-a03f-49dd-9780-7e72ee48747d`, physical EV writer V0.4.6,
+continues to own execution and phase switching. Its Easee Cloud phase path uses
+access, rotating refresh and expiry values from three private Homey Logic
+variables. A refresh on 2026-10-14 returned `EASEE_REFRESH_HTTP_401`.
+The Tesla still charged at 1 × 16 A and completed charging; a manual Easee
+bootstrap followed by read-only HTTP 200 restored access. The exact reason
+for token invalidation has **not been proven**.
+
+**Staged only, NOT a live change:** the PR candidate v0.4.7 introduces one
+atomic Homey Logic JSON bundle for access+refresh+expiry+revision, readback
+verification, and bounded handling of a concurrent newer token after 401.
+The commissioning bootstrap provisions it *after* the three legacy variables;
+a targeted preparation script pins its Logic ID only after checking exact
+v0.4.6 live source. No new planner authority, EV writer, background polling,
+physical writes or change to EV thresholds is introduced. Homey Logic has no
+documented compare-and-swap: this is **not** proof of global single-flight
+refresh protection. Promote only after reviewed tests, explicit Homey APPLY,
+exact readback and subsequent natural token refresh. Until then all current
+runtime assertions remain V0.4.6. See
+`docs/decisions/easee-token-bundle-v047-2026-10-14.md` for staging and rollback.
+
 ## 1. Source of truth
 
 - GitHub `main` is authoritative for Pi runtime source, deployment definitions and architecture documentation.
