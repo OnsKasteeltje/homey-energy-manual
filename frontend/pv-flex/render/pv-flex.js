@@ -1,4 +1,4 @@
-import {loadFlexPriorityShadow,loadHeatingPreheatProgressionShadow,loadHeatingPreheatShadow,loadPvFlex,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
+import {loadDailyPerformance,loadPvFlex,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
 const $=id=>document.getElementById(id); let day=todayAmsterdam();
 const kwh=v=>typeof v==="number"&&Number.isFinite(v)?v.toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:2})+" kWh":"—";
 const pct=v=>typeof v==="number"&&Number.isFinite(v)?Math.round(v*100)+"%":"—";
@@ -293,116 +293,59 @@ function chart(d){
  }
  renderEvidence(null,nowMs);
 }
-const temp=v=>typeof v==="number"&&Number.isFinite(v)?`${v.toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})} °C`:"—";
-const label=s=>({
- PREHEAT_READY_FOR_GRANT:"Klaar voor planner",
- PREHEAT_BLOCKED_CV_ASSIST:"Geblokkeerd · CV-assist",
- PREHEAT_BLOCKED_CV_STATUS_UNKNOWN:"Geblokkeerd · CV-status",
- BASELINE_HEATING:"Normale warmtevraag",
- NOT_ELIGIBLE:"Niet kandidaat"
-}[s]||s||"—");
-const priorityLabel=p=>({
- HEATING:"Heating eerst",
- EV:"EV eerst",
- HOLD_UNKNOWN:"Veilig HOLD"
-}[p]||p||"—");
-const evRoleLabel=r=>({
- MUST:"EV MUST",
- PRIMARY_OPPORTUNITY:"EV primaire opportunity",
- RESIDUAL_OPPORTUNITY:"EV residual via P1",
- SAFETY_HOLD:"EV safety hold"
-}[r]||r||"—");
-const plannerReasonLabel=r=>({
- NO_HEATING_PREHEAT_CANDIDATE:"Geen Heating-kandidaat",
- HEATING_WINDOW_CLOSES_FIRST:"Heating-window sluit eerder",
- HEATING_SCARCE_WINDOW_WITH_NO_EV_DEADLINE_PRESSURE:"Heating-window is schaars; geen EV-deadline-druk",
- EV_SLACK_CLOSES_BEFORE_HEATING_WINDOW:"EV-slack sluit eerder",
- EV_DEADLINE_MUST:"EV-deadline MUST",
- EV_DEADLINE_STATE_NOT_SAFE_TO_DEPRIORITIZE:"EV-deadline onzeker; Heating veilig HOLD"
-}[r]||r||"—");
-const progressionLabel=s=>({
- INACTIVE:"Inactief",
- WAITING_FOR_FRESH_PRIORITY:"Wacht op verse prioriteit",
- WAITING_FOR_GRANT:"Wacht op planner-grant",
- STEP_WAIT:"Stap actief · op temperatuur wachten",
- STEP_REACHED:"Stap bereikt",
- STEP_REACHED_GROUP_WAIT:"Stap bereikt · wacht op groep",
- STEP_HOLD_PRIORITY_UNKNOWN:"Stap HOLD · prioriteit onzeker",
- STEP_HOLD_NO_GRANT:"Stap HOLD · geen grant",
- BLOCKED_CV_ASSIST:"Geblokkeerd · CV-assist",
- BLOCKED_CV_STATUS_UNKNOWN:"Geblokkeerd · CV-status onbekend",
- ENDED_BASELINE_HEATING:"Beëindigd · baseline warmtevraag",
- COMPLETE_TARGET_REACHED:"Gereed · Honeywell-target bereikt",
- COMPLETE_NO_NEXT_STEP:"Gereed · geen volgende stap"
-}[s]||s||"—");
-function roomPlannerState(room,priority){
- const decision=priority?.decision;
- if(!decision)return {grant:"NOT_EVALUATED",reason:"Prioriteit niet beschikbaar"};
- const readyRooms=Array.isArray(priority?.heating?.readyRooms)?priority.heating.readyRooms:[];
- const roomReady=room.shadow?.state==="PREHEAT_READY_FOR_GRANT"&&readyRooms.includes(room.key);
- if(!roomReady)return {grant:"HOLD",reason:"Kamer niet klaar voor planner-grant"};
- if(decision.heatingShadowGrant==="SHADOW_GRANT"){
-  return {grant:"SHADOW_GRANT",reason:plannerReasonLabel(decision.reason)};
- }
- return {grant:"HOLD",reason:plannerReasonLabel(decision.reason)};
-}
-function renderPreheat(d,priority,progression,isCurrent){
- const root=$("preheat-rooms"),empty=$("preheat-empty"),status=$("preheat-status");root.replaceChildren();
- if(!isCurrent){status.textContent="Live shadow";empty.hidden=false;empty.textContent="Preheat shadow wordt alleen voor vandaag getoond.";return;}
- if(!d){status.textContent="Niet beschikbaar";empty.hidden=false;empty.textContent="Heating Preheat shadow is niet beschikbaar; PV & Flex blijft read-only actief.";return;}
- empty.hidden=true;
- const cv=d.cvGuard?.status==="OK"?(d.cvGuard.cvActive?"CV actief":"CV uit"):"CV onbekend";
- const pr=priority?.decision;
- const priorityText=pr?`${priorityLabel(pr.priorityOwner)} · ${evRoleLabel(pr.evRole)}`:"Prioriteit niet beschikbaar";
- status.textContent=`${priorityText} · ${d.house?.baselineHeatingDemandPresent?"Baselinevraag actief":"Baseline voldaan"} · ${cv}`;
- const progressionByKey=new Map((progression?.rooms||[]).map(r=>[r.key,r]));
- for(const r of d.rooms||[]){
-  const roomPlan=roomPlannerState(r,priority);
-  const v04=progressionByKey.get(r.key);
-  const prog=v04?.progression;
-  const card=document.createElement("article");card.className="preheat-room";
-  const head=document.createElement("div");head.className="preheat-room-head";
-  const name=document.createElement("strong");name.textContent=r.displayName||r.key;
-  const badge=document.createElement("span");badge.className=`preheat-state ${r.shadow?.state==="PREHEAT_READY_FOR_GRANT"?"ready":"blocked"}`;badge.textContent=label(r.shadow?.state);
-  head.append(name,badge);
-  const metrics=document.createElement("div");metrics.className="preheat-metrics";
-  const entries=[
-   ["Nu",temp(r.current?.temperature_C)],
-   ["Baseline",temp(r.baseline?.currentTargetTemperature_C)],
-   ["Volgende Honeywell-UP",r.baseline?.direction==="UP"?temp(r.baseline?.targetTemperature_C):"—"],
-   ["Preheat-window",r.candidate?.opportunityOpensAt&&r.candidate?.opportunityClosesAt?`${time(r.candidate.opportunityOpensAt)}–${time(r.candidate.opportunityClosesAt)}`:"—"],
-   ["Planner grant",roomPlan.grant],
-   ["V0.4 progression",progressionLabel(prog?.state)],
-   ["Actieve shadow-target",temp(prog?.activeStepTarget_C)],
-   ["Target bereikt",prog?.activeStepReached===true?"Ja":prog?.activeStepReached===false?"Nee":"—"],
-   ["Volgende V0.4-stap",temp(prog?.nextStepTarget_C)]
-  ];
-  for(const [k,v] of entries){const row=document.createElement("span");const b=document.createElement("b");b.textContent=k;const val=document.createTextNode(v);row.append(b,val);metrics.append(row);}
-  const reason=document.createElement("small");reason.className="preheat-reason";reason.textContent=r.shadow?.reason||r.candidate?.reason||"—";
-  const plannerReason=document.createElement("small");plannerReason.className="preheat-reason";plannerReason.textContent=`Planner: ${roomPlan.reason}`;
-  const progressionReason=document.createElement("small");progressionReason.className="preheat-reason";progressionReason.textContent=`V0.4: ${prog?.reason||"Niet beschikbaar"}`;
-  card.append(head,metrics,reason,plannerReason,progressionReason);root.append(card);
+function renderDailyReport(report,selectedDay){
+ const labelDate=new Date(selectedDay+"T12:00:00Z").toLocaleDateString("nl-NL",{
+  timeZone:"Europe/Amsterdam",day:"numeric",month:"long",year:"numeric"
+ });
+ $("daily-report-date").textContent=labelDate;
+ const notes=$("daily-report-notes");notes.replaceChildren();
+ const status=$("daily-report-status");
+ const isToday=selectedDay>=todayAmsterdam();
+ const valid=report&&report.dateLocal===selectedDay&&report.readOnly===true&&report.controlWrites===false;
+ const accounting=valid?report.accounting||{}:{};
+ const decimal=v=>available(v)?v.toLocaleString("nl-NL",{
+  minimumFractionDigits:3,maximumFractionDigits:3
+ })+" kWh":"—";
+ $("report-pv").textContent=decimal(accounting.pvProducedKWh);
+ $("report-self-rate").textContent=valid?dailyPct(accounting.pvSelfConsumptionRate):"—";
+ $("report-import").textContent=decimal(accounting.gridImportKWh);
+ $("report-export").textContent=decimal(accounting.gridExportKWh);
+ status.textContent=valid?(
+  report.status==="READY"?"Definitief · compleet":report.status==="PARTIAL"?
+  "Definitief · gedeeltelijk":"Onvoldoende meetbewijs"
+ ):(isToday?"Dag in uitvoering":"Niet beschikbaar");
+ const lines=valid&&Array.isArray(report.lines)?report.lines.slice(2):[
+  isToday?"Vandaag is nog niet afgerond; het definitieve dagrapport volgt na de dagelijkse verwerking om 00:20.":
+  "Voor deze dag is nog geen dagrapport gearchiveerd. Bestaande kwartierhistorie blijft hierboven beschikbaar."
+ ];
+ for(const line of lines){
+  const p=document.createElement("p");p.textContent=line;notes.append(p);
  }
 }
+
+let refreshId=0;
 async function refresh(){
+ const selectedDay=day;
+ const requestId=++refreshId;
  $("quality").textContent="Laden…";
- try{
-  const isCurrent=day===todayAmsterdam();
-  const [d,h,p,g]=await Promise.all([
-   loadPvFlex(day),
-   isCurrent?loadHeatingPreheatShadow().catch(()=>null):Promise.resolve(null),
-   isCurrent?loadFlexPriorityShadow().catch(()=>null):Promise.resolve(null),
-   isCurrent?loadHeatingPreheatProgressionShadow().catch(()=>null):Promise.resolve(null)
-  ]);
-  summary(d);chart(d);renderPreheat(h,p,g,isCurrent);
- }catch(e){
+ const [main,daily]=await Promise.allSettled([
+  loadPvFlex(selectedDay),loadDailyPerformance(selectedDay)
+ ]);
+ if(requestId!==refreshId)return; // Ignore stale requests after day navigation.
+ if(main.status==="fulfilled"){
+  try{summary(main.value);chart(main.value);}
+  catch(e){$("quality").textContent="Analyse niet beschikbaar";$("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;}
+ }else{
   $("quality").textContent="Analyse niet beschikbaar";
   $("kpi-self-rate").textContent="—";
   $("kpi-self").textContent="—";
   $("kpi-rate-note").textContent="Geen gevalideerd dagresultaat";
-  $("daily-pv-conclusion").textContent="Dagelijks PV-zelfgebruik niet beschikbaar: "+e.message;
-  $("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;
-  renderPreheat(null,null,null,day===todayAmsterdam());
+  $("daily-pv-conclusion").textContent="Dagelijks PV-zelfgebruik niet beschikbaar: "+main.reason?.message;
+  $("empty").hidden=false;$("empty").textContent=main.reason?.message||"Geen data";
+  $("pv-chart").hidden=true;renderEvidence(null);
  }
+ renderDailyReport(daily.status==="fulfilled"?daily.value:null,selectedDay);
 }
-$("prev").addEventListener("click",()=>{day=shiftDay(day,-1);refresh();});$("next").addEventListener("click",()=>{if(day<todayAmsterdam()){day=shiftDay(day,1);refresh();}});refresh();
+$("prev").addEventListener("click",()=>{day=shiftDay(day,-1);refresh();});
+$("next").addEventListener("click",()=>{if(day<todayAmsterdam()){day=shiftDay(day,1);refresh();}});
+refresh();
