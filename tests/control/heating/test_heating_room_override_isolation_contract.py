@@ -37,7 +37,8 @@ def stamp(dt):
     return dt.isoformat().replace("+00:00", "Z")
 
 
-def inputs(now, overridden=None, mode="temporary_override", system_mode="auto"):
+def inputs(now, overridden=None, mode="temporary_override", system_mode="auto", measured=None):
+    measured = measured or {}
     weekly = [
         {
             "day_of_week": day,
@@ -69,7 +70,7 @@ def inputs(now, overridden=None, mode="temporary_override", system_mode="auto"):
         "zones": [
             {
                 "key": key, "displayName": key,
-                "roomTemperature_C": 17.0,
+                "roomTemperature_C": measured.get(key, 17.0),
                 # Override demand is deliberately real (target 20 > 17):
                 # it must not contaminate every other room's preheat grant.
                 "targetTemperature_C": 20.0 if key == overridden else 16.0,
@@ -126,8 +127,9 @@ def per_room(payload):
 
 
 def cycle(*, now=T0, override=None, mode="temporary_override",
-          system_mode="auto", previous_v04=None, previous_v05=None):
-    schedule, state = inputs(now, override, mode, system_mode)
+          system_mode="auto", previous_v04=None, previous_v05=None,
+          measured=None):
+    schedule, state = inputs(now, override, mode, system_mode, measured)
     model = model_mod.build_model(schedule, state, generated_at=now)
     candidate = plan_mod.build_plan(model, generated_at=now)
     heating = shadow_mod.build_shadow(model, candidate, quatt(now), generated_at=now)
@@ -236,3 +238,31 @@ def test_honeywell_system_mode_is_a_distinct_global_safety_guard():
         assert per_room(model)[key]["effective"]["source"] == "SYSTEM_MODE"
         assert per_room(heating)[key]["shadow"]["state"] != "PREHEAT_READY_FOR_GRANT"
         assert per_room(gate)[key]["command"]["action"] == "HOLD"
+
+@pytest.mark.parametrize(
+    ("overridden", "continuing"),
+    (("eetkamer", "woonkamer"), ("woonkamer", "eetkamer")),
+)
+def test_overridden_living_group_member_cannot_hold_other_room_step(overridden, continuing):
+    # Both grouped rooms previously held 17.5 C. One reaches its own
+    # measured target while the other is explicitly taken over by Honeywell.
+    # Only currently granted group members may influence group progression.
+    _, _, _, previous_progression, previous_gate = cycle()
+    _, _, _, progression, gate = cycle(
+        now=T0 + timedelta(minutes=1),
+        override=overridden,
+        measured={continuing: 17.5},
+        previous_v04=previous_progression,
+        previous_v05=previous_gate,
+    )
+    states = per_room(progression)
+    actions = per_room(gate)
+
+    assert states[overridden]["progression"]["state"] == "INACTIVE"
+    assert actions[overridden]["command"]["action"] == "HOLD"
+    assert states[continuing]["progression"]["activeStepTarget_C"] == 18.0
+    assert states[continuing]["progression"]["reason"] == "ADVANCED_AFTER_MEASURED_STEP_COMPLETION"
+    assert actions[continuing]["command"]["action"] == "WOULD_SET_TEMP"
+    assert actions[continuing]["command"]["target_C"] == 18.0
+    assert progression["physicalWriteAllowed"] is False
+    assert gate["physicalWriteAllowed"] is False
