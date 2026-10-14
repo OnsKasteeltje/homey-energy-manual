@@ -12,7 +12,7 @@ Heating Preheat V0.3 adds a second local-only safety/observability layer in `bui
 
 Heating Preheat V0.4 adds a downstream **stateful progression SHADOW** in `build_heating_preheat_progression_shadow_v0_4.py`. It consumes only the already-derived V0.3 Heating shadow, Flex Priority Shadow V0.1 and its own previous local shadow artifact. V0.4 may persist a hypothetical active `+0.5 C` step and advance it only after measured room-temperature proof, while preserving the V0.3 CV/baseline guards and the central planner grant requirement.
 
-For grouped opportunities such as `living_area`, a subsequent step waits until all selected rooms have reached their currently active shadow target. Loss of planner grant holds progression; it does not invent rollback behavior. `rollbackBehavior = NOT_DEFINED_SHADOW_ONLY` is explicit until a future LIVE actuator contract is designed.
+For grouped opportunities such as `living_area`, a subsequent step waits until all **currently granted** rooms have reached their active shadow target. An overridden or no-longer-granted room is excluded from group progression even if a historical shadow step was still active in its previous snapshot. Group coordination cannot reintroduce a cross-room override HOLD. Loss of planner grant holds progression; it does not invent rollback behavior. `rollbackBehavior = NOT_DEFINED_SHADOW_ONLY` is explicit until a future LIVE actuator contract is designed.
 
 `run_heating_preheat_progression_shadow_v0_4.py` publishes `/home/jeroen/ems/data/heating-preheat-progression-shadow-v0.4.json`. The entire V0.4 layer remains READ_ONLY / SHADOW, performs no network call and has no physical write path.
 
