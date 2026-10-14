@@ -134,6 +134,55 @@ def seasonal_advice_resource():
 
 
 
+def _live_l1_history():
+    """Bounded observation-only L1 history, shared by desktop and iPhone.
+
+    P1 phase samples are archived by the existing Homey Core -> Pi ingest.
+    Do not substitute held/stale PV values or invent per-device wattages.
+    An absent/unavailable SQLite DB simply yields no diagnostic evidence.
+    """
+    after = (datetime.now(timezone.utc) - timedelta(minutes=65)).isoformat()
+    try:
+        with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True, timeout=1.0) as db:
+            rows = db.execute(
+                """
+                SELECT x.ts_utc, d.device_key, m.metric_key, x.value_real
+                FROM measurements x
+                JOIN devices d ON d.id = x.device_id
+                JOIN metrics m ON m.id = x.metric_id
+                WHERE x.ts_utc >= ?
+                  AND x.quality = 'observed'
+                  AND (
+                    (d.device_key='grid_p1' AND m.metric_key='grid_l1_power_w')
+                    OR (d.device_key='pv_solaredge'
+                        AND m.metric_key='electrical_power_w')
+                    OR (d.device_key='tesla'
+                        AND m.metric_key='electrical_power_w')
+                  )
+                ORDER BY x.ts_utc ASC
+                """,
+                (after,),
+            ).fetchall()
+    except (OSError, sqlite3.Error):
+        return []
+
+    grouped = {}
+    for stamp, device, metric, value in rows:
+        if not isinstance(value, (int, float)) or not math.isfinite(value):
+            continue
+        item = grouped.setdefault(stamp, {"at": stamp})
+        if device == "grid_p1" and metric == "grid_l1_power_w":
+            item["l1_net_w"] = value
+        elif device == "pv_solaredge":
+            item["solaredge_w"] = value
+        elif device == "tesla":
+            item["tesla_w"] = value
+    return [
+        item for item in list(grouped.values())[-20:]
+        if all(k in item for k in ("l1_net_w", "solaredge_w", "tesla_w"))
+    ]
+
+
 def state_current_resource():
     """Return the allowlisted Live V2 projection of canonical Pi energy state."""
     source = load_json(ENERGY_STATE_FILE)
@@ -142,7 +191,7 @@ def state_current_resource():
         raise ValueError("SOURCE_GENERATED_AT_INVALID")
 
     allowed_top = {
-        "meta": ("generated_at", "state_age_sec"),
+        "meta": ("generated_at", "source_sample_at", "state_age_sec"),
         "grid": ("power_w", "l1_w", "l2_w", "l3_w"),
         "pv": ("total_w", "solaredge_w", "goodwe_4200_w", "goodwe_2000_w"),
         "quatt": ("power_w", "thermostat_heating_on"),
@@ -222,6 +271,7 @@ def state_current_resource():
         if quooker_fresh and isinstance(quooker_power, (int, float))
         and not isinstance(quooker_power, bool) else None,
     }
+    result["diagnostics"] = {"dishwasher_l1_history": _live_l1_history()}
     return result
 
 
