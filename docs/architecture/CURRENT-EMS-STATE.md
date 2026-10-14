@@ -4,7 +4,7 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-10-13
+**Status date:** 2026-10-14
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 **Primary runtime host:** Raspberry Pi `ems-pi`
@@ -15,29 +15,46 @@ Canonical diagnostic source-of-truth and mandatory root-cause documentation rule
 
 - `apps/cloudflare/` contains the legacy authenticated command Worker, still relevant to the separate GitHub-backed EMS **settings** command. Its old Tesla GitHub-write route is **not** Pi deadline ingress since 2026-10-09. The private Tesla command route is Private Invoer V2, including the iPhone home-screen web app: Tailscale Caddy → Pi Status API ingress. GitHub Pages now publishes only a static landing page; operational runtime snapshots must never be republished to `docs/data/`. See `docs/architecture/public-data-boundary.md`.
 
-### Easee token-authentication incident and proposed recovery (14 October 2026)
+### Easee authentication v0.4.7 — live cutover (14 October 2026)
 
-**Current production remains unchanged:** Homey Advanced Flow
-`fea23193-a03f-49dd-9780-7e72ee48747d`, physical EV writer V0.4.6,
-continues to own execution and phase switching. Its Easee Cloud phase path uses
-access, rotating refresh and expiry values from three private Homey Logic
-variables. A refresh on 2026-10-14 returned `EASEE_REFRESH_HTTP_401`.
-The Tesla still charged at 1 × 16 A and completed charging; a manual Easee
-bootstrap followed by read-only HTTP 200 restored access. The exact reason
-for token invalidation has **not been proven**.
+**Current production:** Homey Advanced Flow
+`fea23193-a03f-49dd-9780-7e72ee48747d` is the **sole** Easee EV
+physical writer, now **v0.4.7 ATOMIC-TOKENS [LIVE]**. Readback on
+2026-10-14 confirmed `enabled=true`, `broken=false`, four existing
+cards, the v0.4.7 script, and one correctly pinned private bundle Logic ID;
+no unreplaced bootstrap placeholder or legacy Easee variable references
+remain in the live executable. The controlled Pi deployer reported matching
+candidate/post-write writable-state SHA-256
+`1acbaac1625757a6879b2e54f7942021624d6bfb6517809b6ca5aa2d910f48a0`
+after a predeploy backup and an earlier dry-run. No manual charge or phase
+transition was triggered as a deployment test.
 
-**Staged only, NOT a live change:** the PR candidate v0.4.7 introduces one
-atomic Homey Logic JSON bundle for access+refresh+expiry+revision, readback
-verification, and bounded handling of a concurrent newer token after 401.
-The commissioning bootstrap provisions it *after* the three legacy variables;
-a targeted preparation script pins its Logic ID only after checking exact
-v0.4.6 live source. No new planner authority, EV writer, background polling,
-physical writes or change to EV thresholds is introduced. Homey Logic has no
-documented compare-and-swap: this is **not** proof of global single-flight
-refresh protection. Promote only after reviewed tests, explicit Homey APPLY,
-exact readback and subsequent natural token refresh. Until then all current
-runtime assertions remain V0.4.6. See
-`docs/decisions/easee-token-bundle-v047-2026-10-14.md` for staging and rollback.
+**Why:** On 2026-10-14 a live v0.4.6 refresh returned
+`EASEE_REFRESH_HTTP_401`, although the Tesla continued charging at 1×16 A
+and subsequently completed the session. A manual bootstrap plus read-only
+Easee HTTP 200 restored access. The original refresh-token invalidation
+cause remains unproven.
+
+**New authentication boundary:** only this Homey physical writer rotates
+the Easee cloud phase-control access and one-use refresh tokens. These plus
+expiry/revision now live in one private Homey Logic JSON bundle
+`EM2_Easee_Token_Bundle_V1`. The commissioning script also maintains the
+three old variables for bounded rollback compatibility, but they are **not**
+a second production token owner. One bundle write is followed by readback;
+a recently advanced bundle may be reused to recover a 401 without another
+refresh. Homey Logic has no documented compare-and-swap, so concurrent
+single-flight refresh is **not proven**. Unexpected/auth failures remain
+fail closed, with Owner notification where applicable. There is no new
+physical writer, automatic polling owner, P1/planner/gate authority, phase
+threshold or safety-policy change.
+
+**Validation boundary:** PR #264 (`576989d6`) passed architecture, security,
+and 16 local Pi EV tests (16/16); exact Homey deployment/readback PASS.
+The **next natural token rotation and next real phase opportunity still need
+operational proof**. A successful post-bootstrap HTTP 200 and successful
+software deployment do not independently prove long-term token renewal.
+For deployment/rollback see
+`docs/decisions/easee-token-bundle-v047-2026-10-14.md`.
 
 ## 1. Source of truth
 
@@ -379,7 +396,7 @@ Derived operational history is rebuilt locally from canonical `measurements` and
 
 Tesla charging remains split between Pi planning and Homey guarded execution. Opportunity charging uses residual PV subject to executable Easee limits; explicit deadline charging is a hard requirement and may use grid energy when required. Homey may trim within the Pi envelope but must not become a second independent planner. The guarded EV actuator remains the sole automatic physical Easee writer in the production EV chain.
 
-Production runs EV phase writer v0.4.6 on the existing sole-writer Advanced Flow `fea23193-a03f-49dd-9780-7e72ee48747d` as `EM v2 | 60 Actuator | EV Power v0.4.6 OFF-ZERO-IDEMPOTENT [LIVE]`. The bounded writer preserves the v0.4.x pause → phase command → confirmation/deadtime → temporary circuit-cap → resume/current → circuit-cap-restore sequence for true 1P↔3P transitions, while same-phase current changes remain direct bounded current writes. Electrical phase telemetry is the strongest confirmation when available, with Easee cloud phase observation used as the bounded transition command/readback path. v0.4.4 added the final pause read that avoids false timeout at the edge of the strict polling window; v0.4.5 adds typed Easee-authentication failures plus deduplicated Owner push / Timeline fallback for terminal auth incidents. Auth alerting is observability only and never bypasses fail-closed actuator behavior or creates a second writer.
+Production runs EV phase writer v0.4.7 on the existing sole-writer Advanced Flow `fea23193-a03f-49dd-9780-7e72ee48747d` as `EM v2 | 60 Actuator | EV Power v0.4.7 ATOMIC-TOKENS [LIVE]`; v0.4.6 remains the confirmed pre-cutover rollback source. The bounded writer preserves the v0.4.x pause → phase command → confirmation/deadtime → temporary circuit-cap → resume/current → circuit-cap-restore sequence for true 1P↔3P transitions, while same-phase current changes remain direct bounded current writes. Electrical phase telemetry is the strongest confirmation when available, with Easee cloud phase observation used as the bounded transition command/readback path. v0.4.4 added the final pause read that avoids false timeout at the edge of the strict polling window; v0.4.5 adds typed Easee-authentication failures plus deduplicated Owner push / Timeline fallback for terminal auth incidents. Auth alerting is observability only and never bypasses fail-closed actuator behavior or creates a second writer.
 
 EV OFF/zero-current reliability fix v0.4.6 (2026-10-11, LIVE after targeted Homey cutover) resides at `apps/homey/control/ev/ev-power-v0.4.6.off-zero-idempotent.js` with standalone Node regression tests at `tests/control/ev/ev-phase-writer-v0.4.6-off-zero.test.mjs`. It retains the v0.4.5 sole-writer/phase/auth fail-closed contracts and makes OFF idempotent using fresh charger target 0 A, offered current <=1 A, measured power <=250 W and charging=false. An already-safe OFF state is not resumed after a previous FAILED status; a positive command remains the only path allowed to resume the session. A timed-out zero-current confirmation gets one final hardware read using unchanged thresholds; true unsuccessful confirmation still uses fail-closed pause/restore and preserves pre-recovery evidence. The existing Homey Flow `fea23193-a03f-49dd-9780-7e72ee48747d` was cut over in place on 2026-10-11: enabled=true, broken=false, four cards, exactly one HomeyScript physical writer, exact v0.4.6 source readback against GitHub main, and all other cards unchanged. Homey was not manually triggered. GitHub PR #232 and main commit `a1300607c8c91643418d0393a0e6c87d93325ebd` passed architecture and security CI. This validates software deployment, not yet the absence of future OFF confirmation timeouts. The v0.4.5 canonical source in legacy `src/homey/actuators/ev-power/` is the confirmed byte-exact rollback baseline; v0.4.6 source is correctly placed under `apps/homey/control/ev/`. The script header's candidate wording records its original staging origin and does not override the verified LIVE source readback. No EV phase/threshold/deadline/planner, Gate or second-writer change is included.
 
@@ -1179,6 +1196,6 @@ difference. Change is frontend-only, no Homey/Pi planner/forecast writes.
 
 ### EV 1P start threshold 1350 W — approved policy, Pi runtime cutover pending (2026-10-11)
 
-The user approved reducing the OFF→1P start threshold from 1500 W to **1350 W** and relaxing the absolute "no intentional grid import for opportunity EV" policy into **PV-primary, small bounded start import**. Strategic 15-minute planning may nominate the nominal 6 A / 230 V = 1380 W 1P minimum when forecast residual PV is 1350–1379 W, with a maximum nominal 30 W shortfall at 1350 W and correct PV benefit limited to forecast residual PV. The permitted strategic import exception applies **only** to this 1P minimum start band and is not carte-blanche grid charging. The Pi `/control/current` phasePolicy declares `start1p_W=1350`; Bridge v1.5.9 consumes the phasePolicy without changing bridge or Homey writer code. Realtime instantaneous viability retains the 250 W deadband, 120 s time-weighted rolling average, 90 s coverage, OFF re-entry dwell 120 s, 1P stop 1100 W, and same-phase current limit around +300 W import. The phasePolicy `nominalStartImportAllowance_W=30` is nominal planning metadata, *not* the realtime grid import limit. Deadline charging and physical writer v0.4.6 unchanged.
+The user approved reducing the OFF→1P start threshold from 1500 W to **1350 W** and relaxing the absolute "no intentional grid import for opportunity EV" policy into **PV-primary, small bounded start import**. Strategic 15-minute planning may nominate the nominal 6 A / 230 V = 1380 W 1P minimum when forecast residual PV is 1350–1379 W, with a maximum nominal 30 W shortfall at 1350 W and correct PV benefit limited to forecast residual PV. The permitted strategic import exception applies **only** to this 1P minimum start band and is not carte-blanche grid charging. The Pi `/control/current` phasePolicy declares `start1p_W=1350`; Bridge v1.5.9 consumes the phasePolicy without changing bridge or Homey writer code. Realtime instantaneous viability retains the 250 W deadband, 120 s time-weighted rolling average, 90 s coverage, OFF re-entry dwell 120 s, 1P stop 1100 W, and same-phase current limit around +300 W import. The phasePolicy `nominalStartImportAllowance_W=30` is nominal planning metadata, *not* the realtime grid import limit. Deadline charging and physical EV writer phase/current/safety policy remain unchanged; only Easee auth persistence changed at v0.4.7.
 
 This GitHub change does not itself install updated Pi runtime binaries. Apply only through the canonical Pi deploy/validation workflow, compare `/control/current` phasePolicy and freshly rebuilt plan after deployment, then verify naturally occurring Homey Gate/EV/Easee/P1 evidence. Do not claim the 1350 W threshold is live until the Pi runtime is validated. The materially touched `src/pi/ems-runtime/planner/dynamic-plan/build_dynamic_shadow_plan.py` remains at its existing deployed legacy path due to the active `scripts/deploy_ems_pi.sh` source-layout dependency; unrelated relocation would risk deployment and is deferred.
