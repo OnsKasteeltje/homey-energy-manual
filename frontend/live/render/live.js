@@ -31,6 +31,34 @@ function sourcePowerText(source) {
   return source.fresh ? formatPower(source.power) : `laatste ${formatPower(source.power)}`;
 }
 
+function applianceStatus(value) {
+  return value === true ? "Actief" : value === false ? "Niet actief" : "Onbekend";
+}
+
+function applianceDetail(item) {
+  if (item.active === null) return "Homey-status ontbreekt";
+  if (!item.active) return "Geen programma actief";
+  return [item.cyclePhase, item.applianceState]
+    .filter(Boolean).join(" · ") || "Programma actief";
+}
+
+function consumerExplanation(s) {
+  if (!s.p1Valid || s.grid === null) return "P1 niet actueel; oorzaak van verbruik onbekend.";
+  const heavy = s.gridPhases
+    .filter((p) => p.power !== null && p.power >= 1500)
+    .sort((a, b) => b.power - a.power)[0];
+  if (s.grid > 1500 && heavy) {
+    if (s.loads.washer.active === true) {
+      return `Hoge netafname op ${heavy.name} terwijl de wasmachine draait. Een verband is mogelijk, maar niet met een aparte vermogensmeter bevestigd.`;
+    }
+    if (s.loads.dryer.active === true) {
+      return `Hoge netafname op ${heavy.name} terwijl de droger draait. Een verband is mogelijk, maar niet met een aparte vermogensmeter bevestigd.`;
+    }
+    return `Hoge netafname op ${heavy.name}. De oorzaak is niet eenduidig uit de beschikbare apparaatmetingen af te leiden.`;
+  }
+  return "Geen opvallend hoge netafname op een afzonderlijke fase.";
+}
+
 function render(s) {
   set("pv-power", formatPower(currentPvPower(s)));
   const pvByKey = Object.fromEntries(s.pvSources.map((source) => [source.key, source]));
@@ -65,6 +93,22 @@ function render(s) {
   set("heat-power", formatPower(s.heat));
   set("heat-state", s.heatOn ? "warmtevraag" : "stand-by");
   set("other-power", formatPower(s.other));
+
+  set("loads-washer-status", applianceStatus(s.loads.washer.active));
+  set("loads-washer-detail", applianceDetail(s.loads.washer));
+  set("loads-dryer-status", applianceStatus(s.loads.dryer.active));
+  set("loads-dryer-detail", applianceDetail(s.loads.dryer));
+  set("loads-quooker-status", applianceStatus(s.loads.quooker.active));
+  set("loads-quooker-detail", !s.loads.quooker.fresh
+    ? "Geen actuele Quooker-detectie"
+    : s.loads.quooker.active && s.loads.quooker.estimatedPowerW !== null
+      ? `${formatPower(s.loads.quooker.estimatedPowerW)} · geschat`
+      : "P1-gebaseerde detectie");
+  for (const phase of s.gridPhases) {
+    set(`loads-phase-${phase.name.toLowerCase()}`,
+      s.p1Valid ? formatPower(phase.power) : "—");
+  }
+  set("loads-explanation", consumerExplanation(s));
 
   set("kpi-grid", formatPower(s.grid === null ? null : Math.abs(s.grid)));
   set("kpi-grid-sub", s.p1Valid ? `${s.gridDirection} · P1 actueel` : "P1 niet actueel");
