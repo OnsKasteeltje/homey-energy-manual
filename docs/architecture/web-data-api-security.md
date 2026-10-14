@@ -284,6 +284,33 @@ Frontend V2 / Live
 
 Schema: `EMS_WEB_STATE_CURRENT_V1`. Only fields consumed by the Live V2 state adapter are exposed. The API does not serialize the complete canonical runtime document and does not derive EMS policy. GitHub `docs/data/energy-state-v2.json` is not a runtime fallback for the private V2 site.
 
+### Live Quooker observation resource (2026-10-14)
+
+`GET /web/live/quooker` exposes schema `EMS_WEB_LIVE_QUOOKER_V1`
+for the existing Live Quooker card. It makes no Homey calls and performs
+**no** device, planner, Core or history writes. It independently reads the
+last archived `quooker_control_events` row in the Pi-local history SQLite
+using `mode=ro`, plus the canonical Core state JSON solely to select a
+fresh switch observation. Thus a failed Quooker projection does **not**
+make `GET /web/state/current` unavailable.
+
+Only the following fields are exposed:
+
+- `mode` (allowlisted `OPPORTUNITY`, `FORCED_ON`, `OFF`, or null);
+- `mode_event_at` (timestamp of most recent recorded event, not a heartbeat);
+- `switch_on` and `switch_sample_at` (only if an event or canonical
+  Core observation is at most 180 seconds old);
+- `last_heated_at` (timestamp of last detected heating start, which may
+  be historical and has **no** 180-second freshness expiry).
+
+No raw Quooker event JSON, arbitrary SQL, device identifiers, controls,
+reasons, physical writes or fresh detector power estimates are exposed.
+Malformed or unavailable underlying SQLite data returns the established
+generic 503, isolated to this route. The frontend polls the route every
+15 seconds, independently of the two-minute Core snapshot, and shows
+mode, switch and the **last heating time** only: it does not claim whether
+the heating element is presently active.
+
 ## 15.1 Current command-state resource
 
 Invoer V2 uses a separate read-only command-state projection:
