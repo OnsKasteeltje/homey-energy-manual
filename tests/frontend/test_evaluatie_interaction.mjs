@@ -93,6 +93,7 @@ test("replaced preheat panel with selected-day report, without leaking old repor
  assert.ok(state.includes('if(day>=todayAmsterdam())return null'));
  assert.ok(script.includes("selectedDay>=todayAmsterdam()"));
  assert.ok(script.includes('report.lines.slice(2)'));
+ assert.ok(script.includes('main.value.provisionalDailyReport'));
  assert.ok(script.includes('requestId!==refreshId'));
 });
 
@@ -113,6 +114,7 @@ test("daily panel shows measured own PV kWh, and blanks unfinished day",()=>{
    createElement(){return createNode();}
   },
   todayAmsterdam:()=> "2026-10-14",
+  time:value=>new Date(value).toLocaleTimeString("nl-NL",{timeZone:"Europe/Amsterdam",hour:"2-digit",minute:"2-digit"}),
   available:v=>typeof v==="number"&&Number.isFinite(v),
   dailyPct:v=>typeof v==="number"&&Number.isFinite(v)?
    (v*100).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})+"%":"—"
@@ -134,6 +136,14 @@ test("daily panel shows measured own PV kWh, and blanks unfinished day",()=>{
  assert.equal(nodes.get("report-self-rate").textContent,"61,7%");
  assert.equal(nodes.get("report-export").textContent,"3,347 kWh");
  assert.equal(nodes.get("daily-report-status").textContent,"Definitief · compleet");
+ render({
+  dateLocal:"2026-10-14",status:"PROVISIONAL",readOnly:true,controlWrites:false,
+  throughLocal:"2026-10-14T12:30:00+02:00",
+  accounting:{pvProducedKWh:5,pvSelfConsumedKWh:4,pvSelfConsumptionRate:.8,gridImportKWh:2,gridExportKWh:1},
+  lines:["Voorlopig subtotaal uit afgesloten kwartieren."]
+ },"2026-10-14");
+ assert.equal(nodes.get("report-self").textContent,"4,000 kWh");
+ assert.equal(nodes.get("daily-report-status").textContent,"Voorlopig · t/m 12:30");
  render(null,"2026-10-14");
  assert.equal(nodes.get("report-self").textContent,"—");
  assert.equal(nodes.get("daily-report-status").textContent,"Dag in uitvoering");
