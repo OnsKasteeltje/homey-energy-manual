@@ -136,3 +136,73 @@ test('write/readback mismatch fails closed instead of certifying credentials',as
   await assert.rejects(()=>f.getAccessToken(v,false),/EASEE_BUNDLE_WRITE_CONFLICT/);
   assert.equal(f.calls.filter(x=>x==='PUT').length,1);
 });
+
+const retryStart=src.indexOf('const withEasee401RefreshRetry=async');
+const retryEnd=src.indexOf('const setPhaseMode=async',retryStart);
+assert.ok(retryStart>=0&&retryEnd>retryStart);
+
+test('primary HTTP 401 reuses a newly rotated access token without another refresh',async()=>{
+  const used=[];
+  const getAccessCalls=[];
+  let reads=0;
+  const replacement=makeBundle({
+    accessToken:'other-access',
+    refreshToken:'other-refresh',
+    revision:101
+  });
+  const context={
+    Date,
+    getAccessToken:async(vars,forced)=>{
+      getAccessCalls.push({revision:vars.revision,forced});
+      return 'old-access';
+    },
+    readEaseeVars:async()=>{reads++;return replacement;}
+  };
+  const withRetry=vm.runInNewContext(
+    src.slice(retryStart,retryEnd)+'\nwithEasee401RefreshRetry',
+    context
+  );
+  const result=await withRetry(makeBundle(),'EASEE_PHASE_OBSERVATION',async(token,attempt)=>{
+    used.push({token,attempt});
+    if(attempt==='PRIMARY'){
+      const err=new Error('EASEE_PHASE_OBSERVATION_HTTP_401');
+      err.httpStatus=401;
+      throw err;
+    }
+    return 'OK';
+  });
+  assert.equal(result,'OK');
+  assert.deepEqual(used,[{token:'old-access',attempt:'PRIMARY'},{token:'other-access',attempt:'RETRY'}]);
+  assert.equal(getAccessCalls.length,1);
+  assert.equal(reads,1);
+});
+
+test('primary HTTP 401 with no new token attempts exactly one forced refresh',async()=>{
+  const used=[];
+  const getAccessCalls=[];
+  const current=makeBundle();
+  const context={
+    Date,
+    getAccessToken:async(vars,forced)=>{
+      getAccessCalls.push({revision:vars.revision,forced});
+      return forced?'refreshed-access':'old-access';
+    },
+    readEaseeVars:async()=>current
+  };
+  const withRetry=vm.runInNewContext(
+    src.slice(retryStart,retryEnd)+'\nwithEasee401RefreshRetry',
+    context
+  );
+  await withRetry(current,'EASEE_PHASE_COMMAND',async(token,attempt)=>{
+    used.push([token,attempt]);
+    if(attempt==='PRIMARY'){
+      const err=new Error('HTTP_401');
+      err.httpStatus=401;
+      throw err;
+    }
+    return true;
+  });
+  assert.deepEqual(used,[['old-access','PRIMARY'],['refreshed-access','RETRY']]);
+  assert.equal(getAccessCalls.length,2);
+  assert.equal(getAccessCalls[1].forced,true);
+});
