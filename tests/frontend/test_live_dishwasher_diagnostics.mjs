@@ -10,7 +10,6 @@ function snapshot(min, l1 = 100, opts = {}) {
     gridPhases: [
       {name: "L1", power: l1}, {name: "L2", power: opts.l2 ?? 2300},
       {name: "L3", power: opts.l3 ?? 60}],
-    pvSources: [{key:"solarEdge", power:opts.seW ?? 0, fresh:opts.seFresh ?? true}],
     teslaCharging: opts.tesla ?? false,
     tesla: opts.teslaPower ?? 0,
     loads: {
@@ -70,16 +69,35 @@ test("same source timestamp polled many times does not create fake corroboration
   assert.equal(hist.length,1);
 });
 
-test("PV is compensated only when fresh and P1 is independently authoritative", () => {
-  const r=run([[0,100],[5,1500,{seW:400}],[10,1510,{seW:410}],
-    [15,380,{seW:0}]]);
-  assert.equal(r.status,"LIKELY");
-  const stale=diagnoseDishwasher(snapshot(0,1800,{seFresh:false}),[],T0);
-  assert.equal(stale.status,"UNAVAILABLE");
-  assert.equal(stale.reason,"SOLAREDGE_STALE");
+test("fingerprint uses P1 alone, entirely independent of three inverters", () => {
+  const values = [[0,100],[5,1900],[10,1920],[15,380]];
+  const baseline=run(values);
+  assert.equal(baseline.status,"LIKELY");
+  let history = [], output;
+  for (const [minute, l1] of values) {
+    const s=snapshot(minute,l1);
+    // The detector must not read any of these fields.
+    s.pvSources = [
+      {key:"solarEdge",power:100000,fresh:false},
+      {key:"goodWe4200",power:20000,fresh:false},
+      {key:"goodWe2000",power:40000,fresh:false}
+    ];
+    output=diagnoseDishwasher(s,history,T0+minute*60000);
+    history=output.history;
+  }
+  assert.equal(output.status,baseline.status);
+  assert.equal(output.confidence,baseline.confidence);
+  assert.equal(output.signalW,380); // actual P1 L1, no inverter compensation
+  assert.equal(output.source,"P1_NET_L1_FINGERPRINT");
   const p1=diagnoseDishwasher(snapshot(0,1800,{p1Valid:false}),[],T0);
   assert.equal(p1.status,"UNAVAILABLE");
   assert.equal(p1.reason,"P1_STALE");
+});
+
+test("negative P1 L1 export never counts as evidence of dishwasher ending", () => {
+  const r=run([[0,100],[5,1900],[10,1920],[15,350],[20,-1100]]);
+  assert.equal(r.status,"NO_MATCH");
+  assert.notEqual(r.reason,"CYCLE_END_CONFIRMED");
 });
 
 test("new iPhone session uses Pi history rather than requiring browser-local samples", () => {
