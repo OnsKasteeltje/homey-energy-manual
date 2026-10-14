@@ -69,9 +69,14 @@ als afzonderlijk wattage in Huis, Overig of de EMS-planner.
   bestaande SQLite-history; de private Live-API publiceert een begrensde,
   strikt allowlisted L1-verificatiereeks. De browser kan lokaal tijdelijk
   samples bijhouden, maar Pi-data is leidend over meerdere apparaten/sessies.
-- Alleen volledige, actuele, `observed` P1/SolarEdge-samples leveren
-  fasefingerprintbewijs. De detector schrijft geen apparaten aan en creëert
-  geen nieuwe Homey-flow of Homey-publisher.
+- Vaatwasserdiagnostiek gebruikt **uitsluitend P1 netto L1**; geen SolarEdge,
+  GoodWe of andere omvormer levert invoer of fungeert als freshness-gate.
+  Historie accepteert een `observed` P1 L1-meting op zichzelf. Tesla is
+  alleen optionele interferentiecontext; een ontbrekende Tesla-meting mag
+  de P1-historie niet blokkeren. Omvormerproductie kan wel netto P1-patronen
+  maskeren, zodat deze herkenning indicatief blijft en missers mogelijk zijn.
+  De detector schrijft geen apparaten aan en creëert geen nieuwe Homey-flow
+  of Homey-publisher.
 
 ## 4. Quooker
 
