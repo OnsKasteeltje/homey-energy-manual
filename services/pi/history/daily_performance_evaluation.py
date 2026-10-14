@@ -14,7 +14,9 @@ from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Europe/Amsterdam")
 OUTPUT = Path("/home/jeroen/ems/data/daily-performance-evaluation.json")
+ARCHIVE = Path("/home/jeroen/ems/data/daily-performance-archive.json")
 SCHEMA = "EMS_PI_DAILY_PERFORMANCE_EVALUATION_V0.1"
+ARCHIVE_SCHEMA = "EMS_PI_DAILY_PERFORMANCE_ARCHIVE_V0.1"
 
 
 def yesterday():
@@ -183,11 +185,34 @@ def _write_atomic(path, result):
             tmp_path.unlink(missing_ok=True)
 
 
+def _update_archive(path, report):
+    """Append or replace one completed-day report in the Pi-private day archive."""
+    if report.get("schema") != SCHEMA or not isinstance(report.get("dateLocal"), str):
+        raise ValueError("daily report schema/date invalid")
+    if path.exists():
+        archive = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(archive, dict) or archive.get("schema") != ARCHIVE_SCHEMA:
+            raise ValueError("daily archive schema invalid")
+        days = archive.get("days")
+        if not isinstance(days, dict):
+            raise ValueError("daily archive structure invalid")
+    else:
+        days = {}
+    days[report["dateLocal"]] = report
+    _write_atomic(path, {
+        "schema": ARCHIVE_SCHEMA,
+        "days": {key: days[key] for key in sorted(days)},
+    })
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("day", nargs="?", default=None, help="Amsterdam date YYYY-MM-DD; default yesterday")
     parser.add_argument("--no-write-output", action="store_true")
+    parser.add_argument("--archive-only", action="store_true", help="backfill one day without replacing latest report")
     args = parser.parse_args(argv)
+    if args.no_write_output and args.archive_only:
+        parser.error("--archive-only and --no-write-output cannot be combined")
     day = date.fromisoformat(args.day) if args.day else yesterday()
     if day >= datetime.now(TZ).date():
         parser.error("only completed local calendar days are supported")
@@ -203,7 +228,9 @@ def main(argv=None):
             replay = None
         result = build_digest(day, performance, replay)
         if not args.no_write_output:
-            _write_atomic(OUTPUT, result)
+            _update_archive(ARCHIVE, result)
+            if not args.archive_only:
+                _write_atomic(OUTPUT, result)
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
         print(f"ERROR: daily EMS evaluation: {exc}", file=sys.stderr)
