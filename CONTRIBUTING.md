@@ -35,6 +35,60 @@ The gate itself must **not** be weakened to accommodate partial commits. The cor
 
 Pure website publication/data-refresh commits and unrelated documentation changes that do not alter the operational EMS architecture do not require an update to `CURRENT-EMS-STATE.md`.
 
+## Risk-driven, minimal regression testing (KISS)
+
+New tests must add **meaningful evidence**, not inflate the number of test
+cases. Select the smallest maintainable set that covers the distinct failure
+risks of a change.
+
+### Test selection
+
+1. Name the specific defect, safety invariant or regression risk each new test
+   is intended to detect. If the risk cannot be stated, reconsider the test.
+2. Check existing unit, contract and integration coverage before creating
+   another test. Prefer extending a relevant existing test over duplication.
+3. Test **distinct behavior and boundaries**, not every permutation of
+   equivalent inputs. Use representative equivalence classes; identical room
+   logic does not automatically require a separate test for every room.
+4. Focus additional coverage on real safety and lifecycle risks: fail-closed
+   behavior, stale or missing data, ownership, idempotency, conflicting control
+   paths, state transitions, recovery and physical-write prevention.
+5. Use broad parameterization only when each case exercises a distinct
+   contract, relevant configuration, or known regression risk. Keep
+   integration tests focused on cross-component behavior rather than
+   repeating all unit cases.
+6. Weigh maintenance and CI cost against incremental assurance. Avoid new
+   fixtures, test infrastructure or CI workflows without a demonstrated need.
+   Never weaken or omit a necessary safety test merely to reduce counts.
+
+### Pre-push validation and CI noise
+
+- Run the **relevant** local tests and applicable architecture/documentation
+  checks before opening or updating a PR or pushing to `main`.
+- Include implementation, necessary tests and required canonical
+  documentation in the same coherent change. Avoid pushing known-incomplete
+  intermediate states simply to let CI discover predictable failures.
+- If a check cannot run locally, state that limitation and use CI deliberately,
+  rather than claiming local PASS.
+- On a failed CI run, inspect the concrete failure and validate the fix
+  locally where possible before the next push. Do not repeatedly push
+  speculative variants that trigger the same failure.
+- Keep mandatory GitHub architecture and security gates enabled. The goal is
+  fewer **avoidable failures**, not less scrutiny.
+
+### Test justification / definition of done
+
+In the change description (PR or commit context), briefly explain:
+
+- **Risk:** what could break?
+- **Coverage:** which existing tests already address it?
+- **Addition:** what distinct assurance does each proposed new case add?
+
+No new test is required when existing coverage is demonstrably sufficient.
+Documentation-only changes do not need invented regression tests. For LIVE
+physical control, add the tests justified by the real risk even if that
+requires more cases.
+
 ## Repository placement is part of every GitHub change
 
 The canonical repository-structure policy is documented in `docs/architecture/repository-structure.md`.
