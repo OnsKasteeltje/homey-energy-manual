@@ -12,43 +12,6 @@ vm.createContext(scope);
 vm.runInContext(pure+picker,scope);
 const evidence=(s,now)=>vm.runInContext("slotEvidence",scope)(s,now);
 const hover=vm.runInContext("closestEvaluationSeries",scope);
-const daily=vm.runInContext("dailySelfUseEvidence",scope);
-function daySample(extra={}){
- return {
-  summary:{
-   pvKWh:19.488001,exportKWh:4.677998,
-   pvSelfConsumedKWh:14.810003,pvSelfConsumptionRate:.76,
-   provisionalPvSelfConsumedKWh:null,provisionalPvSelfConsumptionRate:null,
-   ...extra.summary
-  },
-  quality:{
-   pvSelfUseStatus:"COMPLETE",pvSelfUsePairedCoverage:1,...extra.quality
-  },
- };
-}
-test("October 11 daily PV self-use is 76 percent independent of planner slots",()=>{
- const r=daily({...daySample(),series:[],historicalPlannerAvailable:false});
- assert.equal(r.status,"COMPLETE");
- assert.equal(r.rate,.76);
- assert.ok(Math.abs(r.used-14.810003)<1e-6);
-});
-test("daily PV score is withheld when historian flags low paired coverage",()=>{
- assert.equal(daily(daySample({quality:{pvSelfUsePairedCoverage:.94}})),null);
- assert.equal(daily(daySample({quality:{pvSelfUseStatus:"INSUFFICIENT_COVERAGE"}})),null);
-});
-test("daily PV score rejects negative/inconsistent energy balance",()=>{
- assert.equal(daily(daySample({summary:{pvKWh:2,exportKWh:3}})),null);
-});
-test("in-progress day retains provisional semantics",()=>{
- const r=daily(daySample({summary:{
-  pvKWh:4,exportKWh:1,
-  pvSelfConsumedKWh:null,pvSelfConsumptionRate:null,
-  provisionalPvSelfConsumedKWh:3,provisionalPvSelfConsumptionRate:.75
- },quality:{pvSelfUseStatus:"PROVISIONAL"}}));
- assert.equal(r.status,"PROVISIONAL");
- assert.equal(r.rate,.75);
-});
-
 const start="2026-10-10T08:30:00Z",end="2026-10-10T08:45:00Z";
 const plan={evPlanW:0,wwPlanW:0,quookerPlanW:0};
 function slot(extra={}){
@@ -138,4 +101,47 @@ test("replaced preheat panel with selected-day report, without leaking old repor
  assert.ok(script.includes("selectedDay>=todayAmsterdam()"));
  assert.ok(script.includes('report.lines.slice(2)'));
  assert.ok(script.includes('requestId!==refreshId'));
+});
+
+test("daily panel shows measured own PV kWh, and blanks unfinished day",()=>{
+ const from=script.indexOf("function renderDailyReport(");
+ const to=script.indexOf("let refreshId=0;",from);
+ assert.ok(from>=0&&to>from);
+ const reportSource=script.slice(from,to);
+ const nodes=new Map();
+ const createNode=()=>({
+  textContent:"",children:[],
+  replaceChildren(){this.children=[];},
+  append(child){this.children.push(child);}
+ });
+ const context={
+  document:{
+   getElementById(id){if(!nodes.has(id))nodes.set(id,createNode());return nodes.get(id);},
+   createElement(){return createNode();}
+  },
+  todayAmsterdam:()=> "2026-10-14",
+  available:v=>typeof v==="number"&&Number.isFinite(v),
+  dailyPct:v=>typeof v==="number"&&Number.isFinite(v)?
+   (v*100).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})+"%":"—"
+ };
+ vm.createContext(context);
+ vm.runInContext('const $=id=>document.getElementById(id);'+reportSource,context);
+ const render=vm.runInContext("renderDailyReport",context);
+ const report={
+  dateLocal:"2026-10-13",status:"READY",readOnly:true,controlWrites:false,
+  accounting:{
+   pvProducedKWh:8.748,pvSelfConsumedKWh:5.401,pvSelfConsumptionRate:.6174,
+   gridImportKWh:9.603,gridExportKWh:3.347
+  },
+  lines:["P1 counters","PV self-use","EV estimate","Timing diagnosis"]
+ };
+ render(report,"2026-10-13");
+ assert.equal(nodes.get("report-pv").textContent,"8,748 kWh");
+ assert.equal(nodes.get("report-self").textContent,"5,401 kWh");
+ assert.equal(nodes.get("report-self-rate").textContent,"61,7%");
+ assert.equal(nodes.get("report-export").textContent,"3,347 kWh");
+ assert.equal(nodes.get("daily-report-status").textContent,"Definitief · compleet");
+ render(null,"2026-10-14");
+ assert.equal(nodes.get("report-self").textContent,"—");
+ assert.equal(nodes.get("daily-report-status").textContent,"Dag in uitvoering");
 });

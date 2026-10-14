@@ -24,63 +24,14 @@ function slotEvidence(slot,nowMs=Date.now()){
  const comparable=!!slot.plan&&!!slot.forecast&&available(slot.forecast.pvForecastW)&&p1&&pv;
  return {phase,p1,pv,comparable};
 }
-function dailySelfUseEvidence(d){
- // Authoritative daily ratio is projected by the read-only Pi history API,
- // not recomputed from comparable planner quarters or clamped 15m samples.
- const q=d.quality||{}, s=d.summary||{};
- const complete=q.pvSelfUseStatus==="COMPLETE";
- const provisional=q.pvSelfUseStatus==="PROVISIONAL";
- const status=complete?"COMPLETE":provisional?"PROVISIONAL":"UNAVAILABLE";
- const rate=complete?s.pvSelfConsumptionRate:provisional?s.provisionalPvSelfConsumptionRate:null;
- const used=complete?s.pvSelfConsumedKWh:provisional?s.provisionalPvSelfConsumedKWh:null;
- const valid=status!=="UNAVAILABLE"&&available(rate)&&available(used)&&
-  available(s.pvKWh)&&s.pvKWh>0&&available(s.exportKWh)&&s.exportKWh>=0&&
-  s.exportKWh<=s.pvKWh+0.000001&&rate>=0&&rate<=1&&
-  available(q.pvSelfUsePairedCoverage)&&q.pvSelfUsePairedCoverage>=MIN_COVERAGE;
- return valid?{status,rate,used,pv:s.pvKWh,export:s.exportKWh,
-  coverage:q.pvSelfUsePairedCoverage}:null;
-}
 const dailyPct=v=>available(v)?(v*100).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})+"%":"—";
 function summary(d){
- $("day-title").textContent=new Date(d.period.start).toLocaleDateString("nl-NL",{timeZone:"Europe/Amsterdam",weekday:"long",day:"numeric",month:"long",year:"numeric"});
  const matched=d.series.filter(x=>slotEvidence(x).comparable);
- const forecast=matched.length?matched.reduce((sum,x)=>sum+x.forecast.pvForecastW/4000,0):null;
- const actual=matched.length?matched.reduce((sum,x)=>sum+x.actual.pvKWh,0):null;
- $("kpi-forecast").textContent=kwh(forecast);
- $("kpi-slots").textContent=matched.length+" vergelijkbare kwartieren · "+(d.summary.planSlots||0)+" besluiten";
- const daily=dailySelfUseEvidence(d);
- $("kpi-pv").textContent=daily?kwh(daily.pv):kwh(actual);
- $("kpi-pv-note").textContent=daily?"Dagproductie · cumulatieve PV-energiemeters":
-  matched.length+" vergelijkbare kwartieren · geen gevalideerd dagtotaal";
- $("kpi-self").textContent=kwh(daily?.used);
- $("kpi-self-note").textContent=daily?
-  "P1-netexport afgetrokken van de dagelijkse PV-productie":"Geen betrouwbaar dagtotaal";
- $("kpi-export").textContent=daily?kwh(daily.export):
-  matched.length?kwh(matched.reduce((sum,x)=>sum+x.actual.exportKWh,0)):"—";
- $("kpi-export-note").textContent=daily?"Dagteruglevering · cumulatieve P1-energiemeter":
-  matched.length+" vergelijkbare kwartieren · geen gevalideerd dagtotaal";
- $("kpi-self-rate").textContent=dailyPct(daily?.rate);
- $("kpi-rate-note").textContent=daily?.status==="PROVISIONAL"?
-  "Voorlopig · dag nog niet afgelopen":daily?"Definitief · ≥95% gezamenlijke P1/PV-dekking":
-  "Niet beschikbaar · onvoldoende of ongeldige energiehistorie";
- $("daily-pv-conclusion").textContent=daily?
-  (daily.status==="PROVISIONAL"?"Voorlopige dagstand: ":"Dagconclusie: ")+
-  "van "+kwh(daily.pv)+" opgewekte PV is "+kwh(daily.used)+
-  " ("+dailyPct(daily.rate)+") thuis gebruikt en "+kwh(daily.export)+
-  " teruggeleverd. Dit is gemeten energiezelfgebruik, geen bewijs dat alle EMS-beslissingen optimaal waren.":
-  "Geen betrouwbaar PV-zelfgebruikpercentage voor deze dag: "+(
-   d.quality?.pvSelfUseStatus==="INVALID_ENERGY_BALANCE"?
-   "PV- en P1-energietotalen zijn niet consistent.":
-   d.quality?.pvSelfUseStatus==="NO_PV_PRODUCTION"?
-   "nog geen aantoonbare PV-productie.":
-   "gezamenlijke PV/P1-meetdekking onvoldoende (minimaal 95% vereist)."
-  );
  $("quality").textContent="Dekking kalenderdag "+pct(d.quality.actualCoverage);
- $("next").disabled=day>=todayAmsterdam();
  $("archive-status").textContent=d.historicalPlannerAvailable?
   "Historisch besluit: EV "+kwh(d.summary.plannedEvKWh)+" · boiler "+kwh(d.summary.plannedWwKWh)+
   " · Quooker "+kwh(d.summary.plannedQuookerKWh)+" · "+d.summary.planSlots+"/"+d.series.length+
-  " geldige kwartieren. PV-KPI vergelijkt uitsluitend "+matched.length+" afgesloten kwartieren met voldoende P1/PV-dekking.":
+  " geldige kwartieren. "+matched.length+" afgesloten kwartieren met vergelijkbare P1/PV-meetdekking; definitieve dagcijfers staan in Dagrapport.":
   "V1-plannerarchief ontbreekt. Gemeten P1/PV blijft beschikbaar; geen terugval op V2.";
 }
 function slotAllocation(x,nowMs=Date.now()){
@@ -307,6 +258,7 @@ function renderDailyReport(report,selectedDay){
   minimumFractionDigits:3,maximumFractionDigits:3
  })+" kWh":"—";
  $("report-pv").textContent=decimal(accounting.pvProducedKWh);
+ $("report-self").textContent=decimal(accounting.pvSelfConsumedKWh);
  $("report-self-rate").textContent=valid?dailyPct(accounting.pvSelfConsumptionRate):"—";
  $("report-import").textContent=decimal(accounting.gridImportKWh);
  $("report-export").textContent=decimal(accounting.gridExportKWh);
@@ -327,6 +279,10 @@ let refreshId=0;
 async function refresh(){
  const selectedDay=day;
  const requestId=++refreshId;
+ $("day-title").textContent=new Date(selectedDay+"T12:00:00Z").toLocaleDateString("nl-NL",{
+  timeZone:"Europe/Amsterdam",weekday:"long",day:"numeric",month:"long",year:"numeric"
+ });
+ $("next").disabled=selectedDay>=todayAmsterdam();
  $("quality").textContent="Laden…";
  const [main,daily]=await Promise.allSettled([
   loadPvFlex(selectedDay),loadDailyPerformance(selectedDay)
@@ -337,10 +293,6 @@ async function refresh(){
   catch(e){$("quality").textContent="Analyse niet beschikbaar";$("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;}
  }else{
   $("quality").textContent="Analyse niet beschikbaar";
-  $("kpi-self-rate").textContent="—";
-  $("kpi-self").textContent="—";
-  $("kpi-rate-note").textContent="Geen gevalideerd dagresultaat";
-  $("daily-pv-conclusion").textContent="Dagelijks PV-zelfgebruik niet beschikbaar: "+main.reason?.message;
   $("empty").hidden=false;$("empty").textContent=main.reason?.message||"Geen data";
   $("pv-chart").hidden=true;renderEvidence(null);
  }
