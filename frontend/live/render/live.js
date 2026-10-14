@@ -154,12 +154,6 @@ function render(s) {
   set("loads-dryer-detail", applianceDetail(s.loads.dryer));
   set("loads-dishwasher-status", dishwasherStatus(dishwasher));
   set("loads-dishwasher-detail", dishwasherDetail(dishwasher));
-  set("loads-quooker-status", applianceStatus(s.loads.quooker.active));
-  set("loads-quooker-detail", !s.loads.quooker.fresh
-    ? "Geen actuele Quooker-detectie"
-    : s.loads.quooker.active && s.loads.quooker.estimatedPowerW !== null
-      ? `${formatPower(s.loads.quooker.estimatedPowerW)} · geschat`
-      : "P1-gebaseerde detectie");
   for (const phase of s.gridPhases) {
     set(`loads-phase-${phase.name.toLowerCase()}`,
       s.p1Valid ? formatPower(phase.power) : "—");
@@ -175,7 +169,6 @@ function renderError(error) {
   set("loads-dishwasher-detail", "Geen actuele gegevens");
   set("loads-washer-status", "Onbekend");
   set("loads-dryer-status", "Onbekend");
-  set("loads-quooker-status", "Onbekend");
   for (const phase of ["l1", "l2", "l3"]) set("loads-phase-" + phase, "—");
   set("loads-explanation", "Live-verbruiksdiagnose niet beschikbaar.");
   set("freshness", "Data niet beschikbaar");
@@ -184,5 +177,47 @@ function renderError(error) {
 async function refresh() {
   try { render(await loadState()); } catch (error) { renderError(error); }
 }
+
+const QUOOKER_SOURCE = "/web/live/quooker";
+function quookerModeText(mode) {
+  return {OPPORTUNITY: "Opportunistisch", FORCED_ON: "Geforceerd aan", OFF: "Uit"}[mode] || "Onbekend";
+}
+
+function quookerLastHeated(value) {
+  if (!value) return "—";
+  const at = new Date(value);
+  if (!Number.isFinite(at.getTime())) return "—";
+  const time = formatLocalTime(value);
+  const day = new Intl.DateTimeFormat("nl-NL", {
+    timeZone: "Europe/Amsterdam", day: "2-digit", month: "2-digit"
+  });
+  return day.format(at) === day.format(new Date()) ? time : `${day.format(at)} ${time}`;
+}
+
+function renderQuooker(data) {
+  const eventAge = Date.now() - Date.parse(data.mode_event_at || "");
+  const knownMode = quookerModeText(data.mode);
+  const ageSuffix = Number.isFinite(eventAge) && eventAge > 30 * 60 * 1000
+    ? " · laatst bekend" : "";
+  set("loads-quooker-mode", `EMS-modus: ${knownMode}${data.mode ? ageSuffix : ""}`);
+  set("loads-quooker-status", data.switch_on === true
+    ? "Schakelaar aan" : data.switch_on === false ? "Schakelaar uit" : "Stand onbekend");
+  set("loads-quooker-last-heated", `Laatst verwarmd: ${quookerLastHeated(data.last_heated_at)}`);
+}
+
+async function refreshQuooker() {
+  try {
+    const response = await fetch(QUOOKER_SOURCE, {cache: "no-store"});
+    if (!response.ok) throw new Error(`quooker HTTP ${response.status}`);
+    renderQuooker(await response.json());
+  } catch {
+    set("loads-quooker-mode", "EMS-modus: Onbekend");
+    set("loads-quooker-status", "Stand onbekend");
+    set("loads-quooker-last-heated", "Laatst verwarmd: —");
+  }
+}
+
 refresh();
+refreshQuooker();
 setInterval(refresh, 15000);
+setInterval(refreshQuooker, 15000);
