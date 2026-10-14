@@ -20,7 +20,7 @@ const makeBundle=(overrides={})=>({
   ...overrides
 });
 
-function fixture({bundle=makeBundle(),postJson=async()=>({
+function fixture({bundle=makeBundle(),onWrite=null,postJson=async()=>({
   accessToken:'new-access',refreshToken:'new-refresh',expiresIn:3600
 }),id=UUID}={}){
   let state=JSON.stringify(bundle);
@@ -35,6 +35,7 @@ function fixture({bundle=makeBundle(),postJson=async()=>({
       calls.push('PUT');
       assert.equal(id,UUID);
       state=variable.value;
+      if(onWrite)state=JSON.stringify(onWrite(JSON.parse(state)));
     }
   }};
   const ctx={Homey,IDS:{easeeBundle:id},Date,
@@ -126,9 +127,12 @@ test('missing bundle configuration and malformed bundle fail closed',async()=>{
     /EASEE_BUNDLE_INVALID/);
 });
 
-test('write/readback mismatch fails closed instead of certifying rotated credentials',async()=>{
-  const f=fixture({bundle:makeBundle({expiresAt:new Date(Date.now()-1000).toISOString()})});
-  const original=f.setState;
-  f.setState=()=>{}; // no effect: override logic write using separately controlled test below
-  assert.equal(typeof original,'function');
+test('write/readback mismatch fails closed instead of certifying credentials',async()=>{
+  const f=fixture({
+    bundle:makeBundle({expiresAt:new Date(Date.now()-1000).toISOString()}),
+    onWrite:next=>({...next,refreshToken:'unexpected-token'})
+  });
+  const v=await f.readEaseeVars();
+  await assert.rejects(()=>f.getAccessToken(v,false),/EASEE_BUNDLE_WRITE_CONFLICT/);
+  assert.equal(f.calls.filter(x=>x==='PUT').length,1);
 });
