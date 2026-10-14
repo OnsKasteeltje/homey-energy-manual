@@ -7,21 +7,14 @@ state=Path("frontend/pv-flex/state/pv-flex-state.js").read_text()
 render=Path("frontend/pv-flex/render/pv-flex.js").read_text()
 css=Path("frontend/pv-flex/styles/pv-flex.css").read_text()
 
-for token in ("PV & Flex Evaluatie","PV BIJ BESLISSING","Besloten versus gemeten energie","EV uit PV","Overig eigen gebruik","Export","Heating opportunity","Heating intent","DAGELIJKSE EMS-EVALUATIE · GEMETEN EN GESCHAT","Dagrapport"):
+for token in ("PV & Flex Evaluatie","Besloten versus gemeten energie","EV uit PV","Overig eigen gebruik","Export","Heating opportunity","Heating intent","DAGELIJKSE EMS-EVALUATIE · GEMETEN EN GESCHAT","Dagrapport"):
     assert token in index, token
 for removed in ("flex-panel","ww-lane","evlane","EV laden","heating-note","WW boiler","Heating Flex"):
     assert removed not in index, f"duplicate/legacy render surface remains: {removed}"
 assert 'const API_ROOT="/web/analysis/pv-flex/day"' in state
 assert '{cache:"no-store"}' in state
 assert 'EMS_WEB_PV_FLEX_ANALYSIS_V1' in state
-assert 'id="kpi-self-note"' in index
 assert 'const matched=d.series.filter(x=>slotEvidence(x).comparable)' in render
-assert 'matched.reduce((sum,x)=>sum+x.forecast.pvForecastW/4000,0)' in render
-assert 'dailySelfUseEvidence(d)' in render
-assert 'id="kpi-self-rate"' in index and 'id="daily-pv-conclusion"' in index
-assert 'pvSelfUsePairedCoverage' in render
-assert 'Geen betrouwbaar PV-zelfgebruikpercentage' in render
-assert 'Dit is gemeten energiezelfgebruik, geen bewijs' in render
 assert 'validatedSelf.reduce(' not in render, "daily KPI must not sum per-quarter clamped self-use"
 assert 'const kwh=v=>typeof v==="number"&&Number.isFinite(v)?' in render, "missing daily kWh must not display as zero"
 assert "forecast?.confidence" in render
@@ -49,10 +42,18 @@ assert 'provisional-quarter' not in render and '.provisional-quarter' not in css
 assert 'class:"selected-quarter",visibility:"hidden"' in render
 assert 'selectedRect.setAttribute("visibility","visible")' in render
 assert 'renderEvidence(null,nowMs)' in render
-assert 'id="kpi-pv-note"' in index and 'id="kpi-export-note"' in index
 
 assert 'id="daily-report-panel"' in index
-for metric in ("report-pv", "report-self-rate", "report-import", "report-export", "daily-report-notes"):
+assert 'id="report-self"' in index
+assert '<section class="kpis">' not in index
+assert 'daily-pv-conclusion' not in index
+assert 'id="kpi-' not in index
+assert 'dailySelfUseEvidence' not in render
+assert 'accounting.pvSelfConsumedKWh' in render
+assert '$("report-self").textContent=decimal(accounting.pvSelfConsumedKWh)' in render
+assert 'grid-template-columns:repeat(5,minmax(0,1fr))' in css
+assert '.kpis{' not in css
+for metric in ("report-pv", "report-self", "report-self-rate", "report-import", "report-export", "daily-report-notes"):
     assert f'id="{metric}"' in index, metric
 assert 'id="preheat-panel"' not in index
 assert "Voorverwarming" not in index
