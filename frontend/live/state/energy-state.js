@@ -60,12 +60,35 @@ export function normalize(raw) {
   // the exact-house presentation and must not be invented from stale PV.
   const other = number(raw?.energy_budget?.other_house_load_w);
   const deadline = formatLocalTime(raw?.tesla?.deadline_at);
+  const laundry = (key) => {
+    const item = raw?.loads?.[key];
+    const active = item?.active === true ? true : item?.active === false ? false : null;
+    return {
+      active,
+      applianceState: typeof item?.appliance_state === "string" ? item.appliance_state : null,
+      cyclePhase: typeof item?.cycle_phase === "string" ? item.cycle_phase : null
+    };
+  };
+  const quookerRaw = raw?.loads?.quooker;
+  const quookerFresh = quookerRaw?.fresh === true;
+  const quooker = {
+    fresh: quookerFresh,
+    active: quookerFresh
+      ? (quookerRaw?.active === true ? true : quookerRaw?.active === false ? false : null)
+      : null,
+    estimatedPowerW: quookerFresh ? number(quookerRaw?.estimated_power_w) : null
+  };
 
   return {
     generatedAt: raw?.meta?.generated_at ?? null,
     stateAgeSec: number(raw?.meta?.state_age_sec),
     p1Valid,
-    grid, pv, pvSources, pvQuality, freshPvSources, house, houseQuality,
+    grid, gridPhases: [
+      {name: "L1", power: number(raw?.grid?.l1_w)},
+      {name: "L2", power: number(raw?.grid?.l2_w)},
+      {name: "L3", power: number(raw?.grid?.l3_w)}
+    ], pv, pvSources, pvQuality, freshPvSources, house, houseQuality,
+    loads: {washer: laundry("washer"), dryer: laundry("dryer"), quooker},
     tesla, ww, heat, other,
     gridDirection: grid === null ? "onbekend" : grid > 0 ? "import" : grid < 0 ? "export" : "in balans",
     teslaConnected: raw?.tesla?.connected === true,
