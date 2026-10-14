@@ -97,6 +97,16 @@ test("new iPhone session uses Pi history rather than requiring browser-local sam
   assert.equal(r.powerW,null);
 });
 
+test("short dishwasher low-load tail is retained, prolonged low ends cycle", () => {
+  const tail=run([[0,100],[5,1900],[10,1920],[15,350],[20,100]]);
+  assert.equal(tail.status,"CANDIDATE");
+  assert.equal(tail.reason,"TAIL_AFTER_SEQUENCE");
+  const ended=run([[0,100],[5,1900],[10,1920],[15,350],
+                   [20,100],[25,105],[30,100]]);
+  assert.equal(ended.status,"NO_MATCH");
+  assert.equal(ended.reason,"CYCLE_END_CONFIRMED");
+});
+
 test("Tesla 3-phase overlap still suspends L1 fingerprint diagnosis", () => {
   const r=diagnoseDishwasher(snapshot(0,2000,{tesla:true}),[],T0);
   assert.equal(r.status,"SUSPENDED");
