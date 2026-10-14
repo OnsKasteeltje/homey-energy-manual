@@ -106,6 +106,19 @@ The LAN addresses are router-reserved for the Pi. A future address/interface cha
 7. Where HTTPS is used for remote browser access, termination is provided by the approved private ingress (for example Tailscale Serve), not by exposing the API directly.
 8. Access failures fail closed.
 
+### Selected-day daily performance report (2026-10-14)
+
+`GET /web/analysis/performance/day/YYYY-MM-DD` reads an archived completed
+Amsterdam day from the **fixed** Pi-only
+`/home/jeroen/ems/data/daily-performance-archive.json`. The requested date is
+only an exact key in the validated archive object, never a filesystem path.
+It exposes allowlisted P1-cumulative energy, derived PV self-use,
+estimated EV-only replay, coverage/quality and bounded explanatory text.
+The API cannot start a calculator/subprocess and cannot write archive data,
+call a model or control a device. Missing archived days return 404;
+unfinished/invalid dates return 400; unreadable or malformed archives return
+503. Same-origin Caddy `/web/*` private routing is unchanged.
+
 ## 6. HTTP surface
 
 The Web Data API is read-only.
