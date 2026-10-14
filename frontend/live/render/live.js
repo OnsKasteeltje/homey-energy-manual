@@ -1,7 +1,7 @@
 import {loadState, formatPower, formatLocalTime} from "../state/energy-state.js";
 import {diagnoseDishwasher} from "../diagnostics/dishwasher-fingerprint.mjs";
 
-const DISHWASHER_HISTORY_KEY = "ems-live-dishwasher-l1-diagnostics-v1";
+const DISHWASHER_HISTORY_KEY = "ems-live-dishwasher-p1-only-l1-v2";
 function readDishwasherHistory() {
   try {
     const rows = JSON.parse(localStorage.getItem(DISHWASHER_HISTORY_KEY) || "[]");
