@@ -192,8 +192,16 @@ Desired Homey behavior:
 
 - push on a semantic Core state/revision change;
 - also provide a heartbeat within the existing Core publication interval;
-- current Core metadata advertises `min_publish_interval_sec = 300`;
-- avoid aggressive periodic publication and avoid new Homey device polling.
+- the Homey Core V0.11p cron trigger was changed from 5 to **2 minutes**
+  on 2026-10-14, with byte-identical script and existing single
+  `EM2_Public_State` transport retained (no new publisher);
+- the existing snapshot metadata still advertises
+  `min_publish_interval_sec = 300` and Core dirty/heartbeat thresholds remain
+  270 seconds; these were deliberately left unchanged for this trigger-only
+  pilot, so actual accepted Pi state age must be verified separately;
+- revert the same cron trigger to 5 minutes if Homey load, ingest or
+  freshness becomes problematic. Do not add Homey polling, a second
+  Core writer, or a second transport flow.
 
 The Pi history archive consumes exactly these accepted pushes; it does not introduce a second sampling cadence against Homey.
 

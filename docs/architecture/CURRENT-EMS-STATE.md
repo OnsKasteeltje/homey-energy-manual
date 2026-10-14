@@ -181,6 +181,26 @@ EM v2 | 05 Transport | Homey→Pi State Push v0.1
 
 The state path is push-based. The Pi must not poll Homey merely to reconstruct canonical Core state. Accepted state is written atomically to `/home/jeroen/ems/data/energy-state-v2.json`; accepted payloads are also archived locally to operational history. Freshness and ordering use source timestamps and monotonic revision semantics; stale, future-skewed, replayed or malformed payloads fail closed.
 
+**2026-10-14 — Live freshness trial (Homey verified):** The existing active
+`EM v2 | 00 Core Tick | v0.11p PINNED SOURCE` Advanced Flow
+(`227f8d3b-7551-46dd-837d-1b8c69add824`) changed **only** its
+`homey:manager:cron:every_nth` trigger from 5 to **2 minutes**. Before
+change, its entire 59,064-character HomeyScript matched
+`src/homey/core/core-v0.11p.candidate-homey.js` byte-for-byte. Homey
+readback after change confirmed enabled=true, broken=false, one 2-minute
+cron trigger, identical script and identical remaining cards/edges.
+The existing `EM2_Public_State` variable-change transport flow remains
+the sole Homey→Pi Core publisher; Homey EV/WW actuators, Pi planner,
+state-ingest, history source and frontend polling (15s) were not changed.
+This is a **cadence pilot**, not proof yet of 2-minute accepted Pi pushes:
+verify actual `meta.source_sample_at` advancement and stale/fresh source
+gates on Pi. Rollback: change this same trigger `args.n` from 2 back to 5;
+do not activate an alternative Core writer or the disabled rollback flow.
+The unchanged legacy snapshot field `meta.min_publish_interval_sec=300`
+and Core `MIN_DIRTY_MS` / `HEARTBEAT_MS` values describe prior publication
+policy; they were not silently modified. Their downstream meaning must not
+be used to assert that the 2-minute experiment is already effective.
+
 Homey Core v0.11p publishes state schema 2.13. Schema 2.13 adds cumulative counters `grid.energy_import_kwh`, `grid.energy_export_kwh`, `pv.solaredge_energy_kwh`, `pv.goodwe_4200_energy_kwh` and `pv.goodwe_2000_energy_kwh`. The Homey→Pi transport is intentionally not the semantic schema-compatibility owner: it requires a present schema identifier and valid publisher family but does not pin one exact schema version. Canonical Pi `services/pi/integrations/homey/ingress/state_ingest.py` owns compatibility and currently accepts the explicitly reviewed set `{2.12, 2.13}`; unknown versions remain fail-closed. Runtime validation on 2026-09-19 accepted a genuine v0.11p/schema-2.13 push with HTTP 202 and `stateWritten=true`, and the five cumulative counters were present in canonical `energy-state-v2.json`.
 
 ### 2.2 Control direction — Pi → Homey
