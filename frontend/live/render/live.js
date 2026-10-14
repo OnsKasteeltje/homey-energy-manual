@@ -84,7 +84,7 @@ function dishwasherDetail(d) {
     case "TAIL_AFTER_SEQUENCE": return "L1 · korte rustfase na verwarmingscyclus";
     case "CYCLE_END_CONFIRMED": return "L1 · cyclus beëindigd";
     case "TESLA_MULTIPHASE_INTERFERENCE": return "L1 · Tesla veroorzaakt overlap";
-    case "SOLAREDGE_STALE": return "L1 · SolarEdge-data onvoldoende";
+    case "P1_L1_MISSING": return "L1 · P1-fasemeting ontbreekt";
     case "P1_STALE": return "L1 · P1-data onvoldoende";
     case "SOURCE_TIMESTAMP_INVALID": return "L1 · geen actuele tijdstempel";
     default: return "L1 · geen onderscheidend patroon";
