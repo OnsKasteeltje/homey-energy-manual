@@ -649,6 +649,27 @@ diagnosis of the underlying intermittent I/O or SQLite error; no retries,
 schema changes, database writes, API disclosures, or control changes are
 introduced. Repair requires collecting the concrete failure evidence.
 
+On 2026-10-14 the Pi journal proved `sqlite3.OperationalError: unable to open
+database file` at the actual SELECT in `pv_flex_analysis_resource`, while
+Historie and Heating temperature history simultaneously returned HTTP 503.
+`ems-history.sqlite` is in WAL mode; neither `-wal` nor `-shm` sidecar
+was present at the time of inspection. A read-only connection can still need
+directory write access for WAL sidecar creation. The canonical
+`ems-web-data-api.service` therefore now uses
+`ReadWritePaths=/home/jeroen/ems/data` only for the SQLite data directory,
+with nested `ReadOnlyPaths` protecting the existing
+`ems-history.sqlite` and `planner-history.sqlite` database files in the
+API mount namespace. `ProtectSystem=strict`, `ProtectHome=read-only`,
+localhost binding, explicit API allowlists and all SQLite `mode=ro` reads
+remain. No journal-mode switch, `immutable=1`, new service or device writes.
+**Security trade-off:** the read-write directory exception grants filesystem
+write access to other files in that directory when Unix permissions allow;
+database-file mount protection alone is not full read-only enforcement for
+all runtime JSON. Check its scope on Pi before acceptance; review tighter
+filesystem isolation separately if needed. Verify API 200 on history, PV/flex
+and heating twice under the active sandbox after deployment, and confirm the
+service has not started writing state or changing control behavior.
+
 ## Read-only AI analysis layer — V0.4
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
