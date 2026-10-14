@@ -184,7 +184,7 @@ const findObservationValue=(node,id)=>{
 // Do not deploy until commissioning substitutes the pinned bundle UUID.
 const EASEE_BUNDLE_SCHEMA='EM2_EASEE_TOKEN_BUNDLE_V1';
 const readEaseeVars=async()=>{
-  if(!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(IDS.easeeBundle)){
+  if(!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(IDS.easeeBundle)){
     throw new Error('EASEE_BUNDLE_NOT_CONFIGURED');
   }
   const variable=await Homey.logic.getVariable({id:IDS.easeeBundle});
@@ -244,11 +244,17 @@ const getAccessToken=async(vars,forceRefresh=false)=>{
     revision:current.revision+1
   };
   // Single Homey Logic write: no mixed old/new access and refresh values.
-  await Homey.logic.updateVariable({
-    id:IDS.easeeBundle,
-    variable:{value:JSON.stringify(next)}
-  });
-  const observed=await readEaseeVars();
+  try{
+    await Homey.logic.updateVariable({
+      id:IDS.easeeBundle,
+      variable:{value:JSON.stringify(next)}
+    });
+  }catch(_){
+    throw new Error('EASEE_BUNDLE_WRITE_FAILED');
+  }
+  let observed;
+  try{observed=await readEaseeVars();}
+  catch(_){throw new Error('EASEE_BUNDLE_READBACK_FAILED');}
   if(
     observed.revision!==next.revision ||
     observed.accessToken!==next.accessToken ||
@@ -535,7 +541,7 @@ const confirmLockedPhase=async(mode,vars)=>{
 
 const terminalEaseeAuthCode=reason=>{
   const base=String(reason||'').split(':RECOVERY=')[0];
-  if(base==='EASEE_TOKEN_MISSING'||base==='EASEE_REFRESH_INVALID')return base;
+  if(['EASEE_TOKEN_MISSING','EASEE_REFRESH_INVALID','EASEE_BUNDLE_NOT_CONFIGURED','EASEE_BUNDLE_INVALID','EASEE_BUNDLE_WRITE_FAILED','EASEE_BUNDLE_READBACK_FAILED','EASEE_BUNDLE_WRITE_CONFLICT'].includes(base))return base;
   if(/^EASEE_REFRESH_HTTP_(400|401|403)$/.test(base))return base;
   if(/^EASEE_PHASE_(COMMAND|OBSERVATION)_HTTP_403$/.test(base))return base;
   if(/^EASEE_PHASE_(COMMAND|OBSERVATION)_RETRY_HTTP_(401|403)$/.test(base))return base;
