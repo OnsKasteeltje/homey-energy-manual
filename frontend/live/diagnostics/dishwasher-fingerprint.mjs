@@ -75,6 +75,12 @@ export function diagnoseDishwasher(s, priorHistory = [], nowMs = Date.now()) {
 
   const contextualSequence = strong.length >= 1 && pump.some((p) =>
     p.ts > strong[0].ts && p.ts - strong[0].ts <= CONTEXT_MS);
+  const lastPump = pump.filter((p) => strong.length && p.ts > strong[0].ts)
+    .at(-1);
+  const lowAfterPump = lastPump ? recent.filter((p) =>
+    p.ts > lastPump.ts && p.signalW < 220) : [];
+  const lowSpanMs = lowAfterPump.length >= 2
+    ? lowAfterPump.at(-1).ts - lowAfterPump[0].ts : 0;
   const repeatedHeating = heat.length >= 2;
   const repeatedEdge = edge.length >= 2;
   const currentHeat = heatBand(signalW), currentEdge = edgeBand(signalW);
@@ -86,6 +92,16 @@ export function diagnoseDishwasher(s, priorHistory = [], nowMs = Date.now()) {
     status = "LIKELY";
     confidence = heat.length ? 0.78 : 0.70;
     reason = "HEAT_AND_PUMP_SEQUENCE";
+  } else if (contextualSequence && lastPump && signalW < 220) {
+    // Historical v1.0.2: keep a short low-load tail, then confirm cycle end.
+    if (ts - lastPump.ts <= 12 * 60_000 && lowSpanMs < 8 * 60_000) {
+      status = "CANDIDATE";
+      confidence = 0.58;
+      reason = "TAIL_AFTER_SEQUENCE";
+    } else {
+      status = "NO_MATCH";
+      reason = "CYCLE_END_CONFIRMED";
+    }
   } else if ((currentHeat && repeatedHeating) ||
              (currentEdge && repeatedEdge)) {
     status = "CANDIDATE";
