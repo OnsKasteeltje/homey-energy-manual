@@ -20,12 +20,23 @@ export function diagnoseDishwasher(s, priorHistory = [], nowMs = Date.now()) {
     powerW: null, // No per-appliance power attribution.
     status: "UNAVAILABLE", confidence: null, reason: "NO_VALID_L1_SAMPLE"
   };
-  const history = (Array.isArray(priorHistory) ? priorHistory : [])
-    .filter((p) => validNumber(p?.ts) && nowMs - p.ts >= 0 &&
-      nowMs - p.ts <= HISTORY_MS && validNumber(p?.signalW))
+  // Pi SQLite is primary evidence, so an iPhone opening the page can reuse
+  // earlier Homey Core samples. Browser history is only a temporary fallback.
+  const candidates = [
+    ...(Array.isArray(priorHistory) ? priorHistory : []),
+    ...(Array.isArray(s?.dishwasherL1History) ? s.dishwasherL1History : [])
+  ];
+  const byTime = new Map();
+  for (const p of candidates) {
+    if (validNumber(p?.ts) && nowMs - p.ts >= 0 &&
+        nowMs - p.ts <= HISTORY_MS && validNumber(p?.signalW)) {
+      byTime.set(p.ts, {ts:p.ts, signalW:p.signalW, excluded:p.excluded === true});
+    }
+  }
+  const history = [...byTime.values()].sort((a, b) => a.ts - b.ts)
     .slice(-MAX_SAMPLES);
 
-  const ts = Date.parse(s?.generatedAt || "");
+  const ts = Date.parse(s?.sourceSampleAt || s?.generatedAt || "");
   const pv = solarEdge(s);
   const netL1 = phase(s, "L1");
   if (!s?.p1Valid || !validNumber(netL1) || !pv?.fresh ||
