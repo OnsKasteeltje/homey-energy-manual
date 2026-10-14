@@ -63,8 +63,9 @@ FUNCTION_UNITS = {
         "service": "ems-semantic-event-history.service",
     },
     "evDeadlineCommand": {
-        "unit": "ems-ev-deadline-command.timer",
-        "service": "ems-ev-deadline-command.service",
+        # Local command ingress is a path watcher, not the retired GitHub fetch timer.
+        # Derived-state execution is monitored separately by evDeadlineState.
+        "unit": "ems-ev-deadline-command.path",
     },
     "evDeadlineState": {
         "unit": "ems-ev-deadline-state.timer",
