@@ -108,7 +108,7 @@ test("hover on a stacked measured PV bar reports only that component",()=>{
  assert.equal(bar.value,300);
 });
 test("quarter highlight appears only after click; provisional overlay is absent",()=>{
- const chartSource=script.slice(script.indexOf("function chart(d){"),script.indexOf("const temp="));
+ const chartSource=script.slice(script.indexOf("function chart(d){"),script.indexOf("function renderDailyReport("));
  const clickSource=chartSource.split('hit.addEventListener("click",()=>')[1].split("\n  });")[0];
  const css=readFileSync("frontend/pv-flex/styles/pv-flex.css","utf8");
  const html=readFileSync("frontend/pv-flex/index.html","utf8");
@@ -127,4 +127,15 @@ test("mousemove must not choose a historical decision",()=>{
  assert.ok(!mouse.includes("renderEvidence("));
  assert.ok(script.includes('hit.addEventListener("click",()=>'));
  assert.ok(script.includes("renderEvidence(slot,Date.now())"));
+});
+
+test("replaced preheat panel with selected-day report, without leaking old report on today",()=>{
+ const html=readFileSync("frontend/pv-flex/index.html","utf8");
+ const state=readFileSync("frontend/pv-flex/state/pv-flex-state.js","utf8");
+ assert.ok(html.includes('id="daily-report-panel"'));
+ assert.ok(!html.includes('id="preheat-panel"'));
+ assert.ok(state.includes('if(day>=todayAmsterdam())return null'));
+ assert.ok(script.includes("selectedDay>=todayAmsterdam()"));
+ assert.ok(script.includes('report.lines.slice(2)'));
+ assert.ok(script.includes('requestId!==refreshId'));
 });
