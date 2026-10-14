@@ -620,6 +620,16 @@ call. Missing historical days are explicitly unavailable; today's day report
 remains pending until tomorrow's 00:20 processing. PV & Flex uses its existing
 day navigation and displays no stale prior-day values.
 
+2026-10-14 UI consolidation: remove the redundant top five-KPI row and its
+duplicate daily PV conclusion. The only completed-day KPI cards are now inside
+`Dagrapport`: PV production, **own PV consumed kWh** from
+`accounting.pvSelfConsumedKWh`, PV self-consumption percentage, cumulative
+P1 import and cumulative P1 export. This presentation-only change retains
+the day selector, archived-V1 planner chart, quarterly decision evidence,
+the read-only day-report API and the original measurement authorities.
+For an unfinished or unavailable day, the final daily cards show unknown
+instead of extrapolating incomplete interval measurements.
+
 ## Read-only AI analysis layer — V0.4
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
