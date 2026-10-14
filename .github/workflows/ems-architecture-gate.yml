@@ -109,8 +109,10 @@ jobs:
       - name: Run EV AI reason evidence regression test
         run: python tests/api/test_ai_ev_control_reason_evidence.py
 
-      - name: Run EMS health incident regression test
-        run: python tests/health/test_ems_health_recent_incidents.py
+      - name: Run EMS health incident and deadline watcher regressions
+        run: |
+          python3 tests/health/test_ems_health_recent_incidents.py
+          python3 tests/health/test_ems_health_deadline_watcher.py
 
       - name: Run history integration regression tests
         run: |
