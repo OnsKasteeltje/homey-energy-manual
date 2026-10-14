@@ -92,6 +92,14 @@ COUNTER_DEVICES = {
     },
 }
 
+# Additional observation-only P1 phase evidence. Reuses canonical ingest and
+# existing SQLite history; no extra Homey flow, no planner/control consumers.
+P1_PHASE_METRICS = {
+    "grid_l1_power_w": ("grid", "l1_w"),
+    "grid_l2_power_w": ("grid", "l2_w"),
+    "grid_l3_power_w": ("grid", "l3_w"),
+}
+
 STATE_DEVICES = {
     "washer": {
         "source_device_id": "em2:washer",
@@ -312,6 +320,27 @@ def archive_state_history(payload, db_path=HISTORY_DB):
                 (ts, device_id, power_metric_id, value, quality, resolution),
             )
             inserted += cur.rowcount
+
+        # Persist measured net power per P1 phase for cross-device diagnostics.
+        # Only valid/fresh P1 rows become trusted history.
+        if _quality_for_power(payload, "grid_p1") == "observed":
+            phase_device = _ensure_device(con, "grid_p1", POWER_DEVICES["grid_p1"])
+            for key, path in P1_PHASE_METRICS.items():
+                power = _number(_value_at(payload, path))
+                if power is None:
+                    skipped += 1
+                    continue
+                metric_id = _ensure_metric(con, key, "number", "W")
+                cur = con.execute(
+                    """
+                    INSERT OR IGNORE INTO measurements
+                    (ts_utc, device_id, metric_id, value_real, quality,
+                     source_resolution_seconds)
+                    VALUES (?, ?, ?, ?, 'observed', ?)
+                    """,
+                    (ts, phase_device, metric_id, power, resolution),
+                )
+                inserted += cur.rowcount
 
         for device_key, counter_spec in COUNTER_DEVICES.items():
             device_id = _ensure_device(con, device_key, counter_spec["spec"])

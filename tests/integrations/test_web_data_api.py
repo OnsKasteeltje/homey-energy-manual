@@ -74,11 +74,14 @@ class StateCurrentResourceTest(unittest.TestCase):
         })
         result = server.state_current_resource()
         self.assertEqual(result["schema"], "EMS_WEB_STATE_CURRENT_V1")
-        self.assertEqual(result["grid"], {"power_w": -694})
+        self.assertEqual(result["grid"], {
+            "power_w": -694, "l1_w": 57, "l2_w": None, "l3_w": None
+        })
         self.assertEqual(result["balance"]["control_gate"]["grid_measurement_valid"], True)
         self.assertEqual(result["hot_water"]["control"], {"action": "HOLD"})
         self.assertNotIn("internalSecretLikeField", result)
-        self.assertNotIn("l1_w", result["grid"])
+        self.assertEqual(result["diagnostics"]["dishwasher_l1_history"], [])
+        self.assertNotIn("secret", result["meta"])
         self.assertNotIn("reason", result["hot_water"]["control"])
 
     def test_invalid_state_timestamp_fails_closed(self):

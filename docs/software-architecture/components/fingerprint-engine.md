@@ -50,6 +50,29 @@ De reguliere live bronprioriteit is:
 
 Een status-only device krijgt geen geschat wattage. P1-fingerprint-, fasetransitie- of heuristische schattingen worden niet gebruikt om de reguliere Live Energy View verder uit te splitsen.
 
+### Read-only Live-diagnostiek (toevoeging 14 oktober 2026)
+
+De individuele **vermogensattributie** van Live blijft direct-first.
+De sectie **Actieve verbruikers** eronder mag afzonderlijk *diagnostische kandidaten*
+tonen, mits bron en onzekerheid expliciet zijn. Deze aanwijzingen tellen nooit mee
+als afzonderlijk wattage in Huis, Overig of de EMS-planner.
+
+- Wasmachine en droger: directe Homey/AEG-status. Wasmachine heeft historische
+  L2-referentie; drogerfase is nog niet gevalideerd.
+- Vaatwasser: hergebruik van het sequentiële L1-profiel v1.0.2 als read-only
+  diagnose. Alleen herhaalde L1-verwarmingssamples of een verwarmings-/
+  pompsequentie vormen een kandidaat. Eén hoge piek kan een waterkoker zijn.
+- Geen algemene `KNOWN_LOAD_CONFLICT` als de wasmachine actief is op L2.
+  Gelijktijdige droger met onbekende fase verlaagt de conclusie tot kandidaat.
+  Tesla op meerdere fasen blijft een tijdelijke uitsluitingsgrond.
+- De bestaande Homey Core -> Pi-ingest archiveert drie P1-fasevermogens in
+  bestaande SQLite-history; de private Live-API publiceert een begrensde,
+  strikt allowlisted L1-verificatiereeks. De browser kan lokaal tijdelijk
+  samples bijhouden, maar Pi-data is leidend over meerdere apparaten/sessies.
+- Alleen volledige, actuele, `observed` P1/SolarEdge-samples leveren
+  fasefingerprintbewijs. De detector schrijft geen apparaten aan en creëert
+  geen nieuwe Homey-flow of Homey-publisher.
+
 ## 4. Quooker
 
 De Cooker `onoff`-status is de autoritatieve ON/OFF-bron. Deze directe status kan als live status worden gebruikt. De bestaande P1/L3 heating-assist en baseline/fingerprintlogica is diagnostisch en hoeft niet continu actief te zijn voor de Live Energy View.

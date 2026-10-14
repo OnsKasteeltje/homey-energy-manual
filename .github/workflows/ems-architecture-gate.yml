@@ -92,6 +92,16 @@ jobs:
           node --check frontend/planner/render/planner.js
           node --test tests/frontend/test_planner_line_hover.mjs
 
+      - name: Validate Live appliance evidence and phase-aware fingerprint
+        run: |
+          python3 tests/frontend/test_live_consumers_contract.py
+          python3 tests/api/test_live_l1_sql_history.py
+          python3 tests/frontend/test_v2_local_assets_contract.py
+          node --check frontend/live/render/live.js
+          node --check frontend/live/state/energy-state.js
+          node --check frontend/live/diagnostics/dishwasher-fingerprint.mjs
+          node --test tests/frontend/test_live_dishwasher_diagnostics.mjs
+
       - name: Validate archived V1 Planner Evaluatie
         run: |
           python3 tests/api/test_planner_evaluation_v1_archive.py
