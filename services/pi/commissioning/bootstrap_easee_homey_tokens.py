@@ -9,7 +9,7 @@ Bootstrap Easee cloud tokens into private Homey Logic variables.
 - Does not store username/password.
 - Does not enumerate all Homey Logic variables: the EMS installation contains
   large JSON variables and the Homey CLI can truncate that aggregate response.
-- Persists only the three non-secret Homey variable IDs in a local registry so
+- Persists the four non-secret Homey variable IDs in a local registry so
   later bootstraps can update the exact variables directly.
 
 Required Homey CLI:
@@ -35,6 +35,7 @@ VAR_NAMES = (
     "EM2_Easee_Access_Token",
     "EM2_Easee_Refresh_Token",
     "EM2_Easee_Access_Expires_At",
+    "EM2_Easee_Token_Bundle_V1",
 )
 
 
@@ -206,11 +207,23 @@ def main():
         "EM2_Easee_Access_Token": access,
         "EM2_Easee_Refresh_Token": refresh,
         "EM2_Easee_Access_Expires_At": expires_at,
+        # Atomic canonical token pair for v0.4.7; legacy vars remain for rollback.
+        "EM2_Easee_Token_Bundle_V1": json.dumps(
+            {
+                "schema": "EM2_EASEE_TOKEN_BUNDLE_V1",
+                "accessToken": access,
+                "refreshToken": refresh,
+                "expiresAt": expires_at,
+                "revision": int(datetime.now(timezone.utc).timestamp() * 1000),
+            },
+            separators=(",", ":"),
+        ),
     }
 
     registry = load_registry()
     ids = dict(registry)
 
+    # Commit the atomic bundle last, after legacy rollback variables.
     for name in VAR_NAMES:
         ids[name] = ensure_string_variable(name, values[name], ids)
         # Save after every successful create/update so an interrupted first run
