@@ -275,6 +275,15 @@ const withEasee401RefreshRetry=async(vars,operation,request)=>{
   }catch(err){
     if(err?.httpStatus!==401)throw err;
     const latestVars=await readEaseeVars();
+    // Another writer may already have rotated the one-use token while
+    // the PRIMARY operation was in flight. Try its newer access once,
+    // without consuming the new refresh token again.
+    if(
+      latestVars.accessToken!==access &&
+      Date.parse(String(latestVars.expiresAt||''))>Date.now()+60000
+    ){
+      return await request(latestVars.accessToken,'RETRY');
+    }
     access=await getAccessToken(latestVars,true);
     return await request(access,'RETRY');
   }
