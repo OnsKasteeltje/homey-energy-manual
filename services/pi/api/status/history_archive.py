@@ -321,9 +321,10 @@ def archive_state_history(payload, db_path=HISTORY_DB):
             )
             inserted += cur.rowcount
 
-        # Persist measured net power per P1 phase for cross-device diagnostics.
-        # Only valid/fresh P1 rows become trusted history.
-        if _quality_for_power(payload, "grid_p1") == "observed":
+        # Persist P1 phase evidence when the canonical grid measurement is valid.
+        # Do not inherit legacy source_timing.p1Fresh or any inverter freshness
+        # here: the control gate is the established realtime P1 authority.
+        if _value_at(payload, ("balance", "control_gate", "grid_measurement_valid")) is True:
             phase_device = _ensure_device(con, "grid_p1", POWER_DEVICES["grid_p1"])
             for key, path in P1_PHASE_METRICS.items():
                 power = _number(_value_at(payload, path))

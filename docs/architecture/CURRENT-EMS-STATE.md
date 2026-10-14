@@ -33,6 +33,26 @@ Canonical diagnostic source-of-truth and mandatory root-cause documentation rule
 
 Operational energy history follows the canonical Homey → Pi state direction. Accepted Core state pushes are archived locally on the Pi; automatic Pi polling of Homey Insights is not a production history transport.
 
+### P1-only Live vaatwasserdiagnostiek (14 oktober 2026)
+
+De Live-sectie **Actieve verbruikers** toont wasmachine en droger op basis van
+directe AEG-programmastatus. De read-only vaatwasserdiagnostiek herkent
+uitsluitend sequenties in het **gesigneerde netto P1-fasevermogen L1** en
+rapporteert hooguit een indicatieve kandidaat. Geen SolarEdge, GoodWe of
+andere omvormermeting is een bron, compensatie of freshness-gate voor
+de vaatwasser. Netto L1 kan apparaten onder teruglevering maskeren; de
+fingerprint is daarom geen directe verbruiksmeting en niet geschikt voor
+vermogensattributie of sturing.
+
+De bestaande Homey Core → Pi-ingest archiveert L1/L2/L3 als afzonderlijke
+P1-observaties wanneer `balance.control_gate.grid_measurement_valid=true`.
+De oudere `source_timing.p1Fresh`-hint mag een volgens de canonical gate
+geldige fasemeting niet onzichtbaar maken. De private API levert een begrensde
+historische L1-reeks uit SQLite, onafhankelijk van de aanwezigheid van PV- of
+Tesla-meetrijen. Tesla kan uitsluitend optionele interferentiecontext leveren.
+Geen nieuwe Homey publisher, plannerpad, actuatie of publieke API.
+
+
 
 ### Mobile access — private V2 web app
 

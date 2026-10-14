@@ -137,13 +137,13 @@ def seasonal_advice_resource():
 
 
 def _live_l1_history():
-    """Bounded observation-only L1 history, shared by desktop and iPhone.
+    """Bounded P1-L1 net power history, independent of every PV inverter.
 
-    P1 phase samples are archived by the existing Homey Core -> Pi ingest.
-    Do not substitute held/stale PV values or invent per-device wattages.
-    An absent/unavailable SQLite DB simply yields no diagnostic evidence.
+    Use only observed canonical P1 phase readings. Tesla measurements are
+    optional interference context, never required for a valid P1 sample.
+    Missing SQLite or a not-yet-populated P1 metric safely returns [].
     """
-    after = (datetime.now(timezone.utc) - timedelta(minutes=65)).isoformat()
+    after = (datetime.now(timezone.utc) - timedelta(minutes=110)).isoformat()
     try:
         with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True, timeout=1.0) as db:
             rows = db.execute(
@@ -156,8 +156,6 @@ def _live_l1_history():
                   AND x.quality = 'observed'
                   AND (
                     (d.device_key='grid_p1' AND m.metric_key='grid_l1_power_w')
-                    OR (d.device_key='pv_solaredge'
-                        AND m.metric_key='electrical_power_w')
                     OR (d.device_key='tesla'
                         AND m.metric_key='electrical_power_w')
                   )
@@ -175,15 +173,11 @@ def _live_l1_history():
         item = grouped.setdefault(stamp, {"at": stamp})
         if device == "grid_p1" and metric == "grid_l1_power_w":
             item["l1_net_w"] = value
-        elif device == "pv_solaredge":
-            item["solaredge_w"] = value
         elif device == "tesla":
             item["tesla_w"] = value
-    complete = [
-        item for item in grouped.values()
-        if all(k in item for k in ("l1_net_w", "solaredge_w", "tesla_w"))
-    ]
-    return complete[-20:]
+    # No cross-source completeness gate: the P1 observation stands alone.
+    return [item for item in grouped.values() if "l1_net_w" in item][-30:]
+
 
 
 def daily_performance_resource(value):
