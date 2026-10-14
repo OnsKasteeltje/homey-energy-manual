@@ -42,6 +42,7 @@ EMS_SETTINGS_COMMAND_FILE = os.environ.get(
 )
 HISTORY_DB = os.environ.get("EMS_HISTORY_DB", "/home/jeroen/ems/data/ems-history.sqlite")
 PLANNER_HISTORY_DB = os.environ.get("EMS_PLANNER_HISTORY_DB", "/home/jeroen/ems/data/planner-history.sqlite")
+DAILY_PERFORMANCE_ARCHIVE_FILE = os.environ.get("EMS_DAILY_PERFORMANCE_ARCHIVE_FILE", "/home/jeroen/ems/data/daily-performance-archive.json")
 LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
 API_SCHEMA = "EMS_WEB_WW_SEASONAL_ADVICE_V1"
@@ -49,6 +50,7 @@ STATE_API_SCHEMA = "EMS_WEB_STATE_CURRENT_V1"
 COMMANDS_API_SCHEMA = "EMS_WEB_COMMANDS_CURRENT_V1"
 HISTORY_API_SCHEMA = "EMS_WEB_HISTORY_V1"
 PV_FLEX_API_SCHEMA = "EMS_WEB_PV_FLEX_ANALYSIS_V1"
+DAILY_PERFORMANCE_API_SCHEMA = "EMS_WEB_DAILY_PERFORMANCE_V1"
 PLANNER_EVALUATION_API_SCHEMA = "EMS_WEB_PLANNER_EVALUATION_V2"
 PV_FORECAST_API_SCHEMA = "EMS_WEB_PV_FORECAST_V2"
 DYNAMIC_PLAN_API_SCHEMA = "EMS_WEB_DYNAMIC_PLAN_V1"
@@ -182,6 +184,72 @@ def _live_l1_history():
         if all(k in item for k in ("l1_net_w", "solaredge_w", "tesla_w"))
     ]
     return complete[-20:]
+
+
+def daily_performance_resource(value):
+    """Read one completed date from the fixed Pi-local daily report archive.
+
+    No subprocess, dynamic filesystem path, model call or policy calculation.
+    """
+    try:
+        day = datetime.strptime(value, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        raise ValueError("DAILY_PERFORMANCE_DAY_INVALID")
+    if day.isoformat() != value or day >= datetime.now(LOCAL_TZ).date():
+        raise ValueError("DAILY_PERFORMANCE_DAY_NOT_COMPLETE")
+
+    archive = load_json(DAILY_PERFORMANCE_ARCHIVE_FILE)
+    if (not isinstance(archive, dict)
+            or archive.get("schema") != "EMS_PI_DAILY_PERFORMANCE_ARCHIVE_V0.1"
+            or not isinstance(archive.get("days"), dict)):
+        raise RuntimeError("DAILY_PERFORMANCE_ARCHIVE_INVALID")
+    item = archive["days"].get(value)
+    if item is None:
+        return None
+    if (not isinstance(item, dict)
+            or item.get("schema") != "EMS_PI_DAILY_PERFORMANCE_EVALUATION_V0.1"
+            or item.get("dateLocal") != value
+            or item.get("readOnly") is not True
+            or item.get("controlWrites") is not False
+            or item.get("status") not in {"READY", "PARTIAL", "INSUFFICIENT_EVIDENCE"}):
+        raise RuntimeError("DAILY_PERFORMANCE_REPORT_INVALID")
+
+    account = item.get("accounting")
+    ev = item.get("evReplay")
+    quality = item.get("quality")
+    lines = item.get("lines")
+    if not all(isinstance(value, dict) for value in (account, ev, quality)):
+        raise RuntimeError("DAILY_PERFORMANCE_REPORT_INVALID")
+    if (account.get("authority") != "P1_CUMULATIVE_ENERGY_COUNTERS"
+            or ev.get("energyAuthority") != "SAMPLED_POWER_ESTIMATE_NOT_P1_COUNTER"
+            or not isinstance(lines, list) or len(lines) > 8
+            or any(not isinstance(line, str) or len(line) > 350 for line in lines)):
+        raise RuntimeError("DAILY_PERFORMANCE_REPORT_INVALID")
+
+    return {
+        "schema": DAILY_PERFORMANCE_API_SCHEMA,
+        "dateLocal": value,
+        "status": item["status"],
+        "readOnly": True,
+        "controlWrites": False,
+        "accounting": {
+            key: account.get(key) for key in (
+                "gridImportKWh", "gridExportKWh", "pvProducedKWh",
+                "pvSelfConsumedKWh", "pvSelfConsumptionRate",
+                "p1Coverage", "pairedCoverage",
+            )
+        },
+        "evReplay": {
+            "available": ev.get("available") is True,
+            "estimatedAdditionalFeasibleCaptureKWh": ev.get("estimatedAdditionalFeasibleCaptureKWh"),
+            "scope": "EV_EXPORT_ONLY",
+            "energyAuthority": "SAMPLED_POWER_ESTIMATE_NOT_P1_COUNTER",
+        },
+        "quality": {
+            "issues": [issue for issue in (quality.get("issues") or []) if isinstance(issue, str)][:12],
+        },
+        "lines": lines,
+    }
 
 
 def state_current_resource():
@@ -1962,6 +2030,19 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 400, {"schema":"EMS_WEB_ERROR_V1","status":"ERROR","reason":"HISTORY_PERIOD_INVALID"})
             except (OSError, sqlite3.Error):
                 send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
+            return
+
+        if len(parts) == 5 and parts[:4] == ["web", "analysis", "performance", "day"]:
+            try:
+                result = daily_performance_resource(parts[4])
+                if result is None:
+                    send_json(self, 404, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "DAY_REPORT_NOT_ARCHIVED"})
+                else:
+                    send_json(self, 200, result)
+            except ValueError:
+                send_json(self, 400, {"schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "INVALID_OR_OPEN_DAY"})
+            except (OSError, RuntimeError, json.JSONDecodeError):
+                send_json(self, 503, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "REPORT_ARCHIVE_UNAVAILABLE"})
             return
 
         if len(parts) == 5 and parts[:4] == ["web", "analysis", "pv-flex", "day"]:
