@@ -107,6 +107,7 @@ jobs:
           python3 tests/api/test_planner_evaluation_v1_archive.py
           python3 tests/frontend/test_evaluatie_v1_history_contract.py
           python3 tests/frontend/test_pv_flex_v2_contract.py
+          python3 tests/api/test_daily_performance_web_resource.py
           node --check frontend/pv-flex/state/pv-flex-state.js
           node --check frontend/pv-flex/render/pv-flex.js
           node --test tests/frontend/test_evaluatie_interaction.mjs
@@ -116,8 +117,10 @@ jobs:
           python3 tests/forecast/test_pv_forecast_v2_contract.py
           python3 tests/forecast/test_v2_shadow_azimuth_geometry.py
 
-      - name: Validate deterministic daily performance evaluation
-        run: python3 tests/replay/test_daily_performance_evaluation.py
+      - name: Validate deterministic daily performance evaluation and archive
+        run: |
+          python3 tests/replay/test_daily_performance_evaluation.py
+          python3 tests/replay/test_daily_performance_archive.py
 
       - name: Run EV AI reason and replay energy authority regressions
         run: |
