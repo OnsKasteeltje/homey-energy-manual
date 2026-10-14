@@ -166,21 +166,6 @@ function render(s) {
   }
   set("loads-explanation", consumerExplanation(s, dishwasher));
 
-  set("kpi-grid", formatPower(s.grid === null ? null : Math.abs(s.grid)));
-  set("kpi-grid-sub", s.p1Valid ? `${s.gridDirection} · P1 actueel` : "P1 niet actueel");
-  set("kpi-pv", formatPower(currentPvPower(s)));
-  set("kpi-pv-sub", pvQualityText(s));
-  set("kpi-tesla", s.teslaCharging ? "Laden" : s.teslaConnected ? "Aangesloten" : "Niet aangesloten");
-  set("kpi-tesla-sub", s.teslaDeadlineActive
-    ? [s.teslaDeadline ? `deadline ${s.teslaDeadline}` : null, s.teslaRemainingKWh !== null ? `${s.teslaRemainingKWh.toFixed(2).replace(".", ",")} kWh resterend` : null].filter(Boolean).join(" · ")
-    : (s.teslaNeed || "geen deadline actief"));
-  set("kpi-ww", s.wwBoilerMode ? "Boiler" : "CV");
-  set("kpi-ww-sub", "actieve warmtebron");
-
-  set("manager-priority", s.managerPriority || "EMS");
-  set("manager-title", s.managerDecision ? s.managerDecision.replaceAll("_", " ") : "Geen expliciete EMS-beslissing");
-  set("manager-reason", s.managerReason || "Actuele toestand; geen beslisreden gepubliceerd.");
-
   const generated = formatLocalTime(s.generatedAt);
   set("freshness", generated ? `Bijgewerkt ${generated}` : "Live");
 }
@@ -194,8 +179,6 @@ function renderError(error) {
   for (const phase of ["l1", "l2", "l3"]) set("loads-phase-" + phase, "—");
   set("loads-explanation", "Live-verbruiksdiagnose niet beschikbaar.");
   set("freshness", "Data niet beschikbaar");
-  set("manager-title", "Live data tijdelijk niet beschikbaar");
-  set("manager-reason", error.message);
 }
 
 async function refresh() {
