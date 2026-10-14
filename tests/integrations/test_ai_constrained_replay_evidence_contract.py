@@ -170,6 +170,12 @@ def main():
     assert "never relabel UNAVOIDABLE_EXPORT" in source
     assert "EV_EXPORT_ONLY" in source
     assert "do not claim more counterfactual capture than the replay reports" in source
+    instructions = ai.SYSTEM_INSTRUCTIONS
+    assert "performance.energyAccounting.importKWh/exportKWh" in instructions
+    assert "performance.energyAccounting.p1Coverage is at least 0.95" in instructions
+    assert "constrainedReplay.totals.observedGridExportKWh" in instructions
+    assert "Label replay kWh as estimates" in instructions
+    assert "do not calculate exact money saved" in instructions
 
     print("PASS: AI constrained replay evidence contract")
 
