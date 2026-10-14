@@ -175,10 +175,16 @@ function renderDailyReport(report,selectedDay){
  $("report-import").textContent=decimal(accounting.gridImportKWh);
  $("report-export").textContent=decimal(accounting.gridExportKWh);
  status.textContent=valid?(
+  report.status==="PROVISIONAL"&&report.throughLocal?
+  "Voorlopig · t/m "+time(report.throughLocal):
   report.status==="READY"?"Definitief · compleet":report.status==="PARTIAL"?
-  "Definitief · gedeeltelijk":"Onvoldoende meetbewijs"
+  "Definitief · gedeeltelijk":
+  report.status==="INSUFFICIENT_EVIDENCE"&&isToday?
+  "Voorlopig · onvoldoende meetbewijs":"Onvoldoende meetbewijs"
  ):(isToday?"Dag in uitvoering":"Niet beschikbaar");
- const lines=valid&&Array.isArray(report.lines)?report.lines.slice(2):[
+ const lines=valid&&Array.isArray(report.lines)?(
+  isToday?report.lines:report.lines.slice(2)
+ ):[
   isToday?"Vandaag is nog niet afgerond; het definitieve dagrapport volgt na de dagelijkse verwerking om 00:20.":
   "Voor deze dag is nog geen dagrapport gearchiveerd. Bestaande kwartierhistorie blijft hierboven beschikbaar."
  ];
@@ -208,7 +214,9 @@ async function refresh(){
   $("empty").hidden=false;$("empty").textContent=main.reason?.message||"Geen data";
   $("pv-chart").hidden=true;
  }
- renderDailyReport(daily.status==="fulfilled"?daily.value:null,selectedDay);
+ const report=selectedDay===todayAmsterdam()&&main.status==="fulfilled"?
+  main.value.provisionalDailyReport:(daily.status==="fulfilled"?daily.value:null);
+ renderDailyReport(report,selectedDay);
 }
 $("prev").addEventListener("click",()=>{day=shiftDay(day,-1);refresh();});
 $("next").addEventListener("click",()=>{if(day<todayAmsterdam()){day=shiftDay(day,1);refresh();}});

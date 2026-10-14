@@ -839,6 +839,94 @@ def daily_pv_self_use_accounting(pv_kwh, export_kwh, paired_seconds, expected_se
     }
 
 
+def provisional_daily_report_resource(value, series, paired_seconds_by_slot, now_utc=None):
+    """Read-only cumulative accounting through the last closed, paired 15m slot.
+
+    An open quarter, unpaired P1/PV interval or a gap in today's historical
+    evidence cannot silently contribute to the subtotal. Missing coverage is
+    reported rather than extrapolated. Completed-day archive is unchanged.
+    """
+    now_utc = now_utc or datetime.now(timezone.utc)
+    if value != now_utc.astimezone(LOCAL_TZ).date().isoformat():
+        return None
+
+    local_start = datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=LOCAL_TZ)
+    day_start = local_start.astimezone(timezone.utc)
+    valid_slots = []
+    for slot in series:
+        start = parse_timestamp(slot.get("start"))
+        end = parse_timestamp(slot.get("end"))
+        if start is None or end is None or end <= start or end > now_utc:
+            continue
+        seconds = (end - start).total_seconds()
+        actual = slot.get("actual") or {}
+        values = (actual.get("pvKWh"), actual.get("importKWh"),
+                  actual.get("exportKWh"))
+        if not all(isinstance(x, (int, float)) and math.isfinite(x) and x >= 0
+                   for x in values):
+            continue
+        p1 = actual.get("p1Coverage")
+        pv = actual.get("pvCoverage")
+        paired = max(0.0, min(seconds,
+                     paired_seconds_by_slot.get(_utc_text(start), 0.0)))
+        if (isinstance(p1, (int, float)) and p1 >= 0.95
+                and isinstance(pv, (int, float)) and pv >= 0.95
+                and paired >= seconds * 0.95):
+            valid_slots.append((slot, end, paired))
+
+    through = max((end for _, end, _ in valid_slots), default=None)
+    selected = [entry for entry in valid_slots if entry[1] <= through] if through else []
+    window_seconds = (through - day_start).total_seconds() if through else 0.0
+    paired_seconds = sum(entry[2] for entry in selected)
+    coverage = (min(1.0, paired_seconds / window_seconds)
+                if window_seconds > 0 else 0.0)
+    trustworthy = window_seconds >= 1800 and coverage >= 0.95
+    accounting = {
+        "gridImportKWh": None, "gridExportKWh": None,
+        "pvProducedKWh": None, "pvSelfConsumedKWh": None,
+        "pvSelfConsumptionRate": None, "pairedCoverage": round(coverage, 6),
+    }
+    notes = []
+    if trustworthy:
+        pv_kwh = round(sum(item["actual"]["pvKWh"] for item, _, _ in selected), 6)
+        import_kwh = round(sum(item["actual"]["importKWh"] for item, _, _ in selected), 6)
+        export_kwh = round(sum(item["actual"]["exportKWh"] for item, _, _ in selected), 6)
+        own_use = daily_pv_self_use_accounting(
+            pv_kwh, export_kwh, paired_seconds, window_seconds, False,
+        )
+        accounting.update({
+            "gridImportKWh": import_kwh,
+            "gridExportKWh": export_kwh,
+            "pvProducedKWh": pv_kwh,
+            "pvSelfConsumedKWh": own_use["selfConsumedKWh"],
+            "pvSelfConsumptionRate": own_use["rate"],
+        })
+        notes.append("Voorlopig subtotaal uit afgesloten kwartieren; geen schatting of prognose.")
+        if coverage < 1.0:
+            notes.append(f"Niet alle metingen volledig: {coverage:.1%} gekoppelde P1/PV-dekking.")
+        if own_use["status"] == "INVALID_ENERGY_BALANCE":
+            notes.append("PV-export overschrijdt de gemeten PV-productie; zelfverbruik niet berekend.")
+        elif own_use["status"] == "NO_PV_PRODUCTION":
+            notes.append("Nog geen aantoonbare PV-productie; zelfverbruikpercentage niet beschikbaar.")
+    else:
+        notes.append(
+            "Onvoldoende aaneengesloten P1/PV-meetbewijs tot het laatste berekende kwartier; "
+            "subtotaal verborgen om een onvolledig dagbeeld te voorkomen."
+            if through else "Nog geen afgesloten kwartier met voldoende P1- en PV-meetbewijs."
+        )
+
+    return {
+        "schema": DAILY_PERFORMANCE_API_SCHEMA,
+        "dateLocal": value,
+        "status": "PROVISIONAL" if trustworthy else "INSUFFICIENT_EVIDENCE",
+        "readOnly": True, "controlWrites": False,
+        "throughLocal": through.astimezone(LOCAL_TZ).isoformat() if through else None,
+        "accounting": accounting,
+        "quality": {"pairedCoverage": round(coverage, 6)},
+        "lines": notes,
+    }
+
+
 def pv_flex_analysis_resource(value):
     """Return read-only 15-minute PV/flex evidence for one Amsterdam calendar day.
 
@@ -1149,6 +1237,9 @@ def pv_flex_analysis_resource(value):
 
     return {
         "schema": PV_FLEX_API_SCHEMA,
+        "provisionalDailyReport": provisional_daily_report_resource(
+            value, series, paired_covered_seconds, now_utc,
+        ),
         "mode": "READ_ONLY",
         "controlWrites": False,
         "realtimeAuthority": "P1",
