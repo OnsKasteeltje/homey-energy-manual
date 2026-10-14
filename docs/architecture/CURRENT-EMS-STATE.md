@@ -575,6 +575,31 @@ from them. PV/P1 power-snapshot mismatch is a review flag, not an EMS fault.
 No Homey publisher, control writes, new database, AI scheduling, planner or
 new execution authority.
 
+### PV & Flex selected-day daily evaluation presentation (2026-10-14)
+
+The PV & Flex Evaluatie page now removes the duplicate six-room
+`Voorverwarming` shadow panel (Heating remains on the dedicated Verwarming page)
+and presents the compact measured/estimated daily evaluation in its place.
+Existing 15-minute planner-versus-actual graph, decision evidence and
+Heating opportunity/intent historical chart annotations remain unchanged.
+
+For date navigation the **existing** `ems-history-daily.service` also atomically
+appends each completed-day digest to a fixed private Pi JSON archive at
+`/home/jeroen/ems/data/daily-performance-archive.json`. The existing
+`daily-performance-evaluation.json` latest-day contract is preserved.
+A controlled `--archive-only YYYY-MM-DD` backfill mode records an older
+completed day without changing the latest-day artifact. The existing
+`--no-write-output` remains side-effect-free.
+
+The existing localhost Web Data API reads that **one fixed archive path** and
+projects only allowlisted daily fields via
+`GET /web/analysis/performance/day/YYYY-MM-DD` for an already-archived,
+completed Europe/Amsterdam day. It performs no subprocess invocation,
+DB/report calculation, variable filesystem access, device writes, or model
+call. Missing historical days are explicitly unavailable; today's day report
+remains pending until tomorrow's 00:20 processing. PV & Flex uses its existing
+day navigation and displays no stale prior-day values.
+
 ## Read-only AI analysis layer — V0.4
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
