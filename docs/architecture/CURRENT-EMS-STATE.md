@@ -528,6 +528,15 @@ windows around the selected time. The system prompt forbids model-side
 reclassification or inflation of bounded feasible capture. Replay remains
 outside planner/Gate/actuator authority.
 
+KISS AI interpretation rule (2026-10-14): actual daily grid import/export
+and cost accounting use `performance.energyAccounting.importKWh/exportKWh`
+from cumulative P1 counters (subject to P1 coverage); the EV-only replay
+keeps deterministic classification and control-reason evidence, but its
+power-integrated export, classification kWh and bounded feasible EV-capture kWh
+are **estimates**, not meter-accurate daily energy or proven financial savings.
+No replay schema/logic, timer, SQLite, realtime planning, Gate, or Homey writes
+change.
+
 ## EV energy accounting semantics
 
 EV energy evidence distinguishes measured authority from analysis
