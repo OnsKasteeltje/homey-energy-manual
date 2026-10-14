@@ -22,7 +22,8 @@ payload = {
     },
 }
 ctx = {"load_json": lambda _: payload, "parse_timestamp": lambda _: True,
-       "ENERGY_STATE_FILE": "/dev/null", "STATE_API_SCHEMA": "TEST"}
+       "ENERGY_STATE_FILE": "/dev/null", "STATE_API_SCHEMA": "TEST",
+       "_live_l1_history": lambda: []}
 exec(code, ctx)
 result = ctx["state_current_resource"]()
 assert result["grid"] == {"power_w": 2442, "l1_w": 118, "l2_w": 2264, "l3_w": 59}
@@ -43,10 +44,14 @@ renderer = Path("frontend/live/render/live.js").read_text(encoding="utf-8")
 state = Path("frontend/live/state/energy-state.js").read_text(encoding="utf-8")
 for key in ("loads-washer-status", "loads-dryer-status", "loads-quooker-status",
             "loads-phase-l1", "loads-phase-l2", "loads-phase-l3",
+            "loads-dishwasher-status", "loads-dishwasher-detail",
             "loads-explanation"):
     assert 'id="' + key + '"' in frontend
     assert '"' + key + '"' in renderer or '`loads-phase-' in renderer
 assert 'raw?.loads' in state
 assert 's.p1Valid' in renderer
-assert 'een aparte vermogensmeter bevestigd' in renderer
+assert 'geen directe vermogensmeting' in renderer
+assert result["diagnostics"] == {"dishwasher_l1_history": []}
+assert "source_sample_at" in result["meta"]
+assert "P1_PHASE_METRICS" in Path("services/pi/api/status/history_archive.py").read_text()
 print("PASS: Live consumer evidence contract")
