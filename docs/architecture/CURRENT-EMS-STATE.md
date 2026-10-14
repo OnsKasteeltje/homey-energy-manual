@@ -15,6 +15,40 @@ Canonical diagnostic source-of-truth and mandatory root-cause documentation rule
 
 - `apps/cloudflare/` contains the legacy authenticated command Worker, still relevant to the separate GitHub-backed EMS **settings** command. Its old Tesla GitHub-write route is **not** Pi deadline ingress since 2026-10-09. The private Tesla command route is Private Invoer V2, including the iPhone home-screen web app: Tailscale Caddy → Pi Status API ingress. GitHub Pages now publishes only a static landing page; operational runtime snapshots must never be republished to `docs/data/`. See `docs/architecture/public-data-boundary.md`.
 
+### Heating room-isolated Honeywell overrides — SHADOW candidate (14 October 2026)
+
+**Source change only; Pi runtime promotion and evidence still pending.** All six
+Heating rooms have the **same independent override policy**. An active
+temporary or permanent Honeywell override blocks additional EMS preheating
+**only in that room**. There is no special Douwe-room grouping and no
+house-wide HOLD inferred merely from one room's override. Honeywell
+non-`auto` *system* mode remains a separate system-level safety HOLD.
+Normal scheduled baseline heating and the Quatt/CV guard retain their
+existing conservative shared heating-source safety behavior.
+
+V0.3 continues to expose the truthful *all-room effective* demand in
+`house.baselineHeatingDemandPresent`/`baselineDemandRooms`, even if an
+overridden room requests more heat. New additive
+`preheatBlockingBaselineDemandPresent`/`preheatBlockingBaselineDemandRooms`
+exclude only `TEMPORARY_OVERRIDE`/`PERMANENT_OVERRIDE` demand from that
+existing shared preheat guard. This prevents a single user override
+indirectly holding every other preheat-ready room while retaining diagnosis
+of normal Honeywell heat demand.
+
+V0.5 gives current Honeywell room authority priority over previous
+*simulated* Heating ownership: on a room override or incompatible external
+target, it emits `HOLD`, releases only that room's shadow ownership and
+never proposes `WOULD_RESET_TO_SCHEDULE` over a user's active override.
+Other guards and rollback semantics are unchanged and remain shadow-only;
+a future live actuator still requires **physical** ownership/readback and
+a separately proved reset/watchdog path. An overridden room is reevaluated
+only after return to schedule plus a fresh planner grant.
+
+The offline parametrized six-room cross-layer test suite covers both override
+kinds, mid-step takeover, reentry and global Honeywell system-mode safety.
+No Homey Heating publisher timer, thermostat write, device control or
+Pi deployment is part of this GitHub source candidate.
+
 ### Easee authentication v0.4.7 — live cutover (14 October 2026)
 
 **Current production:** Homey Advanced Flow

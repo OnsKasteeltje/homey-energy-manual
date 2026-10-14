@@ -188,6 +188,8 @@ def build_source_fail_closed(
         "house": {
             "baselineHeatingDemandPresent": None,
             "baselineDemandRooms": [],
+            "preheatBlockingBaselineDemandPresent": None,
+            "preheatBlockingBaselineDemandRooms": [],
         },
         "cvGuard": {
             "status": "UNKNOWN",
@@ -241,6 +243,7 @@ def build_shadow(
         raise ShadowError("room key mismatch between room model and candidate plan")
 
     baseline_demand_rooms: list[str] = []
+    preheat_blocking_baseline_rooms: list[str] = []
     for key, room in model_rooms.items():
         if room.get("valid") is not True:
             raise ShadowError(f"room invalid: {key}")
@@ -253,6 +256,12 @@ def build_shadow(
         )
         if actual < effective_target - BASELINE_TOLERANCE_C:
             baseline_demand_rooms.append(key)
+            # Preserve the complete effective Honeywell heat demand for
+            # diagnostics, but an individual room override cannot put every
+            # other room on preheat HOLD. Existing non-override baseline
+            # demand still has its conservative house-wide safety guard.
+            if effective.get("source") not in {"TEMPORARY_OVERRIDE", "PERMANENT_OVERRIDE"}:
+                preheat_blocking_baseline_rooms.append(key)
 
     candidate_policy = _dict(candidate_plan.get("policy"), "candidate policy")
     max_advance_minutes = _number(
@@ -263,6 +272,7 @@ def build_shadow(
         raise ShadowError("candidate policy.maxAdvanceMinutes must be positive")
 
     baseline_demand_present = bool(baseline_demand_rooms)
+    preheat_blocking_baseline_present = bool(preheat_blocking_baseline_rooms)
     cv_guard = _cv_guard(quatt_current, now)
 
     rooms: list[dict[str, Any]] = []
@@ -293,7 +303,7 @@ def build_shadow(
         if candidate_status != "ELIGIBLE_UP_TRANSITION":
             state = "NOT_ELIGIBLE"
             reason = candidate.get("reason") or "CANDIDATE_NOT_ELIGIBLE"
-        elif baseline_demand_present:
+        elif preheat_blocking_baseline_present:
             state = "BASELINE_HEATING"
             reason = "BASELINE_HEATING_DEMAND_PRESENT"
         elif cv_guard["status"] != "OK":
@@ -366,6 +376,8 @@ def build_shadow(
         "house": {
             "baselineHeatingDemandPresent": baseline_demand_present,
             "baselineDemandRooms": sorted(baseline_demand_rooms),
+            "preheatBlockingBaselineDemandPresent": preheat_blocking_baseline_present,
+            "preheatBlockingBaselineDemandRooms": sorted(preheat_blocking_baseline_rooms),
         },
         "cvGuard": cv_guard,
         "policy": {
