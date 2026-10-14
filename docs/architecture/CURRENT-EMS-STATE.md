@@ -658,6 +658,35 @@ Historical planner/archive data and calculation, the selected day, current
 coverage indicator, chart legend, the graph itself and the daily report remain
 unchanged and read-only. No Web Data API, DB, timer, control or policy changes.
 
+### Evaluatie provisional daily subtotal (2026-10-14; PR #263, pending Pi deployment)
+
+The selected **current Amsterdam day** shows a **provisional** day subtotal,
+computed by the already existing read-only PV/Flex analysis API from persisted
+`house_energy_intervals`; no additional polling, timer or policy layer is added.
+This in-progress projection (`provisionalDailyReport` on
+`GET /web/analysis/pv-flex/day/YYYY-MM-DD`) returns the five existing day
+cards from the last **fully closed 15-minute slot** with valid, paired P1/PV
+meter evidence, explicitly labeled `Voorlopig · t/m HH:mm`.
+
+Only closed and sufficiently paired intervals are eligible (at least 95%
+P1 coverage, PV coverage and paired evidence for each counted interval).
+A minimum of two closed quarters and 95% paired coverage from midnight
+through that cutoff are required before reporting any subtotal.
+The same source window supplies measured P1 import/export and the three
+inverter counters; own PV use is derived as PV production minus P1 export.
+A physically invalid energy balance does not generate self-use kWh/%.
+Missing/unpaired data does not become fabricated zero or a completed day.
+The API returns `INSUFFICIENT_EVIDENCE` plus coverage notes when a trustworthy
+subtotal cannot be formed.
+
+The completed-day `GET /web/analysis/performance/day/YYYY-MM-DD`, private
+archive, 00:20 daily evaluation and P1 energy authority are **unchanged**.
+Past-date navigation continues to read that immutable/archive source and
+never relabels preliminary evidence as definitive. This is a read-only
+presentation addition, not a deploy, and introduces no actuators or Homey
+control writes. After review, the normal Pi deploy and targeted API/frontend
+regression plus visual proof remain required.
+
 ### PV & Flex HTTP 503 diagnostics (2026-10-14)
 
 The read-only `GET /web/analysis/pv-flex/day/YYYY-MM-DD` sometimes
