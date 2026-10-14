@@ -690,6 +690,31 @@ filesystem isolation separately if needed. Verify API 200 on history, PV/flex
 and heating twice under the active sandbox after deployment, and confirm the
 service has not started writing state or changing control behavior.
 
+### 2026-10-14 — Live Quooker status is switch + last heat (read-only)
+
+The existing 15-second V0.5 Homey Quooker detector archives transition
+evidence to Pi SQLite `quooker_control_events`; the two-minute Core
+snapshot may miss short active-heating cycles. The Live Quooker card
+therefore reads the **separate** allowlisted
+`GET /web/live/quooker` projection from the canonical Web Data API
+every 15 seconds; this does not change the Core push cadence,
+`/web/state/current`, planner, detector, Homey actuator or history ingest.
+The card displays only:
+- `Quooker` + `EMS-modus: Opportunistisch/Geforceerd aan/Uit/Onbekend`
+  from the latest archived control event (mode is labelled as last-known
+  when its latest event is older than 30 minutes);
+- `Schakelaar aan/uit`, selected from the most recent *fresh* detector
+  event or Core snapshot (maximum 180-second sample age); unknown otherwise;
+- `Laatst verwarmd: HH:MM` for today, or date + local time for older
+  recorded heating starts.
+
+No dynamic `Verwarming: actief/niet verwarmend` row: that state is
+transient and no longer presents a potentially false negative between
+Core snapshots. No API, Homey or actuation write is added. When the
+Quooker endpoint fails, only its three display fields become unknown,
+not the P1/PV/Tesla Live state. This implements the existing
+`touch-it-place-it` rule and the private Web Data API architecture.
+
 ## Read-only AI analysis layer — V0.4
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
