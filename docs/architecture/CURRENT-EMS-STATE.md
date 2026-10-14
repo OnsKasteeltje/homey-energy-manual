@@ -638,6 +638,17 @@ Historical planner/archive data and calculation, the selected day, current
 coverage indicator, chart legend, the graph itself and the daily report remain
 unchanged and read-only. No Web Data API, DB, timer, control or policy changes.
 
+### PV & Flex HTTP 503 diagnostics (2026-10-14)
+
+The read-only `GET /web/analysis/pv-flex/day/YYYY-MM-DD` sometimes
+returns HTTP 503 even when a repeat request or the equivalent direct
+projection succeeds. The existing HTTP error contract remains unchanged,
+but the caught `OSError` / `sqlite3.Error` is now logged with traceback
+to the private `ems-web-data-api.service` systemd journal. This enables
+diagnosis of the underlying intermittent I/O or SQLite error; no retries,
+schema changes, database writes, API disclosures, or control changes are
+introduced. Repair requires collecting the concrete failure evidence.
+
 ## Read-only AI analysis layer — V0.4
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
