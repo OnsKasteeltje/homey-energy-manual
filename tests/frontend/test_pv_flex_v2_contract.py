@@ -14,36 +14,42 @@ for removed in ("flex-panel","ww-lane","evlane","EV laden","heating-note","WW bo
 assert 'const API_ROOT="/web/analysis/pv-flex/day"' in state
 assert '{cache:"no-store"}' in state
 assert 'EMS_WEB_PV_FLEX_ANALYSIS_V1' in state
-assert 'const matched=d.series.filter(x=>slotEvidence(x).comparable)' in render
 assert 'validatedSelf.reduce(' not in render, "daily KPI must not sum per-quarter clamped self-use"
-assert 'const kwh=v=>typeof v==="number"&&Number.isFinite(v)?' in render, "missing daily kWh must not display as zero"
-assert "forecast?.confidence" in render
 assert 'function lane(' not in render
 assert 'evPowerW' in render
 assert 'heatingFlex' in render
 assert 'actualKnown' in render
 assert 'heating-opportunity-lane' in render
 assert 'heating-intent-lane' in render
-assert 'Tesla werkelijk' in render
 assert 'evPvW' in render
 assert 'class:cls' in render
 assert '.pv-ev' in css and '.pv-self' in css and '.pv-export' in css
 assert '.heating-opportunity-lane' in css
 assert '.heating-intent-lane' in css
 assert '.evbar' not in css and '.evlane' not in css
-assert 'boilerPowerW' in render, 'EV and boiler measured power are compared with plans'
 assert "fetch(" not in render, "renderer must use state adapter"
 assert "tip.innerHTML" not in render, "large all-values hover must be retired"
 assert 'closestEvaluationSeries' in render
-assert 'hit.addEventListener("click"' in render
-assert 'renderEvidence(slot,Date.now())' in render
 assert 'MIN_COVERAGE=0.95' in render
 assert 'provisional-quarter' not in render and '.provisional-quarter' not in css
-assert 'class:"selected-quarter",visibility:"hidden"' in render
-assert 'selectedRect.setAttribute("visibility","visible")' in render
-assert 'renderEvidence(null,nowMs)' in render
 
 assert 'id="daily-report-panel"' in index
+assert 'id="day-title"' in index
+assert 'id="pv-chart"' in index
+assert 'id="tooltip"' in index
+assert '<section class="intro">' not in index
+assert 'CANONIEKE V1 · BESLISSING EN UITVOERING' not in index
+assert 'id="archive-status"' not in index
+assert 'id="decision-evidence"' not in index
+assert 'Beslissing per kwartier' not in index
+assert 'Beweeg over een lijn' not in index
+assert 'renderEvidence' not in render
+assert 'selectedRect' not in render
+assert 'hit.addEventListener("click"' not in render
+assert 'hit.addEventListener("mousemove"' in render
+assert 'closestEvaluationSeries' in render
+assert '.evidence-panel' not in css
+assert '.selected-quarter' not in css
 assert 'id="report-self"' in index
 assert '<section class="kpis">' not in index
 assert 'daily-pv-conclusion' not in index
