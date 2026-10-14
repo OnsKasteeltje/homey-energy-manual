@@ -1,7 +1,7 @@
 // Read-only L1 dishwasher diagnostic, adapted from historical fingerprint v1.0.2.
 // Never assigns appliance wattage, writes to Homey or changes the EMS energy budget.
 // Each unique canonical Pi sample counts once, regardless of 15-second UI polling.
-export const FINGERPRINT_VERSION = "L1_DIAGNOSTIC_V1";
+export const FINGERPRINT_VERSION = "L1_P1_ONLY_V2";
 const HISTORY_MS = 3 * 60 * 60 * 1000;
 const CONTEXT_MS = 45 * 60 * 1000;
 const MAX_SAMPLE_AGE_MS = 10 * 60 * 1000;
@@ -9,14 +9,13 @@ const MAX_SAMPLES = 90;
 
 const validNumber = (v) => typeof v === "number" && Number.isFinite(v);
 const phase = (s, name) => s?.gridPhases?.find((p) => p.name === name)?.power;
-const solarEdge = (s) => s?.pvSources?.find((p) => p.key === "solarEdge");
 const heatBand = (w) => w >= 1750 && w <= 2600;
 const edgeBand = (w) => w >= 1500 && w < 1750;
 const pumpBand = (w) => w >= 220 && w <= 900;
 
 export function diagnoseDishwasher(s, priorHistory = [], nowMs = Date.now()) {
   const base = {
-    version: FINGERPRINT_VERSION, phase: "L1", source: "P1_PHASE_FINGERPRINT",
+    version: FINGERPRINT_VERSION, phase: "L1", source: "P1_NET_L1_FINGERPRINT",
     powerW: null, // No per-appliance power attribution.
     status: "UNAVAILABLE", confidence: null, reason: "NO_VALID_L1_SAMPLE"
   };
@@ -37,18 +36,16 @@ export function diagnoseDishwasher(s, priorHistory = [], nowMs = Date.now()) {
     .slice(-MAX_SAMPLES);
 
   const ts = Date.parse(s?.sourceSampleAt || s?.generatedAt || "");
-  const pv = solarEdge(s);
   const netL1 = phase(s, "L1");
-  if (!s?.p1Valid || !validNumber(netL1) || !pv?.fresh ||
-      !validNumber(pv.power) || !Number.isFinite(ts) ||
+  if (!s?.p1Valid || !validNumber(netL1) || !Number.isFinite(ts) ||
       ts > nowMs + 60_000 || nowMs - ts > MAX_SAMPLE_AGE_MS) {
     return { ...base, history, reason: !s?.p1Valid ? "P1_STALE" :
-      !pv?.fresh || !validNumber(pv?.power) ? "SOLAREDGE_STALE" :
-      "SOURCE_TIMESTAMP_INVALID" };
+      !validNumber(netL1) ? "P1_L1_MISSING" : "SOURCE_TIMESTAMP_INVALID" };
   }
 
-  // L1 gross load: P1 signed net phase + *fresh* SolarEdge production on L1.
-  const signalW = Math.max(0, netL1 + Math.max(0, pv.power));
+  // Signed P1 L1 net power only. No inverter compensation or freshness dependency.
+  // Negative net readings do not prove an appliance is off.
+  const signalW = netL1;
   const teslaInterference = s.teslaCharging === true ||
     (validNumber(s.tesla) && s.tesla > 300);
 
@@ -78,7 +75,7 @@ export function diagnoseDishwasher(s, priorHistory = [], nowMs = Date.now()) {
   const lastPump = pump.filter((p) => strong.length && p.ts > strong[0].ts)
     .at(-1);
   const lowAfterPump = lastPump ? recent.filter((p) =>
-    p.ts > lastPump.ts && p.signalW < 220) : [];
+    p.ts > lastPump.ts && p.signalW >= 0 && p.signalW < 220) : [];
   const lowSpanMs = lowAfterPump.length >= 2
     ? lowAfterPump.at(-1).ts - lowAfterPump[0].ts : 0;
   const repeatedHeating = heat.length >= 2;
@@ -92,7 +89,7 @@ export function diagnoseDishwasher(s, priorHistory = [], nowMs = Date.now()) {
     status = "LIKELY";
     confidence = heat.length ? 0.78 : 0.70;
     reason = "HEAT_AND_PUMP_SEQUENCE";
-  } else if (contextualSequence && lastPump && signalW < 220) {
+  } else if (contextualSequence && lastPump && signalW >= 0 && signalW < 220) {
     // Historical v1.0.2: keep a short low-load tail, then confirm cycle end.
     if (ts - lastPump.ts <= 12 * 60_000 && lowSpanMs < 8 * 60_000) {
       status = "CANDIDATE";
