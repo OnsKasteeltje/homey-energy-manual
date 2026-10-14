@@ -177,10 +177,11 @@ def _live_l1_history():
             item["solaredge_w"] = value
         elif device == "tesla":
             item["tesla_w"] = value
-    return [
-        item for item in list(grouped.values())[-20:]
+    complete = [
+        item for item in grouped.values()
         if all(k in item for k in ("l1_net_w", "solaredge_w", "tesla_w"))
     ]
+    return complete[-20:]
 
 
 def state_current_resource():
