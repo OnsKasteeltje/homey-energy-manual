@@ -48,6 +48,7 @@ LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
 API_SCHEMA = "EMS_WEB_WW_SEASONAL_ADVICE_V1"
 STATE_API_SCHEMA = "EMS_WEB_STATE_CURRENT_V1"
+LIVE_QUOOKER_API_SCHEMA = "EMS_WEB_LIVE_QUOOKER_V1"
 COMMANDS_API_SCHEMA = "EMS_WEB_COMMANDS_CURRENT_V1"
 HISTORY_API_SCHEMA = "EMS_WEB_HISTORY_V1"
 PV_FLEX_API_SCHEMA = "EMS_WEB_PV_FLEX_ANALYSIS_V1"
@@ -338,6 +339,75 @@ def state_current_resource():
     result["diagnostics"] = {"dishwasher_l1_history": _live_l1_history()}
     return result
 
+
+
+def live_quooker_resource():
+    """Present recent switch evidence and the last archived Quooker heat pulse.
+
+    This independent, read-only projection does not change /web/state/current,
+    Core ingestion, the planner or device ownership. SQLite rows are events,
+    not a guaranteed heartbeat; use the more recent fresh Core snapshot for
+    the switch when archived event evidence is older.
+    """
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True, timeout=2.0) as db:
+        row = db.execute("""
+            SELECT ts_utc, control_mode, detector_switch_on,
+                   actuator_actual_on_after, detector_last_heating_at
+            FROM quooker_control_events
+            ORDER BY id DESC LIMIT 1
+        """).fetchone()
+
+    event_at = row[0] if row else None
+    event_time = parse_timestamp(event_at)
+    event_mode = row[1] if row and row[1] in ("OPPORTUNITY", "FORCED_ON", "OFF") else None
+    event_switch = None
+    if row:
+        raw_switch = row[2] if row[2] in (0, 1) else row[3]
+        if raw_switch in (0, 1):
+            event_switch = bool(raw_switch)
+
+    now = datetime.now(timezone.utc)
+    last_heated_at = row[4] if row and parse_timestamp(row[4]) else None
+    if last_heated_at and (parse_timestamp(last_heated_at) - now).total_seconds() > 60:
+        last_heated_at = None
+
+    core_time = None
+    core_switch = None
+    try:
+        state = load_json(ENERGY_STATE_FILE)
+        meta = state.get("meta") or {}
+        core_time = parse_timestamp(meta.get("source_sample_at"))
+        quooker = (state.get("loads") or {}).get("quooker") or {}
+        if quooker.get("fresh") is True and isinstance(quooker.get("switch_on"), bool):
+            core_switch = quooker["switch_on"]
+    except (OSError, json.JSONDecodeError, AttributeError, TypeError):
+        pass
+
+    # Only fresh evidence may assert the current switch position. The last
+    # heating timestamp is historical and deliberately has no short TTL.
+    def is_recent(timestamp):
+        return timestamp is not None and -60 <= (now - timestamp).total_seconds() <= 180
+
+    switch_on = None
+    switch_sample_at = None
+    if core_switch is not None and is_recent(core_time):
+        switch_on = core_switch
+        switch_sample_at = core_time
+    if event_switch is not None and is_recent(event_time) and (
+        switch_sample_at is None or event_time >= switch_sample_at
+    ):
+        switch_on = event_switch
+        switch_sample_at = event_time
+
+    return {
+        "schema": LIVE_QUOOKER_API_SCHEMA,
+        "mode": event_mode,
+        "mode_event_at": event_at if event_time else None,
+        "switch_on": switch_on,
+        "switch_sample_at": switch_sample_at.isoformat().replace("+00:00", "Z")
+        if switch_sample_at else None,
+        "last_heated_at": last_heated_at,
+    }
 
 
 def commands_current_resource():
@@ -2111,6 +2181,17 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 200, pv_forecast_resource())
             except (OSError, json.JSONDecodeError, ValueError):
                 send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
+            return
+
+        if path.path == "/web/live/quooker":
+            try:
+                send_json(self, 200, live_quooker_resource())
+            except (OSError, sqlite3.Error):
+                send_json(self, 503, {
+                    "schema": "EMS_WEB_ERROR_V1",
+                    "status": "UNAVAILABLE",
+                    "reason": "RESOURCE_UNAVAILABLE",
+                })
             return
 
         if path.path == "/web/state/current":
