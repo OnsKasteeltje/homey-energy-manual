@@ -87,12 +87,9 @@ export function normalize(raw) {
         ? raw.diagnostics.dishwasher_l1_history : []
     ).map((item) => ({
       ts: Date.parse(item?.at ?? ""),
-      signalW: (
-        number(item?.l1_net_w) !== null && number(item?.solaredge_w) !== null
-          ? Math.max(0, number(item.l1_net_w) + Math.max(0, number(item.solaredge_w)))
-          : null
-      ),
-      excluded: number(item?.tesla_w) === null || number(item?.tesla_w) > 300
+      signalW: number(item?.l1_net_w),
+      // Historical Tesla evidence is optional; missing data cannot invalidate P1.
+      excluded: number(item?.tesla_w) !== null && number(item.tesla_w) > 300
     })).filter((item) => Number.isFinite(item.ts) && item.signalW !== null),
     stateAgeSec: number(raw?.meta?.state_age_sec),
     p1Valid,
