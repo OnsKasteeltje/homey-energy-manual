@@ -586,15 +586,16 @@ def build_progression(
             "candidateNext": shadow.get("nextStepTarget_C"),
         })
 
-    # A grouped opportunity advances only after every currently selected member
-    # has an active step and has reached it. "Selected" means currently granted
-    # or already carrying an active shadow step for the same group.
+    # A grouped opportunity coordinates only CURRENTLY granted members.
+    # An overridden room, or a room that lost its grant, may still carry
+    # historical activePrev state from the preceding SHADOW snapshot. It must
+    # not pin unrelated rooms at STEP_REACHED_GROUP_WAIT after user takeover.
     group_wait: dict[str, bool] = {}
     groups = {c["group"] for c in contexts if isinstance(c["group"], str) and c["group"]}
     for group in groups:
         selected = [
             c for c in contexts
-            if c["group"] == group and (c["canReceiveGrant"] or c["activePrev"] is not None)
+            if c["group"] == group and c["canReceiveGrant"]
         ]
         group_wait[group] = bool(selected) and not all(
             c["activePrev"] is not None and c["activeReached"] for c in selected
