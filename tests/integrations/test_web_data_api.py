@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 SOURCE = Path(__file__).resolve().parents[2] / "services/pi/api/web-data/server.py"
@@ -88,6 +89,70 @@ class StateCurrentResourceTest(unittest.TestCase):
         server.ENERGY_STATE_FILE = self.write_source({"meta": {"generated_at": "bad"}})
         with self.assertRaises(ValueError):
             server.state_current_resource()
+
+
+
+class LiveQuookerResourceTest(unittest.TestCase):
+    def setUp(self):
+        original_db, original_state = server.HISTORY_DB, server.ENERGY_STATE_FILE
+        self.addCleanup(setattr, server, "HISTORY_DB", original_db)
+        self.addCleanup(setattr, server, "ENERGY_STATE_FILE", original_state)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        server.HISTORY_DB = str(Path(self.tmp.name) / "events.sqlite")
+        server.ENERGY_STATE_FILE = str(Path(self.tmp.name) / "state.json")
+
+    @staticmethod
+    def stamp(seconds_ago):
+        return (datetime.now(timezone.utc) - timedelta(seconds=seconds_ago)).isoformat().replace("+00:00", "Z")
+
+    def fixture(self, event_age, core_age, event_switch, core_switch, mode="OPPORTUNITY"):
+        event_at = self.stamp(event_age)
+        heated_at = "2026-10-14T09:17:00Z"
+        with sqlite3.connect(server.HISTORY_DB) as db:
+            db.execute("""
+                CREATE TABLE quooker_control_events (
+                    id INTEGER PRIMARY KEY, ts_utc TEXT, control_mode TEXT,
+                    detector_switch_on INTEGER, actuator_actual_on_after INTEGER,
+                    detector_last_heating_at TEXT
+                )
+            """)
+            db.execute("""
+                INSERT INTO quooker_control_events
+                    (ts_utc,control_mode,detector_switch_on,actuator_actual_on_after,detector_last_heating_at)
+                VALUES (?,?,?,?,?)
+            """, (event_at, mode, event_switch, None, heated_at))
+        with open(server.ENERGY_STATE_FILE, "w", encoding="utf-8") as handle:
+            json.dump({
+                "meta": {"source_sample_at": self.stamp(core_age)},
+                "loads": {"quooker": {"fresh": True, "switch_on": core_switch}},
+                "secret": "must-not-leak",
+            }, handle)
+        return heated_at
+
+    def test_fresher_core_switch_and_event_last_heated(self):
+        heated_at = self.fixture(event_age=90, core_age=30, event_switch=0, core_switch=True)
+        result = server.live_quooker_resource()
+        self.assertEqual(result["schema"], "EMS_WEB_LIVE_QUOOKER_V1")
+        self.assertTrue(result["switch_on"])
+        self.assertEqual(result["mode"], "OPPORTUNITY")
+        self.assertEqual(result["last_heated_at"], heated_at)
+        self.assertNotIn("secret", result)
+        self.assertNotIn("detector_active", result)
+
+    def test_newer_detector_event_overrides_core_switch(self):
+        self.fixture(event_age=10, core_age=90, event_switch=0, core_switch=True)
+        result = server.live_quooker_resource()
+        self.assertFalse(result["switch_on"])
+        self.assertEqual(result["mode"], "OPPORTUNITY")
+
+    def test_stale_evidence_does_not_claim_live_switch(self):
+        self.fixture(event_age=500, core_age=500, event_switch=1, core_switch=True)
+        result = server.live_quooker_resource()
+        self.assertIsNone(result["switch_on"])
+        self.assertEqual(result["mode"], "OPPORTUNITY")
+        self.assertEqual(result["last_heated_at"], "2026-10-14T09:17:00Z")
+
 
 
 class CommandsCurrentResourceTest(unittest.TestCase):
