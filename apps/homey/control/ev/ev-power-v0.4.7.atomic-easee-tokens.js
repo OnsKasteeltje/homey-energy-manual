@@ -1,0 +1,1266 @@
+// EV Actuator v0.4.7 — atomic Easee token bundle (CANDIDATE, NOT DEPLOYED)
+// Adds typed Easee Cloud auth failures and deduplicated owner alerting.
+// Bounded physical transaction: a required 1P<->3P transition is completed
+// inside one HomeyScript invocation. No self-retrigger is used between stages.
+//
+// Transaction:
+// PAUSE -> confirm paused -> set locked phase -> confirm phase -> 5 s deadtime
+// -> temporary symmetric circuit cap -> RESUME -> set charger current
+// -> confirm Easee accepted the opportunity -> restore original circuit cap -> STABLE.
+//
+// OPPORTUNITY CONTRACT: EMS offers charging capacity; Tesla decides whether to
+// consume it. Actual Tesla current/power is observability only and MUST NOT be a
+// success condition, timeout source or fail-closed trigger for opportunity charging.
+//
+// Bridge/Adapter/Gate remain command authority. P1/phase thresholds are unchanged.
+// The writer only executes an already validated command and re-reads that command
+// while safely paused so a PV-driven mode/current change can be absorbed before
+// resume. Any Easee command/contract failure pauses the session and restores the
+// captured circuit limit.
+
+const VERSION='EM2_EV_ACTUATOR_V0.4.7_PHASE_WRITER';
+const PREVIOUS_COMPAT_VERSION='EM2_EV_ACTUATOR_V0.4.6_PHASE_WRITER';
+const OLDER_COMPAT_VERSION='EM2_EV_ACTUATOR_V0.4.5_PHASE_WRITER';
+const ANCIENT_COMPAT_VERSION='EM2_EV_ACTUATOR_V0.4.4_PHASE_WRITER';
+const SUPPORTED_VERSIONS=[VERSION,PREVIOUS_COMPAT_VERSION,OLDER_COMPAT_VERSION,ANCIENT_COMPAT_VERSION];
+const TRANSITION_SCHEMA='EM2_EV_PHASE_TRANSITION_STATE_V0.4';
+const PHASE_EXECUTION_ENABLED=true;
+
+const FLOW_ID='fea23193-a03f-49dd-9780-7e72ee48747d';
+const CHARGER_ID='4d0b6913-d940-474e-95d6-b43f194c4119';
+const CHARGER_SERIAL='ECHM6B9F';
+
+const FRESH_MS=120000;
+const RUN_LOCK_MS=35000;
+const AUTH_ALERT_RETRY_MS=15*60*1000;
+const POLL_MS=500;
+const PAUSE_TIMEOUT_MS=6000;
+const PHASE_CONFIRM_TIMEOUT_MS=9000;
+const PHASE_CLOUD_CONFIRM_INTERVAL_MS=2500;
+const DEADTIME_MS=5000;
+const CIRCUIT_CONFIRM_TIMEOUT_MS=5000;
+const CURRENT_CONFIRM_TIMEOUT_MS=5000;
+const PHASE_OBSERVATION_ID=38;
+const EV_MIN_A=6,EV_MAX_A=16;
+const MAX_REPLANS_WHILE_PAUSED=3;
+
+const IDS={
+  live:'8d47e98d-e4bc-4f47-8c02-c2aca7f7a978',
+  status:'ea1f8a44-2f6c-490e-9b86-bae761886cf9',
+  intent:'04b57041-dd7f-41f7-a00a-f023afb1ccee',
+  adapter:'f2118322-d59d-4aa8-b478-234effc3983c',
+  gate:'4c66836b-77ae-43b5-b8e0-b32af15b57bc',
+  easeeBundle:'__EM2_EASEE_BUNDLE_ID__'
+};
+
+const parse=x=>{try{return JSON.parse(String(x??''));}catch{return null;}};
+const num=x=>{
+  if(x===null||x===undefined||x==='')return null;
+  const n=Number(x);
+  return Number.isFinite(n)?n:null;
+};
+const age=x=>{
+  const t=Date.parse(String(x||''));
+  return Number.isFinite(t)?Date.now()-t:Infinity;
+};
+const iso=()=>new Date().toISOString();
+// HomeyScript exposes global wait(ms); browser/node timers such as setTimeout are unavailable.
+const sleep=ms=>wait(ms);
+const cap=(d,id)=>d?.capabilitiesObj?.[id]?.value;
+
+const normalizePhaseMode=raw=>{
+  const s=String(raw??'').trim().toLowerCase();
+  if(s==='1'||s==='1p'||s.includes('locked to single'))return '1P';
+  if(s==='3'||s==='3p'||s.includes('locked to three'))return '3P';
+  if(s==='2'||s==='auto')return 'AUTO';
+  return 'UNKNOWN';
+};
+const phaseValue=mode=>mode==='1P'?1:mode==='3P'?3:null;
+
+const findSettingValue=(node,id)=>{
+  if(!node||typeof node!=='object')return null;
+  if(node.id===id&&node.value!==undefined&&node.value!==null)return node.value;
+  if(Array.isArray(node)){
+    for(const child of node){
+      const v=findSettingValue(child,id);
+      if(v!==null)return v;
+    }
+  }else{
+    for(const child of Object.values(node)){
+      const v=findSettingValue(child,id);
+      if(v!==null)return v;
+    }
+  }
+  return null;
+};
+
+const readPhaseSetting=async charger=>{
+  const direct=charger?.settings?.phaseMode;
+  if(direct!==undefined&&direct!==null&&String(direct).trim()!=='')return String(direct);
+  if(typeof Homey.devices?.getDeviceSettingsObj==='function'){
+    try{
+      const obj=await Homey.devices.getDeviceSettingsObj({id:CHARGER_ID});
+      const v=findSettingValue(obj,'phaseMode');
+      if(v!==null)return String(v);
+    }catch(_){}
+  }
+  return null;
+};
+
+const ACTION_IDS={
+  pause:'homey:device:'+CHARGER_ID+':pauseCharging',
+  resume:'homey:device:'+CHARGER_ID+':resumeCharging',
+  circuit:'homey:device:'+CHARGER_ID+':circuitCurrentControl',
+  current:'homey:device:'+CHARGER_ID+':setDynamicChargerCurrent'
+};
+
+const runNative=async(id,args={})=>Homey.flow.runFlowCardAction({id,args});
+const pauseSession=()=>runNative(ACTION_IDS.pause,{});
+const resumeSession=()=>runNative(ACTION_IDS.resume,{});
+const setCircuitA=a=>runNative(ACTION_IDS.circuit,{current:a});
+const setCurrentA=a=>runNative(ACTION_IDS.current,{current:a});
+
+const postJson=async(url,body,accessToken,operation='EASEE')=>{
+  const r=await fetch(url,{
+    method:'POST',
+    headers:{
+      'Authorization':'Bearer '+accessToken,
+      'Accept':'application/json',
+      'Content-Type':'application/json'
+    },
+    body:JSON.stringify(body)
+  });
+  let payload=null;
+  try{payload=await r.json();}catch(_){}
+  if(!r.ok){
+    const err=new Error(operation+'_HTTP_'+r.status);
+    err.httpStatus=r.status;
+    err.operation=operation;
+    throw err;
+  }
+  return payload||{};
+};
+
+const getJson=async(url,accessToken,operation='EASEE')=>{
+  const r=await fetch(url,{
+    method:'GET',
+    headers:{
+      'Authorization':'Bearer '+accessToken,
+      'Accept':'application/json'
+    }
+  });
+  let payload=null;
+  try{payload=await r.json();}catch(_){}
+  if(!r.ok){
+    const err=new Error(operation+'_HTTP_'+r.status);
+    err.httpStatus=r.status;
+    err.operation=operation;
+    throw err;
+  }
+  return payload;
+};
+
+const findObservationValue=(node,id)=>{
+  if(node===null||node===undefined)return null;
+  if(Array.isArray(node)){
+    for(const child of node){
+      const v=findObservationValue(child,id);
+      if(v!==null)return v;
+    }
+    return null;
+  }
+  if(typeof node!=='object')return null;
+  const oid=Number(node.id??node.observationId??node.observationID);
+  if(oid===id&&node.value!==undefined&&node.value!==null)return node.value;
+  for(const child of Object.values(node)){
+    const v=findObservationValue(child,id);
+    if(v!==null)return v;
+  }
+  return null;
+};
+
+// Token ownership: this single actuator owns Easee cloud token rotation.
+// One Homey Logic string contains the entire access+refresh+expiry bundle.
+// Do not deploy until commissioning substitutes the pinned bundle UUID.
+const EASEE_BUNDLE_SCHEMA='EM2_EASEE_TOKEN_BUNDLE_V1';
+const readEaseeVars=async()=>{
+  if(!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(IDS.easeeBundle)){
+    throw new Error('EASEE_BUNDLE_NOT_CONFIGURED');
+  }
+  const variable=await Homey.logic.getVariable({id:IDS.easeeBundle});
+  const token=parse(variable?.value);
+  if(
+    token?.schema!==EASEE_BUNDLE_SCHEMA ||
+    !String(token?.accessToken||'').trim() ||
+    !String(token?.refreshToken||'').trim() ||
+    !Number.isFinite(Date.parse(String(token?.expiresAt||''))) ||
+    !Number.isSafeInteger(token?.revision) ||
+    token.revision<0
+  ){
+    throw new Error('EASEE_BUNDLE_INVALID');
+  }
+  return token;
+};
+
+const getAccessToken=async(vars,forceRefresh=false)=>{
+  const validUntil=v=>Date.parse(String(v?.expiresAt||''))>Date.now()+60000;
+  if(!forceRefresh&&validUntil(vars))return vars.accessToken;
+  // Re-read to avoid consuming a token that another invocation just rotated.
+  const current=await readEaseeVars();
+  if(current.revision!==vars.revision&&validUntil(current)){
+    return current.accessToken;
+  }
+  if(!forceRefresh&&validUntil(current))return current.accessToken;
+  let payload;
+  try{
+    payload=await postJson(
+      'https://api.easee.com/api/accounts/refresh_token',
+      {refreshToken:current.refreshToken},
+      current.accessToken,
+      'EASEE_REFRESH'
+    );
+  }catch(err){
+    // Another invocation may have won the one-use refresh race.
+    // Never retry the same refresh token: reuse only a proven newer bundle.
+    if(err?.httpStatus===401){
+      const newest=await readEaseeVars();
+      if(newest.revision>current.revision&&validUntil(newest)){
+        return newest.accessToken;
+      }
+    }
+    throw err;
+  }
+  const nextAccess=String(payload?.accessToken||'').trim();
+  const nextRefresh=String(payload?.refreshToken||'').trim();
+  const expiresIn=Number(payload?.expiresIn);
+  if(!nextAccess||!nextRefresh||!Number.isFinite(expiresIn)||expiresIn<=0){
+    throw new Error('EASEE_REFRESH_INVALID');
+  }
+  const next={
+    schema:EASEE_BUNDLE_SCHEMA,
+    accessToken:nextAccess,
+    refreshToken:nextRefresh,
+    expiresAt:new Date(Date.now()+Math.max(60,expiresIn-60)*1000).toISOString(),
+    revision:current.revision+1
+  };
+  // Single Homey Logic write: no mixed old/new access and refresh values.
+  try{
+    await Homey.logic.updateVariable({
+      id:IDS.easeeBundle,
+      variable:{value:JSON.stringify(next)}
+    });
+  }catch(_){
+    throw new Error('EASEE_BUNDLE_WRITE_FAILED');
+  }
+  let observed;
+  try{observed=await readEaseeVars();}
+  catch(_){throw new Error('EASEE_BUNDLE_READBACK_FAILED');}
+  if(
+    observed.revision!==next.revision ||
+    observed.accessToken!==next.accessToken ||
+    observed.refreshToken!==next.refreshToken
+  ){
+    throw new Error('EASEE_BUNDLE_WRITE_CONFLICT');
+  }
+  return observed.accessToken;
+};
+
+// Easee documents that tokens should be refreshed when an API call returns 4xx.
+// For the physical phase boundary we keep that recovery deliberately bounded:
+// exactly one forced refresh + one retry, and only for HTTP 401.
+const withEasee401RefreshRetry=async(vars,operation,request)=>{
+  let access=await getAccessToken(vars,false);
+  try{
+    return await request(access,'PRIMARY');
+  }catch(err){
+    if(err?.httpStatus!==401)throw err;
+    const latestVars=await readEaseeVars();
+    // Another writer may already have rotated the one-use token while
+    // the PRIMARY operation was in flight. Try its newer access once,
+    // without consuming the new refresh token again.
+    if(
+      latestVars.accessToken!==access &&
+      Date.parse(String(latestVars.expiresAt||''))>Date.now()+60000
+    ){
+      return await request(latestVars.accessToken,'RETRY');
+    }
+    access=await getAccessToken(latestVars,true);
+    return await request(access,'RETRY');
+  }
+};
+
+const setPhaseMode=async(mode,vars)=>{
+  const pv=phaseValue(mode);
+  if(![1,3].includes(pv))throw new Error('PHASE_MODE_INVALID');
+  await withEasee401RefreshRetry(
+    vars,
+    'EASEE_PHASE_COMMAND',
+    (access,attempt)=>postJson(
+      'https://api.easee.com/api/chargers/'+encodeURIComponent(CHARGER_SERIAL)+'/commands/set_phase_mode',
+      {phaseMode:pv},
+      access,
+      attempt==='RETRY'?'EASEE_PHASE_COMMAND_RETRY':'EASEE_PHASE_COMMAND'
+    )
+  );
+};
+
+const readCloudPhaseMode=async vars=>{
+  const payload=await withEasee401RefreshRetry(
+    vars,
+    'EASEE_PHASE_OBSERVATION',
+    (access,attempt)=>getJson(
+      'https://api.easee.com/state/'+encodeURIComponent(CHARGER_SERIAL)+'/observations?ids='+PHASE_OBSERVATION_ID,
+      access,
+      attempt==='RETRY'?'EASEE_PHASE_OBSERVATION_RETRY':'EASEE_PHASE_OBSERVATION'
+    )
+  );
+  return findObservationValue(payload,PHASE_OBSERVATION_ID);
+};
+
+const readControl=async()=>{
+  const [intentVar,adapterVar,gateVar]=await Promise.all([
+    Homey.logic.getVariable({id:IDS.intent}),
+    Homey.logic.getVariable({id:IDS.adapter}),
+    Homey.logic.getVariable({id:IDS.gate})
+  ]);
+  const intent=parse(intentVar?.value);
+  const adapter=parse(adapterVar?.value);
+  const gate=parse(gateVar?.value);
+  const cmd=adapter?.command||{};
+  const ev=intent?.targets?.ev||{};
+
+  const controlRevision=String(intent?.controlRevision||'');
+  const mode=String(cmd?.mode||'OFF');
+  const requestedA=num(cmd?.requested_A);
+  const requestedW=num(cmd?.requested_W);
+  const targetW=num(ev?.target_W);
+
+  const aligned=
+    intent?.schema==='EM2_POWER_INTENT_V0.2' &&
+    adapter?.schema==='EM2_EV_POWER_ADAPTER_V0.2' &&
+    gate?.schema==='EM2_EV_ADAPTER_GATE_V0.3' &&
+    cmd?.schema==='EM2_EV_PHASE_COMMAND_V0.1' &&
+    !!controlRevision &&
+    String(adapter?.controlRevision||'')===controlRevision &&
+    String(gate?.controlRevision||'')===controlRevision &&
+    String(gate?.adapterControlRevision||'')===controlRevision &&
+    adapter?.valid===true &&
+    gate?.finalStatus==='PASS';
+
+  const requestValid=
+    ['OFF','1P','3P'].includes(mode) &&
+    Number.isInteger(requestedA) &&
+    Number.isInteger(requestedW) &&
+    requestedW===targetW &&
+    (
+      (mode==='OFF'&&requestedA===0&&requestedW===0) ||
+      (mode==='1P'&&requestedA>=EV_MIN_A&&requestedA<=EV_MAX_A&&requestedW===requestedA*230) ||
+      (mode==='3P'&&requestedA>=EV_MIN_A&&requestedA<=EV_MAX_A&&requestedW===requestedA*690)
+    );
+
+  const fresh=
+    age(intent?.generatedAt)<=FRESH_MS &&
+    age(adapter?.generatedAt)<=FRESH_MS &&
+    age(gate?.updatedAt)<=FRESH_MS;
+
+  const deadlineTarget=
+    String(ev?.status||'')==='NUMERIC_DEADLINE_TARGET' ||
+    String(ev?.source||'')==='REMAINING_KWH_OVER_TIME_TO_DEADLINE';
+  const deadlinePhaseOK=!deadlineTarget||mode==='3P';
+
+  let error=null;
+  if(!aligned)error='CONTROL_CONTRACT_NOT_ALIGNED';
+  else if(!fresh)error='CONTROL_NOT_FRESH';
+  else if(!requestValid)error='INVALID_PHASE_REQUEST';
+  else if(!deadlinePhaseOK)error='DEADLINE_MUST_USE_3P';
+
+  return {
+    ok:error===null,
+    error,
+    controlRevision,
+    mode,
+    requestedA,
+    requestedW,
+    targetW,
+    deadlineTarget,
+    generatedAt:intent?.generatedAt,
+    adapterGeneratedAt:adapter?.generatedAt,
+    gateUpdatedAt:gate?.updatedAt
+  };
+};
+
+const readHardware=async()=>{
+  const devices=await Homey.devices.getDevices();
+  const charger=devices?.[CHARGER_ID];
+  if(!charger)throw new Error('CHARGER_MISSING');
+
+  const chargeState=String(cap(charger,'evcharger_charging_state')||'unknown').toLowerCase();
+  const charging=cap(charger,'evcharger_charging')===true;
+  const sessionEnabled=cap(charger,'onoff')===true;
+  const chargerTargetA=num(cap(charger,'target_charger_current'));
+  const circuitTargetA=num(cap(charger,'target_circuit_current'));
+  const offeredA=num(cap(charger,'measure_current.offered'));
+  const powerW=num(cap(charger,'measure_power'));
+  const p1A=num(cap(charger,'measure_current.p1'));
+  const p2A=num(cap(charger,'measure_current.p2'));
+  const p3A=num(cap(charger,'measure_current.p3'));
+  const phaseRaw=await readPhaseSetting(charger);
+  const homeyMode=normalizePhaseMode(phaseRaw);
+  const activeElectricalPhases=[p1A,p2A,p3A].filter(x=>x!==null&&Math.abs(x)>=2).length;
+  const electricalMode=
+    charging===true && powerW!==null && powerW>500 && offeredA!==null && offeredA>=5.5
+      ?(activeElectricalPhases>=2?'3P':activeElectricalPhases===1?'1P':'UNKNOWN')
+      :'UNKNOWN';
+  const confirmedMode=electricalMode!=='UNKNOWN'?electricalMode:homeyMode;
+  const phaseConfirmationSource=
+    electricalMode!=='UNKNOWN'?'ELECTRICAL_TELEMETRY':
+    homeyMode!=='UNKNOWN'?'HOMEY_SETTINGS':'NONE';
+  const paused=
+    charging!==true &&
+    chargeState==='plugged_in_paused' &&
+    offeredA!==null && offeredA<=1 &&
+    powerW!==null && powerW<=250;
+
+  return {
+    chargeState,charging,sessionEnabled,paused,
+    chargerTargetA,circuitTargetA,offeredA,powerW,p1A,p2A,p3A,
+    phaseRaw,homeyMode,electricalMode,confirmedMode,phaseConfirmationSource
+  };
+};
+
+const transitionObject=(stage,control,originalCircuitA,extra={})=>({
+  schema:TRANSITION_SCHEMA,
+  stage,
+  transitionId:extra.transitionId||null,
+  requestedMode:control?.mode||'OFF',
+  requestedA:control?.requestedA??0,
+  originalCircuitA:Number.isInteger(originalCircuitA)?originalCircuitA:null,
+  startedAt:extra.startedAt||null,
+  stageSince:iso(),
+  failure:extra.failure||null,
+  phaseConfirmedMode:extra.phaseConfirmedMode||null,
+  phaseConfirmedAt:extra.phaseConfirmedAt||null,
+  phaseConfirmationSource:extra.phaseConfirmationSource||null,
+  bounded:true
+});
+
+const saveStatus=async(status,reason,stage,control,hw,originalCircuitA,extra={})=>{
+  const transition=transitionObject(stage,control,originalCircuitA,extra);
+  const value=JSON.stringify({
+    schema:VERSION,
+    status,
+    at:iso(),
+    reason,
+    live:extra.live===true,
+    phaseExecutionEnabled:PHASE_EXECUTION_ENABLED,
+    physicalWritePerformed:extra.physicalWritePerformed===true,
+    controlRevision:control?.controlRevision||'',
+    targetW:control?.targetW??0,
+    targetA:control?.requestedA??0,
+    phaseMode:control?.mode||'OFF',
+    candidateAction:extra.action||'NOOP',
+    confirmedMode:hw?.confirmedMode||'UNKNOWN',
+    transition,
+    boundedTransition:true,
+    opportunityOnly:true,
+    teslaConsumptionRequired:false,
+    observed:hw||null,
+    ...extra.statusExtra
+  });
+  await Homey.logic.updateVariable({id:IDS.status,variable:{value}});
+};
+
+const waitHardware=async(predicate,timeoutMs,errorCode)=>{
+  const deadline=Date.now()+timeoutMs;
+  let hw=null;
+  while(Date.now()<=deadline){
+    hw=await readHardware();
+    if(predicate(hw))return hw;
+    await sleep(POLL_MS);
+  }
+  const err=new Error(errorCode);
+  err.lastHardware=hw;
+  throw err;
+};
+
+const restoreCircuit=async(originalCircuitA)=>{
+  if(!Number.isInteger(originalCircuitA)||originalCircuitA<EV_MIN_A||originalCircuitA>64){
+    throw new Error('ORIGINAL_CIRCUIT_LIMIT_INVALID');
+  }
+  let hw=await readHardware();
+  if(hw.circuitTargetA!==originalCircuitA){
+    await setCircuitA(originalCircuitA);
+    hw=await waitHardware(
+      x=>x.circuitTargetA===originalCircuitA,
+      CIRCUIT_CONFIRM_TIMEOUT_MS,
+      'CIRCUIT_RESTORE_TIMEOUT'
+    );
+  }
+  return hw;
+};
+
+// FINAL_PAUSE_READ_AFTER_TIMEOUT: keep pause confirmation bounded, but do one
+// definitive hardware read before declaring timeout. This accepts an Easee pause
+// that became safely observable at the timeout boundary without extending the
+// polling loop or weakening the paused-state criteria.
+const pauseAndConfirm=async()=>{
+  let hw=await readHardware();
+  if(hw.paused)return hw;
+  await pauseSession();
+  try{
+    return await waitHardware(x=>x.paused,PAUSE_TIMEOUT_MS,'PAUSE_CONFIRM_TIMEOUT');
+  }catch(err){
+    if(String(err?.message||err)!=='PAUSE_CONFIRM_TIMEOUT')throw err;
+    hw=await readHardware();
+    if(hw.paused)return hw;
+    if(err&&typeof err==='object')err.lastHardware=hw;
+    throw err;
+  }
+};
+
+const confirmLockedPhase=async(mode,vars)=>{
+  const deadline=Date.now()+PHASE_CONFIRM_TIMEOUT_MS;
+  let nextCloudAt=Date.now()+PHASE_CLOUD_CONFIRM_INTERVAL_MS;
+  let lastHw=null;
+  while(Date.now()<=deadline){
+    lastHw=await readHardware();
+    if(lastHw.confirmedMode===mode){
+      return {
+        hw:lastHw,
+        source:lastHw.phaseConfirmationSource,
+        raw:lastHw.phaseRaw
+      };
+    }
+    if(Date.now()>=nextCloudAt){
+      try{
+        const raw=await readCloudPhaseMode(vars);
+        const cloudMode=normalizePhaseMode(raw);
+        if(cloudMode===mode){
+          return {hw:lastHw,source:'EASEE_CLOUD_OBSERVATION_38',raw};
+        }
+      }catch(_){}
+      nextCloudAt=Date.now()+PHASE_CLOUD_CONFIRM_INTERVAL_MS;
+    }
+    await sleep(POLL_MS);
+  }
+  const err=new Error('PHASE_CONFIRM_TIMEOUT');
+  err.lastHardware=lastHw;
+  throw err;
+};
+
+const terminalEaseeAuthCode=reason=>{
+  const base=String(reason||'').split(':RECOVERY=')[0];
+  if(['EASEE_TOKEN_MISSING','EASEE_REFRESH_INVALID','EASEE_BUNDLE_NOT_CONFIGURED','EASEE_BUNDLE_INVALID','EASEE_BUNDLE_WRITE_FAILED','EASEE_BUNDLE_READBACK_FAILED','EASEE_BUNDLE_WRITE_CONFLICT'].includes(base))return base;
+  if(/^EASEE_REFRESH_HTTP_(400|401|403)$/.test(base))return base;
+  if(/^EASEE_PHASE_(COMMAND|OBSERVATION)_HTTP_403$/.test(base))return base;
+  if(/^EASEE_PHASE_(COMMAND|OBSERVATION)_RETRY_HTTP_(401|403)$/.test(base))return base;
+  return null;
+};
+
+const notifyEaseeAuthFailure=async(reason,previousStatus)=>{
+  const code=terminalEaseeAuthCode(reason);
+  if(!code)return null;
+
+  const prior=previousStatus?.authAlert;
+  const priorAttemptMs=Date.parse(String(prior?.attemptedAt||prior?.sentAt||''));
+  const sameActiveFailure=
+    previousStatus?.status==='FAILED' &&
+    prior?.code===code;
+  const deliveryAlreadySucceeded=prior?.delivered===true;
+  const retryStillSuppressed=
+    Number.isFinite(priorAttemptMs) &&
+    Date.now()-priorAttemptMs<AUTH_ALERT_RETRY_MS;
+  if(sameActiveFailure&&(deliveryAlreadySucceeded||retryStillSuppressed)){
+    return {
+      ...prior,
+      active:true,
+      deduped:true,
+      lastObservedAt:iso()
+    };
+  }
+
+  const attemptedAt=iso();
+  const message=
+    'EMS Tesla PV-laden geblokkeerd: Easee Cloud-authenticatie faalt ('+
+    code+
+    '). Herstel op de Pi met bootstrap_easee_homey_tokens.py.';
+
+  let pushSent=false;
+  let timelineSent=false;
+  let pushError=null;
+  let timelineError=null;
+
+  try{
+    const users=await Homey.users.getUsers();
+    const owner=Object.values(users||{}).find(
+      u=>String(u?.role||'').toLowerCase()==='owner'
+    );
+    if(!owner?.id||!owner?.athomId)throw new Error('HOMEY_OWNER_NOT_FOUND');
+    await Homey.flow.runFlowCardAction({
+      uri:'homey:manager:mobile',
+      id:'homey:manager:mobile:push_text',
+      args:{
+        user:{id:owner.id,athomId:owner.athomId},
+        text:message
+      }
+    });
+    pushSent=true;
+  }catch(err){
+    pushError=String(err?.message||err).slice(0,160);
+  }
+
+  if(!pushSent){
+    try{
+      await Homey.flow.runFlowCardAction({
+        uri:'homey:manager:notifications',
+        id:'homey:manager:notifications:create_notification',
+        args:{text:message}
+      });
+      timelineSent=true;
+    }catch(err){
+      timelineError=String(err?.message||err).slice(0,160);
+    }
+  }
+
+  const delivered=pushSent||timelineSent;
+  return {
+    schema:'EM2_EV_AUTH_ALERT_V0.1',
+    active:true,
+    code,
+    delivered,
+    channel:pushSent
+      ?'HOMEY_OWNER_PUSH'
+      :timelineSent
+        ?'HOMEY_TIMELINE_FALLBACK'
+        :'NONE',
+    attemptedAt,
+    sentAt:delivered?iso():null,
+    deduped:false,
+    pushError,
+    timelineError,
+    remediation:'RUN_EASEE_TOKEN_BOOTSTRAP',
+    secretMaterialIncluded:false
+  };
+};
+
+const safeAbort=async(reason,control,originalCircuitA,live,startedAt,diagnostics={})=>{
+  let hw=null;
+  let restoreError=null;
+  try{
+    hw=await pauseAndConfirm();
+  }catch(err){
+    restoreError=String(err?.message||err);
+  }
+  if(Number.isInteger(originalCircuitA)){
+    try{
+      hw=await restoreCircuit(originalCircuitA);
+    }catch(err){
+      restoreError=(restoreError?restoreError+';':'')+String(err?.message||err);
+    }
+  }
+  if(!hw){
+    try{hw=await readHardware();}catch(_){}
+  }
+  const finalReason=restoreError?reason+':RECOVERY='+restoreError:reason;
+  const authAlert=await notifyEaseeAuthFailure(finalReason,previous);
+  await saveStatus(
+    'FAILED',
+    finalReason,
+    'FAILED',
+    control,
+    hw,
+    originalCircuitA,
+    {
+      live,
+      physicalWritePerformed:true,
+      action:'PAUSE_AND_RESTORE',
+      startedAt,
+      failure:finalReason,
+      statusExtra:{authAlert,...diagnostics}
+    }
+  );
+  return true;
+};
+
+const liveVar=await Homey.logic.getVariable({id:IDS.live});
+const statusVar=await Homey.logic.getVariable({id:IDS.status});
+const previous=parse(statusVar?.value);
+const liveEnabled=liveVar?.value===true;
+
+if(SUPPORTED_VERSIONS.includes(previous?.schema)&&previous?.status==='RUNNING'&&age(previous?.at)<RUN_LOCK_MS){
+  return true;
+}
+
+let control=await readControl();
+let hw=await readHardware();
+
+if(!control.ok){
+  return await safeAbort(control.error,control,null,liveEnabled,null);
+}
+
+if(!liveEnabled||!PHASE_EXECUTION_ENABLED){
+  await saveStatus(
+    'ARMED_DISABLED',
+    liveEnabled?'PHASE_EXECUTION_DISABLED':'LIVE_FLAG_DISABLED',
+    'STABLE',
+    control,
+    hw,
+    null,
+    {live:liveEnabled,physicalWritePerformed:false,action:'NOOP'}
+  );
+  return true;
+}
+
+// If a previous v0.4.4/v0.4.5 invocation died after applying a temporary cap,
+// recover its captured baseline before evaluating a new command.
+const previousOriginal=num(previous?.transition?.originalCircuitA);
+const previousNeedsRecovery=
+  SUPPORTED_VERSIONS.includes(previous?.schema) &&
+  ['RUNNING','FAILED','RECOVERY'].includes(String(previous?.status||'')) &&
+  Number.isInteger(previousOriginal) &&
+  previousOriginal>=EV_MIN_A &&
+  previousOriginal<=64;
+
+// A previously captured baseline can itself become stale after Easee/Homey
+// normalizes the circuit limit outside the EMS transition. While safely paused,
+// any live circuit target above EV_MAX_A is independently proven not to be a
+// temporary transition cap, because this writer never sets a transition cap
+// above EV_MAX_A. In that narrow case, trust the live normal baseline instead
+// of repeatedly forcing an obsolete saved value.
+let startupRecoveryBaselineReconciled=false;
+const previousNormalCircuitBaseline=
+  Number.isInteger(previousOriginal) &&
+  previousOriginal>EV_MAX_A &&
+  previousOriginal<=64;
+const liveNormalCircuitBaseline=
+  Number.isInteger(hw.circuitTargetA) &&
+  hw.circuitTargetA>EV_MAX_A &&
+  hw.circuitTargetA<=64;
+
+if(
+  previousNeedsRecovery &&
+  hw.circuitTargetA!==previousOriginal &&
+  hw.paused===true &&
+  previousNormalCircuitBaseline &&
+  liveNormalCircuitBaseline
+){
+  startupRecoveryBaselineReconciled=true;
+}else if(previousNeedsRecovery&&hw.circuitTargetA!==previousOriginal){
+  try{
+    hw=await pauseAndConfirm();
+    hw=await restoreCircuit(previousOriginal);
+  }catch(err){
+    return await safeAbort(
+      'STARTUP_CIRCUIT_RECOVERY_FAILED:'+String(err?.message||err),
+      control,
+      previousOriginal,
+      liveEnabled,
+      previous?.transition?.startedAt||null
+    );
+  }
+  control=await readControl();
+  if(!control.ok){
+    return await safeAbort(control.error,control,previousOriginal,liveEnabled,null);
+  }
+  hw=await readHardware();
+}
+
+// OFF zero readback is sufficient regardless of a previous FAILED/RUNNING
+// status. Safety is based on current hardware evidence, not the status ledger.
+// A true unsafe or unreadable state still goes through the existing fail-closed
+// pause-and-recover path.
+const offZeroConfirmed=hw=>
+  hw?.charging===false &&
+  hw?.chargerTargetA===0 &&
+  Number.isFinite(hw?.offeredA) && hw.offeredA<=1 &&
+  Number.isFinite(hw?.powerW) && hw.powerW<=250;
+
+// NORMAL_OFF_ZERO_A_HOLD:
+// A normal loss of PV opportunity is not a session-safety event. Command 0 A
+// without calling pauseCharging(). Homey's Easee app represents both native
+// pause and dynamic-current 0 A as plugged_in_paused/onoff=false, so the hold
+// contract is confirmed from the dynamic-current/power readback, not onoff.
+// The writer-status reason distinguishes our zero-A hold from a true safety pause.
+const previousReason=String(previous?.reason||'');
+const previousWasZeroHold=
+  SUPPORTED_VERSIONS.includes(previous?.schema) &&
+  previous?.status==='STABLE' &&
+  previousReason.startsWith('OFF_ZERO_A_HOLD');
+
+if(control.mode==='OFF'){
+  let offZeroLastReadback=hw;
+  try{
+    let physicalWrite=false;
+    let confirmedAfterTimeout=false;
+
+    // OFF is an idempotent safety goal. An already-confirmed 0 A / 0 W
+    // hardware state must not be resumed merely because the previous
+    // actuator status was FAILED. A later positive command owns resume.
+    if(!offZeroConfirmed(hw)){
+      await setCurrentA(0);
+      physicalWrite=true;
+      try{
+        hw=await waitHardware(
+          offZeroConfirmed,
+          CURRENT_CONFIRM_TIMEOUT_MS,
+          'OFF_ZERO_CURRENT_CONFIRM_TIMEOUT'
+        );
+      }catch(err){
+        offZeroLastReadback=err?.lastHardware||hw;
+        if(String(err?.message||err)!=='OFF_ZERO_CURRENT_CONFIRM_TIMEOUT')throw err;
+        // Same bounded late-read pattern as pause confirmation: one final
+        // read, no extended polling and no relaxed electrical predicates.
+        hw=await readHardware();
+        if(!offZeroConfirmed(hw))throw err;
+        confirmedAfterTimeout=true;
+      }
+    }
+
+    await saveStatus(
+      'STABLE',
+      confirmedAfterTimeout?'OFF_ZERO_A_HOLD_LATE_CONFIRMED':'OFF_ZERO_A_HOLD',
+      'STABLE',
+      control,
+      hw,
+      null,
+      {
+        live:true,
+        physicalWritePerformed:physicalWrite,
+        action:physicalWrite?'SET_CURRENT_ZERO':'NOOP_ALREADY_ZERO'
+      }
+    );
+    return true;
+  }catch(err){
+    return await safeAbort(
+      'OFF_ZERO_A_HOLD_FAILED:'+String(err?.message||err),
+      control,
+      null,
+      liveEnabled,
+      null,
+      {offZeroLastReadback}
+    );
+  }
+}
+
+// If the EV is already safely paused on the requested confirmed phase, there is
+// no phase transition to perform. Resume directly and apply the requested current;
+// do not touch the circuit cap.
+if(
+  hw.confirmedMode===control.mode &&
+  hw.chargeState==='plugged_in_paused' &&
+  hw.chargerTargetA===0
+){
+  if(hw.circuitTargetA===null||hw.circuitTargetA<control.requestedA){
+    return await safeAbort('CIRCUIT_LIMIT_BELOW_REQUEST',control,null,liveEnabled,null);
+  }
+  try{
+    await resumeSession();
+    await sleep(POLL_MS);
+    await setCurrentA(control.requestedA);
+    hw=await waitHardware(
+      x=>x.chargerTargetA===control.requestedA,
+      CURRENT_CONFIRM_TIMEOUT_MS,
+      'ZERO_HOLD_RESUME_CURRENT_CONFIRM_TIMEOUT'
+    );
+    await saveStatus(
+      'STABLE',
+      hw.charging===true?'SAME_PHASE_RESUMED':'SAME_PHASE_OPPORTUNITY_ARMED',
+      'STABLE',
+      control,
+      hw,
+      null,
+      {live:true,physicalWritePerformed:true,action:'RESUME_SAME_PHASE_PAUSED'}
+    );
+    return true;
+  }catch(err){
+    return await safeAbort(
+      'SAME_PHASE_RESUME_FAILED:'+String(err?.message||err),
+      control,
+      null,
+      liveEnabled,
+      null
+    );
+  }
+}
+
+// If Easee already exposes the requested same-phase opportunity, Tesla draw is
+// irrelevant: 0 W is a valid healthy state (for example when the car is full).
+if(
+  hw.confirmedMode===control.mode &&
+  hw.sessionEnabled===true &&
+  hw.chargerTargetA===control.requestedA &&
+  hw.circuitTargetA!==null &&
+  hw.circuitTargetA>=control.requestedA
+){
+  await saveStatus(
+    'STABLE',
+    hw.charging===true?'STABLE':'OPPORTUNITY_ARMED',
+    'STABLE',
+    control,
+    hw,
+    null,
+    {live:true,physicalWritePerformed:false,action:'NOOP'}
+  );
+  return true;
+}
+
+// Same-phase current adjustment while the opportunity is already enabled.
+if(hw.confirmedMode===control.mode&&hw.sessionEnabled===true){
+  if(hw.circuitTargetA===null||hw.circuitTargetA<control.requestedA){
+    return await safeAbort('CIRCUIT_LIMIT_BELOW_REQUEST',control,null,liveEnabled,null);
+  }
+  await setCurrentA(control.requestedA);
+  try{
+    hw=await waitHardware(
+      x=>x.chargerTargetA===control.requestedA,
+      CURRENT_CONFIRM_TIMEOUT_MS,
+      'CURRENT_TARGET_CONFIRM_TIMEOUT'
+    );
+  }catch(err){
+    // Same-phase current readback can lag Easee/Homey. If the charger remains
+    // electrically bounded at or below the requested current, keep the active
+    // session intact. A readback timeout is not a reason to pause charging.
+    try{hw=await readHardware();}catch(_){}
+    const boundedExistingTarget=
+      Number.isInteger(hw?.chargerTargetA) &&
+      hw.chargerTargetA>=0 &&
+      hw.chargerTargetA<=control.requestedA &&
+      Number.isInteger(hw?.circuitTargetA) &&
+      hw.circuitTargetA>=control.requestedA;
+    if(boundedExistingTarget){
+      await saveStatus(
+        'DEGRADED',
+        'STABLE_CURRENT_ADJUST_CONFIRM_TIMEOUT_PRESERVED',
+        'STABLE',
+        control,
+        hw,
+        null,
+        {
+          live:true,
+          physicalWritePerformed:true,
+          action:'PRESERVE_BOUNDED_SAME_PHASE_TARGET',
+          statusExtra:{executionError:String(err?.message||err)}
+        }
+      );
+      return true;
+    }
+    return await safeAbort(
+      'STABLE_CURRENT_ADJUST_FAILED:'+String(err?.message||err),
+      control,
+      null,
+      liveEnabled,
+      null
+    );
+  }
+  await saveStatus(
+    'STABLE',
+    hw.charging===true?'STABLE_CURRENT_ADJUST':'OPPORTUNITY_CURRENT_ADJUST',
+    'STABLE',
+    control,
+    hw,
+    null,
+    {live:true,physicalWritePerformed:true,action:'SET_CURRENT'}
+  );
+  return true;
+}
+
+// KISS invariant: same confirmed phase is never a phase transition.
+// sessionEnabled is not authoritative enough to justify a resume: Easee/Homey
+// can report it false while electrical telemetry proves the EV is charging.
+// Resume only when the charger is actually paused; otherwise only adjust A.
+if(hw.confirmedMode===control.mode){
+  if(hw.circuitTargetA===null||hw.circuitTargetA<control.requestedA){
+    return await safeAbort('CIRCUIT_LIMIT_BELOW_REQUEST',control,null,liveEnabled,null);
+  }
+  try{
+    let resumed=false;
+    if(hw.chargeState==='plugged_in_paused'||hw.paused===true){
+      await resumeSession();
+      resumed=true;
+      await sleep(POLL_MS);
+    }
+    await setCurrentA(control.requestedA);
+    hw=await waitHardware(
+      x=>x.chargerTargetA===control.requestedA,
+      CURRENT_CONFIRM_TIMEOUT_MS,
+      'SAME_PHASE_CURRENT_CONFIRM_TIMEOUT'
+    );
+    await saveStatus(
+      'STABLE',
+      resumed?'SAME_PHASE_RESUMED':'SAME_PHASE_CURRENT_APPLIED',
+      'STABLE',
+      control,
+      hw,
+      null,
+      {
+        live:true,
+        physicalWritePerformed:true,
+        action:resumed?'RESUME_SAME_PHASE':'SET_CURRENT'
+      }
+    );
+    return true;
+  }catch(err){
+    // A same-phase current-confirm timeout is not a phase-safety failure.
+    // Preserve an already bounded target (for example previous 8 A while 9 A
+    // is being requested) instead of turning a harmless readback lag into a
+    // physical pause. Only invoke fail-safe pause when the observed target is
+    // actually above the requested bound or otherwise unsafe/unknown.
+    try{hw=await readHardware();}catch(_){}
+    const boundedExistingTarget=
+      Number.isInteger(hw?.chargerTargetA) &&
+      hw.chargerTargetA>=0 &&
+      hw.chargerTargetA<=control.requestedA &&
+      Number.isInteger(hw?.circuitTargetA) &&
+      hw.circuitTargetA>=control.requestedA;
+    if(boundedExistingTarget){
+      await saveStatus(
+        'DEGRADED',
+        'SAME_PHASE_CURRENT_CONFIRM_TIMEOUT_PRESERVED',
+        'STABLE',
+        control,
+        hw,
+        null,
+        {
+          live:true,
+          physicalWritePerformed:true,
+          action:'PRESERVE_BOUNDED_SAME_PHASE_TARGET',
+          statusExtra:{executionError:String(err?.message||err)}
+        }
+      );
+      return true;
+    }
+    return await safeAbort(
+      'SAME_PHASE_EXECUTION_FAILED:'+String(err?.message||err),
+      control,
+      null,
+      liveEnabled,
+      null
+    );
+  }
+}
+
+const originalCircuitA=hw.circuitTargetA;
+if(!Number.isInteger(originalCircuitA)||originalCircuitA<EV_MIN_A||originalCircuitA>64){
+  return await safeAbort('CIRCUIT_TARGET_UNKNOWN',control,null,liveEnabled,null);
+}
+if(originalCircuitA<control.requestedA){
+  return await safeAbort('CIRCUIT_LIMIT_BELOW_REQUEST',control,originalCircuitA,liveEnabled,null);
+}
+
+const startedAt=iso();
+const transitionId=Date.now()+':'+control.mode+':'+control.requestedA;
+
+await saveStatus(
+  'RUNNING',
+  'BOUNDED_TRANSITION_START',
+  'PAUSING',
+  control,
+  hw,
+  originalCircuitA,
+  {
+    live:true,
+    physicalWritePerformed:false,
+    action:'PAUSE_SESSION',
+    transitionId,
+    startedAt,
+    statusExtra:{startupRecoveryBaselineReconciled}
+  }
+);
+
+try{
+  // Capture the electrically proven mode before pausing; once paused, electrical
+  // telemetry is zero and Homey settings may lag behind the physical state.
+  let phaseLatch=hw.confirmedMode;
+  hw=await pauseAndConfirm();
+  await saveStatus(
+    'RUNNING','PAUSE_CONFIRMED','PAUSED',
+    control,hw,originalCircuitA,
+    {live:true,physicalWritePerformed:true,action:'PAUSE_SESSION',transitionId,startedAt}
+  );
+
+  const vars=await readEaseeVars();
+
+  for(let replan=0;replan<=MAX_REPLANS_WHILE_PAUSED;replan++){
+    control=await readControl();
+    if(!control.ok)throw new Error(control.error);
+
+    if(control.mode==='OFF'){
+      hw=await restoreCircuit(originalCircuitA);
+      await saveStatus(
+        'STABLE','OFF_DURING_BOUNDED_TRANSITION','STABLE',
+        control,hw,null,
+        {
+          live:true,physicalWritePerformed:true,action:'RESTORE_CIRCUIT_CAP',
+          transitionId,startedAt,statusExtra:{replansWhilePaused:replan}
+        }
+      );
+      return true;
+    }
+
+    if(control.requestedA>originalCircuitA){
+      throw new Error('CIRCUIT_LIMIT_BELOW_REQUEST');
+    }
+
+    if(phaseLatch!==control.mode){
+      await saveStatus(
+        'RUNNING','PHASE_COMMAND','PHASE_COMMAND',
+        control,hw,originalCircuitA,
+        {
+          live:true,physicalWritePerformed:false,action:'SET_PHASE_MODE',
+          transitionId,startedAt,statusExtra:{replansWhilePaused:replan}
+        }
+      );
+      await setPhaseMode(control.mode,vars);
+      const confirmation=await confirmLockedPhase(control.mode,vars);
+      hw=confirmation.hw;
+      phaseLatch=control.mode;
+
+      await saveStatus(
+        'RUNNING','PHASE_CONFIRMED','DEADTIME',
+        control,hw,originalCircuitA,
+        {
+          live:true,physicalWritePerformed:true,action:'WAIT_DEADTIME',
+          transitionId,startedAt,
+          phaseConfirmedMode:control.mode,
+          phaseConfirmedAt:iso(),
+          phaseConfirmationSource:confirmation.source,
+          statusExtra:{phaseConfirmationRaw:confirmation.raw,replansWhilePaused:replan}
+        }
+      );
+      await sleep(DEADTIME_MS);
+    }
+
+    const afterDeadtime=await readControl();
+    if(!afterDeadtime.ok)throw new Error(afterDeadtime.error);
+    if(afterDeadtime.mode!==control.mode){
+      control=afterDeadtime;
+      if(replan===MAX_REPLANS_WHILE_PAUSED){
+        throw new Error('MODE_UNSTABLE_DURING_TRANSITION');
+      }
+      continue;
+    }
+    control=afterDeadtime;
+
+    await setCircuitA(control.requestedA);
+    hw=await waitHardware(
+      x=>x.paused&&x.circuitTargetA===control.requestedA,
+      CIRCUIT_CONFIRM_TIMEOUT_MS,
+      'TRANSITION_CIRCUIT_CAP_CONFIRM_TIMEOUT'
+    );
+
+    await saveStatus(
+      'RUNNING','TRANSITION_CIRCUIT_CAP_CONFIRMED','ARMING_CIRCUIT_CAP',
+      control,hw,originalCircuitA,
+      {
+        live:true,physicalWritePerformed:true,action:'SET_TRANSITION_CIRCUIT_CAP',
+        transitionId,startedAt,statusExtra:{replansWhilePaused:replan}
+      }
+    );
+
+    const beforeResume=await readControl();
+    if(!beforeResume.ok)throw new Error(beforeResume.error);
+    if(beforeResume.mode!==control.mode){
+      hw=await restoreCircuit(originalCircuitA);
+      control=beforeResume;
+      phaseLatch=hw.confirmedMode==='UNKNOWN'?phaseLatch:hw.confirmedMode;
+      if(replan===MAX_REPLANS_WHILE_PAUSED){
+        throw new Error('MODE_UNSTABLE_DURING_TRANSITION');
+      }
+      continue;
+    }
+    if(beforeResume.requestedA!==control.requestedA){
+      control=beforeResume;
+      if(control.requestedA>originalCircuitA)throw new Error('CIRCUIT_LIMIT_BELOW_REQUEST');
+      await setCircuitA(control.requestedA);
+      hw=await waitHardware(
+        x=>x.paused&&x.circuitTargetA===control.requestedA,
+        CIRCUIT_CONFIRM_TIMEOUT_MS,
+        'UPDATED_TRANSITION_CAP_CONFIRM_TIMEOUT'
+      );
+    }else{
+      control=beforeResume;
+    }
+
+    await resumeSession();
+    await saveStatus(
+      'RUNNING','OPPORTUNITY_RESUME_SENT','RESUMING',
+      control,hw,originalCircuitA,
+      {
+        live:true,physicalWritePerformed:true,action:'RESUME_SESSION',
+        transitionId,startedAt,statusExtra:{replansWhilePaused:replan}
+      }
+    );
+
+    // Easee resume can reset dynamic charger current. Give Easee one short
+    // device-settle tick, then re-apply and confirm the bounded opportunity.
+    // This wait is for Easee command ordering, never for Tesla consumption.
+    await sleep(POLL_MS);
+    await setCurrentA(control.requestedA);
+    hw=await waitHardware(
+      x=>x.chargerTargetA===control.requestedA,
+      CURRENT_CONFIRM_TIMEOUT_MS,
+      'CURRENT_TARGET_CONFIRM_TIMEOUT'
+    );
+
+    await saveStatus(
+      'RUNNING','OPPORTUNITY_CURRENT_CONFIRMED','RESTORING_CIRCUIT_CAP',
+      control,hw,originalCircuitA,
+      {
+        live:true,physicalWritePerformed:true,action:'RESTORE_CIRCUIT_CAP',
+        transitionId,startedAt,
+        phaseConfirmedMode:control.mode,
+        phaseConfirmedAt:iso(),
+        phaseConfirmationSource:hw.phaseConfirmationSource,
+        statusExtra:{
+          replansWhilePaused:replan,
+          teslaConsumptionObserved:hw.powerW!==null&&hw.powerW>0
+        }
+      }
+    );
+
+    hw=await restoreCircuit(originalCircuitA);
+
+    const latest=await readControl();
+    if(latest.ok&&latest.mode===control.mode&&latest.requestedA!==control.requestedA){
+      if(latest.requestedA<=originalCircuitA){
+        await setCurrentA(latest.requestedA);
+        control=latest;
+        hw=await waitHardware(
+          x=>x.chargerTargetA===control.requestedA,
+          CURRENT_CONFIRM_TIMEOUT_MS,
+          'FINAL_CURRENT_CONFIRM_TIMEOUT'
+        );
+      }
+    }
+
+    await saveStatus(
+      'STABLE','BOUNDED_TRANSITION_COMPLETE','STABLE',
+      control,hw,null,
+      {
+        live:true,physicalWritePerformed:true,action:'NOOP',
+        transitionId,startedAt,
+        phaseConfirmedMode:control.mode,
+        phaseConfirmedAt:iso(),
+        phaseConfirmationSource:hw.phaseConfirmationSource,
+        statusExtra:{
+          durationMs:Date.now()-Date.parse(startedAt),
+          replansWhilePaused:replan,
+          selfRetriggerUsed:false,
+          teslaConsumptionObserved:hw.powerW!==null&&hw.powerW>0,
+          startupRecoveryBaselineReconciled
+        }
+      }
+    );
+    return true;
+  }
+
+  throw new Error('MODE_UNSTABLE_DURING_TRANSITION');
+}catch(err){
+  return await safeAbort(
+    String(err?.message||err||'BOUNDED_TRANSITION_FAILED'),
+    control,
+    originalCircuitA,
+    liveEnabled,
+    startedAt
+  );
+}

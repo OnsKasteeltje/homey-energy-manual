@@ -157,6 +157,9 @@ jobs:
             tests/ev-phase-current-bridge-v1.5.7.test.mjs \
             tests/control/ev/ev-phase-current-bridge-v1.5.8.test.mjs
 
+      - name: Check Easee bootstrap syntax
+        run: python3 -m py_compile services/pi/commissioning/bootstrap_easee_homey_tokens.py tools/maintenance/homey/prepare_easee_v047_candidate.py
+
       - name: Run EV phase writer contract tests
         run: |
           node --test \
@@ -165,4 +168,5 @@ jobs:
             tests/ev-phase-writer-v0.4.4-bounded.test.mjs \
             tests/ev-phase-v044-upgrade-guard.test.mjs \
             tests/ev-phase-writer-v0.4.5-auth-alert.test.mjs \
-            tests/control/ev/ev-phase-writer-v0.4.6-off-zero.test.mjs
+            tests/control/ev/ev-phase-writer-v0.4.6-off-zero.test.mjs \
+            tests/control/ev/ev-phase-writer-v0.4.7-atomic-easee.test.mjs
