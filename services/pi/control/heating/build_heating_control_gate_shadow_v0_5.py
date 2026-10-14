@@ -151,6 +151,7 @@ def _first_failure(checks: dict[str, bool]) -> str:
         ("progressionUpstreamSafe", "PROGRESSION_UPSTREAM_NOT_SAFE"),
         ("v04NoPhysicalWrite", "PROGRESSION_WRITE_CONTRACT_INVALID"),
         ("preheatScope", "ROOM_OUT_OF_PREHEAT_SCOPE"),
+        ("honeywellControlUncontested", "HONEYWELL_ROOM_CONTROL_NOT_AVAILABLE"),
         ("opportunityAligned", "OPPORTUNITY_ID_MISMATCH"),
         ("baselineUp", "BASELINE_NOT_UP"),
         ("cvSafe", "CV_GUARD_NOT_SAFE"),
@@ -206,6 +207,7 @@ def build_fail_closed(
                 "sourcesFresh": False, "sourceOrder": False,
                 "progressionUpstreamSafe": False, "v04NoPhysicalWrite": False,
                 "preheatScope": previous_room.get("preheatScope") is True,
+                "honeywellControlUncontested": False,
                 "opportunityAligned": False, "baselineUp": False, "cvSafe": False,
                 "heatingReady": False, "plannerGrant": False,
                 "progressionState": False, "activeTargetNumeric": False,
@@ -299,6 +301,16 @@ def build_gate(
         previous_room = previous_rooms.get(key)
         baseline = _dict(hroom.get("baseline"), f"{key}.baseline")
         hstate = _dict(hroom.get("shadow"), f"{key}.shadow")
+        # V0.3 carries the effective Honeywell per-room control authority.
+        # Existing single-room commissioning fixtures may omit this projection;
+        # actual V0.3 runtime output always provides it.
+        effective = hroom.get("effective")
+        effective = _dict(effective, f"{key}.effective") if effective is not None else {}
+        effective_source = effective.get("source")
+        external_room_control = (
+            effective_source in {"TEMPORARY_OVERRIDE", "PERMANENT_OVERRIDE", "SYSTEM_MODE"}
+            or effective.get("reason") == "FOLLOW_SCHEDULE_TARGET_MISMATCH"
+        )
         eligibility = _dict(proom.get("heatingEligibility"), f"{key}.heatingEligibility")
         planner = _dict(proom.get("planner"), f"{key}.planner")
         pstate = _dict(proom.get("progression"), f"{key}.progression")
@@ -336,6 +348,7 @@ def build_gate(
             "progressionUpstreamSafe": progression_upstream_safe,
             "v04NoPhysicalWrite": progression.get("physicalWriteAllowed") is False,
             "preheatScope": hroom.get("preheatScope") is True and proom.get("preheatScope") is True,
+            "honeywellControlUncontested": not external_room_control,
             "opportunityAligned": isinstance(progression_opportunity_id, str) and progression_opportunity_id == opportunity_id,
             "baselineUp": baseline.get("direction") == "UP",
             "cvSafe": cv_safe,
@@ -350,7 +363,17 @@ def build_gate(
         safe = all(checks.values())
         failure_reason = _first_failure(checks)
 
-        if previously_owned and previous_opportunity_id != opportunity_id:
+        if external_room_control:
+            # A manual Honeywell target or system-mode change always wins.
+            # Even if this shadow previously "owned" a target, it has no
+            # physical ownership proof and must NOT propose resetting the
+            # user's newly selected override back to the weekly schedule.
+            action, reason, command_target, would_own, rollback = (
+                "HOLD",
+                effective.get("reason") or "HONEYWELL_ROOM_CONTROL_NOT_AVAILABLE",
+                None, False, False,
+            )
+        elif previously_owned and previous_opportunity_id != opportunity_id:
             action, reason, command_target, would_own, rollback = (
                 "WOULD_RESET_TO_SCHEDULE", "OPPORTUNITY_CHANGED_BEFORE_NEW_COMMAND", None, False, True
             )
@@ -384,6 +407,8 @@ def build_gate(
                 "changeAt": baseline.get("changeAt"),
             },
             "source": {
+                "honeywellEffectiveSource": effective_source,
+                "honeywellEffectiveReason": effective.get("reason"),
                 "heatingState": hstate.get("state"),
                 "heatingReason": hstate.get("reason"),
                 "plannerGrant": planner.get("domainGrant"),
