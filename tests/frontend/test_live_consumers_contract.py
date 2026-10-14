@@ -54,4 +54,12 @@ assert 'geen directe vermogensmeting' in renderer
 assert result["diagnostics"] == {"dishwasher_l1_history": []}
 assert "source_sample_at" in result["meta"]
 assert "P1_PHASE_METRICS" in Path("services/pi/api/status/history_archive.py").read_text()
+for obsolete in ("<section class=\"cards\">", 'aria-label="Actuele EMS-beslissing"', 'id="kpi-grid"', 'id="manager-reason"'):
+    assert obsolete not in frontend, obsolete
+for keep in ('aria-label="Actuele energiestroom"', 'aria-label="Actieve verbruikers"',
+             'id="grid-power"', 'id="pv-power"', 'id="tesla-power"',
+             'id="loads-dishwasher-status"'):
+    assert keep in frontend, keep
+for obsolete in ('set("kpi-grid"', 'set("manager-reason"', 'set("manager-title"'):
+    assert obsolete not in renderer, obsolete
 print("PASS: Live consumer evidence contract")
