@@ -81,6 +81,8 @@ function dishwasherDetail(d) {
     case "REPEATED_L1_HEATING_NO_PUMP_YET": return "L1 · meerdere verwarmingssamples";
     case "DRYER_PHASE_UNVERIFIED": return "L1 · mogelijke overlap met droger";
     case "ISOLATED_L1_HIGH_LOAD": return "L1 · losse piek, onvoldoende bewijs";
+    case "TAIL_AFTER_SEQUENCE": return "L1 · korte rustfase na verwarmingscyclus";
+    case "CYCLE_END_CONFIRMED": return "L1 · cyclus beëindigd";
     case "TESLA_MULTIPHASE_INTERFERENCE": return "L1 · Tesla veroorzaakt overlap";
     case "SOLAREDGE_STALE": return "L1 · SolarEdge-data onvoldoende";
     case "P1_STALE": return "L1 · P1-data onvoldoende";
