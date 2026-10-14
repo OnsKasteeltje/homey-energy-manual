@@ -282,6 +282,10 @@ before the replay is exposed as AI evidence.
 
 The Pi exposes `GET /control/current`. A valid production response uses schema `EMS_PI_CONTROL_COMMAND_V0.1`, is bounded to the current quarter-hour slot and planner validity, and fails closed on stale or invalid planner input. The endpoint is a readiness/command endpoint, not a second authority selector.
 
+### EV deadline health watcher
+
+The canonical local `ems-ev-deadline-command.path` watches the private Pi deadline command for changes and triggers `ems-ev-deadline-state.service`. The separate `ems-ev-deadline-state.timer` remains the derived-state watchdog. The read-only `ems-health` monitor therefore checks the active `.path` unit as `evDeadlineCommand`, and checks the state timer/service as `evDeadlineState`. The retired GitHub-fetch `ems-ev-deadline-command.timer` and `.service` must **not** be monitored or reactivated.
+
 ### 5.1 EV deadline independence — PR #212 (LIVE since 2026-10-09)
 
 A deadline is explicit user intent, independent from PV opportunity planning. The prepared Pi contract retains the **single** `GET /control/current` endpoint and existing `EMS_PI_CONTROL_COMMAND_V0.1` command schema, and evaluates the global execution policy before planner/deadline selection. The healthy-plan response preserves the current 15-minute planner semantics with additive `executionMode=PLANNER`, `planner.valid=true`. A failed/missing/stale dynamic plan **does not** make the entire command unavailable when the Pi deadline contract is independently valid, active, `TRACKING`, unexpired and based on fresh Homey Core telemetry. Instead, only in that case Pi returns a bounded `executionMode=DEADLINE_ONLY` response (`validUntil <= now + 90s`) with `planner.valid=false` and the explicit planner error.
