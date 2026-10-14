@@ -81,6 +81,19 @@ export function normalize(raw) {
 
   return {
     generatedAt: raw?.meta?.generated_at ?? null,
+    sourceSampleAt: raw?.meta?.source_sample_at ?? null,
+    dishwasherL1History: (
+      Array.isArray(raw?.diagnostics?.dishwasher_l1_history)
+        ? raw.diagnostics.dishwasher_l1_history : []
+    ).map((item) => ({
+      ts: Date.parse(item?.at ?? ""),
+      signalW: (
+        number(item?.l1_net_w) !== null && number(item?.solaredge_w) !== null
+          ? Math.max(0, number(item.l1_net_w) + Math.max(0, number(item.solaredge_w)))
+          : null
+      ),
+      excluded: number(item?.tesla_w) === null || number(item?.tesla_w) > 300
+    })).filter((item) => Number.isFinite(item.ts) && item.signalW !== null),
     stateAgeSec: number(raw?.meta?.state_age_sec),
     p1Valid,
     grid, gridPhases: [
