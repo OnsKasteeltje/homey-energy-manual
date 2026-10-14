@@ -27,7 +27,7 @@ The single Homey selector remains `EM2_Planner_Authority`. Pi owns current plann
 
 - Adapter: V0.2.0, Flow `953e9b18-3576-4557-b940-ed4a64eb2516`.
 - Gate: V0.3.0, Flow `ec5e5d34-8205-4cf0-a661-7bf744feb6e0`.
-- **Single physical Easee writer:** V0.4.6, Flow `fea23193-a03f-49dd-9780-7e72ee48747d`, enabled and not broken at 2026-10-13 readback.
+- **Single physical Easee writer:** V0.4.7 ATOMIC-TOKENS, Flow `fea23193-a03f-49dd-9780-7e72ee48747d`, enabled and not broken at 2026-10-14 targeted Homey readback. The version-controlled physical-writer source is `apps/homey/control/ev/ev-power-v0.4.7.atomic-easee-tokens.js` with the private Homey Logic bundle ID pinned at deployment. The writer now stores the Easee cloud token pair/expiry/revision in one private Homey Logic value `EM2_Easee_Token_Bundle_V1`; the former v0.4.6 source and three legacy Logic values are rollback-only. The natural automatic token rotation has not yet been observed under v0.4.7.
 - EV Device Health V0.4 is observability only, not a control owner.
 - Tesla deadline ingress since 2026-10-09: private Invoer V2 → Tailscale/Caddy → Pi Status API `/commands/tesla` → local Pi command file. The GitHub fetcher/service/timer were retired.
 
