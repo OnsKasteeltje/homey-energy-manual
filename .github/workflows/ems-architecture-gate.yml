@@ -106,6 +106,9 @@ jobs:
           python3 tests/forecast/test_pv_forecast_v2_contract.py
           python3 tests/forecast/test_v2_shadow_azimuth_geometry.py
 
+      - name: Validate deterministic daily performance evaluation
+        run: python3 tests/replay/test_daily_performance_evaluation.py
+
       - name: Run EV AI reason and replay energy authority regressions
         run: |
           python3 tests/api/test_ai_ev_control_reason_evidence.py

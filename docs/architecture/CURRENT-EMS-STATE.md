@@ -554,6 +554,27 @@ metered source-energy fact. This changes evidence/accounting semantics only:
 EV planning, Gate, actuator, Homey control and Constrained Replay V0.1.1 are
 unchanged.
 
+## Daily EMS performance evaluation V0.1 (deterministic)
+
+The existing `ems-history-daily.service` (00:20 Europe/Amsterdam) now
+builds its original daily energy history and then runs
+`services/pi/history/daily_performance_evaluation.py` for the **previous
+completed local day**. No extra timer or AI-model call is added.
+The small report is atomically stored only on the private Pi at
+`/home/jeroen/ems/data/daily-performance-evaluation.json`;
+a CLI `--no-write-output` mode supports one-off checks without changing files.
+
+It reuses `ems-performance` for authoritative P1 cumulative import/export,
+PV energy and paired-coverage checks, and `ems-constrained-replay --no-write-output`
+for EV-only deterministic classification and **estimated** kWh opportunities.
+P1 cumulative energy is never replaced by replay sampled-power totals.
+Poor/missing evidence yields unavailable/null fields, not invented energy.
+Missing replay yields a partial report with independently measured P1 totals.
+All model/replay figures remain diagnostic; no financial savings are calculated
+from them. PV/P1 power-snapshot mismatch is a review flag, not an EMS fault.
+No Homey publisher, control writes, new database, AI scheduling, planner or
+new execution authority.
+
 ## Read-only AI analysis layer — V0.4
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
