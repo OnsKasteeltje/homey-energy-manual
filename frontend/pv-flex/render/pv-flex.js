@@ -1,13 +1,9 @@
 import {loadDailyPerformance,loadPvFlex,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
 const $=id=>document.getElementById(id); let day=todayAmsterdam();
-const kwh=v=>typeof v==="number"&&Number.isFinite(v)?v.toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:2})+" kWh":"—";
 const pct=v=>typeof v==="number"&&Number.isFinite(v)?Math.round(v*100)+"%":"—";
 const time=x=>new Date(x).toLocaleTimeString("nl-NL",{timeZone:"Europe/Amsterdam",hour:"2-digit",minute:"2-digit"});
 const available=v=>typeof v==="number"&&Number.isFinite(v);
 const power=v=>available(v)?(v/1000).toLocaleString("nl-NL",{maximumFractionDigits:2})+" kW":"—";
-const measuredW=v=>available(v)?power(v):"— (geen apparaatmeting)";
-const planW=v=>available(v)?power(v):"— (niet vastgelegd)";
-const stamp=v=>v?new Date(v).toLocaleString("nl-NL",{timeZone:"Europe/Amsterdam",hour:"2-digit",minute:"2-digit",second:"2-digit"}):"—";
 const MIN_COVERAGE=0.95;
 
 // End-of-slot and independent P1/PV evidence: zero coverage is never 0 kWh.
@@ -26,13 +22,7 @@ function slotEvidence(slot,nowMs=Date.now()){
 }
 const dailyPct=v=>available(v)?(v*100).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})+"%":"—";
 function summary(d){
- const matched=d.series.filter(x=>slotEvidence(x).comparable);
  $("quality").textContent="Dekking kalenderdag "+pct(d.quality.actualCoverage);
- $("archive-status").textContent=d.historicalPlannerAvailable?
-  "Historisch besluit: EV "+kwh(d.summary.plannedEvKWh)+" · boiler "+kwh(d.summary.plannedWwKWh)+
-  " · Quooker "+kwh(d.summary.plannedQuookerKWh)+" · "+d.summary.planSlots+"/"+d.series.length+
-  " geldige kwartieren. "+matched.length+" afgesloten kwartieren met vergelijkbare P1/PV-meetdekking; definitieve dagcijfers staan in Dagrapport.":
-  "V1-plannerarchief ontbreekt. Gemeten P1/PV blijft beschikbaar; geen terugval op V2.";
 }
 function slotAllocation(x,nowMs=Date.now()){
  const quality=slotEvidence(x,nowMs);
@@ -48,75 +38,7 @@ function slotAllocation(x,nowMs=Date.now()){
  const otherPvW=known?Math.max(0,directPvW-evPvW):0;
  return {pvW,exportW,directPvW,houseW,evActualW,evPvW,otherPvW,actualKnown:known};
 }
-function renderEvidence(slot,nowMs=Date.now()){
- const root=$("decision-evidence");root.replaceChildren();
- if(!slot){
-  $("evidence-time").textContent="—";
-  const hint=document.createElement("p");
-  hint.className="evidence-placeholder";
-  hint.textContent="Selecteer een kwartier in de grafiek.";
-  root.appendChild(hint);
-  return;
- }
- const q=slotEvidence(slot,nowMs);
- const state=q.phase==="OPEN"?"LOPEND · voorlopig":q.phase==="FUTURE"?"TOEKOMST · nog niet uitgevoerd":"AFGESLOTEN";
- $("evidence-time").textContent=time(slot.start)+" · "+state;
- const plan=slot.plan, actual=slot.actual||{},devices=slot.devices||{};
- const deviceNote=q.phase==="OPEN"?" (voorlopige apparaatwaarde)":q.phase==="FUTURE"?" (nog niet uitgevoerd)":"";
- const evKnown=q.phase!=="FUTURE"&&available(devices.evPowerW);
- const wwKnown=q.phase!=="FUTURE"&&available(devices.boilerPowerW);
- const noEvidence=q.phase!=="CLOSED"?"— (kwartier nog niet afgesloten)":"— (onvoldoende meetdekking)";
- const verdict=!plan?"Geen geldig historisch plannerbesluit":q.phase!=="CLOSED"?
-  "Nog geen beoordeling: kwartier niet afgesloten":!q.p1||!q.pv?
-  "Onvoldoende meetgegevens: P1/PV-dekking onvolledig":
-  "Besluit en gemeten resultaat beschikbaar; oorzaak/kwaliteit niet automatisch bewezen";
- const cells=[
-  ["1. Informatie",[
-   "Besluit vastgelegd: "+stamp(plan?.generatedAt),
-   "PV verwacht: "+planW(slot.forecast?.pvForecastW),
-   "Confidence: "+(available(slot.forecast?.confidence)?pct(slot.forecast.confidence):"—"),
-   "EV beschikbaar (prognose): "+(plan?.teslaAvailableForecast==null?"—":plan.teslaAvailableForecast?"Ja":"Nee"),
-   "Warmwaterbron: "+(plan?.wwSourceMode||"—")
-  ]],
-  ["2. Beslissing",[
-   "Tesla: "+planW(plan?.evPlanW)+" · "+(plan?.evReason||"reden onbekend"),
-   "Boiler: "+planW(plan?.wwPlanW)+" · "+(plan?.wwReason||"reden onbekend"),
-   "Quooker: "+planW(plan?.quookerPlanW)+" · "+(plan?.quookerMode||"modus onbekend"),
-   "PV-opportunity Quooker: "+(plan?.quookerOpportunityAllowed==null?"—":plan.quookerOpportunityAllowed?"toegestaan":"niet toegestaan"),
-   "Net gepland: import "+planW(plan?.gridImportAfterFlexW)+" / export "+planW(plan?.gridExportAfterFlexW)
-  ]],
-  ["3. Uitvoering",[
-   "Tesla werkelijk: "+(evKnown?measuredW(devices.evPowerW)+deviceNote:"— (niet beschikbaar)"),
-   "Boiler werkelijk: "+(wwKnown?measuredW(devices.boilerPowerW)+deviceNote:"— (niet beschikbaar)"),
-   "Quooker werkelijk: — (niet gemeten in deze API)",
-   "Heating: "+(slot.heatingFlex?.intent?"shadow-intent vastgelegd":"geen aangetoonde shadow-intent")
-  ]],
-  ["4. Resultaat",[
-   "PV gemeten: "+(q.pv?kwh(actual.pvKWh):noEvidence),
-   "Import: "+(q.p1?kwh(actual.importKWh):noEvidence),
-   "Export: "+(q.p1?kwh(actual.exportKWh):noEvidence),
-   "Direct PV-gebruik: "+(q.comparable&&available(actual.pvSelfConsumedKWh)?kwh(actual.pvSelfConsumedKWh):noEvidence),
-   "Dekking P1/PV: "+pct(actual.p1Coverage)+" / "+pct(actual.pvCoverage)
-  ]],
-  ["5. Beoordeling",[
-   verdict,
-   "EV uitvoering: "+(!plan||!evKnown?"onvoldoende bewijs":"plan "+planW(plan.evPlanW)+" / apparaat "+measuredW(devices.evPowerW)+deviceNote),
-   "Boiler uitvoering: "+(!plan||!wwKnown?"onvoldoende bewijs":"plan "+planW(plan.wwPlanW)+" / apparaat "+measuredW(devices.boilerPowerW)+deviceNote),
-   "Quooker: daadwerkelijke uitvoering niet vastgesteld",
-   "Een verschil is geen bewezen uitvoeringsfout; realtime controlreden ontbreekt",
-   "Gemiste kans: niet beoordeeld (haalbare benchmark ontbreekt)"
-  ]]
- ];
- for(const [heading,lines] of cells){
-  const card=document.createElement("article");card.className="evidence-step";
-  const headingNode=document.createElement("strong");headingNode.textContent=heading;
-  const text=document.createElement("p");text.textContent=lines.join("\n");
-  card.append(headingNode,text);root.append(card);
- }
-}
-
-// Mouse hover is for a single *visible* curve or stacked measured bar.
-// Intent/history details belong to the selected-quarter evidence panel.
+// Hover exposes only the nearest visible curve or measured bar.
 function closestEvaluationSeries(slots,allocated,index,px,py,view){
  const {left,top,height,step,max,radius}=view;
  const cx=i=>left+(i+0.5)*step;
@@ -160,7 +82,7 @@ function chart(d){
  const nowMs=Date.now();
  const has=a.some(x=>slotEvidence(x,nowMs).pv||x.plan);
  $("empty").hidden=has;svg.hidden=!has;
- if(!has){tip.hidden=true;renderEvidence(null,nowMs);return;}
+ if(!has){tip.hidden=true;return;}
  const W=1000,H=330,p={l:52,r:18,t:18,b:40},iw=W-p.l-p.r,ih=H-p.t-p.b,ns="http://www.w3.org/2000/svg";
  const allocated=a.map(s=>slotAllocation(s,nowMs));
  const max=Math.max(100,...a.flatMap((x,i)=>[
@@ -180,10 +102,6 @@ function chart(d){
   add("text",{x:p.l-7,y:y+4,class:"axis","text-anchor":"end"},(max*(4-i)/4000).toFixed(1)+"kW");
  }
  const step=iw/a.length;
- // Nothing is selected until the user clicks a quarter.
- const selectedRect=add("rect",{
-  x:p.l,y:p.t,width:step,height:ih,class:"selected-quarter",visibility:"hidden"
- });
  const points=[];
  a.forEach((slot,i)=>{
   const cx=p.l+(i+.5)*step,s=allocated[i],barW=step*.68;
@@ -223,11 +141,6 @@ function chart(d){
     Math.max(8,event.clientY-rect.top-tip.offsetHeight-12))+"px";
   });
   hit.addEventListener("mouseleave",()=>tip.hidden=true);
-  hit.addEventListener("click",()=>{
-   selectedRect.setAttribute("x",p.l+i*step);
-   selectedRect.setAttribute("visibility","visible");
-   renderEvidence(slot,Date.now());
-  });
  });
  const plotSegments=(values,cls)=>{
   let segment=[];
@@ -242,7 +155,6 @@ function chart(d){
   plotSegments(a.map((slot,i)=>available(slot.plan?.[field])?
    (p.l+(i+.5)*step)+","+(p.t+ih-slot.plan[field]/max*ih):null),cls);
  }
- renderEvidence(null,nowMs);
 }
 function renderDailyReport(report,selectedDay){
  const labelDate=new Date(selectedDay+"T12:00:00Z").toLocaleDateString("nl-NL",{
@@ -294,7 +206,7 @@ async function refresh(){
  }else{
   $("quality").textContent="Analyse niet beschikbaar";
   $("empty").hidden=false;$("empty").textContent=main.reason?.message||"Geen data";
-  $("pv-chart").hidden=true;renderEvidence(null);
+  $("pv-chart").hidden=true;
  }
  renderDailyReport(daily.status==="fulfilled"?daily.value:null,selectedDay);
 }

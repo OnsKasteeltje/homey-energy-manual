@@ -70,28 +70,21 @@ test("hover on a stacked measured PV bar reports only that component",()=>{
  assert.equal(bar.label,"Overig eigen PV");
  assert.equal(bar.value,300);
 });
-test("quarter highlight appears only after click; provisional overlay is absent",()=>{
+test("the graph retains nearest-line hover without dead quarter-selection controls",()=>{
  const chartSource=script.slice(script.indexOf("function chart(d){"),script.indexOf("function renderDailyReport("));
- const clickSource=chartSource.split('hit.addEventListener("click",()=>')[1].split("\n  });")[0];
- const css=readFileSync("frontend/pv-flex/styles/pv-flex.css","utf8");
  const html=readFileSync("frontend/pv-flex/index.html","utf8");
- assert.ok(chartSource.includes('class:"selected-quarter",visibility:"hidden"'));
- assert.ok(clickSource.includes('selectedRect.setAttribute("visibility","visible")'));
- assert.ok(chartSource.includes("renderEvidence(null,nowMs)"));
- assert.ok(script.includes('hint.textContent="Selecteer een kwartier in de grafiek."'));
- assert.ok(!chartSource.includes('class:"provisional-quarter"'));
- assert.ok(!css.includes(".provisional-quarter"));
- assert.ok(!html.includes("Het lopende kwartier is licht gemarkeerd"));
+ const css=readFileSync("frontend/pv-flex/styles/pv-flex.css","utf8");
+ assert.ok(chartSource.includes('hit.addEventListener("mousemove"'));
+ assert.ok(chartSource.includes('hit.addEventListener("mouseleave"'));
+ assert.ok(chartSource.includes("closestEvaluationSeries"));
+ assert.ok(!chartSource.includes('hit.addEventListener("click"'));
+ assert.ok(!chartSource.includes("renderEvidence("));
+ assert.ok(!chartSource.includes("selectedRect"));
+ assert.ok(!css.includes(".selected-quarter"));
+ assert.ok(!html.includes('id="decision-evidence"'));
+ assert.ok(!html.includes('id="archive-status"'));
+ assert.ok(!html.includes('<section class="intro">'));
 });
-
-test("mousemove must not choose a historical decision",()=>{
- const mouse=script.split('hit.addEventListener("mousemove",event=>')[1].split('hit.addEventListener("mouseleave"')[0];
- assert.ok(mouse.includes("closestEvaluationSeries"));
- assert.ok(!mouse.includes("renderEvidence("));
- assert.ok(script.includes('hit.addEventListener("click",()=>'));
- assert.ok(script.includes("renderEvidence(slot,Date.now())"));
-});
-
 test("replaced preheat panel with selected-day report, without leaking old report on today",()=>{
  const html=readFileSync("frontend/pv-flex/index.html","utf8");
  const state=readFileSync("frontend/pv-flex/state/pv-flex-state.js","utf8");

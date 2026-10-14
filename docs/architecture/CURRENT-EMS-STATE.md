@@ -630,6 +630,14 @@ the read-only day-report API and the original measurement authorities.
 For an unfinished or unavailable day, the final daily cards show unknown
 instead of extrapolating incomplete interval measurements.
 
+2026-10-14 presentation simplification: drop the introductory title/subtitle
+above the day selector and the entire explanatory / `Beslissing per kwartier`
+section below the 15-minute PV/flex graph. Remove the now-dead click-to-select
+quarter implementation; hover remains available for a single graph value.
+Historical planner/archive data and calculation, the selected day, current
+coverage indicator, chart legend, the graph itself and the daily report remain
+unchanged and read-only. No Web Data API, DB, timer, control or policy changes.
+
 ## Read-only AI analysis layer — V0.4
 
 The Pi exposes an optional read-only EMS AI analysis service for human-facing
