@@ -1,4 +1,26 @@
 import {loadState, formatPower, formatLocalTime} from "../state/energy-state.js";
+import {diagnoseDishwasher} from "../diagnostics/dishwasher-fingerprint.mjs";
+
+const DISHWASHER_HISTORY_KEY = "ems-live-dishwasher-l1-diagnostics-v1";
+function readDishwasherHistory() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(DISHWASHER_HISTORY_KEY) || "[]");
+    return Array.isArray(rows) ? rows : [];
+  } catch { return []; }
+}
+let dishwasherHistory = readDishwasherHistory();
+function dishwasherDiagnosis(state) {
+  const result = diagnoseDishwasher(state, dishwasherHistory);
+  const changed = result.history.length !== dishwasherHistory.length ||
+    result.history.at(-1)?.ts !== dishwasherHistory.at(-1)?.ts;
+  dishwasherHistory = result.history;
+  if (changed) {
+    try { localStorage.setItem(DISHWASHER_HISTORY_KEY, JSON.stringify(dishwasherHistory)); }
+    catch { /* storage is optional; live read-only display still works */ }
+  }
+  return result;
+}
+
 
 const $ = (id) => document.getElementById(id);
 const set = (id, value) => { const el=$(id); if (el) el.textContent=value ?? "—"; };
@@ -42,24 +64,54 @@ function applianceDetail(item) {
     .filter(Boolean).join(" · ") || "Programma actief";
 }
 
-function consumerExplanation(s) {
-  if (!s.p1Valid || s.grid === null) return "P1 niet actueel; oorzaak van verbruik onbekend.";
+function dishwasherStatus(d) {
+  switch (d.status) {
+    case "LIKELY": return "Waarschijnlijk";
+    case "CANDIDATE": return "Kandidaat";
+    case "UNCONFIRMED": return "Niet bevestigd";
+    case "NO_MATCH": return "Niet herkend";
+    case "SUSPENDED": return "Niet beoordeelbaar";
+    default: return "Onbekend";
+  }
+}
+
+function dishwasherDetail(d) {
+  switch (d.reason) {
+    case "HEAT_AND_PUMP_SEQUENCE": return "L1 · verwarmings- en pomppatroon";
+    case "REPEATED_L1_HEATING_NO_PUMP_YET": return "L1 · meerdere verwarmingssamples";
+    case "DRYER_PHASE_UNVERIFIED": return "L1 · mogelijke overlap met droger";
+    case "ISOLATED_L1_HIGH_LOAD": return "L1 · losse piek, onvoldoende bewijs";
+    case "TESLA_MULTIPHASE_INTERFERENCE": return "L1 · Tesla veroorzaakt overlap";
+    case "SOLAREDGE_STALE": return "L1 · SolarEdge-data onvoldoende";
+    case "P1_STALE": return "L1 · P1-data onvoldoende";
+    case "SOURCE_TIMESTAMP_INVALID": return "L1 · geen actuele tijdstempel";
+    default: return "L1 · geen onderscheidend patroon";
+  }
+}
+
+function consumerExplanation(s, dishwasher) {
+  if (!s.p1Valid || s.grid === null) return "P1 niet actueel; verbruiksdiagnose tijdelijk niet beschikbaar.";
+  const notes = [];
+  if (s.loads.washer.active === true)
+    notes.push("Wasmachine actief volgens AEG (fase L2 als historische referentie).");
+  if (s.loads.dryer.active === true)
+    notes.push("Droger actief volgens AEG (fase nog niet gevalideerd).");
+  if (dishwasher.status === "LIKELY")
+    notes.push("Vaatwasser waarschijnlijk actief volgens L1-sequentie; geen directe vermogensmeting.");
+  else if (dishwasher.status === "CANDIDATE")
+    notes.push("Vaatwasser kandidaat op L1; nog niet voldoende bewijs om het apparaat te bevestigen.");
+  else if (dishwasher.status === "UNCONFIRMED")
+    notes.push("Extra L1-belasting gezien, maar één piek bewijst geen vaatwasser.");
   const heavy = s.gridPhases
     .filter((p) => p.power !== null && p.power >= 1500)
-    .sort((a, b) => b.power - a.power)[0];
-  if (s.grid > 1500 && heavy) {
-    if (s.loads.washer.active === true) {
-      return `Hoge netafname op ${heavy.name} terwijl de wasmachine draait. Een verband is mogelijk, maar niet met een aparte vermogensmeter bevestigd.`;
-    }
-    if (s.loads.dryer.active === true) {
-      return `Hoge netafname op ${heavy.name} terwijl de droger draait. Een verband is mogelijk, maar niet met een aparte vermogensmeter bevestigd.`;
-    }
-    return `Hoge netafname op ${heavy.name}. De oorzaak is niet eenduidig uit de beschikbare apparaatmetingen af te leiden.`;
-  }
-  return "Geen opvallend hoge netafname op een afzonderlijke fase.";
+    .sort((a, b) => b.power - a.power);
+  if (heavy.length > 0 && dishwasher.status !== "LIKELY")
+    notes.push("Hoge netto belasting op " + heavy.map((p) => p.name).join(" en ") + ".");
+  return notes.length ? notes.join(" ") : "Geen betrouwbaar te onderscheiden grote apparaatbelasting.";
 }
 
 function render(s) {
+  const dishwasher = dishwasherDiagnosis(s);
   set("pv-power", formatPower(currentPvPower(s)));
   const pvByKey = Object.fromEntries(s.pvSources.map((source) => [source.key, source]));
   set("pv-source-summary", pvSourceSummary(s));
@@ -98,6 +150,8 @@ function render(s) {
   set("loads-washer-detail", applianceDetail(s.loads.washer));
   set("loads-dryer-status", applianceStatus(s.loads.dryer.active));
   set("loads-dryer-detail", applianceDetail(s.loads.dryer));
+  set("loads-dishwasher-status", dishwasherStatus(dishwasher));
+  set("loads-dishwasher-detail", dishwasherDetail(dishwasher));
   set("loads-quooker-status", applianceStatus(s.loads.quooker.active));
   set("loads-quooker-detail", !s.loads.quooker.fresh
     ? "Geen actuele Quooker-detectie"
@@ -108,7 +162,7 @@ function render(s) {
     set(`loads-phase-${phase.name.toLowerCase()}`,
       s.p1Valid ? formatPower(phase.power) : "—");
   }
-  set("loads-explanation", consumerExplanation(s));
+  set("loads-explanation", consumerExplanation(s, dishwasher));
 
   set("kpi-grid", formatPower(s.grid === null ? null : Math.abs(s.grid)));
   set("kpi-grid-sub", s.p1Valid ? `${s.gridDirection} · P1 actueel` : "P1 niet actueel");
@@ -130,6 +184,13 @@ function render(s) {
 }
 
 function renderError(error) {
+  set("loads-dishwasher-status", "Onbekend");
+  set("loads-dishwasher-detail", "Geen actuele gegevens");
+  set("loads-washer-status", "Onbekend");
+  set("loads-dryer-status", "Onbekend");
+  set("loads-quooker-status", "Onbekend");
+  for (const phase of ["l1", "l2", "l3"]) set("loads-phase-" + phase, "—");
+  set("loads-explanation", "Live-verbruiksdiagnose niet beschikbaar.");
   set("freshness", "Data niet beschikbaar");
   set("manager-title", "Live data tijdelijk niet beschikbaar");
   set("manager-reason", error.message);
