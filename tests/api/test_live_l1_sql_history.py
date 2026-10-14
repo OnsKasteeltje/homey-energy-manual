@@ -12,7 +12,7 @@ helper = next(x for x in ast.parse(source).body
               if isinstance(x, ast.FunctionDef) and x.name == "_live_l1_history")
 fn_code = compile(ast.Module(body=[helper], type_ignores=[]), "<web-data>", "exec")
 archive = Path("services/pi/api/status/history_archive.py").read_text(encoding="utf-8")
-assert "'grid_l1_power_w':" in archive
+assert '"grid_l1_power_w":' in archive
 assert '_quality_for_power(payload, "grid_p1") == "observed"' in archive
 assert "INSERT OR IGNORE INTO measurements" in archive
 
