@@ -82,6 +82,21 @@ test("PV is compensated only when fresh and P1 is independently authoritative", 
   assert.equal(p1.reason,"P1_STALE");
 });
 
+test("new iPhone session uses Pi history rather than requiring browser-local samples", () => {
+  const s=snapshot(15,390);
+  s.sourceSampleAt = s.generatedAt;
+  s.dishwasherL1History = [
+    {ts:T0, signalW:100, excluded:false},
+    {ts:T0+5*60000, signalW:1880, excluded:false},
+    {ts:T0+10*60000, signalW:1920, excluded:false},
+    {ts:T0+15*60000, signalW:390, excluded:false}
+  ];
+  const r=diagnoseDishwasher(s,[],T0+15*60000);
+  assert.equal(r.status,"LIKELY");
+  assert.equal(r.history.length,4);
+  assert.equal(r.powerW,null);
+});
+
 test("Tesla 3-phase overlap still suspends L1 fingerprint diagnosis", () => {
   const r=diagnoseDishwasher(snapshot(0,2000,{tesla:true}),[],T0);
   assert.equal(r.status,"SUSPENDED");
