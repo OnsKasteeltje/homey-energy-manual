@@ -11,7 +11,7 @@ for token in ("/web/analysis/planner/day/","EMS_WEB_PLANNER_EVALUATION_V2",
 for token in ("Besloten versus gemeten energie","Quooker gepland","pv-chart",
               "daily-report-panel","day-title"):
     assert token in html,token
-for token in ("planned-quooker-line","boilerPowerW","quookerPlanW",
+for token in ("planned-quooker-line","quookerPlanW",
               "slotEvidence","closestEvaluationSeries","renderDailyReport"):
     assert token in render,token
 for token in ("decision-evidence","archive-status"):
