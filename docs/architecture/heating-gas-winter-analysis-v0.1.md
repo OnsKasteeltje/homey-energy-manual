@@ -1,6 +1,6 @@
 # Heating gas winter analysis V0.1 — read-only pilot
 
-Status: **source-only, not deployed or scheduled**. Historical Analysis perspective; no control authority. Baseline: 2025-11-01 to 2026-04-01 (Europe/Amsterdam).
+Status: **offline winter retrospective not scheduled**; separate P1 gas/Quatt CV live read-only telemetry **commissioned 15 October 2026**. Historical Analysis perspective; no control authority. Baseline: 2025-11-01 to 2026-04-01 (Europe/Amsterdam).
 
 ## Goal and evidence
 
@@ -38,12 +38,12 @@ The export skips already successfully fetched metric/year pairs (resumable). It 
 
 ## Acceptance
 
-Only two focused offline tests: a complete six-hour counter day and a missing-bucket case. No GitHub workflow, timer, integration or frontend route is added by this pilot. Deployment, runtime validation and canonical architecture promotion are out of scope for this source-only branch.
+Only two focused offline retrospective tests: a complete six-hour counter day and a missing-bucket case. No GitHub workflow, timer, frontend route or automatic Insights collector was added. The historical analyzer remains a one-off tool; the separate live gas/CV telemetry was later commissioned through the existing Homey→Pi ingest, with two additional targeted archive tests.
 
 
-## Proposed live season observability (source-only; NOT promoted)
+## Live-season gas/CV observations (read-only; commissioned)
 
-The existing Core v0.11p already reads the P1 and Quatt devices in its single targeted acquisition batch. On this analysis branch, its source adds one additive schema-2.13 observation:
+The existing Core v0.11p already reads the P1 and Quatt devices in its single targeted acquisition batch. Release `5e386b717` adds one additive schema-2.13 observation:
 
 - `grid.gas_meter_m3` from the **existing** P1 `meter_gas` capability; absent/non-finite/negative is `null`. The new `grid.gas_meter_sample_at` carries this capability's independent `lastUpdated` timestamp. This is the whole-house **cumulative** gas meter, not gas-use power and not space-heating-only energy.
 - Existing `quatt.cv_requested` is preserved as **nullable raw boolean** from `measure_boiler_cic_central_heating_on`, rather than coercing an unavailable capability to `false`.
@@ -61,9 +61,9 @@ Existing P1/Quatt power and CV snapshots keep the Core sample timestamp. Gas cou
 
 **Warm water mode is already archived** as an observed semantic event in `services/pi/history/archive_semantic_events.py` (`warm_water.source_mode` and `WW_SOURCE_CHANGED`). The initial observation is a baseline, not an invented historical transition. We deliberately do not duplicate it as a new high-frequency measurement.
 
-### Promotion gate
+### Live commissioning confirmation — 2026-10-15
 
-This is an **unreleased** source change to the existing Core and Pi history archive, not a live claim. Do not deploy the Homey Core candidate by replacing a running Flow without reconciling its exact active script and validated release. A Pi-only archive deployment before the Core changes is backward compatible but creates **no gas rows** until the new Core payload is actually received. No schema major/minor bump, separate publisher, Homey flow, Homey Insights reader, physical writer, or scheduled job is introduced.
+The Pi targeted status-API archive update returned PASS with a bounded HTTP readiness check after an initial premature health probe had rolled back safely. The exact Homey Core v0.11p code was reconciled against the previous pinned live script and installed in the **existing** enabled flow. Homey and SQLite readback confirmed the independently timestamped gas counter and two sequential observed CV-request false rows; burner activity remained `null`, with no fabricated `cv_flame` row. A normal five-minute cadence must not be inferred from gas meter data. The original full-deployment marker remains older because this was a scoped file install. Neither the winter retrospective analyzer nor the new telemetry invokes heating controls. No schema major/minor bump, second publisher, new Homey flow, Homey Insights reader, physical writer, or scheduled job was introduced.
 
 Minimal targeted regression test:
 
@@ -71,4 +71,4 @@ Minimal targeted regression test:
 python3 -m pytest -q tests/integrations/test_history_archive_counters.py
 ```
 
-After explicit runtime cutover, verify on the Pi: a new accepted `/state/energy` snapshot carries a numeric `grid.gas_meter_m3` and nullable CV booleans; `measurements` contains `grid_p1/gas_meter_m3` and `quatt_cic/cv_requested` with honest quality, but no `cv_flame` row until the source is a real boolean; `warm_water.source_mode` remains in semantic event state. Then run the existing Pi drift check, verify no duplicate source/metric combinations, and keep shadow-only temperature policy.
+After commissioning, verify continued ingestion through the accepted `/state/energy` path: recent SQLite `grid_p1/gas_meter_m3` and `quatt_cic/cv_requested` rows must have honest timestamps and quality, and there must be no `cv_flame` row until the source provides a real boolean. Existing `warm_water.source_mode` remains separate semantic event state. The full Pi deployment marker was intentionally not rewritten by the targeted archive installation; running an unqualified full Pi deploy could inadvertently promote unrelated code. Keep all temperature changes shadow-only.
