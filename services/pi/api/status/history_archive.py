@@ -8,6 +8,7 @@ Archiving is intentionally idempotent on (timestamp, device, metric).
 """
 
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 HISTORY_DB = Path("/home/jeroen/ems/data/ems-history.sqlite")
@@ -64,6 +65,7 @@ COUNTER_DEVICES = {
         "metrics": {
             "energy_import_kwh": ("grid", "energy_import_kwh"),
             "energy_export_kwh": ("grid", "energy_export_kwh"),
+            "gas_meter_m3": ("grid", "gas_meter_m3"),
         },
     },
     "pv_solaredge": {
@@ -90,6 +92,13 @@ COUNTER_DEVICES = {
             "energy_delivered_kwh": ("tesla", "meter_kwh"),
         },
     },
+}
+
+# Quatt CV request and burner are separate, observation-only signals.
+# cv_requested is not proof of gas combustion; cv_flame may be unavailable.
+QUATT_CV_METRICS = {
+    "cv_requested": ("quatt", "cv_requested"),
+    "cv_flame": ("quatt", "cv_flame"),
 }
 
 # Additional observation-only P1 phase evidence. Reuses canonical ingest and
@@ -169,6 +178,23 @@ def _number(value):
     if number != number or number in (float("inf"), float("-inf")):
         return None
     return number
+
+
+def _gas_meter_observed_at(payload, push_at):
+    """Use the gas capability's own update time, not the P1 power tick."""
+    raw = _value_at(payload, ("grid", "gas_meter_sample_at"))
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        measured = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        pushed = datetime.fromisoformat(push_at.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+    if measured.tzinfo is None or pushed.tzinfo is None:
+        return None
+    if measured > pushed + timedelta(seconds=60):
+        return None
+    return measured.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _source_resolution(payload):
@@ -278,19 +304,20 @@ def archive_state_history(payload, db_path=HISTORY_DB):
         ).fetchone()[0]
 
         counter_metric_ids = {}
-        for metric_key, description in (
-            ("energy_import_kwh", "Cumulative lifetime grid import"),
-            ("energy_export_kwh", "Cumulative lifetime grid export"),
-            ("energy_produced_kwh", "Cumulative lifetime energy production"),
-            ("energy_delivered_kwh", "Cumulative Easee delivered energy"),
+        for metric_key, unit, description in (
+            ("energy_import_kwh", "kWh", "Cumulative lifetime grid import"),
+            ("energy_export_kwh", "kWh", "Cumulative lifetime grid export"),
+            ("energy_produced_kwh", "kWh", "Cumulative lifetime energy production"),
+            ("energy_delivered_kwh", "kWh", "Cumulative Easee delivered energy"),
+            ("gas_meter_m3", "m³", "Cumulative P1 gas meter; includes domestic hot water"),
         ):
             con.execute(
                 """
                 INSERT OR IGNORE INTO metrics
                 (metric_key, unit, value_type, description)
-                VALUES (?, 'kWh', 'number', ?)
+                VALUES (?, ?, 'number', ?)
                 """,
-                (metric_key, description),
+                (metric_key, unit, description),
             )
             counter_metric_ids[metric_key] = con.execute(
                 "SELECT id FROM metrics WHERE metric_key=?",
@@ -354,6 +381,19 @@ def archive_state_history(payload, db_path=HISTORY_DB):
                 if value is None or value < 0:
                     skipped += 1
                     continue
+                counter_ts = ts
+                counter_resolution = resolution
+                if metric_key == "gas_meter_m3":
+                    # DSMR gas updates are not synchronized to electrical P1.
+                    # No capability update timestamp -> no invented measurement.
+                    if quality != "observed":
+                        skipped += 1
+                        continue
+                    counter_ts = _gas_meter_observed_at(payload, ts)
+                    if counter_ts is None:
+                        skipped += 1
+                        continue
+                    counter_resolution = None  # actual meter update cadence is unknown
                 cur = con.execute(
                     """
                     INSERT OR IGNORE INTO measurements
@@ -363,9 +403,28 @@ def archive_state_history(payload, db_path=HISTORY_DB):
                     )
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (ts, device_id, counter_metric_ids[metric_key], value, quality, resolution),
+                    (counter_ts, device_id, counter_metric_ids[metric_key], value, quality, counter_resolution),
                 )
                 inserted += cur.rowcount
+
+        # Existing Core push already includes Quatt request/flame. Do not infer
+        # flame from request, operating mode, gas counter or missing values.
+        for metric_key, path in QUATT_CV_METRICS.items():
+            state = _value_at(payload, path)
+            if not isinstance(state, bool):
+                skipped += 1
+                continue
+            device_id = _ensure_device(con, "quatt_cic", POWER_DEVICES["quatt_cic"])
+            metric_id = _ensure_metric(con, metric_key, "boolean")
+            cur = con.execute(
+                """
+                INSERT OR IGNORE INTO measurements
+                (ts_utc, device_id, metric_id, value_real, quality, source_resolution_seconds)
+                VALUES (?, ?, ?, ?, 'observed', ?)
+                """,
+                (ts, device_id, metric_id, 1.0 if state else 0.0, resolution),
+            )
+            inserted += cur.rowcount
 
         for device_key, spec in STATE_DEVICES.items():
             value = _value_at(payload, spec["path"])

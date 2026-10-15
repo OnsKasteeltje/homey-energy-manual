@@ -145,3 +145,70 @@ def test_archive_stale_pv_counter_is_held(tmp_path):
         ("pv_goodwe4200", "held"),
         ("pv_solaredge", "observed"),
     ]
+
+
+def test_archive_gas_counter_cv_request_without_inventing_missing_flame(tmp_path):
+    db = tmp_path / "history.sqlite"
+    _create_db(db)
+    module = _load_archive()
+    payload = {
+        "meta": {"source_sample_at": "2026-10-15T09:00:00Z",
+                 "min_publish_interval_sec": 300},
+        "grid": {"power_w": 200.0, "gas_meter_m3": 18125.375,
+                 "gas_meter_sample_at": "2026-10-15T08:54:00Z"},
+        "balance": {"control_gate": {"grid_measurement_valid": True},
+                    "source_timing": {"p1Fresh": True}},
+        "quatt": {"cv_requested": True, "cv_flame": None},
+        "hot_water": {"mode": False},
+    }
+
+    first = module.archive_state_history(payload, db)
+    second = module.archive_state_history(payload, db)
+    assert first["archived"] is True
+    assert second["inserted"] == 0
+
+    con = sqlite3.connect(db)
+    rows = con.execute("""
+        SELECT d.device_key, m.metric_key, m.unit, x.value_real, x.quality
+        FROM measurements x
+        JOIN devices d ON x.device_id=d.id
+        JOIN metrics m ON x.metric_id=m.id
+        WHERE m.metric_key IN ('gas_meter_m3', 'cv_requested', 'cv_flame')
+        ORDER BY d.device_key, m.metric_key
+    """).fetchall()
+    gas_evidence = con.execute("""
+        SELECT x.ts_utc, x.source_resolution_seconds
+        FROM measurements x JOIN metrics m ON x.metric_id=m.id
+        WHERE m.metric_key='gas_meter_m3'
+    """).fetchone()
+    con.close()
+    assert gas_evidence == ("2026-10-15T08:54:00Z", None)
+    assert rows == [
+        ("grid_p1", "gas_meter_m3", "m³", 18125.375, "observed"),
+        ("quatt_cic", "cv_requested", None, 1.0, "observed"),
+    ]  # flame=None is UNKNOWN, not false; WW source belongs to semantic events
+
+
+def test_archive_invalid_p1_gas_and_nullable_cv_do_not_become_false(tmp_path):
+    db = tmp_path / "history.sqlite"
+    _create_db(db)
+    module = _load_archive()
+    payload = {
+        "meta": {"source_sample_at": "2026-10-15T09:05:00Z"},
+        "grid": {"power_w": 150.0, "gas_meter_m3": 18125.400,
+                 "gas_meter_sample_at": "2026-10-15T09:04:00Z"},
+        "balance": {"control_gate": {"grid_measurement_valid": False}},
+        "quatt": {"cv_requested": None, "cv_flame": False},
+    }
+    module.archive_state_history(payload, db)
+
+    con = sqlite3.connect(db)
+    values = con.execute("""
+        SELECT m.metric_key, x.value_real
+        FROM measurements x JOIN metrics m ON m.id=x.metric_id
+        WHERE m.metric_key IN ('gas_meter_m3', 'cv_requested', 'cv_flame')
+        ORDER BY m.metric_key
+    """).fetchall()
+    con.close()
+    assert values == [("cv_flame", 0.0)]
+    # Invalid P1 is not observed; UNKNOWN CV request has no row.

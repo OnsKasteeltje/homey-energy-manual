@@ -115,6 +115,15 @@ For deployment/rollback see
 
 Operational energy history follows the canonical Homey → Pi state direction. Accepted Core state pushes are archived locally on the Pi; automatic Pi polling of Homey Insights is not a production history transport.
 
+### Historical gas/CV evidence — prepared source, NOT LIVE (15 October 2026)
+
+This release candidate extends the **existing** Homey Core v0.11p P1 and Quatt single-read state, and the Pi `services/pi/api/status/history_archive.py` push-fed history archive. It adds `grid.gas_meter_m3` from P1 `meter_gas` with its own `grid.gas_meter_sample_at` capability-update timestamp, and persists cumulative `grid_p1/gas_meter_m3` (m³) in `ems-history.sqlite` only for a valid P1 source and valid capability timestamp. Repeated unchanged gas updates are idempotent; source resolution stays unknown instead of inventing an electrical five-minute gas cadence. The gas counter includes domestic hot water and is not room-heat consumption.
+
+The already-present `quatt.cv_requested` is retained as a nullable boolean rather than coercing missing values to `false`. History retains separate `quatt_cic/cv_requested` (demand, not burner proof) and `quatt_cic/cv_flame` (potential burner proof, only when the capability is a real boolean). Quatt flame currently reads `null`; unknown must not be called off. The existing `warm_water.source_mode` and `WW_SOURCE_CHANGED` semantic history already record BOILER/CV source changes and must not be duplicated.
+
+**Promotion status:** branch-level code and scoped Pi tests checked, runtime cutover pending. The P1/Quatt Homey read batch, transport ownership, Pi scheduler, physical Homey writers, Honeywell setpoints, EV/WW priority and realtime P1 authority remain unchanged. No new polling, timer, automated setpoint change or live-actuator capability is added. Deployment must reconcile the existing live Homey Core exactly and avoid replaying unrelated Pi changes from the older deployment marker. See `docs/architecture/heating-gas-winter-analysis-v0.1.md`.
+
+
 ### P1-only Live vaatwasserdiagnostiek (14 oktober 2026)
 
 De Live-sectie **Actieve verbruikers** toont wasmachine en droger op basis van
