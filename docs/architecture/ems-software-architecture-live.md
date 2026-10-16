@@ -404,6 +404,15 @@ Quooker is voorbereid als eenvoudige flexload zonder thermisch model. De Pi bezi
 - maandag t/m vrijdag: `OPPORTUNITY` vóór 17:00, `FORCED_ON` van 17:00–18:00, daarna `OFF`;
 - zaterdag/zondag: `OPPORTUNITY` vóór 13:00, `FORCED_ON` van 13:00–14:00, daarna `OFF`.
 
+De Dynamic Pi Planner reserveert precies 0,25 kWh op een toekomstige
+PV-exportkans (vanaf 1250 W resterende export) **ná** de WW- en
+EV-toewijzing. Bij gebrek aan een geschikte PV-kans blijft de bestaande
+17:00/13:00-reservering. `quookerPlanW` wordt als echte kwartierreservering
+meegenomen in de netbalans; de website toont alleen dit plannerresultaat
+en markeert het fallbackvenster zonder dubbel verbruik. Deze
+forecastreservering verandert **niet** het realtime Homey-controlbeleid
+of het fysieke switch-venster; Pi deployment/validatie moet nog gebeuren.
+
 Het gemodelleerde Quooker-vermogen is 1580 W. Binnen `OPPORTUNITY` gebruikt Homey de bestaande `EM2_P1_Rolling` 120-secondenmeting als realtime executor-safety: start bij gemiddeld minstens 1250 W export (`avgGridW <= -1250`) en blijf aan totdat gemiddeld minstens 600 W import ontstaat (`avgGridW >= +600`).
 
 De keten is momenteel:

@@ -92,9 +92,9 @@ Over 6–30 september 2026 leverde de conservatief geselecteerde set normale cyc
 Plannerregel:
 
 - energy-budget: `0.25 kWh`;
-- forced planning-equivalent: `1000 W` in één 15-minuten-slot;
+- planning-equivalent: `1000 W` in één 15-minuten-slot, PV-eerst na WW/EV, anders het bestaande forced venster;
 - instantaneous heating/headroom: `1580 W`;
-- de resterende forced-slots reserveren geen tweede, derde of vierde 0,25 kWh;
+- het forced venster blijft beschikbaar, maar bij eerdere PV-reservering wordt geen tweede 0,25 kWh gereserveerd;
 - realtime `OPPORTUNITY`/`FORCED_ON` control-envelope blijft afzonderlijk van deze energieboekhouding.
 
 ## AI / historische actuator-evidence

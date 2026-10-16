@@ -175,6 +175,73 @@ def quooker_plan_w(local_dt):
     return 0
 
 
+def allocate_quooker_pv_reservation(slots, now_utc):
+    """Move one daily 0.25 kWh forecast reservation after EV allocation.
+
+    EV and WW are higher priority; Quooker may use only the remaining
+    forecast export in an unstarted OPPORTUNITY slot. Existing Homey
+    real-time P1 gate and forced window are NOT controlled by this choice.
+    """
+    by_day = {}
+    for slot in slots:
+        slot["quookerAllocationReason"] = None
+        local_day = parse_utc(slot["slot_start_utc"]).astimezone(TZ).date()
+        by_day.setdefault(local_day, []).append(slot)
+
+    for day_slots in by_day.values():
+        forced = next(
+            (slot for slot in day_slots
+             if int(slot.get("quookerPlanW") or 0) == QUOOKER_PLANNING_SLOT_W),
+            None,
+        )
+        if forced is None:
+            # The 24 h horizon does not contain that day's fallback slot.
+            continue
+
+        forced_at = parse_utc(forced["slot_start_utc"])
+        candidates = [
+            slot for slot in day_slots
+            if slot.get("quookerMode") == "OPPORTUNITY"
+            and now_utc <= parse_utc(slot["slot_start_utc"]) < forced_at
+            and float(slot.get("gridExportAfterFlexW") or 0)
+                >= QUOOKER_START_EXPORT_W
+        ]
+        if not candidates:
+            forced["quookerAllocationReason"] = "FORCED_WINDOW_FALLBACK"
+            continue
+
+        # Highest residual export wins. On a tie, prefer the earlier slot.
+        selected = max(
+            candidates,
+            key=lambda slot: (
+                float(slot["gridExportAfterFlexW"]),
+                -parse_utc(slot["slot_start_utc"]).timestamp(),
+            ),
+        )
+        forced["quookerPlanW"] = 0
+        forced["quookerPlanEnergyKWh"] = 0.0
+        forced["quookerAllocationReason"] = "FORCED_WINDOW_STANDBY"
+        selected["quookerPlanW"] = QUOOKER_PLANNING_SLOT_W
+        selected["quookerPlanEnergyKWh"] = QUOOKER_ENERGY_BUDGET_KWH
+        selected["quookerAllocationReason"] = "PV_FORECAST_OPPORTUNITY"
+
+        # The Quooker is now in the actual plan, not a frontend overlay.
+        # Reconcile the energy balance without re-optimizing EV or WW.
+        for slot in (forced, selected):
+            net = (
+                float(slot["baseLoadForecastW"])
+                + float(slot["quattForecastW"])
+                + float(slot["wwPlanW"])
+                + float(slot["evPlanW"])
+                + float(slot["quookerPlanW"])
+                - float(slot["pvForecastW"])
+            )
+            slot["gridImportAfterFlexW"] = round(max(0.0, net))
+            slot["gridExportAfterFlexW"] = round(max(0.0, -net))
+
+    return slots
+
+
 def is_consecutive(a, b):
     return (
         parse_utc(b["slot_start_utc"]) - parse_utc(a["slot_start_utc"])
@@ -1721,6 +1788,9 @@ def main():
         now_utc,
     )
 
+    # Use only PV left AFTER WW/EV opportunity and EV deadlines.
+    allocate_quooker_pv_reservation(slots, now_utc)
+
     payload = {
         "schema": "EMS_PI_DYNAMIC_SHADOW_PLAN_V0.3",
         "generated_at": now_utc.isoformat().replace("+00:00", "Z"),
@@ -1756,6 +1826,7 @@ def main():
             "quookerOpportunityStopImportW": QUOOKER_STOP_IMPORT_W,
             "quookerWeekdayForcedLocal": "17:00-18:00",
             "quookerWeekendForcedLocal": "13:00-14:00",
+            "quookerForecastReservationPolicy": "PV_AFTER_EV_WW_ELSE_FORCED_WINDOW_V0.1",
             "wwDeadlineLocal": "19:00",
             "wwMinRunMinutes": WW_MIN_RUN_SLOTS * SLOT_MIN,
             "wwShoulderMinPvCoverage": WW_SHOULDER_MIN_COVERAGE,

@@ -2,7 +2,7 @@
 """Contract test for Quooker planner energy-budget semantics."""
 
 import importlib.util
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -36,4 +36,44 @@ assert mod.quooker_plan_w(weekday_opportunity) == 0
 assert mod.quooker_mode(weekday_off) == "OFF"
 assert mod.quooker_plan_w(weekday_off) == 0
 
-print("PASS: Quooker planner reserves exactly 0.25 kWh per forced window")
+# One regression covers the distinct risk: same reservation, PV after EV,
+# and a consistent grid balance; the Homey control envelope is unchanged.
+def make_slots(midday_export, later_export):
+    slots = []
+    for hour, minute, export_w, mode, q_w in (
+        (12, 15, midday_export, "OPPORTUNITY", 0),
+        (14, 45, later_export, "OPPORTUNITY", 0),
+        (17, 0, 0, "FORCED_ON", 1000),
+    ):
+        slots.append({
+            "slot_start_utc": datetime(2026, 9, 29, hour, minute, tzinfo=TZ)
+                .astimezone(timezone.utc).isoformat(),
+            "quookerMode": mode,
+            "quookerPlanW": q_w,
+            "quookerPlanEnergyKWh": q_w * mod.SLOT_H / 1000,
+            "pvForecastW": 3000 if hour < 17 else 0,
+            "baseLoadForecastW": 500,
+            "quattForecastW": 0,
+            "wwPlanW": 0,
+            "evPlanW": 0,
+            "gridExportAfterFlexW": export_w,
+            "gridImportAfterFlexW": 1000 if hour == 17 else 0,
+        })
+    return slots
+
+
+now = datetime(2026, 9, 29, 8, tzinfo=TZ).astimezone(timezone.utc)
+moved = mod.allocate_quooker_pv_reservation(make_slots(1550, 1050), now)
+assert [s["quookerPlanW"] for s in moved] == [1000, 0, 0]
+assert moved[0]["quookerAllocationReason"] == "PV_FORECAST_OPPORTUNITY"
+assert moved[2]["quookerAllocationReason"] == "FORCED_WINDOW_STANDBY"
+assert sum(s["quookerPlanEnergyKWh"] for s in moved) == 0.25
+assert moved[0]["gridExportAfterFlexW"] == 1500
+assert moved[2]["gridImportAfterFlexW"] == 500
+
+# EV consumed the midday export: no Quooker PV booking.
+fallback = mod.allocate_quooker_pv_reservation(make_slots(200, 1050), now)
+assert [s["quookerPlanW"] for s in fallback] == [0, 0, 1000]
+assert fallback[2]["quookerAllocationReason"] == "FORCED_WINDOW_FALLBACK"
+
+print("PASS: one Quooker reservation on residual PV or forced fallback")
