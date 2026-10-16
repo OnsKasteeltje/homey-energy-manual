@@ -27,6 +27,8 @@ TARGET_HEALTH_RUNTIME="$RUNTIME/health"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 HEALTH_COMMAND="/usr/local/bin/ems-health"
 SYSTEMD="$REPO/deploy/systemd"
+CADDY_DROPIN_SOURCE="$REPO/deploy/systemd-dropins/caddy.service.d/10-tailscale-retry.conf"
+CADDY_DROPIN_TARGET="/etc/systemd/system/caddy.service.d/10-tailscale-retry.conf"
 RETIRED_FORECAST_UNITS=(
     "ems-weather-forecast.timer"
     "ems-weather-forecast.service"
@@ -395,6 +397,18 @@ for src in "$SYSTEMD"/*; do
         FAIL=1
     fi
 done
+
+echo
+echo "=== CADDY TAILSCALE RETRY DROP-IN ==="
+if [[ ! -f "$CADDY_DROPIN_TARGET" ]]; then
+    echo "MISSING: $CADDY_DROPIN_TARGET"
+    FAIL=1
+elif ! cmp -s "$CADDY_DROPIN_SOURCE" "$CADDY_DROPIN_TARGET"; then
+    echo "DRIFT:   $CADDY_DROPIN_TARGET"
+    FAIL=1
+else
+    echo "PASS: Caddy Tailscale retry drop-in matches Git source"
+fi
 
 echo
 echo "=== RETIRED FORECAST SYSTEMD UNITS ==="

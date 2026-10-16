@@ -8,6 +8,25 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### Private Caddy ingress: Tailscale startup retry (16 October 2026)
+
+Following an unexpected Pi power-off, Caddy could start before Tailscale assigned
+`100.127.130.0` and fail with `bind: cannot assign requested address`.
+The host was recovered by restarting Caddy after Tailscale became available.
+The repository now owns the matching systemd drop-in at
+`deploy/systemd-dropins/caddy.service.d/10-tailscale-retry.conf`:
+`Wants=tailscaled.service`, `After=tailscaled.service`,
+`Restart=on-failure`, `RestartSec=10s`.
+The canonical Pi deploy backs up any existing host drop-in, installs the
+versioned file and runs `systemctl daemon-reload` **without restarting Caddy**.
+The Pi drift check verifies the installed drop-in matches Git source.
+Ordering alone is not enough: the 10-second retry handles the interval between
+Tailscale service startup and assignment of the specific bind address.
+The ingress remains bound only to the private Tailnet IP; no wildcard listener,
+public port-forward, new API permissions or Homey/device writes are introduced.
+This is a GitHub source change; a later controlled Pi sync verifies it in place.
+See `deploy/caddy/README.md` for installation and recovery.
+
 ### Quooker forecast-first energy reservation — SHADOW source candidate (16 October 2026)
 
 The Dynamic Pi Planner now selects **one** 0.25 kWh Quooker energy
