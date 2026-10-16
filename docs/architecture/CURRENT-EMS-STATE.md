@@ -10,6 +10,11 @@
 
 ### Heating Thermal Learning: CiC modes at scheduled step-ups (16 October 2026)
 
+The on-demand Thermal Learning builder retains its executable bit (100755)
+for compatibility with direct CLI invocation; analysis and control semantics
+remain unchanged.
+
+
 The on-demand, read-only `build_thermal_learning_episodes.py` now correlates
 Honeywell planned target-UP events in the six heating dashboard rooms with
 raw observed `quatt_cic/supervisory_control_mode` (one-minute CiC evidence)
