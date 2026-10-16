@@ -79,6 +79,19 @@ Do not turn this document into a chronological incident log. Record reusable dia
 
 A troubleshooting task is not architecturally complete at "root cause found". It is complete only after reusable chain knowledge is captured here and affected component/runbook documentation is aligned.
 
+### PV historical-profile staleness (October 2026)
+
+Use distinct sources for each boundary: `ems-history.sqlite.measurements_15m`
+(three PV devices, `quality=complete`) -> daily
+`build_pv_history_profile.py` -> Pi-local `pv-history-profile.json`
+-> 15-minute Open-Meteo `fetch_pv_forecast.py` -> `pv-forecast.json`.
+A recent forecast timestamp is **not** proof that its historical
+calibration was refreshed: an unscheduled builder left a September profile
+in use during October. Check both timestamps, the daily service/timer
+and its quality-gate failure logs. The previous profile is deliberately kept
+if inputs are stale/incomplete. This is separate from transient changes
+in Open-Meteo's shortwave radiation feed and from EV/Homey control.
+
 ## 5. Tesla deadline diagnostic sequence (live local ingress)
 
 ```text
