@@ -62,6 +62,75 @@ test("hover selects only the nearest nonzero PV/EV/Quooker line",()=>{
  assert.equal(pv.label,"PV-forecast bij besluit");
  assert.equal(hover(slots,empty,1,30,32,view),null);
 });
+
+test("future PV overlay uses only fresh read-only current plan and preserves decision history",async()=>{
+ const source=readFileSync("frontend/pv-flex/state/pv-flex-state.js","utf8")
+   .replaceAll("export ","");
+ const now=Date.parse("2026-10-16T09:30:00Z");
+ class Clock extends Date{
+  constructor(...args){super(...(args.length?args:[now]));}
+  static now(){return now;}
+ }
+ const past="2026-10-16T08:00:00Z",future="2026-10-16T12:00:00Z";
+ const futureSlots=Array.from({length:96},(_,i)=>({
+  start:new Date(now+900000*(i+1)).toISOString(),
+  pvForecastW:1700+i
+ }));
+ futureSlots[0]={start:future,pvForecastW:2700};
+ futureSlots[1]={start:past,pvForecastW:9999}; // Never leak to past.
+ let currentAvailable=true,requests=[];
+ const respond=(body,ok=true)=>({ok,json:async()=>body});
+ const context={Date:Clock,fetch:async(url)=>{
+  requests.push(url);
+  if(url.startsWith("/web/analysis/pv-flex/day/"))return respond({
+   schema:"EMS_WEB_PV_FLEX_ANALYSIS_V1",
+   series:[{start:past},{start:future}],summary:{}
+  });
+  if(url.startsWith("/web/analysis/planner/day/"))return respond({
+   schema:"EMS_WEB_PLANNER_EVALUATION_V2",
+   forecastSource:"ARCHIVED_CANONICAL_V1_DYNAMIC_PLAN",
+   series:[{start:past,forecast:{pvForecastW:400},plan:{evPlanW:0}}]
+  });
+  if(url==="/web/planner/current"){
+   return respond({
+    schema:"EMS_WEB_DYNAMIC_PLAN_V1",status:"SHADOW",controlWrites:false,
+    forecastSource:"PV_V1_EMBEDDED_IN_DYNAMIC_PLAN",
+    generatedAt:new Date(now-60_000).toISOString(),
+    validUntil:new Date(currentAvailable?now+600_000:now-1).toISOString(),
+    slots:futureSlots
+   });
+  }
+  throw new Error("Unexpected request "+url);
+ }};
+ vm.createContext(context);
+ vm.runInContext(source,context);
+ const load=vm.runInContext("loadPvFlex",context);
+ const d=await load("2026-10-16");
+ assert.equal(d.series[0].forecast.pvForecastW,400); // Archived evidence unchanged.
+ assert.equal(d.series[0].currentPvForecastW,null);
+ assert.equal(d.series[1].forecast,null);
+ assert.equal(d.series[1].currentPvForecastW,2700);
+ assert.ok(requests.includes("/web/planner/current"));
+ const decisions=vm.runInContext("decisionPvW",scope);
+ const current=vm.runInContext("currentFuturePvW",scope);
+ assert.equal(decisions(d.series[0],now),400);
+ assert.equal(decisions(d.series[1],now),null);
+ assert.equal(current(d.series[0],now),null);
+ assert.equal(current(d.series[1],now),2700);
+ currentAvailable=false;
+ const stale=await load("2026-10-16");
+ assert.equal(stale.series[1].currentPvForecastW,null);
+ assert.equal(stale.series[0].forecast.pvForecastW,400);
+ requests=[];
+ await load("2026-10-15");
+ assert.ok(!requests.includes("/web/planner/current")); // Historical day: never fetch live overlay.
+ const html=readFileSync("frontend/pv-flex/index.html","utf8");
+ const css=readFileSync("frontend/pv-flex/styles/pv-flex.css","utf8");
+ assert.ok(html.includes('class="forecast-current"'));
+ assert.ok(css.includes(".forecast-current-line"));
+ assert.ok(script.includes('plotSegments(currentPoints,"forecast-current-line")'));
+});
+
 test("hover on a stacked measured PV bar reports only that component",()=>{
  const slots=[slot(),slot(),slot()];
  const bars=slots.map(()=>({actualKnown:true,pvW:500,evPvW:100,otherPvW:300,exportW:100}));

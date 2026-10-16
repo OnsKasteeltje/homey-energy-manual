@@ -20,6 +20,11 @@ function slotEvidence(slot,nowMs=Date.now()){
  const comparable=!!slot.plan&&!!slot.forecast&&available(slot.forecast.pvForecastW)&&p1&&pv;
  return {phase,p1,pv,comparable};
 }
+// Decision evidence is historic; the current Pi plan is only a future overlay.
+const decisionPvW=(s,nowMs=Date.now())=>
+ Date.parse(s.start)<=nowMs&&available(s.forecast?.pvForecastW)?s.forecast.pvForecastW:null;
+const currentFuturePvW=(s,nowMs=Date.now())=>
+ Date.parse(s.start)>nowMs&&available(s.currentPvForecastW)?s.currentPvForecastW:null;
 const dailyPct=v=>available(v)?(v*100).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})+"%":"—";
 function summary(d){
  $("quality").textContent="Dekking kalenderdag "+pct(d.quality.actualCoverage);
@@ -39,13 +44,14 @@ function slotAllocation(x,nowMs=Date.now()){
  return {pvW,exportW,directPvW,houseW,evActualW,evPvW,otherPvW,actualKnown:known};
 }
 // Hover exposes only the nearest visible curve or measured bar.
-function closestEvaluationSeries(slots,allocated,index,px,py,view){
+function closestEvaluationSeries(slots,allocated,index,px,py,view,nowMs=Date.now()){
  const {left,top,height,step,max,radius}=view;
  const cx=i=>left+(i+0.5)*step;
  const y=v=>top+height-v/max*height;
  let best=null,dist=radius;
  const lines=[
-  ["pvForecastW","PV-forecast bij besluit",s=>s.forecast?.pvForecastW],
+  ["pvForecastW","PV-forecast bij besluit",s=>decisionPvW(s,nowMs)],
+  ["currentPvForecastW","PV-forecast actueel",s=>currentFuturePvW(s,nowMs)],
   ["evPlanW","Tesla gepland",s=>s.plan?.evPlanW],
   ["wwPlanW","Warm water gepland",s=>s.plan?.wwPlanW],
   ["quookerPlanW","Quooker gepland",s=>s.plan?.quookerPlanW]
@@ -80,13 +86,14 @@ function closestEvaluationSeries(slots,allocated,index,px,py,view){
 function chart(d){
  const svg=$("pv-chart"),tip=$("tooltip"),a=d.series;svg.replaceChildren();
  const nowMs=Date.now();
- const has=a.some(x=>slotEvidence(x,nowMs).pv||x.plan);
+ const has=a.some(x=>slotEvidence(x,nowMs).pv||x.plan||currentFuturePvW(x,nowMs)!==null);
  $("empty").hidden=has;svg.hidden=!has;
  if(!has){tip.hidden=true;return;}
  const W=1000,H=330,p={l:52,r:18,t:18,b:40},iw=W-p.l-p.r,ih=H-p.t-p.b,ns="http://www.w3.org/2000/svg";
  const allocated=a.map(s=>slotAllocation(s,nowMs));
  const max=Math.max(100,...a.flatMap((x,i)=>[
-  allocated[i].pvW,x.forecast?.pvForecastW||0,x.plan?.evPlanW||0,
+  allocated[i].pvW,decisionPvW(x,nowMs)||0,currentFuturePvW(x,nowMs)||0,
+  x.plan?.evPlanW||0,
   x.plan?.wwPlanW||0,x.plan?.quookerPlanW||0
  ]));
  svg.setAttribute("viewBox","0 0 "+W+" "+H);
@@ -102,7 +109,7 @@ function chart(d){
   add("text",{x:p.l-7,y:y+4,class:"axis","text-anchor":"end"},(max*(4-i)/4000).toFixed(1)+"kW");
  }
  const step=iw/a.length;
- const points=[];
+ const points=[],currentPoints=[];
  a.forEach((slot,i)=>{
   const cx=p.l+(i+.5)*step,s=allocated[i],barW=step*.68;
   const heat=slot.heatingFlex||{};
@@ -115,7 +122,10 @@ function chart(d){
     if(h>0){y-=h;add("rect",{x:cx-barW/2,y,width:barW,height:h,class:cls});}
    }
   }
-  points.push(slot.forecast?cx+","+(p.t+ih-slot.forecast.pvForecastW/max*ih):null);
+  const historicalW=decisionPvW(slot,nowMs);
+  const currentW=currentFuturePvW(slot,nowMs);
+  points.push(historicalW===null?null:cx+","+(p.t+ih-historicalW/max*ih));
+  currentPoints.push(currentW===null?null:cx+","+(p.t+ih-currentW/max*ih));
   if(i%8===0)add("text",{x:cx,y:H-15,class:"axis","text-anchor":"middle"},time(slot.start));
   const hit=add("rect",{x:p.l+i*step,y:p.t,width:step,height:ih,class:"hit"});
   hit.addEventListener("mousemove",event=>{
@@ -127,7 +137,7 @@ function chart(d){
    const scale=Math.hypot(matrix.a,matrix.b);
    const hover=closestEvaluationSeries(a,allocated,i,pos.x,pos.y,{
     left:p.l,top:p.t,height:ih,step,max,radius:11/scale
-   });
+   },nowMs);
    if(!hover||!available(hover.value)){tip.hidden=true;return;}
    tip.replaceChildren();
    const title=document.createElement("strong");title.textContent=time(slot.start);
@@ -149,6 +159,7 @@ function chart(d){
   flush();
  };
  plotSegments(points,"forecast-line");
+ plotSegments(currentPoints,"forecast-current-line");
  for(const [field,cls] of [
   ["evPlanW","planned-ev-line"],["wwPlanW","planned-ww-line"],["quookerPlanW","planned-quooker-line"]
  ]){

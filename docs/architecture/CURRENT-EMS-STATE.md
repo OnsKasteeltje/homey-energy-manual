@@ -8,6 +8,22 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### Evaluatie: historische PV-beslisforecast versus actuele toekomst (16 October 2026)
+
+The read-only PV & Flex evaluation overlays two deliberately distinct sources
+for the **current** Amsterdam day. Solid blue is exclusively the archived
+canonical planner-decision PV forecast, selected at each slot and not
+rewritten. Dashed blue is the fresh `/web/planner/current` canonical PV V1
+forecast embedded in the presently valid 96-slot Pi plan, shown **only for
+future quarter starts**, as known when the page was loaded. The read-only
+browser adapter validates schema, shadow mode, controlWrites=false, expected
+source, 96 slots, generatedAt and validUntil, and skips the overlay if the
+endpoint is unavailable or stale. Previous days never fetch this endpoint.
+The forecast lines are disconnected at the present boundary rather than
+backfilling missing archived decisions. This is solely an additive
+frontend visualization: no new API/control authority, no changed planner
+forecasts, no Homey writes and no retroactive evaluation changes.
+
 ### Quality-gated daily PV calibration (16 October 2026)
 
 The 15-minute PV forecast was repeatedly reading a historical calibration last
