@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,7 +21,7 @@ SCHEMA = "EMS_HEATING_THERMAL_LEARNING_EPISODES_V0.1"
 HOME_TZ_NAME = "Europe/Amsterdam"
 HOME_TZ = ZoneInfo(HOME_TZ_NAME)
 
-SCOPED_ROOMS = {"woonkamer", "eetkamer", "keuken", "serre"}
+SCOPED_ROOMS = {"woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"}
 ROOM_GROUPS = {"living_area": ["woonkamer", "eetkamer"]}
 
 PRE_WINDOW = timedelta(hours=3)
@@ -97,6 +98,66 @@ def _series(
         for row in rows
     ]
 
+
+
+def _raw_evidence(
+    con: sqlite3.Connection, device_key: str, metric_key: str,
+    start: datetime, end: datetime,
+) -> list[dict[str, Any]]:
+    """Bounded observed samples. Do not fill missing minutes or reconstruct gas."""
+    did = _device_id(con, device_key)
+    mid = _metric_id(con, metric_key)
+    if did is None or mid is None:
+        return []
+    rows = con.execute(
+        """
+        SELECT x.ts_utc, x.value_real
+        FROM measurements x
+        WHERE x.device_id=? AND x.metric_id=?
+          AND x.quality='observed' AND x.value_real IS NOT NULL
+          AND julianday(x.ts_utc) >= julianday(?)
+          AND julianday(x.ts_utc) <= julianday(?)
+        ORDER BY julianday(x.ts_utc)
+        """,
+        (did, mid, _iso(start), _iso(end)),
+    ).fetchall()
+    result = []
+    for ts, raw in rows:
+        try:
+            instant = _parse(ts)
+            value = float(raw)
+        except (EpisodeError, TypeError, ValueError):
+            continue
+        if not math.isfinite(value):
+            continue
+        if metric_key == "supervisory_control_mode":
+            # Do not reinterpret absent/future CiC modes as standby.
+            if not (value.is_integer() and 0 <= value <= 65535):
+                continue
+            result.append({"at": _iso(instant), "mode": int(value)})
+        elif metric_key == "gas_meter_m3" and value >= 0:
+            result.append({"at": _iso(instant), "meterM3": value})
+    return result
+
+
+def _cic_stepup_context(
+    samples: list[dict[str, Any]], step_at: datetime,
+) -> dict[str, Any]:
+    """Observation, not proof of firing or causality for this room."""
+    before = [s for s in samples if _parse(s["at"]) < step_at]
+    after = [s for s in samples if _parse(s["at"]) >= step_at]
+    selected_after = next((s for s in after if s["mode"] in (3, 4)), None)
+    return {
+        "samples": samples,
+        "sampleCountAfterStepUp": len(after),
+        "firstBoilerModeAfterStepUpAt": (
+            selected_after["at"] if selected_after else None
+        ),
+        "boilerModeAlsoObservedBeforeStepUp": any(
+            s["mode"] in (3, 4) for s in before
+        ) if before else None,
+        "interpretation": "CIC_SELECTED_BOILER_MODE_NOT_BURNER_PROOF",
+    }
 
 def _counter_delta(series: list[dict[str, Any]]) -> float | None:
     vals = [x["avg"] for x in series if x["avg"] is not None]
@@ -394,6 +455,16 @@ def build_episodes(
             con, "quatt_cic", "heating_on",
             window_start, window_end,
         )
+        # Observed one-minute CiC mode; do not aggregate into 15m
+        # averages because short 3/4 episodes would disappear.
+        cic_samples = _raw_evidence(
+            con, "quatt_cic", "supervisory_control_mode",
+            window_start, window_end,
+        )
+        gas_samples = _raw_evidence(
+            con, "grid_p1", "gas_meter_m3",
+            window_start, window_end,
+        )
 
         pv_wh = sum(
             value or 0.0
@@ -427,6 +498,7 @@ def build_episodes(
                     "grid": {
                         "importDelta_kWh": _counter_delta(grid_import),
                         "exportDelta_kWh": _counter_delta(grid_export),
+                        "gasMeterObservations": gas_samples,
                     },
                     "pv": {
                         "productionEnergy_Wh": round(pv_wh, 3),
@@ -436,6 +508,9 @@ def build_episodes(
                         "electricalPower": quatt_electrical,
                         "outsideTemperature": outside_temp,
                         "heatingOn": heating_on,
+                        "cicSupervisoryMode": _cic_stepup_context(
+                            cic_samples, t0,
+                        ),
                     },
                 },
                 "quality": {
@@ -446,6 +521,8 @@ def build_episodes(
                     "hasQuattEvidence": bool(
                         quatt_electrical or outside_temp or heating_on
                     ),
+                    "cicModeObservedSamples": len(cic_samples),
+                    "gasMeterObservedSamples": len(gas_samples),
                 },
                 "assessment": {
                     "status": "UNASSESSED",

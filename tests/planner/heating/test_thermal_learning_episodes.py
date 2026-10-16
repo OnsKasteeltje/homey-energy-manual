@@ -160,6 +160,15 @@ def empty_db():
           unit TEXT
         );
 
+        CREATE TABLE measurements (
+          ts_utc TEXT,
+          device_id INTEGER,
+          metric_id INTEGER,
+          value_real REAL,
+          quality TEXT,
+          source_resolution_seconds INTEGER
+        );
+
         CREATE TABLE measurements_15m (
           slot_start_utc TEXT,
           device_id INTEGER,

@@ -73,7 +73,7 @@ python3 -m pytest -q tests/integrations/test_history_archive_counters.py
 
 After commissioning, verify continued ingestion through the accepted `/state/energy` path: recent SQLite `grid_p1/gas_meter_m3` and `quatt_cic/cv_requested` rows must have honest timestamps and quality, and there must be no `cv_flame` row until the source provides a real boolean. Existing `warm_water.source_mode` remains separate semantic event state. The full Pi deployment marker was intentionally not rewritten by the targeted archive installation; running an unqualified full Pi deploy could inadvertently promote unrelated code. Keep all temperature changes shadow-only.
 
-## CiC supervisory-control mode — read-only collector (candidate, not yet deployed)
+## CiC supervisory-control mode — commissioned read-only collector (16 October 2026)
 
 The 16 October 2026 Douwe bedroom test physically confirmed boiler operation
 while the Homey `quatt.cv_requested` signal stayed false. The P1 gas counter
@@ -89,7 +89,7 @@ confirmed gas flame. Verify correlations against real gas counter updates,
 hot-water source and, where possible, physical burner observation before
 using mode for heating optimisation or safety decisions.
 
-The proposed `services/pi/integrations/quatt/collect_quatt_cic_mode.py`
+The commissioned `services/pi/integrations/quatt/collect_quatt_cic_mode.py`
 uses **only one local HTTP GET each minute**, separate from the existing
 five-minute Homey Quatt collector. It inserts `quatt_cic /
 supervisory_control_mode` in the existing `ems-history.sqlite` with actual
@@ -105,3 +105,13 @@ machine-specific address must not be embedded in public source. New
 this source. Commission the timer explicitly after a clean read-only trial
 and a successful test. No Homey flow, planner priority, CV guard, actuator,
 Honeywell target, or physical write changes. The mode remains ANALYSIS ONLY.
+
+### Scheduled Heating UP correlation (16 October 2026)
+
+The on-demand Thermal Learning Episodes V0.1 report now embeds observed CiC
+mode samples and P1 gas **meter observations** around planned Honeywell UP
+points for all six Heating rooms. This is read-only and retrospective, not
+a controller input. The manually triggered 19:59 Douwe experiment was an
+override, **not** a scheduled UP and is not automatically represented as one.
+Short-mode evidence cannot by itself establish CV flame or gas attributable
+to a room. No new timer or collector is necessary.
