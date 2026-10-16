@@ -74,7 +74,7 @@ test("future PV overlay uses only fresh read-only current plan and preserves dec
  const past="2026-10-16T08:00:00Z",future="2026-10-16T12:00:00Z";
  const futureSlots=Array.from({length:96},(_,i)=>{
   const start=new Date(now+900000*(i+1)).toISOString();
-  return {start,pvForecastW:start===future?2700:1700+i};
+  return {start,pvForecastW:Date.parse(start)===Date.parse(future)?2700:1700+i};
  });
  futureSlots[1]={start:past,pvForecastW:9999}; // Never leak to past.
  let currentAvailable=true,requests=[];
