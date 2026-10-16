@@ -1373,8 +1373,14 @@ def dynamic_planner_resource():
         quooker_opportunity = item.get("quookerOpportunityAllowed")
         if not isinstance(quooker_opportunity, bool):
             quooker_opportunity = None
+        quooker_reason = item.get("quookerAllocationReason")
+        if quooker_reason not in (
+                None, "PV_FORECAST_OPPORTUNITY",
+                "FORCED_WINDOW_FALLBACK", "FORCED_WINDOW_STANDBY"):
+            raise ValueError("DYNAMIC_PLAN_QUOOKER_REASON_INVALID")
         exposed.append({
             "quookerPlanW": quooker_w,
+            "quookerAllocationReason": quooker_reason,
             "quookerMode": quooker_mode,
             "quookerOpportunityAllowed": quooker_opportunity,
             "start": item["slot_start_utc"],

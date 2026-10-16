@@ -14,6 +14,18 @@ There is no fixed PV start threshold such as 500 W. A slot is valued relative to
 
 Forecast export is corrected in the near horizon with live P1 export. The live influence is strongest now and decays smoothly over two hours.
 
+## Quooker reservation priority (source candidate, not yet deployed)
+
+The existing Homey/Pi control envelope is unchanged. The Dynamic Pi
+Planner treats Quooker heat-up as one small daily 0.25 kWh forecast
+reservation. WW and Tesla—including EV deadline charging—are allocated
+first. Quooker then uses the future slot with the highest remaining
+export >=1250 W before its weekday 17:00/weekend 13:00 fallback window.
+If none qualifies, the fixed-slot reservation remains. This is reflected
+in `quookerPlanW` and the canonical final grid balance; the frontend
+is a pure reader. It does not prove physical heating or override
+Homey's realtime rolling P1 safety rules.
+
 ## Forecast confidence
 
 Confidence is intentionally compact and uses only three signals:

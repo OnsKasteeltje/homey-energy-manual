@@ -19,6 +19,7 @@ slot = {
     "pvForecastW": 2200, "evPlanW": 1400, "wwPlanW": 0,
     "gridImportAfterFlexW": 0, "gridExportAfterFlexW": 400,
     "confidence": 0.8, "quookerPlanW": 1000, "quookerMode": "FORCED_ON", "quookerOpportunityAllowed": False,
+    "quookerAllocationReason": "FORCED_WINDOW_FALLBACK",
     "evAllocationReason": "PV_OPPORTUNITY",
     "wwAllocationReason": "BLOCKED_SOURCE_CV",
 }
@@ -47,6 +48,7 @@ with tempfile.TemporaryDirectory() as tmp:
     assert result["slots"][0]["evPlanW"]==1400
     assert result["slots"][0]["quookerPlanW"]==1000
     assert result["slots"][0]["quookerMode"]=="FORCED_ON"
+    assert result["slots"][0]["quookerAllocationReason"]=="FORCED_WINDOW_FALLBACK"
     assert result["slots"][0]["evReason"]=="PV_OPPORTUNITY"
     assert "secret" not in json.dumps(result)
     assert "guardrails" not in result

@@ -67,7 +67,9 @@ function render({plan, ev}) {
   $("freshness").textContent = "Plan " + localTime(plan.generatedAt) +
     " · geldig tot " + localTime(plan.validUntil);
   $("plan-mode").textContent = "Warmwaterbron: " + (plan.wwSourceMode || "onbekend") +
-    ". Alle lijnen zijn plan/forecast, geen gemeten uitvoering. Verwarming heeft een aparte shadow-keten; realtime P1 blijft leidend.";
+    ". Quooker: één reservering van 0,25 kWh in het dynamische plan, PV-eerst na EV/WW; " +
+    "17:00 (weekend 13:00) blijft een Homey-fallbackvenster. " +
+    "Alle lijnen zijn plan/forecast, geen gemeten uitvoering; realtime P1 blijft leidend.";
   renderRequirement(ev);
 
   const slots = plan.slots || [];
@@ -127,6 +129,12 @@ function render({plan, ev}) {
     marker(ev.latestStartAt,"ev-latest","EV uiterlijk starten");
     marker(ev.deadlineAt,"ev-deadline","EV deadline");
   }
+  // Mark the existing planner mode transition, never a second load.
+  slots.forEach((s,i)=>{
+    if (s.quookerMode==="FORCED_ON" &&
+        (i===0 || slots[i-1].quookerMode!=="FORCED_ON"))
+      marker(s.start,"quooker-fallback","Quooker fallback vanaf");
+  });
   for (let h=0;h<=24;h+=2) {
     const ms=viewStart+h*3600000;
     add("text",{x:xFor(ms),y:H-20,class:"axis","text-anchor":h===0?"start":h===24?"end":"middle"},localTime(ms));
@@ -159,9 +167,12 @@ function render({plan, ev}) {
     };
     addDetail(label,slot[field]==null?"—":fmtW(slot[field]));
     if (field==="quookerPlanW") {
+      addDetail("Quooker reservering",slot.quookerAllocationReason==="PV_FORECAST_OPPORTUNITY"
+        ? "PV, na EV/WW" : "Vast fallbackvenster");
       addDetail("Quooker modus",slot.quookerMode||"—");
       addDetail("PV-kans",slot.quookerOpportunityAllowed===true?"toegestaan":
         slot.quookerOpportunityAllowed===false?"niet toegestaan":"—");
+      addDetail("Uitvoering", "Homey beslist op actuele P1");
     } else if (field==="evPlanW") {
       addDetail("EV reden",slot.evReason||"—");
     } else if (field==="wwPlanW") {

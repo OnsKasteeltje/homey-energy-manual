@@ -7,6 +7,25 @@
 **Status date:** 2026-10-14
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
+
+### Quooker forecast-first energy reservation — SHADOW source candidate (16 October 2026)
+
+The Dynamic Pi Planner now selects **one** 0.25 kWh Quooker energy
+reservation per local day in the 24-hour action horizon: after WW, EV
+opportunity and EV deadline planning, use the future OPPORTUNITY slot
+with highest remaining forecast export >=1250 W before the fixed window,
+otherwise keep the 17:00 weekday / 13:00 weekend fallback reservation.
+The chosen `quookerPlanW` is included in the canonical plan's final net
+import/export accounting, not a website-side hypothetical overlay.
+EV/WW allocation remains unchanged and takes priority; a Quooker slot
+never consumes PV already assigned to Tesla. This is a planning **source
+candidate only** until Pi deployment and observed runtime checks pass.
+The existing Pi mode/time envelope, Homey 120-second rolling-P1 start
+and stop safety, and sole LIVE Cooker writer are unchanged. The fixed
+window remains an *execution window*, not evidence that 0.25 kWh will
+physically be consumed then. Forecast reservation is never evidence
+of a completed heat cycle.
+
 **Primary runtime host:** Raspberry Pi `ems-pi`
 
 Detailed bidirectional runtime chain: `docs/architecture/homey-pi-runtime-dataflow.md`.
