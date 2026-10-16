@@ -8,6 +8,23 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### Quatt CiC supervisory-mode logging — candidate (16 October 2026)
+
+The new **read-only** `ems-quatt-cic-mode.service/.timer` can sample the local
+CiC `qc.supervisoryControlMode` once per minute (HTTPS is not used; only
+the private-LAN HTTP GET feed on port 8080). It records the observed integer
+at `quatt_cic/supervisory_control_mode` in canonical `ems-history.sqlite`
+without adding a second planner, changing the existing five-minute Homey
+Quatt reader, or modifying any heat actuator. Local URL configuration is
+private to the Pi in `/etc/default/ems-quatt-cic-mode`. Mode `3`/`4`
+indicates CiC-selected boiler operation, **not confirmed burner ignition**;
+combine with independently timestamped P1 gas observations and hot-water
+context for later analysis. Missing/malformed observations never become 0.
+The new timer is **not enabled automatically** by adding or merging source:
+Pi commissioning and readback are explicit and separate. Until validated
+against physical burner observations, this metric is ANALYSIS ONLY and must
+not weaken existing conservative CV guards.
+
 ### Evaluatie: historische PV-beslisforecast versus actuele toekomst (16 October 2026)
 
 The read-only PV & Flex evaluation overlays two deliberately distinct sources
