@@ -368,6 +368,7 @@ pass "PV Forecast V2 target-structure deploy/drift mapping present"
 
 python3 "$FORECAST_TRANSPORT_TEST" || fail "bounded Open-Meteo transport retry contract failed"
 python3 "$FORECAST_CADENCE_TEST" || fail "atomic forecast single-cadence contract failed"
+python3 tests/forecast/test_pv_history_profile_daily_contract.py || fail "daily PV profile quality contract failed"
 for retired in \
   deploy/systemd/ems-weather-forecast.timer \
   deploy/systemd/ems-weather-forecast.service \

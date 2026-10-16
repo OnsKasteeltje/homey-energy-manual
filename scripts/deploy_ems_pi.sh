@@ -450,6 +450,9 @@ done
 echo "=== SYSTEMD RELOAD ==="
 systemctl daemon-reload
 
+echo "=== ENABLE DAILY PV PROFILE REFRESH ==="
+systemctl enable --now ems-pv-history-profile.timer
+
 for unit in "${RETIRED_FORECAST_UNITS[@]}"; do
     if [[ -e "/etc/systemd/system/$unit" ]]; then
         echo "ERROR: retired forecast unit still installed: $unit"

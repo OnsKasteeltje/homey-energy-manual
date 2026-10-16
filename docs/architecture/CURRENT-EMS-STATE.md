@@ -8,6 +8,28 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### Quality-gated daily PV calibration (16 October 2026)
+
+The 15-minute PV forecast was repeatedly reading a historical calibration last
+generated 13 September: the builder existed but had no scheduled refresh.
+The read-only 16 October check found 2,869/2,875 complete three-inverter
+quarters (99.8%), 27 peak-qualified days and all 96 quarter bins represented.
+A separate shadow rebuild proved the October envelope differs materially.
+
+The source-managed `ems-pv-history-profile.timer` runs once daily at
+00:27 Europe/Amsterdam, after the 00:17 15-minute and 00:20 daily history jobs.
+The builder reads SQLite **read-only**, uses only complete power quarters from
+all three inverters and promotes the rolling 30-day P80 profile only if at
+least seven peak-qualified days, 80 bins, >=95% complete measurements and one
+fresh complete three-inverter quarter in the last 36 hours are available.
+On failure, it raises a service error without replacing the active profile.
+On success, it saves the previous active JSON to
+`pv-history-profile.previous.json` and atomically publishes the new JSON.
+The existing 15-minute forecast chain picks up changes at its next cycle;
+it is not restarted or run separately. Deployment enables the daily timer.
+There are no Homey/device writes. This fixes stale calibration, not abrupt
+Open-Meteo radiation changes, which require a separate forecast-quality review.
+
 ### Private Caddy ingress: Tailscale startup retry (16 October 2026)
 
 Following an unexpected Pi power-off, Caddy could start before Tailscale assigned
