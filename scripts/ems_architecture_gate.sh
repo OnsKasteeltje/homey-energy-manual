@@ -218,6 +218,9 @@ if grep -Eq 'runtime/publisher/publish_(dynamic_)?planner_shadow\.py' "$FORECAST
 fi
 pass "forecast chain terminates in Pi-local planner projections with no GitHub runtime publication dependency"
 
+python3 tests/deploy/test_caddy_tailscale_dropin_contract.py || fail "Caddy Tailscale retry deployment contract failed"
+pass "Caddy Tailscale retry drop-in is source-managed, backed up and drift-checked"
+
 for legacy_planner_github_artifact in \
   src/pi/ems-runtime/publisher/publish_planner_shadow.py \
   src/pi/ems-runtime/publisher/publish_dynamic_planner_shadow.py \

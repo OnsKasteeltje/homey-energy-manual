@@ -28,6 +28,8 @@ PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 CONSTRAINED_REPLAY_COMMAND="/usr/local/bin/ems-constrained-replay"
 HEALTH_COMMAND="/usr/local/bin/ems-health"
 SYSTEMD="$REPO/deploy/systemd"
+CADDY_DROPIN_SOURCE="$REPO/deploy/systemd-dropins/caddy.service.d/10-tailscale-retry.conf"
+CADDY_DROPIN_TARGET="/etc/systemd/system/caddy.service.d/10-tailscale-retry.conf"
 BACKUP_ROOT="/home/jeroen/ems/backup"
 DEPLOY_MARKER="/home/jeroen/ems/data/deployed-git-commit"
 RETIRED_FORECAST_TIMERS=(
@@ -96,6 +98,10 @@ cp -a "$RUNTIME" "$BACKUP/runtime"
 for f in "$SYSTEMD"/*; do
     cp -a "/etc/systemd/system/$(basename "$f")" "$BACKUP/" 2>/dev/null || true
 done
+if [[ -f "$CADDY_DROPIN_TARGET" ]]; then
+    mkdir -p "$BACKUP/caddy.service.d"
+    cp -a "$CADDY_DROPIN_TARGET" "$BACKUP/caddy.service.d/"
+fi
 # Retiring units are no longer in Git, so preserve any still-installed copies
 # explicitly in this deployment backup before removing them from the host.
 for unit in "${RETIRED_FORECAST_UNITS[@]}" "${RETIRED_EV_DEADLINE_FETCH_UNITS[@]}"; do
@@ -417,6 +423,9 @@ echo "=== DEPLOY SYSTEMD ==="
 for f in "$SYSTEMD"/*; do
     cp -a "$f" "/etc/systemd/system/$(basename "$f")"
 done
+
+echo "=== DEPLOY CADDY TAILSCALE RETRY DROP-IN ==="
+install -D -m 0644 "$CADDY_DROPIN_SOURCE" "$CADDY_DROPIN_TARGET"
 
 echo
 echo "=== RETIRE LEGACY FORECAST UNITS ==="
