@@ -72,3 +72,36 @@ python3 -m pytest -q tests/integrations/test_history_archive_counters.py
 ```
 
 After commissioning, verify continued ingestion through the accepted `/state/energy` path: recent SQLite `grid_p1/gas_meter_m3` and `quatt_cic/cv_requested` rows must have honest timestamps and quality, and there must be no `cv_flame` row until the source provides a real boolean. Existing `warm_water.source_mode` remains separate semantic event state. The full Pi deployment marker was intentionally not rewritten by the targeted archive installation; running an unqualified full Pi deploy could inadvertently promote unrelated code. Keep all temperature changes shadow-only.
+
+## CiC supervisory-control mode — read-only collector (candidate, not yet deployed)
+
+The 16 October 2026 Douwe bedroom test physically confirmed boiler operation
+while the Homey `quatt.cv_requested` signal stayed false. The P1 gas counter
+increased, but `cv_flame` was unavailable. These are observations, not proof
+that the P1 meter alone can attribute gas use to space heating.
+
+The local Quatt CiC feed `/beta/feed/data.json` exposes
+`qc.supervisoryControlMode`: `0` standby, `1` standby/heating,
+`2` heat pump only, `3` heat pump + boiler, `4` boiler only; additional
+maintenance/protection values must be preserved as observed, not mapped to
+standby. Modes 3/4 indicate **CiC-selected boiler operation**, not independently
+confirmed gas flame. Verify correlations against real gas counter updates,
+hot-water source and, where possible, physical burner observation before
+using mode for heating optimisation or safety decisions.
+
+The proposed `services/pi/integrations/quatt/collect_quatt_cic_mode.py`
+uses **only one local HTTP GET each minute**, separate from the existing
+five-minute Homey Quatt collector. It inserts `quatt_cic /
+supervisory_control_mode` in the existing `ems-history.sqlite` with actual
+UTC observation timestamp, `quality=observed`, and
+`source_resolution_seconds=60`. Invalid/missing/unknown-source payloads
+fail closed (no fabricated standby). Failures cannot affect the Homey or
+heating control chain; the one-minute timer does not replay missed samples.
+
+Pi-local configuration: `/etc/default/ems-quatt-cic-mode` contains
+`QUATT_CIC_URL=http://<private-CiC-IP>:8080/beta/feed/data.json`; this
+machine-specific address must not be embedded in public source. New
+`ems-quatt-cic-mode.service/.timer` are **not** activated by merely merging
+this source. Commission the timer explicitly after a clean read-only trial
+and a successful test. No Homey flow, planner priority, CV guard, actuator,
+Honeywell target, or physical write changes. The mode remains ANALYSIS ONLY.
