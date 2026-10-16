@@ -108,6 +108,34 @@ The initial evidence window is three hours before through three hours after the
 planned Honeywell UP transition. This is an observation window, not a learned
 or fixed optimal preheat duration.
 
+### CiC/CV-evidence gekoppeld aan schema-step-ups (16 oktober 2026)
+
+The existing on-demand Thermal Learning Episodes V0.1 builder now includes
+all six Heating dashboard rooms, including `douwe_slaapkamer` and
+`erker_douwe`. For each *planned* UP transition it includes the **original,
+timestamped, minute-level** `quatt_cic/supervisory_control_mode` samples
+from the canonical SQLite history in
+`evidence.quatt.cicSupervisoryMode`. It also includes independently timestamped
+`grid_p1/gas_meter_m3` observations as
+`evidence.grid.gasMeterObservations`, without deriving a per-room gas figure.
+
+The first mode 3/4 **observed after** a planned step-up is supplied as
+`firstBoilerModeAfterStepUpAt`, or `null` when not observed. A prior mode
+3/4 observation is flagged separately, because concurrent household heating
+cannot be attributed to one room. Missing 60-second samples stay missing.
+Mode 3/4 is CiC-selected boiler operation, not evidence of physical flame.
+No heater-on conclusion is drawn from the absence of an observation.
+
+The Honeywell **weekly schedule** remains the baseline authority for planned
+transitions. A manually changed target (such as the Douwe test on 16 October)
+is deliberately **not** mislabeled as a scheduled UP. Historical changes to
+the weekly schedule are not reconstructed from today's schedule; interpret
+retrospective episodes only when the matching schedule history is credible.
+
+This feature runs **on demand**, not on an extra timer; the previous
+`UNASSESSED / RAW_EPISODE_EVIDENCE_ONLY` assessment remains intact.
+Nothing is published to Homey and no physical control is enabled.
+
 ## Frontend and planner boundary
 
 The canonical cross-domain boundary is defined in `docs/architecture/forward-planning-vs-historical-learning.md`.

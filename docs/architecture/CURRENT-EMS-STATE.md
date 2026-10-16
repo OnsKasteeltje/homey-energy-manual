@@ -8,6 +8,21 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### Heating Thermal Learning: CiC modes at scheduled step-ups (16 October 2026)
+
+The on-demand, read-only `build_thermal_learning_episodes.py` now correlates
+Honeywell planned target-UP events in the six heating dashboard rooms with
+raw observed `quatt_cic/supervisory_control_mode` (one-minute CiC evidence)
+and `grid_p1/gas_meter_m3` (independent P1-gas counter observations)
+inside the existing +/-3-hour evidence window. Each episode can report the
+first observed CiC mode 3/4 after the planned step-up, but never infers a
+physical flame, a room-specific gas amount, or that the room caused boiler
+selection. Missing intervals remain unknown, and the episode stays
+`UNASSESSED`/SHADOW. Manual Honeywell override changes remain distinct from
+weekly schedule step-ups. No new timer, controller, Homey flow, heating
+actuator, or telemetry publisher is created. Refer to
+`docs/components/space-heating-thermal-learning.md` for detailed semantics.
+
 ### Quatt CiC supervisory-mode logging — candidate (16 October 2026)
 
 The new **read-only** `ems-quatt-cic-mode.service/.timer` can sample the local
