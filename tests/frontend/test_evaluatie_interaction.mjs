@@ -17,6 +17,17 @@ const plan={evPlanW:0,wwPlanW:0,quookerPlanW:0};
 function slot(extra={}){
  return {start,end,actual:{p1Coverage:1,pvCoverage:1,pvKWh:.1,importKWh:.05,exportKWh:.01},forecast:{pvForecastW:400},plan,...extra};
 }
+test("archived PV display never turns an expired plan into decision evidence",()=>{
+ const now=Date.parse("2026-10-10T08:50:00Z");
+ const s=slot({forecast:null,plan:null,historicalPvDisplay:{
+  pvForecastW:2250,source:"ARCHIVED_EXPIRED_PLAN_DISPLAY_ONLY",ageMinutes:27}});
+ const decision=vm.runInContext("decisionPvW",scope);
+ assert.equal(decision(s,now),2250);
+ assert.equal(evidence(s,now).comparable,false);
+ assert.equal(decision(s,Date.parse("2026-10-10T08:35:00Z")),null);
+ assert.equal(decision({...s,historicalPvDisplay:null},now),null);
+ assert.equal(decision({...s,forecast:{pvForecastW:3200}},now),3200);
+});
 test("running quarter is provisional even if device power was already recorded",()=>{
  const result=evidence(slot(),Date.parse("2026-10-10T08:36:00Z"));
  assert.equal(result.phase,"OPEN");

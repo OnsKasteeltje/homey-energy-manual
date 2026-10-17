@@ -682,6 +682,7 @@ def planner_evaluation_resource(value):
             "start": cursor.astimezone(LOCAL_TZ).isoformat(),
             "forecast": None,
             "plan": None,
+            "displayForecast": None,
         }
         cursor += timedelta(minutes=15)
 
@@ -729,10 +730,27 @@ def planner_evaluation_resource(value):
             if not isinstance(item, dict):
                 continue
             when = parse_timestamp(item.get("slot_start_utc"))
-            if when is None or when < generated or when > valid_until:
+            if when is None or when < generated:
                 continue
             slot = slots.get(_utc_text(when))
             if slot is None or slot["plan"] is not None:
+                continue
+            if when > valid_until:
+                # Archive PV values can be displayed, never reused as
+                # valid planner decisions or comparable evaluation evidence.
+                age_seconds = (when - generated).total_seconds()
+                if age_seconds > 45 * 60 or slot["displayForecast"] is not None:
+                    continue
+                try:
+                    display_w = watts(item, "pvForecastW")
+                except ValueError:
+                    continue
+                slot["displayForecast"] = {
+                    "pvForecastW": display_w,
+                    "generatedAt": generated_value,
+                    "ageMinutes": round(age_seconds / 60, 1),
+                    "source": "ARCHIVED_EXPIRED_PLAN_DISPLAY_ONLY",
+                }
                 continue
             try:
                 values = {key: watts(item, key) for key in (
@@ -756,6 +774,7 @@ def planner_evaluation_resource(value):
             if not isinstance(quooker_allowed, bool):
                 quooker_allowed = None
             # The forecast is the value the SAME selected decision used.
+            slot["displayForecast"] = None
             slot["forecast"] = {
                 "pvForecastW": values["pvForecastW"],
                 "confidence": confidence,
@@ -787,6 +806,11 @@ def planner_evaluation_resource(value):
         "controlWrites": False,
         "forecastSource": "ARCHIVED_CANONICAL_V1_DYNAMIC_PLAN",
         "forecastSelection": {"kind": "SAME_AS_VALID_PLAN_DECISION"},
+        "displayForecastSelection": {
+            "kind": "LATEST_ARCHIVED_FORECAST_DISPLAY_ONLY",
+            "maxAgeMinutes": 45,
+            "doesNotCreatePlanEvidence": True,
+        },
         "planSelection": {"kind": "LATEST_VALID_BEFORE_SLOT_START"},
         "summary": {
             "forecastSlots": len(planned),

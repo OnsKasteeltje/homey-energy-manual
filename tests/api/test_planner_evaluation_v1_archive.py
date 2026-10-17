@@ -70,6 +70,22 @@ with tempfile.TemporaryDirectory() as tmp:
     assert "secret" not in json.dumps(result)
     assert result["summary"]["quookerPlanSlots"]>=1
     assert result["summary"]["plannedQuookerKWh"] is not None
+    # Existing forecast in an expired snapshot is graph-only. All plan and
+    # decision comparability evidence remains absent.
+    con=sqlite3.connect(db)
+    con.execute("DELETE FROM planner_snapshots")
+    generated=slot-timedelta(minutes=27)
+    write(con,generated,slot-timedelta(minutes=7),2250,9999,9999)
+    con.commit()
+    display_only=api.planner_evaluation_resource("2026-10-09")
+    first=display_only["series"][0]
+    assert first["forecast"] is None and first["plan"] is None
+    assert first["displayForecast"]["pvForecastW"]==2250
+    assert first["displayForecast"]["ageMinutes"]==27.0
+    assert first["displayForecast"]["source"]=="ARCHIVED_EXPIRED_PLAN_DISPLAY_ONLY"
+    assert display_only["summary"]["forecastKWh"] is None
+    assert display_only["series"][4]["displayForecast"] is None, "45m bound"
+    con.close()
     # Missing or incomplete archival evidence must stay unknown.
     con=sqlite3.connect(db)
     con.execute("DELETE FROM planner_snapshots")
@@ -78,5 +94,5 @@ with tempfile.TemporaryDirectory() as tmp:
     missing=api.planner_evaluation_resource("2026-10-09")
     assert missing["summary"]["forecastKWh"] is None
     assert missing["summary"]["plannedQuookerKWh"] is None
-    assert all(row["forecast"] is None and row["plan"] is None for row in missing["series"])
+    assert all(row["forecast"] is None and row["plan"] is None and row["displayForecast"] is None for row in missing["series"])
     print("PASS: single original plan V1 PV, Tesla/WW/Quooker, no hindsight, no fabricated evidence")

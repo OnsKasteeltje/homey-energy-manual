@@ -56,6 +56,15 @@ forecast embedded in the presently valid 96-slot Pi plan, shown for the
 browser adapter validates schema, shadow mode, controlWrites=false, expected
 source, 96 slots, generatedAt and validUntil, and skips the overlay if the
 endpoint is unavailable or stale. Previous days never fetch this endpoint.
+An additive **read-only display-only** fallback uses `displayForecast` from the
+latest earlier archived Pi snapshot when the original planner decision expired,
+provided the stored PV forecast covers that exact quarter and the snapshot is
+at most **45 minutes** old. Its `ARCHIVED_EXPIRED_PLAN_DISPLAY_ONLY` provenance
+is explicit. The frontend may draw this archived historical PV value on the
+blue curve, but never modifies `forecast`, `plan`, `forecastKWh`, planner
+comparability or physical controls. No archive/DB backfill, interpolation or
+retroactive decision approval. Outside the 45m bound, genuine gaps remain.
+
 The solid decision line stops at the last *closed* quarter. The dashed
 live line starts at the *open* quarter; it includes the actual preceding
 archived point as a visual anchor to join the two blue segments. This does
