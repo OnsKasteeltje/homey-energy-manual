@@ -69,8 +69,9 @@ export async function loadPvFlex(day){
   series:d.series.map(slot=>{
    const historical=map.get(new Date(slot.start).getTime());
    const when=Date.parse(slot.start);
-   // Forecast at decision stays immutable; current forecast is FUTURE only.
-   const currentPvForecastW=Number.isFinite(when)&&when>now?
+   // Keep decision evidence intact; live PV covers the open quarter and future.
+   const end=Number.isFinite(Date.parse(slot.end))?Date.parse(slot.end):when+900000;
+   const currentPvForecastW=Number.isFinite(when)&&Number.isFinite(end)&&end>now?
     currentMap.get(when)??null:null;
    return {...slot,forecast:historical?.forecast||null,
     plan:historical?.plan||null,currentPvForecastW};
