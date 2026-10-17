@@ -70,7 +70,7 @@ test("hover selects only the nearest nonzero PV/EV/Quooker line",()=>{
  assert.equal(quooker.label,"Quooker gepland");
  assert.equal(quooker.value,1000);
  const pv=hover(slots,empty,1,30,60,view);
- assert.equal(pv.label,"PV-forecast bij besluit");
+ assert.equal(pv.label,"PV-forecast historisch");
  assert.equal(hover(slots,empty,1,30,32,view),null);
 });
 
