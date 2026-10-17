@@ -334,40 +334,49 @@ same-phase current down-limit = +300 W effective; 250 W phase-entry viability ma
 deadline = forced 3P within Pi request maxA
 ```
 
-De bridge owns de bounded realtime phase-selector binnen de Pi-envelope. In v1.5.8 blijven het 120-second rolling venster en minimaal 90-second coverage leidend; upward hysterese is opgesplitst in 120 s OFF re-entry en 180 s 1P→3P. De current-loop gebruikt bounded settled stappen (+3 A 1P, +2 A 3P) en is getuned op maximaal ongeveer +300 W voorspelde netimport om vermijdbare export verder te absorberen. v1.5.9 laat uitsluitend in reeds bevestigde 3P-modus een grotere stap toe tot maximaal +4 A, en alleen wanneer actuele P1-export, het ready 2-minute rolling signaal en het instantaneous predictive target diezelfde extra stap ondersteunen én de fysieke Easee current eerst op het vorige target is gesettled. Zonder deze gezamenlijke bevestiging blijft de normale +2 A 3P-bound actief. Down-regulation, dwell/phase-transities en deadline-force blijven ongewijzigd. De adapter vertaalt het authoritative phase contract exact; de Gate valideert schema, control revisions, freshness en de 230/690 W/A mapping. Alleen de actuator schrijft fysiek naar Easee. Voor 1P↔3P gebruikt de actuator een bounded pause/phase/deadtime/resume-transactie. De aparte Easee Cloud-authenticatie voor phase control is fail-closed. Writer v0.4.5 onderscheidt refresh-, phase-command- en retry-authfouten en stuurt bij een terminale authfout één gededupliceerde Owner-push, met Timeline fallback; melding heeft geen control impact.
+De bridge owns de bounded realtime phase-selector binnen de Pi-envelope. In v1.5.8 blijven het 120-second rolling venster en minimaal 90-second coverage leidend; upward hysterese is opgesplitst in 120 s OFF re-entry en 180 s 1P→3P. De current-loop gebruikt bounded settled stappen (+3 A 1P, +2 A 3P) en is getuned op maximaal ongeveer +300 W voorspelde netimport om vermijdbare export verder te absorberen. v1.5.9 laat uitsluitend in reeds bevestigde 3P-modus een grotere stap toe tot maximaal +4 A, en alleen wanneer actuele P1-export, het ready 2-minute rolling signaal en het instantaneous predictive target diezelfde extra stap ondersteunen én de fysieke Easee current eerst op het vorige target is gesettled. Zonder deze gezamenlijke bevestiging blijft de normale +2 A 3P-bound actief. Down-regulation, dwell/phase-transities en deadline-force blijven ongewijzigd. De adapter vertaalt het authoritative phase contract exact; de Gate valideert schema, control revisions, freshness en de 230/690 W/A mapping. Alleen de actuator schrijft fysiek naar Easee. Voor 1P↔3P gebruikt de actuator een bounded pause/phase/deadtime/resume-transactie. De aparte Easee Cloud-authenticatie voor phase control is fail-closed. De actieve writer v0.4.7 onderscheidt refresh-, phase-command- en retry-authfouten en stuurt bij een terminale authfout één gededupliceerde Owner-push, met Timeline fallback; melding heeft geen control impact.
 
-### Easee-authenticatie — v0.4.7 LIVE (14 oktober 2026)
+### Easee-authenticatie — v0.4.7 LIVE, refresh bewezen (17 oktober 2026)
 
-Homey Advanced Flow `fea23193-a03f-49dd-9780-7e72ee48747d` was
-via de gecontroleerde Pi-deployer omgezet naar dezelfde unieke fysieke
-writer, nu `EM v2 | 60 Actuator | EV Power v0.4.7 ATOMIC-TOKENS [LIVE]`.
-De predeploy-backup werd aangemaakt; de kandidaat-/readback-SHA-256 was
-`1acbaac1625757a6879b2e54f7942021624d6bfb6517809b6ca5aa2d910f48a0`.
-Een extra Homey-read bevestigde enabled, niet broken, vier cards,
-v0.4.7-script en correct ingevulde private Easee-bundle-ID. Dit is een
-software-/deploybewijs; een natuurlijke refresh en faseovergang moeten
-nog afzonderlijk bewezen worden.
+Homey Advanced Flow `fea23193-a03f-49dd-9780-7e72ee48747d`
+blijft de enige fysieke Easee-faseschrijver:
+`EM v2 | 60 Actuator | EV Power v0.4.7 ATOMIC-TOKENS [LIVE]`.
+De authenticatie gebruikt één private Homey Logic-bundel
+`EM2_Easee_Token_Bundle_V1` (access-token, roterend refresh-token,
+vervaltijd, revisie). Die bundel wordt samen geschreven en teruggelezen.
+De oude drie Logic-tokenvariabelen zijn uitsluitend rollbackmateriaal;
+er is geen tweede productie-tokenowner.
 
-De Easee-accountauthenticatie voor cloud-fasecommando's heeft nog
-steeds exact **één** Homey writer. V0.4.7 gebruikt één Logic-variabele
-`EM2_Easee_Token_Bundle_V1` met access-token, roterend refresh-token,
-vervaltijd en revisie in één JSON-waarde, schrijft de volledige bundel in
-één Homey Logic-update en controleert daarna de readback. Bij een
-primaire 401 onderzoekt de writer eerst of een latere bundel kan worden
-hergebruikt; anders volgt hoogstens één vernieuwingspoging en één
-beperkte retry. Oude Easee Logic-tokenvariabelen zijn alleen voor
-rollback behouden en worden niet meer door het actieve script gelezen.
-Omdat Homey Logic geen transactionele compare-and-swap garandeert,
-blijft echte gelijktijdige single-flight bij twee invocaties
-een te monitoren risico.
+Na `EASEE_REFRESH_HTTP_401` in oktober is met
+[PR #276](https://github.com/OnsKasteeltje/homey-energy-manual/pull/276)
+de refresh-HTTP-aanvraag gecorrigeerd. Het JSON-request bevat nu
+`accessToken` **én** `refreshToken`, zonder verlopen Bearer-header.
+Alleen de normale fasecommando's behouden een Bearer-header.
+De eerdere afwijkende requestvorm is een sterke oorzaakhypothese;
+andere historische oorzaken (bijvoorbeeld een verlopen sessie of race)
+zijn daarmee niet volledig uitgesloten.
 
-De aanleiding was `EASEE_REFRESH_HTTP_401` op 14 oktober 2026 in
-v0.4.6, bij een verder normaal geladen Tesla (1×16 A); bootstrap en
-een read-only Easee HTTP 200 herstelden de actuele sessie. Waarom de
-vorige token ongeldig werd is **niet bewezen**. Geen fysieke laadsessie
-of fasewisseling is voor de migratie geforceerd. Fasepolicy, P1,
-planner, Bridge, Adapter, Gate, laadstromen, thresholds, safeguards
-en overige device-writes blijven ongewijzigd.
+**Productieacceptatie 17 oktober:** Pi `main` op
+`35a1f876234521143c67b65ed799a415bd57fc0f`;
+10/10 gerichte tests en driftcontrole PASS; Homey inplace-deploy met
+backup en exacte readback PASS (vier cards, enabled, niet broken,
+script-SHA-256
+`896c5be8ee97b22f91bfefbee6aae62cb59aee2d11e06af9563bee959ab2233e`).
+Zonder handmatige EV-acties schakelde de auto natuurlijk van 3P naar
+1P en terug naar fysiek 3×7 A (circa 5,0 kW).
+Read-only tokenmetadata ging van `1792231554108` naar
+`1792231554109` (**+1**, passend bij een Homey-writer-refresh);
+de nieuwe vervaltijd was 17 oktober 14:04:06 NL en het token was geldig.
+De actuator rapporteerde `STABLE`, `SAME_PHASE_CURRENT_APPLIED`, `3P`.
+Dat is sterk operationeel bewijs van automatische tokenrotatie, niet
+een onafhankelijk opgenomen HTTP-trace.
+
+Geen wijzigingen aan de Pi-planner, fasepolicy, P1-safety, Adapter,
+Gate of fysieke laadstrategie. Concurrente Homey-writer-invocaties
+kennen geen gegarandeerde transactionele single-flight: bij terugkerende
+401 eerst causaal onderzoeken, zonder onbeperkte retries of tweede
+writer. Details en rollback:
+`docs/decisions/easee-token-bundle-v047-2026-10-14.md`.
 
 ### EV OFF-zero idempotency — v0.4.6 LIVE (11 oktober 2026)
 
