@@ -121,13 +121,16 @@ const setCircuitA=a=>runNative(ACTION_IDS.circuit,{current:a});
 const setCurrentA=a=>runNative(ACTION_IDS.current,{current:a});
 
 const postJson=async(url,body,accessToken,operation='EASEE')=>{
+  const headers={
+    'Accept':'application/json',
+    'Content-Type':'application/json'
+  };
+  // Refresh authenticates with both tokens in the body, not an expired Bearer.
+  // Physical phase commands retain their Bearer header.
+  if(operation!=='EASEE_REFRESH')headers.Authorization='Bearer '+accessToken;
   const r=await fetch(url,{
     method:'POST',
-    headers:{
-      'Authorization':'Bearer '+accessToken,
-      'Accept':'application/json',
-      'Content-Type':'application/json'
-    },
+    headers,
     body:JSON.stringify(body)
   });
   let payload=null;
@@ -215,8 +218,8 @@ const getAccessToken=async(vars,forceRefresh=false)=>{
   try{
     payload=await postJson(
       'https://api.easee.com/api/accounts/refresh_token',
-      {refreshToken:current.refreshToken},
-      current.accessToken,
+      {accessToken:current.accessToken,refreshToken:current.refreshToken},
+      null,
       'EASEE_REFRESH'
     );
   }catch(err){
