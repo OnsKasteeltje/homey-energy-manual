@@ -74,7 +74,9 @@ export async function loadPvFlex(day){
    const currentPvForecastW=Number.isFinite(when)&&Number.isFinite(end)&&end>now?
     currentMap.get(when)??null:null;
    return {...slot,forecast:historical?.forecast||null,
-    plan:historical?.plan||null,currentPvForecastW};
+    plan:historical?.plan||null,
+    historicalPvDisplay:historical?.displayForecast||null,
+    currentPvForecastW};
   })
  };
 }

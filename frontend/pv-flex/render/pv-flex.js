@@ -26,8 +26,12 @@ const slotEndMs=s=>{
  const end=Date.parse(s.end);
  return Number.isFinite(end)?end:Date.parse(s.start)+900000;
 };
-const decisionPvW=(s,nowMs=Date.now())=>
- slotEndMs(s)<=nowMs&&available(s.forecast?.pvForecastW)?s.forecast.pvForecastW:null;
+const decisionPvW=(s,nowMs=Date.now())=>{
+ if(slotEndMs(s)>nowMs)return null;
+ if(available(s.forecast?.pvForecastW))return s.forecast.pvForecastW;
+ return available(s.historicalPvDisplay?.pvForecastW)?
+  s.historicalPvDisplay.pvForecastW:null;
+};
 const currentFuturePvW=(s,nowMs=Date.now())=>
  slotEndMs(s)>nowMs&&available(s.currentPvForecastW)?s.currentPvForecastW:null;
 // Extend the dashed series by one actual archived point to make the seam
@@ -66,7 +70,7 @@ function closestEvaluationSeries(slots,allocated,index,px,py,view,nowMs=Date.now
  const y=v=>top+height-v/max*height;
  let best=null,dist=radius;
  const lines=[
-  ["pvForecastW","PV-forecast bij besluit",s=>decisionPvW(s,nowMs)],
+  ["pvForecastW","PV-forecast historisch",s=>decisionPvW(s,nowMs)],
   ["currentPvForecastW","PV-forecast actueel",s=>currentFuturePvW(s,nowMs)],
   ["evPlanW","Tesla gepland",s=>s.plan?.evPlanW],
   ["wwPlanW","Warm water gepland",s=>s.plan?.wwPlanW],
