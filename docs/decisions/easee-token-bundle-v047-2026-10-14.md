@@ -1,120 +1,115 @@
-# Easee rotating-token recovery — v0.4.7 candidate (2026-10-14)
+# Easee rotating-token recovery — v0.4.7 LIVE (14–17 October 2026)
 
-**Status: PROPOSED ONLY — NOT DEPLOYED.** The production Homey physical Easee
-writer remains v0.4.6, Advanced Flow `fea23193-a03f-49dd-9780-7e72ee48747d`.
-No EV threshold, phase-transition, planner, gate, hardware-write, or P1 policy
-changes are part of this proposal.
+**Status: DEPLOYED AND OPERATIONALLY ACCEPTED, 17 October 2026.**
+The production physical writer is Homey Advanced Flow
+`fea23193-a03f-49dd-9780-7e72ee48747d`, version
+`EV Power v0.4.7 ATOMIC-TOKENS [LIVE]`.
+This document retains the design limits and records the observed
+production acceptance of
+[PR #276](https://github.com/OnsKasteeltje/homey-energy-manual/pull/276).
+No EV threshold, phase-transition, planner, Gate, hardware-write or
+P1 policy changed in this auth repair.
 
-## Incident evidence
+## Incident evidence and likely defect
 
-On 2026-10-14 the Homey EV writer reported `EASEE_REFRESH_HTTP_401`.
-Three separate Homey Logic variables for access, rotating refresh and expiry
-were populated; the expiry was 2026-10-14T09:37:06Z. The Tesla continued charging
-at 1 × 16 A and later finished normally. The commissioning bootstrap produced a
-fresh Easee login token pair and a **read-only Easee HTTP 200** followed.
+On 14 October 2026 a Homey EV phase writer reported
+`EASEE_REFRESH_HTTP_401`; the Tesla could still charge 1×16 A and
+complete its session. The then-current split legacy Logic variables
+did not provide a single atomic token-pair update. A controlled
+commissioning bootstrap restored a token pair and a read-only Easee
+HTTP 200, but **that alone did not prove automatic refresh**.
 
-**Proven:** refresh HTTP 401 prevented a successful phase-cloud refresh at the
-failed invocation. **Not proven:** whether the root cause was lost/rotated tokens,
-concurrent invocations, partial Homey Logic update, revoked session or upstream
-Easee API behavior. A 200 after bootstrap does not prove future automatic
-rotation works.
+The v0.4.7 atomic-bundle design was promoted via PR #264. Further
+natural refresh failures on 17 October showed that atomic storage
+alone had not corrected the refresh HTTP request. Before PR #276 the
+refresh body contained only `refreshToken`, while the request also
+sent `Authorization: Bearer <accessToken>` even if that access token
+had expired. Three independently reviewed Easee client implementations
+instead sent both tokens in JSON without that Bearer header. The
+specific request-shape mismatch is a strong explanation for the
+observed 401, but the full history of upstream token invalidation
+or any concurrent refresh race has **not** been independently proven.
 
-## Candidate design
+## Production design and corrected HTTP contract
 
-- Retain **one physical EV writer** in Homey; use existing flow and card IDs.
-- Bootstrap additionally provisions one private Homey Logic string variable:
-  `EM2_Easee_Token_Bundle_V1`, containing the schema, access/refresh token,
-  expiry and monotonic revision in **one JSON value**.
-- The candidate v0.4.7 writer reads/updates **only that canonical bundle** for
-  Easee phase-mode cloud operations. Normal Easee Homey-app native action cards
-  remain unchanged.
-- Before refresh the writer re-reads the bundle; if a newer revision has already
-  been stored, it uses it instead of consuming an older one-use refresh token.
-  After a refresh HTTP 401 it checks once whether another execution already
-  published a valid newer bundle; it never retries the rejected refresh token.
-- On successful refresh it writes the *entire* token pair + expiry in one Logic
-  update and reads back to check that the revision and token pair match.
-- Missing/invalid/uncommissioned bundle, failed refresh, write/readback conflict
-  and unacceptable error responses remain **fail closed**.
-- Access/refresh tokens and password must never be committed, logged, pasted
-  into terminal output or sent to GitHub. The bundle Logic ID is not a secret.
+- Keep exactly **one physical Easee EV writer** in the existing
+  enabled Homey Advanced Flow and preserve its card IDs.
+- The canonical private Homey Logic string
+  `EM2_Easee_Token_Bundle_V1` stores
+  `schema`, `accessToken`, `refreshToken`, `expiresAt`
+  and a monotonic integer `revision` together in one JSON value.
+  Old split token variables remain rollback-only, not live producers.
+- Before refresh, re-read the bundle and reuse a valid newer revision
+  if one has appeared; on a 401, never retry the rejected one-use
+  refresh token. A successful refresh writes the complete new pair,
+  expiry and revision together, then verifies the Logic readback.
+- **PR #276, merged as
+  `35a1f876234521143c67b65ed799a415bd57fc0f`:**
+  `POST https://api.easee.com/api/accounts/refresh_token`
+  with JSON body `{accessToken, refreshToken}`, headers
+  `Accept: application/json` and
+  `Content-Type: application/json`, **no Authorization Bearer
+  header** for this operation. The distinct physical phase command
+  still uses the access-token Bearer header.
+- Missing/invalid bundles, expired/rejected auth, write/readback
+  mismatch and unexpected responses remain bounded and fail closed.
+  Access tokens, refresh tokens and passwords must never be printed,
+  committed, put in notifications or pasted into chat.
 
-### Concurrency limitation
+### Concurrency and safety limits
 
-Homey Logic does not expose a documented atomic compare-and-swap transaction.
-The above minimizes stale-token races, but **does not guarantee mutually
-exclusive refresh across truly concurrent writer invocations**. The existing
-bounded actuator RUNNING gate remains in effect, but is not a distributed mutex.
-Do not describe this patch as a proven global single-flight token service.
-If a 401 recurs after v0.4.7, investigate a single durable Pi-side token-owner
-service rather than adding unbounded Homey polling/retries.
+Homey Logic offers no documented compare-and-swap. A single bundled
+write plus readback reduces mixed-token failures but is **not a
+transactional mutual-exclusion lock** for concurrent writer invocations.
+The existing actuator RUNNING guard is not a distributed mutex.
+There are no unlimited retries, background login loops or additional
+token owners. After a successful remote refresh but failed Homey
+Logic persistence, a new controlled bootstrap may be necessary
+because the already-used refresh token cannot safely be replayed.
 
-A successful Easee refresh followed by a failed Homey Logic write also cannot
-be safely rolled back at Easee; this requires fresh login/bootstrap. No
-password-based automatic retries.
+## Deployment and acceptance evidence — 17 October 2026
 
-## Safe commissioning after PR merge / reviewed tests
+| Evidence | Observed result |
+| --- | --- |
+| GitHub code review | PR #276 merged to `main`, SHA `35a1f876234521143c67b65ed799a415bd57fc0f` |
+| Pi source state | Clean `main` at the merged SHA; Pi drift check PASS |
+| Focused regression | `node --test tests/control/ev/ev-phase-writer-v0.4.7-atomic-easee.test.mjs`: 10/10 PASS, including mock HTTP request/header contract |
+| Predeploy safety | Actuator `STABLE`; backup, source guard, flow configuration guards PASS |
+| Homey deployment | Single in-place update, exact readback PASS, four cards retained, enabled and not broken |
+| Deployed script SHA-256 | `896c5be8ee97b22f91bfefbee6aae62cb59aee2d11e06af9563bee959ab2233e` |
+| Natural charging | Charging resumed after 3P→1P transition; later 1P→3P and physical 3×7 A (about 5,001 W) |
+| Token bundle before refresh | Revision `1792231554108`; post-bootstrap expiry 17 October 13:04:54 Europe/Amsterdam |
+| Token bundle after natural cycle | Revision **`1792231554109` (+1)**, expiry **17 October 14:04:06 Europe/Amsterdam**, token still valid |
+| Homey actuator after cycle | `STABLE`, reason `SAME_PHASE_CURRENT_APPLIED`, confirmed `3P` |
 
-Prerequisites: Tesla charging completed, EV planner/gates stable, no concurrent
-Homey maintenance in another session. Follow the mandatory low-load Homey
-access guideline. Do **not** start the physical EV writer manually for tests.
+The +1 revision is the writer's refresh revision convention; a new
+bootstrap uses a millisecond timestamp rather than an increment.
+The new expiry, valid bundle and natural physical operation together
+constitute **strong production evidence for a successful automatic
+writer-owned token rotation**. There was no manually forced refresh,
+Tesla start, phase change or additional hardware write. We did not
+capture a network-level trace of the individual successful HTTP
+request; avoid claiming independent packet-level verification.
+One successful renewal does not eliminate the concurrent-refresh risk
+or guarantee future renewals.
 
-1. On Pi, sync clean `main` after the PR is merged and verify the approved
-   v0.4.7 source/commissioning scripts exist. No runtime change yet.
-2. Run the existing locally interactive command, not in chat:
+## Recovery / rollback
 
-   ```bash
-   cd /home/jeroen/ems/repo/homey-energy-manual
-   python3 services/pi/commissioning/bootstrap_easee_homey_tokens.py
-   ```
+If an auth failure recurs, record only sanitized actuator reason,
+revision, expiry and whether the token bundle was rotated; never dump
+token values. Determine whether the problem is a stale/consumed token,
+writer race, readback failure or changed Easee API request contract
+**before** proposing another architecture.
 
-   This creates/updates the three legacy rollback values **then** the new
-   atomic bundle. Confirm only `PASS` and four `PRESENT` reports. Never print
-   the tokens. The new bundle Logic ID is stored in the existing 0600 Pi registry.
-3. Run targeted candidate preparation (one live flow read; no writes):
+The 0600 predeploy Homey Flow JSON backup is retained locally on the
+Pi (17 October 2026). A prior v0.4.6 script and the old split Logic
+values are *historical rollback material only*. Old split tokens may
+already be revoked after rotation; never reactivate them assuming
+validity. A controlled local interactive bootstrap can restore both
+formats if rollback truly requires it, followed by an exact Homey Flow
+readback. Do not trigger a physical EV actuator manually to test auth,
+change the phase policy to mask an auth failure, or add a second
+production Easee token writer.
 
-   ```bash
-   python3 tools/maintenance/homey/prepare_easee_v047_candidate.py
-   ```
-
-   It verifies the *exact* deployed v0.4.6 script against canonical v0.4.6,
-   replaces the sole pinned bundle-ID placeholder and writes a local 0600
-   candidate JSON. Any unexpected live drift **must stop** the deployment.
-4. Test and use the controlled deployer **dry-run first**:
-
-   ```bash
-   node --test tests/control/ev/ev-phase-writer-v0.4.7-atomic-easee.test.mjs
-   node --test tests/control/ev/ev-phase-writer-v0.4.6-off-zero.test.mjs
-   python3 -m py_compile services/pi/commissioning/bootstrap_easee_homey_tokens.py tools/maintenance/homey/prepare_easee_v047_candidate.py
-   python3 tools/maintenance/homey/homey_flow_deploy.py \
-     --id fea23193-a03f-49dd-9780-7e72ee48747d \
-     --candidate /home/jeroen/ems/data/deploy/easee-v047-candidate.json
-   ```
-
-   Expected: `DIFF`, dry-run write **BLOCKED**, predeploy backup present.
-   The deployer may return exit 1 for an intentional dry-run difference.
-5. After explicit APPLY approval and reviewed gate results, use the **same**
-   deployer and candidate path with `--apply`. Require exact post-write
-   readback hash and v0.4.7 flow name/version. Do not change charger settings,
-   force a phase transition or force an artificial refresh.
-6. Observe the next **natural** token expiry and normal EV opportunity.
-   Verify no auth alert, API 401, stale bundle or unexpected Homey 429.
-   HTTP 200 immediately after a bootstrap alone is not rotation proof.
-
-### Rollback
-
-The normal controlled deployer preserves the predeploy flow JSON.
-If rollback is needed *after the bundle has rotated*, the three legacy token
-variables may no longer be valid. **Bootstrap again locally** to restore both
-formats, then restore the backed-up v0.4.6 writable flow with the controlled
-deployer and verify the readback. Never assume a previous refresh token can be
-reused. Do not change EV charging policy to mask authentication failure.
-
-## Required acceptance
-
-- Contract and bootstrap syntax tests PASS in CI.
-- Exact live v0.4.6 source verified, candidate prepared without a Homey write.
-- Explicit apply approval, predeploy backup and postdeploy exact readback PASS.
-- Real natural refresh and subsequent normal 1P/3P operation separately proven.
-- Only then update current-state and canonical live architecture documentation
-  to reflect the promoted version, not before.
+Architecture ownership remains Pi planner → Homey realtime Gate /
+single physical Easee writer, with P1 as actual net-import authority.

@@ -169,46 +169,57 @@ kinds, mid-step takeover, reentry and global Honeywell system-mode safety.
 No Homey Heating publisher timer, thermostat write, device control or
 Pi deployment is part of this GitHub source candidate.
 
-### Easee authentication v0.4.7 — live cutover (14 October 2026)
+### Easee authentication v0.4.7 — LIVE, natural refresh accepted (17 October 2026)
 
-**Current production:** Homey Advanced Flow
-`fea23193-a03f-49dd-9780-7e72ee48747d` is the **sole** Easee EV
-physical writer, now **v0.4.7 ATOMIC-TOKENS [LIVE]**. Readback on
-2026-10-14 confirmed `enabled=true`, `broken=false`, four existing
-cards, the v0.4.7 script, and one correctly pinned private bundle Logic ID;
-no unreplaced bootstrap placeholder or legacy Easee variable references
-remain in the live executable. The controlled Pi deployer reported matching
-candidate/post-write writable-state SHA-256
-`1acbaac1625757a6879b2e54f7942021624d6bfb6517809b6ca5aa2d910f48a0`
-after a predeploy backup and an earlier dry-run. No manual charge or phase
-transition was triggered as a deployment test.
+**Production ownership:** Homey Advanced Flow
+`fea23193-a03f-49dd-9780-7e72ee48747d` is the sole physical Easee
+phase writer (`EM v2 | 60 Actuator | EV Power v0.4.7 ATOMIC-TOKENS [LIVE]`).
+Homey is the actuator and local safety owner; the Pi remains planner owner.
+The same private Homey Logic JSON variable `EM2_Easee_Token_Bundle_V1`
+holds the paired access/refresh tokens, expiry and monotonic revision. The
+three legacy Logic token variables are rollback-only, not a second live
+token owner. No password-based automated bootstrap or second token
+service was introduced.
 
-**Why:** On 2026-10-14 a live v0.4.6 refresh returned
-`EASEE_REFRESH_HTTP_401`, although the Tesla continued charging at 1×16 A
-and subsequently completed the session. A manual bootstrap plus read-only
-Easee HTTP 200 restored access. The original refresh-token invalidation
-cause remains unproven.
+**Incident and targeted repair:** An `EASEE_REFRESH_HTTP_401` occurred
+on 14 October and again on 17 October before the repair. The v0.4.7
+request sent only `refreshToken` in the JSON body while attaching
+`Authorization: Bearer <accessToken>` (potentially expired). PR
+[#276](https://github.com/OnsKasteeltje/homey-energy-manual/pull/276),
+merged as `35a1f876234521143c67b65ed799a415bd57fc0f`, aligns the
+refresh call to the observed Easee client contract: JSON body contains
+**both** `accessToken` and `refreshToken` and **no Bearer Authorization
+header**; normal physical phase-control requests retain Bearer. This
+request-shape mismatch is a strong explanation for the 401; the sole
+historical cause of every pre-fix 401 is not independently proven.
 
-**New authentication boundary:** only this Homey physical writer rotates
-the Easee cloud phase-control access and one-use refresh tokens. These plus
-expiry/revision now live in one private Homey Logic JSON bundle
-`EM2_Easee_Token_Bundle_V1`. The commissioning script also maintains the
-three old variables for bounded rollback compatibility, but they are **not**
-a second production token owner. One bundle write is followed by readback;
-a recently advanced bundle may be reused to recover a 401 without another
-refresh. Homey Logic has no documented compare-and-swap, so concurrent
-single-flight refresh is **not proven**. Unexpected/auth failures remain
-fail closed, with Owner notification where applicable. There is no new
-physical writer, automatic polling owner, P1/planner/gate authority, phase
-threshold or safety-policy change.
+**Deployment and operational acceptance (17 October 2026):** The Pi was
+synced to the above `main` commit, focused v0.4.7 tests passed 10/10
+and the Pi drift check passed. A backed-up, guarded in-place update
+preserved the existing four Homey Flow cards; exact live readback
+confirmed `enabled=true`, `broken=false` and the new script
+SHA-256 `896c5be8ee97b22f91bfefbee6aae62cb59aee2d11e06af9563bee959ab2233e`.
+No manual actuator invocation or forced phase switch was performed.
+Subsequent natural charging showed 3P→1P and 1P→3P transitions. At the
+natural 1P→3P return, Easee physically drew approximately 3×7 A
+(5,001 W). Read-only private token metadata changed from revision
+`1792231554108` to **`1792231554109` (exactly +1)**; expiry
+advanced to **2026-10-17 14:04:06 Europe/Amsterdam** with the token
+still valid. The subsequent actuator status was `STABLE`, reason
+`SAME_PHASE_CURRENT_APPLIED`, confirmed mode `3P`.
+The +1 revision, new expiry and continuing physical operation are
+strong production evidence for a successful automatic writer-owned
+refresh. No raw HTTP refresh trace was captured, so do not claim
+that individual network call was independently packet-verified.
 
-**Validation boundary:** PR #264 (`576989d6`) passed architecture, security,
-and 16 local Pi EV tests (16/16); exact Homey deployment/readback PASS.
-The **next natural token rotation and next real phase opportunity still need
-operational proof**. A successful post-bootstrap HTTP 200 and successful
-software deployment do not independently prove long-term token renewal.
-For deployment/rollback see
-`docs/decisions/easee-token-bundle-v047-2026-10-14.md`.
+**Residual limitations:** Homey Logic has no documented atomic
+compare-and-swap; fully concurrent single-flight refresh is not
+guaranteed. Error paths remain bounded and fail closed. This documents
+one proven natural refresh cycle, not unlimited future availability.
+EV planner/phase thresholds, Homey Gate/Adapter, P1 safety, current
+policy and physical write ownership are unchanged.
+See `docs/decisions/easee-token-bundle-v047-2026-10-14.md`
+for design, rollback and acceptance evidence.
 
 ## 1. Source of truth
 
@@ -479,7 +490,7 @@ EV opportunity forecasting is phase-aware from 2026-10-01. The strategic 15-minu
 
 From 2026-10-10 (planner source merged in PR #228), the strategic Dynamic Pi Planner's **near-horizon P1 forecast correction** compensates for EV consumption already absorbed behind the meter. For a connected, actively charging Tesla with valid canonical measurements, the derived export headroom is `availableForEvW = max(0, tesla.power_w - grid.power_w)`, where signed `grid.power_w` is positive on import and negative on export. Thus a charging EV does not make its own PV opportunity disappear from the forecast correction. The adjustment applies to the median/trend P1 export baseline used by the strategic forecast; it does **not** alter the canonical PV-production forecast, the physical P1 reading, the phase-entry thresholds, or Homey realtime control. The original observed P1 export remains stored as `exportW` in `recentP1ExportSamples`, with the calculated `availableForEvW` stored separately; older samples without this field retain the original measured-export behavior until they naturally age out. Compensation falls back to raw P1 export when the Tesla is not charging or connected, EV power or signed P1 is missing/invalid, canonical `meta.source_sample_at` is more than 360 seconds old or future-dated (allowing the five-minute Homey push cadence to cover the planner's :03/:18/:33/:48 runs), or P1 is explicitly marked stale. The planner's resulting values remain read-only decision inputs; this change introduces no physical writes, separate control authority, or Homey/Easee modification.
 
-Bridge v1.5.9 is **LIVE** on stable Homey Advanced Flow `8bf53fdb-76f4-47db-8ccb-773ac515f06e` as `EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.9 ADAPTIVE UPSCALE [READY]`. Canonical source is `apps/homey/control/ev/pi-dynamic-planner-bridge-v1.5.9.adaptive-upscale.js`. The 2026-10-04 same-day replay showed that most residual PV export occurred while the EV was already charging rather than because the planner missed the opportunity window, so v1.5.9 changes only same-phase 3P upward current response. Phase thresholds, OFF re-entry dwell, 1P→3P dwell, deadline force and fast down-regulation remain unchanged. The normal bounds stay +3 A in 1P and +2 A in 3P; only an already-confirmed 3P session may use up to +4 A when instantaneous P1 export, the ready 2-minute rolling available-power signal, the instantaneous predictive desired current and settled physical Easee current all support the same larger step. The diagnostic reason is `PREDICTIVE_UP_ADAPTIVE_EXPORT`; controller diagnostics are `EM2_EV_PHASE_CURRENT_CONTROLLER_V0.4` and expose rolling desired current, current export, candidate adaptive step and applied step. Adapter/Gate/Writer contracts remain unchanged and writer v0.4.5 remains the sole physical Easee writer. The exact targeted post-write readback verified stable Flow ID, enabled=true, broken=false, five cards, byte-identical non-script cards and exact v1.5.9 script source.
+Bridge v1.5.9 is **LIVE** on stable Homey Advanced Flow `8bf53fdb-76f4-47db-8ccb-773ac515f06e` as `EM v2 | 20 Power Intent | PI Dynamic Planner Bridge v1.5.9 ADAPTIVE UPSCALE [READY]`. Canonical source is `apps/homey/control/ev/pi-dynamic-planner-bridge-v1.5.9.adaptive-upscale.js`. The 2026-10-04 same-day replay showed that most residual PV export occurred while the EV was already charging rather than because the planner missed the opportunity window, so v1.5.9 changes only same-phase 3P upward current response. Phase thresholds, OFF re-entry dwell, 1P→3P dwell, deadline force and fast down-regulation remain unchanged. The normal bounds stay +3 A in 1P and +2 A in 3P; only an already-confirmed 3P session may use up to +4 A when instantaneous P1 export, the ready 2-minute rolling available-power signal, the instantaneous predictive desired current and settled physical Easee current all support the same larger step. The diagnostic reason is `PREDICTIVE_UP_ADAPTIVE_EXPORT`; controller diagnostics are `EM2_EV_PHASE_CURRENT_CONTROLLER_V0.4` and expose rolling desired current, current export, candidate adaptive step and applied step. Adapter/Gate/Writer contracts remain unchanged and writer v0.4.7 remains the sole physical Easee writer. The exact targeted post-write readback verified stable Flow ID, enabled=true, broken=false, five cards, byte-identical non-script cards and exact v1.5.9 script source.
 
 For opportunity stop/restart semantics, a planner quarter-hour marked `RUN / OPPORTUNITY` is permission and strategic allocation, not a command to charge continuously through that slot. The Homey realtime executor may drive the EV to `OFF/IDLE` when the rolling available-power signal falls below the phase-specific stop threshold. In particular, 1P stops below 1100 W rolling available power. Restart from OFF requires the rolling signal to recover to at least 1350 W, instantaneous power sufficient for minimum 1P, and the v1.5.8 120-second OFF re-entry dwell. Promotion from 1P to 3P requires rolling available power of at least 4400 W, instantaneous 3P/6 A viability and the separate 180-second 1P→3P dwell. The 2026-10-04 12:45–13:00 event demonstrated why planner opportunity and realtime physical execution must be diagnosed separately; later same-day minute telemetry showed that the former unified 300-second upward dwell left material PV export during rapid irradiance recovery, motivating the bounded v1.5.8 reduction.
 
