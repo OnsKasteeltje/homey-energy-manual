@@ -20,11 +20,27 @@ function slotEvidence(slot,nowMs=Date.now()){
  const comparable=!!slot.plan&&!!slot.forecast&&available(slot.forecast.pvForecastW)&&p1&&pv;
  return {phase,p1,pv,comparable};
 }
-// Decision evidence is historic; the current Pi plan is only a future overlay.
+// Historic decisions are shown for closed quarters; current Pi PV covers
+// the running quarter and the future. No archived snapshot is rewritten.
+const slotEndMs=s=>{
+ const end=Date.parse(s.end);
+ return Number.isFinite(end)?end:Date.parse(s.start)+900000;
+};
 const decisionPvW=(s,nowMs=Date.now())=>
- Date.parse(s.start)<=nowMs&&available(s.forecast?.pvForecastW)?s.forecast.pvForecastW:null;
+ slotEndMs(s)<=nowMs&&available(s.forecast?.pvForecastW)?s.forecast.pvForecastW:null;
 const currentFuturePvW=(s,nowMs=Date.now())=>
- Date.parse(s.start)>nowMs&&available(s.currentPvForecastW)?s.currentPvForecastW:null;
+ slotEndMs(s)>nowMs&&available(s.currentPvForecastW)?s.currentPvForecastW:null;
+// Extend the dashed series by one actual archived point to make the seam
+// continuous; never interpolate across missing historical decision evidence.
+function joinedPvForecasts(slots,nowMs=Date.now()){
+ const historical=slots.map(s=>decisionPvW(s,nowMs));
+ const current=slots.map(s=>currentFuturePvW(s,nowMs));
+ const boundary=current.findIndex(v=>v!==null);
+ if(boundary>0&&historical[boundary-1]!==null){
+  current[boundary-1]=historical[boundary-1];
+ }
+ return {historical,current};
+}
 const dailyPct=v=>available(v)?(v*100).toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1})+"%":"—";
 function summary(d){
  $("quality").textContent="Dekking kalenderdag "+pct(d.quality.actualCoverage);
@@ -109,7 +125,7 @@ function chart(d){
   add("text",{x:p.l-7,y:y+4,class:"axis","text-anchor":"end"},(max*(4-i)/4000).toFixed(1)+"kW");
  }
  const step=iw/a.length;
- const points=[],currentPoints=[];
+ const points=[],currentPoints=[],forecastValues=joinedPvForecasts(a,nowMs);
  a.forEach((slot,i)=>{
   const cx=p.l+(i+.5)*step,s=allocated[i],barW=step*.68;
   const heat=slot.heatingFlex||{};
@@ -122,8 +138,8 @@ function chart(d){
     if(h>0){y-=h;add("rect",{x:cx-barW/2,y,width:barW,height:h,class:cls});}
    }
   }
-  const historicalW=decisionPvW(slot,nowMs);
-  const currentW=currentFuturePvW(slot,nowMs);
+  const historicalW=forecastValues.historical[i];
+  const currentW=forecastValues.current[i];
   points.push(historicalW===null?null:cx+","+(p.t+ih-historicalW/max*ih));
   currentPoints.push(currentW===null?null:cx+","+(p.t+ih-currentW/max*ih));
   if(i%8===0)add("text",{x:cx,y:H-15,class:"axis","text-anchor":"middle"},time(slot.start));

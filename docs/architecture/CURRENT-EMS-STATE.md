@@ -51,15 +51,19 @@ The read-only PV & Flex evaluation overlays two deliberately distinct sources
 for the **current** Amsterdam day. Solid blue is exclusively the archived
 canonical planner-decision PV forecast, selected at each slot and not
 rewritten. Dashed blue is the fresh `/web/planner/current` canonical PV V1
-forecast embedded in the presently valid 96-slot Pi plan, shown **only for
-future quarter starts**, as known when the page was loaded. The read-only
+forecast embedded in the presently valid 96-slot Pi plan, shown for the
+**currently open quarter and future quarters**, as known when the page was loaded. The read-only
 browser adapter validates schema, shadow mode, controlWrites=false, expected
 source, 96 slots, generatedAt and validUntil, and skips the overlay if the
 endpoint is unavailable or stale. Previous days never fetch this endpoint.
-The forecast lines are disconnected at the present boundary rather than
-backfilling missing archived decisions. This is solely an additive
-frontend visualization: no new API/control authority, no changed planner
-forecasts, no Homey writes and no retroactive evaluation changes.
+The solid decision line stops at the last *closed* quarter. The dashed
+live line starts at the *open* quarter; it includes the actual preceding
+archived point as a visual anchor to join the two blue segments. This does
+not rewrite either source or fabricate any quarter value. If the adjacent
+closed quarter has no archived decision, the gap remains visible rather
+than bridging an evidence hole. This is solely an additive frontend
+visualization: no new API/control authority, no changed planner forecasts,
+no Homey writes and no retroactive evaluation changes.
 
 ### Quality-gated daily PV calibration (16 October 2026)
 
