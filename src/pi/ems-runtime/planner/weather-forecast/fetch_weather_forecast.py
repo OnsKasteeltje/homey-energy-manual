@@ -2,9 +2,6 @@
 
 import json
 import sys
-import urllib.parse
-import urllib.request
-
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,7 +9,7 @@ FORECAST_LIB_DIR = Path("/home/jeroen/ems/runtime/forecast")
 if str(FORECAST_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(FORECAST_LIB_DIR))
 
-from open_meteo_transport import fetch_json_with_retry
+from open_meteo_cache import load_snapshot
 
 LAT = 52.70808
 LON = 5.10003
@@ -23,93 +20,20 @@ MAX_SLOTS = 96
 OUTPUT = Path("/home/jeroen/ems/data/weather-forecast.json")
 AXIS = Path("/home/jeroen/ems/data/planner-axis.json")
 
-BASE_PARAMS = {
-    "latitude": LAT,
-    "longitude": LON,
-    "minutely_15": ",".join([
-        "temperature_2m",
-        "apparent_temperature",
-        "cloud_cover",
-        "wind_speed_10m",
-        "wind_direction_10m",
-        "shortwave_radiation",
-        "direct_radiation",
-        "diffuse_radiation",
-        "direct_normal_irradiance",
-        "shortwave_radiation_clear_sky",
-        "sunshine_duration",
-    ]),
-    "past_minutely_15": 4,
-    "forecast_minutely_15": 104,
-    "timezone": "UTC",
-}
-
-
-def fetch_weather():
-    url = (
-        "https://api.open-meteo.com/v1/forecast?"
-        + urllib.parse.urlencode(BASE_PARAMS)
-    )
-
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": "EMS-Pi-Weather-Forecast/0.2"},
-    )
-
-    return fetch_json_with_retry(
-        req,
-        label="weather-main",
-    )
-
-
-def fetch_gti(azimuth, tilt):
-    params = {
-        "latitude": LAT,
-        "longitude": LON,
-        "minutely_15": "global_tilted_irradiance",
-        "past_minutely_15": 4,
-        "forecast_minutely_15": 104,
-        "timezone": "UTC",
-        "tilt": tilt,
-        "azimuth": azimuth,
-    }
-
-    url = (
-        "https://api.open-meteo.com/v1/forecast?"
-        + urllib.parse.urlencode(params)
-    )
-
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": "EMS-Pi-GTI/0.2"},
-    )
-
-    data = fetch_json_with_retry(
-        req,
-        label=f"weather-gti azimuth={azimuth} tilt={tilt}",
-    )
-
+def gti_by_timestamp(data):
     q = data.get("minutely_15", {})
     times = q.get("time", [])
     values = q.get("global_tilted_irradiance", [])
-
     result = {}
-
     for t, value in zip(times, values):
-        key = t
-
-        if len(key) == 16:
-            key += ":00"
-
-        key += "Z"
-
+        key = t + (":00" if len(t) == 16 else "") + "Z"
         result[key] = value
-
     return result
 
 
 def main():
-    data = fetch_weather()
+    snapshot = load_snapshot()
+    data = snapshot["sources"]["weather"]
 
     q = data.get("minutely_15", {})
     times = q.get("time", [])
@@ -147,9 +71,9 @@ def main():
     # ZO = -135°
     # ZW = +135°
 
-    gti_goodwe2000 = fetch_gti(-135, 30)
-    gti_goodwe4200 = fetch_gti(135, 30)
-    gti_solaredge = fetch_gti(135, 25)
+    gti_goodwe2000 = gti_by_timestamp(snapshot["sources"]["gti_goodwe2000"])
+    gti_goodwe4200 = gti_by_timestamp(snapshot["sources"]["gti_goodwe4200"])
+    gti_solaredge = gti_by_timestamp(snapshot["sources"]["gti_solaredge"])
 
     with AXIS.open() as f:
         axis = json.load(f)
@@ -219,6 +143,7 @@ def main():
 
     output = {
         "schema": "EMS_PI_WEATHER_FORECAST_V0.2",
+        "sourceFetchedAt": snapshot["fetchedAt"],
         "generated_at": datetime.now(timezone.utc)
         .isoformat()
         .replace("+00:00", "Z"),

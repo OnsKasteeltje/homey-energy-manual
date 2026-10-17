@@ -22,6 +22,7 @@ DATA_SOURCES = {
     "evDeadline": (DATA / "ev-deadline-shadow-state.json", ("generatedAt",), 900),
     "pvForecast": (DATA / "pv-forecast.json", ("generated_at",), 2100),
     "weatherForecast": (DATA / "weather-forecast.json", ("generated_at",), 2100),
+    "openMeteoSource": (DATA / "open-meteo-source-cache.json", ("fetchedAt",), 5400),
     "quattForecast": (DATA / "quatt-forecast.json", ("generated_at",), 2100),
     "wwPlan": (DATA / "ww-plan.json", ("generated_at",), 2100),
     "heatingPreheatV03": (
@@ -45,6 +46,11 @@ FUNCTION_UNITS = {
     "forecastChain": {
         "unit": "ems-forecast-chain.timer",
         "service": "ems-forecast-chain.service",
+    },
+    "openMeteoRefresh": {
+        "unit": "ems-open-meteo-refresh.timer",
+        "service": "ems-open-meteo-refresh.service",
+        "proofData": "openMeteoSource",
     },
     "history15m": {
         "unit": "ems-history-15m.timer",

@@ -124,7 +124,8 @@ def main():
     weather_source = WEATHER.read_text(encoding="utf-8")
     pv_source = PV.read_text(encoding="utf-8")
     for name, source in (("weather", weather_source), ("pv", pv_source)):
-        assert "fetch_json_with_retry" in source, name
+        assert "from open_meteo_cache import load_snapshot" in source, name
+        assert "fetch_json_with_retry" not in source, name
         assert "urllib.request.urlopen(" not in source, name
 
     print("PASS: bounded Open-Meteo transport retry contract")
