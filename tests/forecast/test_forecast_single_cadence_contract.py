@@ -26,6 +26,8 @@ def main():
     health = load_health()
 
     assert "forecastChain" in health.FUNCTION_UNITS
+    assert "openMeteoRefresh" in health.FUNCTION_UNITS
+    assert "openMeteoSource" in health.DATA_SOURCES
     assert "weatherForecast" not in health.FUNCTION_UNITS
     assert "weatherForecast" in health.DATA_SOURCES
     assert "pvForecast" in health.DATA_SOURCES
@@ -33,6 +35,13 @@ def main():
     chain_timer = CHAIN_TIMER.read_text(encoding="utf-8")
     assert "OnCalendar=*-*-* *:03,18,33,48:00" in chain_timer
 
+    # Input-only refresh is separate from the sole planner cadence.
+    refresh_timer = (ROOT / "deploy/systemd/ems-open-meteo-refresh.timer").read_text()
+    refresh_service = (ROOT / "deploy/systemd/ems-open-meteo-refresh.service").read_text()
+    assert "OnCalendar=*-*-* *:00,30:00" in refresh_timer
+    assert "/home/jeroen/ems/runtime/forecast/open_meteo_cache.py" in refresh_service
+    chain = (ROOT / "deploy/systemd/ems-forecast-chain.service").read_text()
+    assert "open_meteo_cache.py" not in chain
     # Retired standalone producers must no longer exist in canonical systemd source.
     for unit in LEGACY_UNITS:
         assert not (ROOT / "deploy/systemd" / unit).exists(), unit

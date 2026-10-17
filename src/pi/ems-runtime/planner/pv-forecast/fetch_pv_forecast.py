@@ -3,8 +3,6 @@
 import json
 import math
 import sys
-import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -13,7 +11,7 @@ FORECAST_LIB_DIR = Path("/home/jeroen/ems/runtime/forecast")
 if str(FORECAST_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(FORECAST_LIB_DIR))
 
-from open_meteo_transport import fetch_json_with_retry
+from open_meteo_cache import load_snapshot
 
 LAT = 52.70808
 LON = 5.10003
@@ -50,29 +48,8 @@ def haurwitz_clear_sky_ghi(terrestrial_w_m2):
     )
 
 
-params = {
-    "latitude": LAT,
-    "longitude": LON,
-    "minutely_15": "shortwave_radiation,terrestrial_radiation",
-    "past_minutely_15": 96,
-    "forecast_minutely_15": 104,
-    "timezone": "UTC",
-}
-
-url = (
-    "https://api.open-meteo.com/v1/forecast?"
-    + urllib.parse.urlencode(params)
-)
-
-request = urllib.request.Request(
-    url,
-    headers={"User-Agent": "ems-pi-pv-forecast/0.3"},
-)
-
-weather = fetch_json_with_retry(
-    request,
-    label="pv-forecast",
-)
+snapshot = load_snapshot()
+weather = snapshot["sources"]["weather"]
 
 quarter = weather.get("minutely_15", {})
 times = quarter.get("time", [])
@@ -184,6 +161,7 @@ if len(slots) < 96:
 
 document = {
     "schema": "EMS_PI_PV_FORECAST_V0.2",
+    "sourceFetchedAt": snapshot["fetchedAt"],
     "generated_at": datetime.now(timezone.utc)
         .isoformat()
         .replace("+00:00", "Z"),

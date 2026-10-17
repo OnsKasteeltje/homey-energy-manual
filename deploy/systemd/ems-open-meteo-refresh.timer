@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh EMS Open-Meteo source snapshot every 30 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00,30:00
+AccuracySec=5s
+Persistent=true
+Unit=ems-open-meteo-refresh.service
+
+[Install]
+WantedBy=timers.target

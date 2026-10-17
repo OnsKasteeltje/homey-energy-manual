@@ -367,6 +367,7 @@ grep -q '/home/jeroen/ems/runtime/forecast/pv/build_pv_forecast_v2.py' "$PV_FORE
 pass "PV Forecast V2 target-structure deploy/drift mapping present"
 
 python3 "$FORECAST_TRANSPORT_TEST" || fail "bounded Open-Meteo transport retry contract failed"
+python3 tests/forecast/test_open_meteo_cache_decoupling.py || fail "Open-Meteo cache decoupling contract failed"
 python3 "$FORECAST_CADENCE_TEST" || fail "atomic forecast single-cadence contract failed"
 python3 tests/forecast/test_pv_history_profile_daily_contract.py || fail "daily PV profile quality contract failed"
 for retired in \

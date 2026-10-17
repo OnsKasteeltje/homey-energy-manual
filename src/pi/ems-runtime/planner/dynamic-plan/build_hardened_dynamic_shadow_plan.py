@@ -109,6 +109,21 @@ def validate_freshness(now):
             raise SystemExit(
                 f"FAIL_CLOSED: stale input {path.name}: age={age:.0f}s max={max_age}s"
             )
+        if path in (PV_FILE, WEATHER_FILE):
+            raw_source = doc.get("sourceFetchedAt")
+            try:
+                source_stamp = parse_utc(raw_source)
+                source_age = (now - source_stamp).total_seconds()
+            except (TypeError, ValueError):
+                raise SystemExit(f"FAIL_CLOSED: missing sourceFetchedAt in {path.name}")
+            source_limit = 90 * 60
+            report[path.name]["sourceAgeSec"] = round(source_age)
+            report[path.name]["sourceMaxAgeSec"] = source_limit
+            if not -120 <= source_age <= source_limit:
+                raise SystemExit(
+                    f"FAIL_CLOSED: stale Open-Meteo source {path.name}: "
+                    f"age={source_age:.0f}s max={source_limit}s"
+                )
     return report
 
 
