@@ -65,6 +65,43 @@ test('v0.4.7 HomeyScript parses and preserves one physical writer and phase poli
   assert.doesNotMatch(src,/easeeVar1|easeeVar2|easeeVar3/);
 });
 
+test('Easee refresh POST sends both tokens without Bearer; phase POST keeps Bearer',async()=>{
+  const postStart=src.indexOf('const postJson=async');
+  const postEnd=src.indexOf('const getJson=async',postStart);
+  assert.ok(postStart>=0&&postEnd>postStart);
+  const requests=[];
+  const actualPost=vm.runInNewContext(
+    src.slice(postStart,postEnd)+'\npostJson',
+    {fetch:async(url,options)=>{
+      requests.push({
+        url,method:options.method,headers:{...options.headers},
+        body:JSON.parse(options.body)
+      });
+      return {ok:true,status:200,json:async()=>({
+        accessToken:'new-access',refreshToken:'new-refresh',expiresIn:3600
+      })};
+    }}
+  );
+  const f=fixture({
+    bundle:makeBundle({expiresAt:new Date(Date.now()-1000).toISOString()}),
+    postJson:actualPost
+  });
+  const current=await f.readEaseeVars();
+  assert.equal(await f.getAccessToken(current,false),'new-access');
+  assert.deepEqual(requests[0],{
+    url:'https://api.easee.com/api/accounts/refresh_token',
+    method:'POST',
+    headers:{'Accept':'application/json','Content-Type':'application/json'},
+    body:{accessToken:'old-access',refreshToken:'old-refresh'}
+  });
+  await actualPost(
+    'https://api.easee.com/api/chargers/ECHM6B9F/commands/set_phase_mode',
+    {phaseMode:3},'new-access','EASEE_PHASE_COMMAND'
+  );
+  assert.equal(requests[1].headers.Authorization,'Bearer new-access');
+  assert.deepEqual(requests[1].body,{phaseMode:3});
+});
+
 test('fresh token is reused without refresh or Logic writes',async()=>{
   const f=fixture();
   const v=await f.readEaseeVars();
