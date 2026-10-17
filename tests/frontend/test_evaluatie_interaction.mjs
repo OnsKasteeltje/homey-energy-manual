@@ -76,7 +76,9 @@ test("PV forecast joins closed historical quarter to live open quarter without r
  const startOfDay=Date.parse("2026-10-15T22:00:00Z");
  const currentSlots=Array.from({length:96},(_,i)=>{
   const start=new Date(startOfDay+i*900000).toISOString();
-  const pvForecastW=start===closed?9999:start===open?2700:start===future?3100:1700;
+  const at=Date.parse(start);
+  const pvForecastW=at===Date.parse(closed)?9999:at===Date.parse(open)?2700:
+   at===Date.parse(future)?3100:1700;
   return {start,pvForecastW};
  });
  let currentAvailable=true,requests=[];
