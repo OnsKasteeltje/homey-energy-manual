@@ -114,6 +114,8 @@ const ACTION_IDS={
   current:'homey:device:'+CHARGER_ID+':setDynamicChargerCurrent'
 };
 
+// A successful Easee Cloud HTTP response is the only proof that clears an auth alert.
+let easeeCloudAuthenticatedAt=null;
 const runNative=async(id,args={})=>Homey.flow.runFlowCardAction({id,args});
 const pauseSession=()=>runNative(ACTION_IDS.pause,{});
 const resumeSession=()=>runNative(ACTION_IDS.resume,{});
@@ -135,6 +137,7 @@ const postJson=async(url,body,accessToken,operation='EASEE')=>{
   });
   let payload=null;
   try{payload=await r.json();}catch(_){}
+  if(r.ok)easeeCloudAuthenticatedAt=new Date().toISOString();
   if(!r.ok){
     const err=new Error(operation+'_HTTP_'+r.status);
     err.httpStatus=r.status;
@@ -154,6 +157,7 @@ const getJson=async(url,accessToken,operation='EASEE')=>{
   });
   let payload=null;
   try{payload=await r.json();}catch(_){}
+  if(r.ok)easeeCloudAuthenticatedAt=new Date().toISOString();
   if(!r.ok){
     const err=new Error(operation+'_HTTP_'+r.status);
     err.httpStatus=r.status;
@@ -449,10 +453,27 @@ const transitionObject=(stage,control,originalCircuitA,extra={})=>({
 
 const saveStatus=async(status,reason,stage,control,hw,originalCircuitA,extra={})=>{
   const transition=transitionObject(stage,control,originalCircuitA,extra);
+  // A hardware OFF/no-op is not proof of successful Easee authentication.
+  // Retain the last alert across STABLE and OFF_ZERO_A_HOLD status writes.
+  // Re-read at status commit: maintenance may have posted or resolved an
+  // alert after this actuator invocation captured its 'previous' snapshot.
+  let latestStatus=null;
+  try{
+    const latest=await Homey.logic.getVariable({id:IDS.status});
+    latestStatus=parse(latest?.value);
+  }catch(_){}
+  const priorAlert=latestStatus?.authAlert||previous?.authAlert;
+  const stickyAlert=priorAlert?.active===true
+    ? (easeeCloudAuthenticatedAt
+        ? {...priorAlert,active:false,resolvedAt:easeeCloudAuthenticatedAt,
+           resolution:'EASEE_CLOUD_HTTP_SUCCESS'}
+        : priorAlert)
+    : priorAlert;
   const value=JSON.stringify({
     schema:VERSION,
     status,
     at:iso(),
+    ...(stickyAlert ? {authAlert:stickyAlert} : {}),
     reason,
     live:extra.live===true,
     phaseExecutionEnabled:PHASE_EXECUTION_ENABLED,
@@ -567,7 +588,7 @@ const notifyEaseeAuthFailure=async(reason,previousStatus)=>{
   const prior=previousStatus?.authAlert;
   const priorAttemptMs=Date.parse(String(prior?.attemptedAt||prior?.sentAt||''));
   const sameActiveFailure=
-    previousStatus?.status==='FAILED' &&
+    prior?.active===true &&
     prior?.code===code;
   const deliveryAlreadySucceeded=prior?.delivered===true;
   const retryStillSuppressed=

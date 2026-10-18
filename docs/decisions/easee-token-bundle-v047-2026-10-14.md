@@ -113,3 +113,39 @@ production Easee token writer.
 
 Architecture ownership remains Pi planner → Homey realtime Gate /
 single physical Easee writer, with P1 as actual net-import authority.
+
+## Proposed 2026-10-18 KISS follow-up — not deployed (draft PR)
+
+A new auth-only action card in the **existing EV Power v0.4.7 Homey Advanced
+Flow** (same Flow ID, no new physical writer) is scheduled by a separate
+15-minute cron trigger. Its source:
+`apps/homey/control/ev/easee-auth-maintenance-v0.1.homeyscript.js`.
+During controlled commissioning substitute the pinned
+`__EM2_EASEE_BUNDLE_ID__` placeholder with the local private Homey bundle
+variable ID; keep secrets exclusively in Homey Logic.
+
+- At each 15-minute tick, read the canonical Homey token bundle; refresh only
+  if remaining validity is under 20 minutes.
+- No Easee charger physical calls, phase/current commands, Flow triggers,
+  pauses/resumes or Pi token service from the maintenance action.
+- The existing writer remains the sole **physical** Easee writer and retains
+  its own lazy refresh/retry when a phase command requires it. Both entry
+  paths share one token bundle. Homey Logic does **not** provide CAS or a
+  cross-invocation lock; race risk is not claimed eliminated.
+- HTTP refresh 401, invalid bundle and failed persistence remain bounded and
+  fail closed; push via the existing Homey owner-push/Timeline fallback,
+  deduplicated against an active prior alert.
+- The actor status preserves an active `authAlert` across physically STABLE
+  or OFF 0A executions. Only a successful Easee Cloud HTTP operation or
+  successful maintenance refresh explicitly resolves the alert. This is
+  authentication health, independent of physical charging status.
+- No automatic password login or credential storage; a revoked single-use
+  refresh token requires controlled local interactive bootstrap.
+
+**Deployment gate (not done in this PR):** focused tests, architecture/security
+checks, exact in-place Homey Flow backup and readback, cron trigger wired
+exclusively to the auth-only action, only one new action card and one trigger;
+verify no charger writes across maintenance; verify real token revision/expiry
+after one natural refresh, and owner push on sanitized simulated or observed
+auth failure (do not intentionally invalidate production credentials).
+No main/Pi/Homey production deployment without separate acceptance.
