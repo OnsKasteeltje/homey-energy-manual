@@ -462,6 +462,12 @@ const saveStatus=async(status,reason,stage,control,hw,originalCircuitA,extra={})
     const latest=await Homey.logic.getVariable({id:IDS.status});
     latestStatus=parse(latest?.value);
   }catch(_){}
+  // Keep independent auth-maintenance evidence when the physical actuator
+  // updates its own status. Only fall back to the earlier snapshot if the
+  // status re-read failed; never recreate a cleared maintenance record.
+  const lastMaintenance=latestStatus===null
+    ? previous?.authMaintenance
+    : latestStatus.authMaintenance;
   const priorAlert=latestStatus?.authAlert||previous?.authAlert;
   const stickyAlert=priorAlert?.active===true
     ? (easeeCloudAuthenticatedAt
@@ -474,6 +480,8 @@ const saveStatus=async(status,reason,stage,control,hw,originalCircuitA,extra={})
     status,
     at:iso(),
     ...(stickyAlert ? {authAlert:stickyAlert} : {}),
+    ...(lastMaintenance && typeof lastMaintenance==='object'
+      ? {authMaintenance:lastMaintenance} : {}),
     reason,
     live:extra.live===true,
     phaseExecutionEnabled:PHASE_EXECUTION_ENABLED,
