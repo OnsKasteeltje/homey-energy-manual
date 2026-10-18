@@ -162,3 +162,33 @@ test('STABLE writer respects newer resolved alert after maintenance refresh',asy
  assert.equal(submitted[0].authAlert.active,false);
  assert.equal(submitted[0].authAlert.resolution,'EASEE_REFRESH_HTTP_SUCCESS');
 });
+
+test('normal actuator status updates retain newest independent auth-maintenance record',async()=>{
+ const start=writer.indexOf('const saveStatus=async');
+ const end=writer.indexOf('const waitHardware=async',start);
+ assert.ok(start>=0&&end>start);
+ const maintenance={schema:'EMS_EASEE_AUTH_MAINTENANCE_V0.1',
+   at:'2026-10-18T19:00:00Z',result:'REFRESHED',revision:42};
+ const published=[];
+ const context={
+   VERSION:'EM2_EV_ACTUATOR_V0.4.7_PHASE_WRITER',
+   PHASE_EXECUTION_ENABLED:true,
+   IDS:{status:'test-status'},
+   previous:{status:'STABLE',authMaintenance:{result:'OLDER',revision:41}},
+   parse:s=>JSON.parse(s),iso:()=>new Date().toISOString(),
+   easeeCloudAuthenticatedAt:null,
+   transitionObject:()=>({stage:'STABLE'}),
+   Homey:{logic:{
+     getVariable:async()=>({value:JSON.stringify({status:'STABLE',authMaintenance:maintenance})}),
+     updateVariable:async({variable})=>published.push(JSON.parse(variable.value))
+   }}
+ };
+ const fn=vm.runInNewContext(writer.slice(start,end)+'\n saveStatus',context);
+ await fn('STABLE','OFF_ZERO_A_HOLD','STABLE',
+   {controlRevision:'x',mode:'OFF',requestedA:0,targetW:0},
+   {confirmedMode:'OFF'},null,{live:true});
+ assert.equal(published.length,1);
+ assert.deepEqual(published[0].authMaintenance,maintenance);
+ assert.equal(published[0].status,'STABLE');
+ assert.equal(published[0].reason,'OFF_ZERO_A_HOLD');
+});
