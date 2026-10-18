@@ -8,6 +8,29 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### Historical room-temperature analysis — 15m evidence (18 October 2026)
+
+`/heating-analysis/` now presents a room-selectable archived
+15-minute temperature-versus-recorded-setpoint history with a whole-Quatt
+heating_on background and outdoor-temperature right axis. A separate
+allowlisted, read-only `GET /web/analysis/heating/temperature/day/YYYY-MM-DD`
+projection reads at most one **archived and completed** Amsterdam day from
+canonical `ems-history.sqlite.measurements_15m`, without changing the
+daily archive, planner or control model. It handles missing quarters and
+23h/25h DST dates explicitly.
+
+Registered `room_setpoint_c` is historical Honeywell **observed target**;
+it can include overrides and is not a replay of the original versioned
+weekly schedule. Step-response intervals require recognizable, stable
+recorded target-UP edges and complete subsequent observations; after an
+unknown/missing/changed-target segment no duration is invented. The
+evening/night cooling observation requires stable targets, a falling
+room temperature, >=1h complete data and Quatt heating_on<=0.1;
+otherwise it is unassessed. These are indicators, **not** proof of
+per-room actuator action, source attribution, solar heat buffering or a
+building heat-loss coefficient. Eight rooms remain observational while
+Heating Flex retains its six-room control scope.
+
 ### Separate Heating Analysis website — historical view (18 October 2026)
 
 The private EMS Frontend V2 gains an independently navigable

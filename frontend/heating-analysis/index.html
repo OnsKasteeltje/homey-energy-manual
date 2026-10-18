@@ -42,6 +42,23 @@
       <span id="hp-coverage">Quatt-dekking —</span>
       <span id="pv-provenance">PV-bronstatus —</span>
     </section>
+    <section class="panel thermal-analysis" aria-labelledby="thermal-analysis-title">
+      <header><div><small>HONEYWELL · HISTORISCH · 15 MINUTEN</small><h2 id="thermal-analysis-title">Temperatuurverloop versus doeltemperatuur</h2></div><span class="pill">OBSERVATIE · SHADOW</span></header>
+      <div class="room-picker"><label for="room-select">Kies kamer</label><select id="room-select" aria-label="Kies een kamer voor de temperatuurgrafiek"></select></div>
+      <p class="hint">Blauw: gemeten kamertemperatuur. Groen: destijds geregistreerd Honeywell-setpoint (inclusief eventuele handmatige overrides; geen gegarandeerde reconstructie van het weekschema). Oranje, rechteras: buitentemperatuur. Gele vlakken: Quatt heating_on gedurende meer dan 50% van het kwartier; geen bewijs van warmtevraag in deze kamer.</p>
+      <div class="chart-legend"><span class="legend-room">Kamertemperatuur</span><span class="legend-target">Geregistreerd setpoint</span><span class="legend-outdoor">Buitentemperatuur (rechteras)</span><span class="legend-heating">Quatt heating_on &gt;50%</span></div>
+      <div class="temperature-chart-wrap">
+        <svg id="temperature-chart" role="img" aria-label="Historisch temperatuurverloop van geselecteerde kamer met Honeywell-setpoint, buitentemperatuur en Quatt-activiteit"></svg>
+      </div>
+      <p id="chart-hover" class="chart-hover" role="status" aria-live="off">Beweeg over de grafiek om metingen per kwartier te bekijken.</p>
+      <p id="series-quality" class="hint">Temperatuurhistorie laden…</p>
+      <div class="thermal-kpis" aria-label="Thermische indicatoren">
+        <article><small>REACTIE NA DOELVERHOGING</small><strong id="reaction">—</strong><span id="reaction-explanation">Alleen goed herkenbare setpoint-stappen.</span></article>
+        <article><small>AVONDAFKOELING · 18–24U</small><strong id="cooling-evening">—</strong><span id="cooling-evening-detail">Alleen bij stabiel doel en Quatt-signaal uit.</span></article>
+        <article><small>NACHTAFKOELING · 00–06U</small><strong id="cooling-night">—</strong><span id="cooling-night-detail">Alleen bij stabiel doel en Quatt-signaal uit.</span></article>
+      </div>
+      <p class="hint">Reactietijd = waargenomen tijd tussen een herkenbare doelverhoging en het bereiken van de geregistreerde doeltemperatuur (±0,2 °C), maximaal vier uur. Geen bewezen responstijd van de warmtebron. Afkoeling is indicatief, gemeten bij Quatt heating_on ≈ 0 en stabiel doel; geen warmteverliescoëfficiënt. Bij onvoldoende bewijs tonen we geen getal.</p>
+    </section>
     <section class="panel">
       <header><div><small>VIER DAGDELEN</small><h2>Warmtepomp en zonneoverschot</h2></div><span class="pill">GEMETEN · GEEN SIMULATIE</span></header>
       <p class="hint">Elektriciteit van de Quatt tegenover netexport. Export is geen bewezen beschikbare warmtebuffer of besparing.</p>
@@ -49,10 +66,10 @@
       <div id="dayparts" class="dayparts" role="img" aria-label="Quatt en PV-export per dagdeel"></div>
     </section>
     <section class="panel">
-      <header><div><small>HONEYWELL · 8 RUIMTES</small><h2>Kamertemperaturen</h2></div><span class="pill">OBSERVATIE</span></header>
-      <p class="hint">Temperaturen en setpoints zijn 15-minuten gemiddelden. Onder het setpoint is een indicatie, niet bewezen individuele warmtevraag.</p>
+      <header><div><small>HONEYWELL · 8 RUIMTES</small><h2>Comfort &amp; meetdekking</h2></div><span class="pill">OBSERVATIE</span></header>
+      <p class="hint">Kwartieren met minstens 0,2 °C verschil tussen geregistreerd setpoint en gemeten kamertemperatuur. Een tekort is niet hetzelfde als bewezen warmtevraag.</p>
       <div class="table-scroller">
-        <table><thead><tr><th scope="col">Kamer</th><th scope="col">Begin</th><th scope="col">Eind</th><th scope="col">Laatste doel</th><th scope="col">Onder doel ≥0,2 °C</th><th scope="col">Dekking</th></tr></thead><tbody id="rooms"></tbody></table>
+        <table><thead><tr><th scope="col">Kamer</th><th scope="col">Onder doel ≥0,2 °C</th><th scope="col">Dekking</th></tr></thead><tbody id="rooms"></tbody></table>
       </div>
     </section>
     <section class="panel evidence">

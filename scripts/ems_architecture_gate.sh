@@ -697,6 +697,7 @@ pass "canonical local derived-history pipeline present and isolated from legacy 
 
 # A single focused end-to-end contract for the read-only heating archive view.
 python3 tests/api/test_heating_daily_web_resource.py || fail "Heating Analysis API/page contract failed"
+python3 tests/api/test_heating_daily_temperature_series.py || fail "Heating Analysis 15m graph/response/cooling contract failed"
 python3 tests/frontend/test_v2_shared_navigation_contract.py || fail "shared navigation contract failed"
 python3 tests/frontend/test_v2_local_assets_contract.py || fail "Frontend V2 asset paths invalid"
 node --check frontend/heating-analysis/render/heating-analysis.js || fail "Heating Analysis frontend JS syntax invalid"
