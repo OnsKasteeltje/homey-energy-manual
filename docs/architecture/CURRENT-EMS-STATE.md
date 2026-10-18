@@ -137,6 +137,19 @@ than bridging an evidence hole. This is solely an additive frontend
 visualization: no new API/control authority, no changed planner forecasts,
 no Homey writes and no retroactive evaluation changes.
 
+### PV forecast historical weighting — source change pending Pi deployment (18 October 2026)
+
+GitHub V1 (canonical 15-minute Pi planner input) and V2 (read-only shadow)
+change only `HISTORICAL_WEIGHT` from 0.85 to 0.20. The remaining 80% uses
+the existing irradiation-based theoretical component; this is not an additional
+weather source or a live-PV feedback controller. Existing P1 realtime authority,
+PV-calibration profile, timer cadence, forecasts archived before the change,
+Homey device writers and heating/EV safety remain unchanged. Runtime effect
+and forecast accuracy are **not yet certified** until Pi deploy/readback and
+later forecast-versus-actual measurement. The original 18 October 15:00
+forecast overestimated production (2367 W forecast; approximately 540 W actual),
+but one afternoon is not sufficient to prove the new weighting is optimal.
+
 ### Quality-gated daily PV calibration (16 October 2026)
 
 The 15-minute PV forecast was repeatedly reading a historical calibration last

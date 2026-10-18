@@ -15,7 +15,7 @@ SLOTS = 96
 PV_NOMINAL_W = 8000
 SOLAR_CONSTANT_W_M2 = 1367.7
 MIN_CLEAR_SKY_W_M2 = 25.0
-HISTORICAL_WEIGHT = 0.85
+HISTORICAL_WEIGHT = 0.20  # Prefer current irradiance over sunny-day historical envelope
 MIN_PROFILE_DAYS = 3
 MIN_PROFILE_SAMPLES = 3
 # Open-Meteo azimuth convention: 0=south, -90=east, +90=west.
