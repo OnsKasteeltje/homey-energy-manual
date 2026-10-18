@@ -44,6 +44,7 @@ EMS_SETTINGS_COMMAND_FILE = os.environ.get(
 HISTORY_DB = os.environ.get("EMS_HISTORY_DB", "/home/jeroen/ems/data/ems-history.sqlite")
 PLANNER_HISTORY_DB = os.environ.get("EMS_PLANNER_HISTORY_DB", "/home/jeroen/ems/data/planner-history.sqlite")
 DAILY_PERFORMANCE_ARCHIVE_FILE = os.environ.get("EMS_DAILY_PERFORMANCE_ARCHIVE_FILE", "/home/jeroen/ems/data/daily-performance-archive.json")
+HEATING_DAILY_ARCHIVE_FILE = os.environ.get("EMS_HEATING_DAILY_ARCHIVE_FILE", "/home/jeroen/ems/data/heating-daily-archive.json")
 LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
 API_SCHEMA = "EMS_WEB_WW_SEASONAL_ADVICE_V1"
@@ -53,6 +54,7 @@ COMMANDS_API_SCHEMA = "EMS_WEB_COMMANDS_CURRENT_V1"
 HISTORY_API_SCHEMA = "EMS_WEB_HISTORY_V1"
 PV_FLEX_API_SCHEMA = "EMS_WEB_PV_FLEX_ANALYSIS_V1"
 DAILY_PERFORMANCE_API_SCHEMA = "EMS_WEB_DAILY_PERFORMANCE_V1"
+HEATING_DAILY_API_SCHEMA = "EMS_WEB_HEATING_DAILY_V1"
 PLANNER_EVALUATION_API_SCHEMA = "EMS_WEB_PLANNER_EVALUATION_V2"
 PV_FORECAST_API_SCHEMA = "EMS_WEB_PV_FORECAST_V2"
 DYNAMIC_PLAN_API_SCHEMA = "EMS_WEB_DYNAMIC_PLAN_V1"
@@ -245,6 +247,145 @@ def daily_performance_resource(value):
             "issues": [issue for issue in (quality.get("issues") or []) if isinstance(issue, str)][:12],
         },
         "lines": lines,
+    }
+
+
+
+def heating_daily_resource(value):
+    """Allowlisted historical heating report; no runtime commands or unbounded file access."""
+    try:
+        day = datetime.strptime(value, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        raise ValueError("HEATING_DAY_INVALID")
+    if day.isoformat() != value or day >= datetime.now(LOCAL_TZ).date():
+        raise ValueError("HEATING_DAY_NOT_COMPLETE")
+
+    archive = load_json(HEATING_DAILY_ARCHIVE_FILE)
+    if (not isinstance(archive, dict)
+            or archive.get("schema") != "EMS_HEATING_DAILY_ARCHIVE_V0.1"
+            or not isinstance(archive.get("days"), dict)):
+        raise RuntimeError("HEATING_ARCHIVE_INVALID")
+    item = archive["days"].get(value)
+    if item is None:
+        return None
+    if (not isinstance(item, dict)
+            or item.get("schema") != "EMS_HEATING_DAILY_EVALUATION_V0.1"
+            or item.get("dateLocal") != value
+            or item.get("mode") != "READ_ONLY"
+            or item.get("controlMode") != "SHADOW"
+            or item.get("controlWrites") is not False):
+        raise RuntimeError("HEATING_REPORT_INVALID")
+
+    quality = item.get("quality")
+    energy = item.get("energy")
+    quatt = item.get("quattAndRooms")
+    periods = item.get("periods")
+    if not all(isinstance(x, dict) for x in (quality, energy, quatt, periods)):
+        raise RuntimeError("HEATING_REPORT_INVALID")
+    if quality.get("status") not in {"GOOD", "PARTIAL", "INSUFFICIENT"}:
+        raise RuntimeError("HEATING_REPORT_INVALID")
+    issues = quality.get("issues")
+    if (not isinstance(issues, list) or len(issues) > 30
+            or any(not isinstance(s, str) or len(s) > 120 for s in issues)):
+        raise RuntimeError("HEATING_REPORT_INVALID")
+
+    def numeric(value, *, lo=None, hi=None):
+        if value is None:
+            return None
+        if (not isinstance(value, (int, float)) or isinstance(value, bool)
+                or not math.isfinite(value)
+                or (lo is not None and value < lo)
+                or (hi is not None and value > hi)):
+            raise RuntimeError("HEATING_REPORT_INVALID")
+        return value
+
+    def quatt_view(source):
+        if not isinstance(source, dict):
+            raise RuntimeError("HEATING_REPORT_INVALID")
+        return {
+            "electricKWh": numeric(source.get("quattElectricKWh"), lo=0),
+            "hp1HeatSensorKWh": numeric(source.get("quattHeatHP1SensorKWh"), lo=0),
+            "hp2HeatSensorKWh": numeric(source.get("quattHeatHP2SensorKWh"), lo=0),
+            "hp1HeatToElectricRatio": numeric(source.get("pairedHP1HeatToElectricRatio"), lo=0),
+            "completeSlots": numeric(source.get("quattElectricCompleteSlots"), lo=0),
+            "expectedSlots": numeric(source.get("expectedSlots"), lo=0),
+            "heatingSignalMean": numeric(source.get("heatingSignalMean"), lo=0, hi=1),
+            "outsideTempMeanC": numeric(source.get("outsideTempMeanC"), lo=-80, hi=80),
+        }
+
+    def energy_view(source):
+        if not isinstance(source, dict):
+            raise RuntimeError("HEATING_REPORT_INVALID")
+        good = source.get("balanceQuality") == "GOOD"
+        return {
+            "quality": "GOOD" if good else "INSUFFICIENT",
+            "pairedCoverage": numeric(source.get("pairedCoverage"), lo=0, hi=1),
+            "heldPvHours": numeric(source.get("heldPvHours"), lo=0),
+            "estimatedPvHours": numeric(source.get("estimatedPvHours"), lo=0),
+            "importKWh": numeric(source.get("importKWh"), lo=0) if good else None,
+            "exportKWh": numeric(source.get("exportKWh"), lo=0) if good else None,
+            "pvProducedKWh": numeric(source.get("pvProducedKWh"), lo=0) if good else None,
+            "houseKWh": numeric(source.get("houseKWh"), lo=0) if good else None,
+        }
+
+    room_names = (
+        ("woonkamer", "Woonkamer"),
+        ("eetkamer", "Eetkamer"),
+        ("keuken", "Keuken"),
+        ("serre", "Serre"),
+        ("douwe_slaapkamer", "Douwe slaapkamer"),
+        ("erker_douwe", "Erker Douwe"),
+        ("krijn_slaapkamer", "Krijn slaapkamer"),
+        ("master_bedroom", "Master bedroom"),
+    )
+    raw_rooms = quatt.get("rooms")
+    if not isinstance(raw_rooms, dict):
+        raise RuntimeError("HEATING_REPORT_INVALID")
+    rooms = []
+    for key, label in room_names:
+        room = raw_rooms.get(key)
+        if not isinstance(room, dict):
+            raise RuntimeError("HEATING_REPORT_INVALID")
+        rooms.append({
+            "name": label,
+            "coverage": numeric(room.get("coverage"), lo=0, hi=1),
+            "firstTemperatureC": numeric(room.get("firstTemperatureC"), lo=-40, hi=80),
+            "lastTemperatureC": numeric(room.get("lastTemperatureC"), lo=-40, hi=80),
+            "lastSetpointC": numeric(room.get("lastSetpointC"), lo=-40, hi=80),
+            "belowSetpointBy02CSlots": numeric(room.get("belowSetpointBy02CSlots"), lo=0),
+            "completePairedSlots": numeric(room.get("completePairedSlots"), lo=0),
+        })
+    period_views = []
+    for key, title in (
+        ("00-09", "00:00–09:00"), ("09-12", "09:00–12:00"),
+        ("12-17", "12:00–17:00"), ("17-24", "17:00–24:00")
+    ):
+        block = periods.get(key)
+        if not isinstance(block, dict):
+            raise RuntimeError("HEATING_REPORT_INVALID")
+        period_views.append({
+            "label": title,
+            "quatt": quatt_view(block.get("quattAndRooms")),
+            "energy": energy_view(block.get("energy")),
+        })
+
+    cic = item.get("cicAndGas")
+    if not isinstance(cic, dict):
+        raise RuntimeError("HEATING_REPORT_INVALID")
+    return {
+        "schema": HEATING_DAILY_API_SCHEMA,
+        "dateLocal": value,
+        "readOnly": True, "controlWrites": False, "controlMode": "SHADOW",
+        "quality": {"status": quality["status"], "issues": issues},
+        "quatt": quatt_view(quatt),
+        "energy": energy_view(energy),
+        "rooms": rooms,
+        "periods": period_views,
+        "cic": {
+            "boilerSelectedSamples": numeric(cic.get("cicBoilerSelectedSamples"), lo=0),
+            "gasObservedSpanDeltaM3": numeric(cic.get("gasObservedSpanDeltaM3"), lo=0),
+            "gasMeterObservedSamples": numeric(cic.get("gasMeterObservedSamples"), lo=0),
+        },
     }
 
 
@@ -2221,6 +2362,19 @@ class Handler(BaseHTTPRequestHandler):
         if len(parts) == 5 and parts[:4] == ["web", "analysis", "performance", "day"]:
             try:
                 result = daily_performance_resource(parts[4])
+                if result is None:
+                    send_json(self, 404, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "DAY_REPORT_NOT_ARCHIVED"})
+                else:
+                    send_json(self, 200, result)
+            except ValueError:
+                send_json(self, 400, {"schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "INVALID_OR_OPEN_DAY"})
+            except (OSError, RuntimeError, json.JSONDecodeError):
+                send_json(self, 503, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "REPORT_ARCHIVE_UNAVAILABLE"})
+            return
+
+        if len(parts) == 5 and parts[:4] == ["web", "analysis", "heating", "day"]:
+            try:
+                result = heating_daily_resource(parts[4])
                 if result is None:
                     send_json(self, 404, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "DAY_REPORT_NOT_ARCHIVED"})
                 else:

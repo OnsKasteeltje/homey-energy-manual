@@ -4,11 +4,33 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-10-14
+**Status date:** 2026-10-18
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
-### Daily Heating Evaluation V0.1 — source candidate (17 October 2026)
+### Separate Heating Analysis website — historical view (18 October 2026)
+
+The private EMS Frontend V2 gains an independently navigable
+`/heating-analysis/` page (**Analyse verwarming**), separate from the
+`/heating/` six-zone rolling Heating Flex shadow/planner page. It reads
+only **completed local days** from the Pi-private V0.1 daily heating
+archive via `GET /web/analysis/heating/day/YYYY-MM-DD` on the existing
+Pi Web Data API (port 3200), proxied by the existing Tailscale-only Caddy
+`/web/*` route. No new collector, service, public web route, control
+command or Homey write is added. Eight historical Honeywell zones are
+displayed without modifying the six controllable heating zones.
+
+The API returns an allowlisted, schema-checked projection and never
+forwards the private raw archive. Invalid/open dates fail closed, a
+missing archived day returns 404, malformed archive/records return 503.
+Missing or low-quality paired P1/PV intervals are **not** shown as exact
+house/import/export totals. `held` and `estimated` PV evidence retains
+quality metadata. HP1 sensor heat and CiC mode/gas are evidence, not
+proof of individual room heat demand, burner firing, PV capture or
+savings. Frontend does not calculate preheat plans or fabricate COP.
+See `docs/components/automated-heating-evaluation.md`.
+
+### Daily Heating Evaluation V0.1 — production acceptance (18 October 2026)
 
 A separate, read-only daily heating evaluation is added as the **third,
 best-effort** `ExecStart=-` step of existing `ems-history-daily.service` at
@@ -23,8 +45,8 @@ planner/control rooms remain unchanged. `held` PV accounting is retained with
 explicit provenance; paired P1+PV coverage and energy-balance gates prohibit
 false precision. Quatt sensor heat, thermostat heating_on, CiC mode and gas
 observations do not prove per-room heat demand, burner firing or savings.
-GitHub source candidate only until separately synchronized/deployed/observed
-on the Pi; see `docs/components/automated-heating-evaluation.md`.
+Pi installation, nightly 2026-10-18 run and report/archive creation verified;
+see `docs/components/automated-heating-evaluation.md`.
 
 ### Heating Thermal Learning: CiC modes at scheduled step-ups (16 October 2026)
 

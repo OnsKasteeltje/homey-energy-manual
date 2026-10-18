@@ -5,7 +5,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 ROOT = Path("frontend")
-PAGES = ("live", "settings", "history", "planner", "pv-flex", "heating", "ai")
+PAGES = ("live", "settings", "history", "planner", "pv-flex", "heating", "heating-analysis", "ai")
 
 class Assets(HTMLParser):
     def __init__(self):

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f4f8fc">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="EMS">
+  <title>EMS · Verwarmingsanalyse</title>
+  <link rel="stylesheet" href="../shared/styles/v2-shell.css">
+  <link rel="stylesheet" href="./styles/heating-analysis.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../live/">EMS <span>Productie</span></a>
+  <nav data-ems-main-nav aria-label="Hoofdnavigatie"></nav>
+  <div id="freshness" class="freshness">Historie laden…</div>
+</header>
+<main>
+  <section class="intro">
+    <small>HISTORISCHE ANALYSE · READ-ONLY</small>
+    <h1>Verwarmingsanalyse</h1>
+    <p>Dagelijkse Quatt-, Honeywell- en P1/PV-metingen. Dit is een aparte historische pagina; de actuele Heating Flex-planning blijft bij <a href="../heating/">Verwarming</a>.</p>
+  </section>
+  <nav class="period-nav" aria-label="Historische dag">
+    <button id="prev" type="button" aria-label="Vorige dag">‹</button>
+    <div><strong id="day-title">—</strong><span>Afgesloten kalenderdag · Europe/Amsterdam</span></div>
+    <button id="next" type="button" aria-label="Volgende dag">›</button>
+  </nav>
+  <p id="page-message" class="message" role="status" aria-live="polite">Dagrapport laden…</p>
+  <section id="report" hidden>
+    <section class="kpis" aria-label="Dagtotalen">
+      <article><small>QUATT ELEKTRICITEIT</small><strong id="kpi-quatt">—</strong><span>gemeten kWh</span></article>
+      <article><small>HP1 WARMTE</small><strong id="kpi-thermal">—</strong><span>sensorindicatie kWh</span></article>
+      <article><small>NETIMPORT</small><strong id="kpi-import">—</strong><span>P1 kWh</span></article>
+      <article><small>PV-EXPORT</small><strong id="kpi-export">—</strong><span>P1 kWh</span></article>
+    </section>
+    <section class="summary" aria-label="Dekking en interpretatie">
+      <span id="quality">Kwaliteit —</span>
+      <span id="coverage">P1/PV-dekking —</span>
+      <span id="hp-coverage">Quatt-dekking —</span>
+      <span id="pv-provenance">PV-bronstatus —</span>
+    </section>
+    <section class="panel">
+      <header><div><small>VIER DAGDELEN</small><h2>Warmtepomp en zonneoverschot</h2></div><span class="pill">GEMETEN · GEEN SIMULATIE</span></header>
+      <p class="hint">Elektriciteit van de Quatt tegenover netexport. Export is geen bewezen beschikbare warmtebuffer of besparing.</p>
+      <div class="bar-legend"><span class="quatt-key">Quatt-elektriciteit</span><span class="export-key">PV-export naar net</span></div>
+      <div id="dayparts" class="dayparts" role="img" aria-label="Quatt en PV-export per dagdeel"></div>
+    </section>
+    <section class="panel">
+      <header><div><small>HONEYWELL · 8 RUIMTES</small><h2>Kamertemperaturen</h2></div><span class="pill">OBSERVATIE</span></header>
+      <p class="hint">Temperaturen en setpoints zijn 15-minuten gemiddelden. Onder het setpoint is een indicatie, niet bewezen individuele warmtevraag.</p>
+      <div class="table-scroller">
+        <table><thead><tr><th scope="col">Kamer</th><th scope="col">Begin</th><th scope="col">Eind</th><th scope="col">Laatste doel</th><th scope="col">Onder doel ≥0,2 °C</th><th scope="col">Dekking</th></tr></thead><tbody id="rooms"></tbody></table>
+      </div>
+    </section>
+    <section class="panel evidence">
+      <header><div><small>BRONKWALITEIT</small><h2>Context en beperkingen</h2></div></header>
+      <div class="details"><div><small>Buiten gemiddeld</small><strong id="outside">—</strong></div><div><small>Heating-on-signaal</small><strong id="heating">—</strong></div><div><small>HP1 sensorverhouding</small><strong id="ratio">—</strong></div><div><small>CiC boilerselectie</small><strong id="cic">—</strong></div><div><small>Gasobservaties</small><strong id="gas">—</strong></div></div>
+      <p id="issues" class="notes"></p>
+      <p class="disclaimer">HP1 warmte is een Quatt-sensorindicatie; de verhouding is geen gevalideerde SCOP. CiC mode 3/4 is geen branderbewijs. De gasmeter meet het gehele huis inclusief warm water. Warmtevraag per kamer, PV-toewijzing aan Quatt en besparing zijn hiermee niet bewezen. Geen fysieke writes.</p>
+    </section>
+  </section>
+  <p class="preview-note">EMS productie · Verwarmingsanalyse · Read-only</p>
+</main>
+<script type="module" src="./render/heating-analysis.js"></script>
+<script type="module" src="../shared/navigation.js"></script>
+</body>
+</html>

@@ -5,12 +5,13 @@ const ITEMS = [
   { key: "planner", label: "Planner", href: "../planner/" },
   { key: "pv-flex", label: "Evaluatie", href: "../pv-flex/" },
   { key: "heating", label: "Verwarming", href: "../heating/" },
+  { key: "heating-analysis", label: "Analyse verwarming", href: "../heating-analysis/" },
   { key: "ai", label: "AI Analyse", href: "../ai/" },
   { key: "groups", label: "Groepen & fasen", disabled: true },
 ];
 
 const MOBILE_PRIMARY = ["live", "settings", "history"];
-const MOBILE_MORE = ["planner", "pv-flex", "heating", "ai", "groups"];
+const MOBILE_MORE = ["planner", "pv-flex", "heating", "heating-analysis", "ai", "groups"];
 
 const ICONS = {
   live: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
