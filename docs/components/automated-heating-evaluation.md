@@ -68,3 +68,53 @@ The website Analysis view is **deferred**, to consume validated local reports
 through the existing private Pi API. Do not put the private archive in GitHub
 Pages or `docs/data`. Thermal Learning remains `UNASSESSED` until sufficient
 comparable data supports a careful empirical model.
+
+## Separate analysis page: 15-minute temperature vs archived setpoint (V0.2)
+
+The private `/heating-analysis/` page now prioritizes an observational
+**room-selectable daily curve** above the daily energy bars. It displays all
+eight Honeywell rooms individually, with:
+
+- Room temperature and *archived observed Honeywell setpoint*, both from
+  `measurements_15m`, and explicit gaps for any incomplete/missing quarters.
+- Optional context on the **same timeline**: Quatt `heating_on` fraction
+  (>50% shaded), and outdoor temperature on an independently labelled
+  **right-hand axis**. Quatt is a whole-system signal; it cannot prove
+  heating demand or valve state for one particular room.
+- The observed time to reach a new recorded setpoint on a clearly detected
+  step-up (>=0.4 C between consecutive complete quarters, previous and
+  following quarter stable within 0.15 C). The response needs continuous
+  complete temperature/target pairs without target changes, with a maximum
+  four-hour observation window; already-at-target, data gaps, changed targets
+  and never-reached remain distinct. The result is not an estimated thermal
+  time constant or a causal source response time.
+- Indicative evening (18:00-24:00 local) and night (00:00-06:00 local)
+  **temperature decline** only during at least one hour of consecutive,
+  complete measurements with steady observed setpoint, Quatt
+  `heating_on <= 0.1` and at least 0.2 C of actual temperature decrease.
+  Exclude warming/missing intervals. If none qualifies, display "insufficient
+  evidence", **not** a fitted house-loss parameter.
+
+The new read-only endpoint
+`GET /web/analysis/heating/temperature/day/YYYY-MM-DD`
+reads only a bounded completed, already-archived day from the canonical Pi
+SQLite `measurements_15m` database; it performs no new polling and retains
+the existing Tailscale-only /web/* proxy. It returns at most 100 15-minute
+slots per room for a 25-hour DST autumn date. The API does not include
+Honeywell credentials, internal IDs or raw arbitrary history.
+
+**Fundamental provenance boundary:** `room_setpoint_c` is the *observed*
+Honeywell setpoint at the time (including manual overrides). It is not
+equivalent to an immutable, historical reconstruction of the **weekly
+schedule**. The public-facing graph must label it "geregistreerd Honeywell
+setpoint" rather than claiming an original planned schedule. Resolving
+scheduled vs manual transitions historically requires credible versioned
+schedule/switchpoint evidence; the UI must not misclassify a manual override
+as a scheduled step-up.
+
+The previous First/Last/Last Target columns are removed from the room summary;
+the remaining table shows below-target paired quarter counts and coverage.
+The actual Heating Flex / planner page and the six control-scope rooms are
+unchanged. No Homey writes, Honeywell writes, Quatt writes or heating
+actuators are added. The graph, reaction and cooling calculations are
+retrospective evidence only.

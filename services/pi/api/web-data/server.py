@@ -389,6 +389,208 @@ def heating_daily_resource(value):
     }
 
 
+def heating_daily_temperature_resource(value):
+    """Bounded 15m observational overlay for one archived, completed local day.
+
+    Historic sampled targets may include manual overrides. They are NOT
+    a replay of a versioned Honeywell weekly schedule.
+    """
+    archived = heating_daily_resource(value)  # also enforces completed date / archive gate
+    if archived is None:
+        return None
+    day = datetime.strptime(value, "%Y-%m-%d").date()
+    start = datetime.combine(day, datetime.min.time(), LOCAL_TZ).astimezone(timezone.utc)
+    end = datetime.combine(day + timedelta(days=1), datetime.min.time(), LOCAL_TZ).astimezone(timezone.utc)
+    quarters = int((end - start).total_seconds() / 900)
+    room_labels = {
+        "woonkamer": "Woonkamer", "eetkamer": "Eetkamer", "keuken": "Keuken",
+        "serre": "Serre", "douwe_slaapkamer": "Douwe slaapkamer",
+        "erker_douwe": "Erker Douwe", "krijn_slaapkamer": "Krijn slaapkamer",
+        "master_bedroom": "Master bedroom",
+    }
+    allowed = {
+        **{f"honeywell_{key}": {"room_temperature_c", "room_setpoint_c"}
+           for key in room_labels},
+        "quatt_cic": {"heating_on", "outside_temperature_c"},
+    }
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True, timeout=3.0) as con:
+        con.execute("PRAGMA query_only=ON")
+        rows = con.execute(
+            """
+            SELECT x.slot_start_utc, d.device_key, m.metric_key,
+                   x.value_avg, x.quality
+            FROM measurements_15m x
+            JOIN devices d ON d.id=x.device_id
+            JOIN metrics m ON m.id=x.metric_id
+            WHERE julianday(x.slot_start_utc)>=julianday(?)
+              AND julianday(x.slot_start_utc)<julianday(?)
+              AND (d.device_key LIKE 'honeywell_%' OR d.device_key='quatt_cic')
+              AND m.metric_key IN ('room_temperature_c','room_setpoint_c',
+                                   'heating_on','outside_temperature_c')
+            ORDER BY julianday(x.slot_start_utc)
+            """,
+            (start.isoformat(), end.isoformat()),
+        ).fetchall()
+
+    slots = [start + timedelta(minutes=15 * i) for i in range(quarters)]
+    names = [_utc_text(t) for t in slots]
+    by_time = {name: i for i, name in enumerate(names)}
+    observed = {}
+    for stamp, device, metric, val, quality in rows:
+        if metric not in allowed.get(device, ()):
+            continue
+        stamp_dt = parse_timestamp(stamp)
+        if stamp_dt is None:
+            continue
+        i = by_time.get(_utc_text(stamp_dt))
+        if i is None:
+            continue
+        if (quality != "complete" or not isinstance(val, (int, float))
+                or isinstance(val, bool) or not math.isfinite(val)):
+            continue
+        if metric == "heating_on":
+            if not 0 <= val <= 1:
+                continue
+        elif metric == "outside_temperature_c":
+            if not -80 <= val <= 80:
+                continue
+        elif not -40 <= val <= 80:
+            continue
+        observed[(i, device, metric)] = round(float(val), 3)
+
+    def series(device, metric):
+        return [observed.get((i, device, metric)) for i in range(quarters)]
+
+    heating = series("quatt_cic", "heating_on")
+    outside = series("quatt_cic", "outside_temperature_c")
+
+    def reaction_events(temperatures, targets):
+        events = []
+        for i in range(1, quarters - 2):
+            previous, current = targets[i-1], targets[i]
+            if previous is None or current is None:
+                continue
+            # Quarter means may smear a transition. Classify only distinct
+            # steps, stable immediately before/after; otherwise unknown.
+            if current - previous < 0.4:
+                continue
+            if (i < 2 or targets[i-2] is None
+                    or abs(targets[i-2]-previous) > 0.15
+                    or targets[i+1] is None
+                    or abs(targets[i+1]-current) > 0.15):
+                continue
+            episode = {
+                "at": names[i], "fromTargetC": previous,
+                "toTargetC": current, "status": "UNKNOWN",
+                "minutesToTarget": None,
+            }
+            if temperatures[i] is None:
+                episode["status"] = "INSUFFICIENT_DATA"
+            elif temperatures[i] >= current - 0.2:
+                episode["status"] = "ALREADY_AT_TARGET"
+            else:
+                status = "NOT_REACHED_IN_WINDOW"
+                # Four-hour observation window; stop if target changes or
+                # continuity is broken. Missing data is never a 0-minute result.
+                for j in range(i + 1, min(i + 17, quarters)):
+                    if targets[j] is None or temperatures[j] is None:
+                        status = "INSUFFICIENT_DATA"
+                        break
+                    if abs(targets[j] - current) > 0.15:
+                        status = "TARGET_CHANGED"
+                        break
+                    if temperatures[j] >= current - 0.2:
+                        status = "REACHED"
+                        episode["minutesToTarget"] = (j-i)*15
+                        break
+                episode["status"] = status
+            events.append(episode)
+        return events[:16]
+
+    def cooling_episode(temperatures, targets, period):
+        """Most defensible continuous falling interval, *not* a heat-loss constant."""
+        candidates = []
+        run = []
+        def evaluate(values):
+            if len(values) < 5:
+                return
+            first, last = values[0], values[-1]
+            drop = temperatures[first] - temperatures[last]
+            duration = (last-first)*0.25
+            if drop < 0.2 or duration < 1:
+                return
+            if any(temperatures[j] > temperatures[j-1] + 0.15
+                   for j in values[1:]):
+                return
+            candidates.append((duration, drop, first, last))
+
+        for i, stamp in enumerate(slots):
+            hour = stamp.astimezone(LOCAL_TZ).hour
+            matching = (18 <= hour < 24) if period == "evening" else (0 <= hour < 6)
+            valid = (matching and temperatures[i] is not None
+                     and targets[i] is not None
+                     and heating[i] is not None and heating[i] <= 0.1)
+            if valid and run:
+                prev = run[-1]
+                valid = (i == prev + 1
+                         and abs(targets[i]-targets[prev]) <= 0.15
+                         and temperatures[i] <= temperatures[prev] + 0.15)
+            if not valid:
+                evaluate(run)
+                run = []
+            if matching and temperatures[i] is not None and targets[i] is not None and heating[i] is not None and heating[i] <= 0.1:
+                run = run + [i] if not run or valid else [i]
+        evaluate(run)
+        if not candidates:
+            return {"status": "INSUFFICIENT_EVIDENCE",
+                    "coolingCPerHour": None, "durationMinutes": None,
+                    "fromAt": None, "toAt": None}
+        duration, drop, first, last = max(candidates, key=lambda c: (c[0], c[1]))
+        return {
+            "status": "OBSERVED_WITH_QUATT_SIGNAL_OFF",
+            "coolingCPerHour": round(drop/duration, 3),
+            "temperatureDropC": round(drop, 3),
+            "durationMinutes": int(duration*60),
+            "fromAt": names[first], "toAt": names[last],
+        }
+
+    room_views = []
+    for key, label in room_labels.items():
+        actual = series(f"honeywell_{key}", "room_temperature_c")
+        target = series(f"honeywell_{key}", "room_setpoint_c")
+        room_views.append({
+            "key": key, "name": label,
+            "series": [{"at": names[i], "temperatureC": actual[i],
+                        "observedTargetC": target[i]}
+                       for i in range(quarters)],
+            "responseEvents": reaction_events(actual, target),
+            "cooling": {
+                "evening": cooling_episode(actual, target, "evening"),
+                "night": cooling_episode(actual, target, "night"),
+            },
+            "completePairedSlots": sum(a is not None and b is not None
+                                       for a, b in zip(actual, target)),
+        })
+
+    return {
+        "schema": "EMS_WEB_HEATING_DAILY_TEMPERATURE_V1",
+        "dateLocal": value, "timezone": "Europe/Amsterdam",
+        "mode": "READ_ONLY", "controlMode": "SHADOW",
+        "controlWrites": False, "presentationOnly": True,
+        "expectedSlots": quarters, "sampleMinutes": 15,
+        "source": "CANONICAL_MEASUREMENTS_15M",
+        "setpointProvenance": "OBSERVED_HONEYWELL_SETPOINT_INCLUDING_OVERRIDES_NOT_VERSIONED_WEEKLY_SCHEDULE",
+        "quatt": [{"at": names[i], "heatingOnFraction": heating[i],
+                   "outsideTemperatureC": outside[i]}
+                  for i in range(quarters)],
+        "rooms": room_views,
+        "interpretation": {
+            "reaction": "OBSERVED_TIME_TO_RECORDED_TARGET_NOT_PHYSICAL_ROOM_HEATUP_CAUSALITY",
+            "cooling": "FALLING_ROOM_TEMPERATURE_WHILE_WHOLE_QUATT_HEATING_SIGNAL_OFF",
+        },
+    }
+
+
 def state_current_resource():
     """Return the allowlisted Live V2 projection of canonical Pi energy state."""
     source = load_json(ENERGY_STATE_FILE)
@@ -2370,6 +2572,20 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 400, {"schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "INVALID_OR_OPEN_DAY"})
             except (OSError, RuntimeError, json.JSONDecodeError):
                 send_json(self, 503, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "REPORT_ARCHIVE_UNAVAILABLE"})
+            return
+
+        if len(parts) == 6 and parts[:5] == ["web", "analysis", "heating", "temperature", "day"]:
+            try:
+                result = heating_daily_temperature_resource(parts[5])
+                if result is None:
+                    send_json(self, 404, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "DAY_REPORT_NOT_ARCHIVED"})
+                else:
+                    send_json(self, 200, result)
+            except ValueError:
+                send_json(self, 400, {"schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "INVALID_OR_OPEN_DAY"})
+            except (OSError, RuntimeError, sqlite3.Error, json.JSONDecodeError):
+                logging.exception("Heating day timeseries unavailable")
+                send_json(self, 503, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "HEATING_SERIES_UNAVAILABLE"})
             return
 
         if len(parts) == 5 and parts[:4] == ["web", "analysis", "heating", "day"]:

@@ -48,3 +48,23 @@ td:not(:first-child){white-space:nowrap}
 .disclaimer{padding-top:12px;border-top:1px solid var(--line)}
 @media(max-width:900px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.details{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:600px){main{margin-top:18px}.panel{padding:15px}.panel header{align-items:flex-start;flex-direction:column}.kpis strong{font-size:22px}.daypart{grid-template-columns:1fr;gap:5px}.details{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Historical thermal evidence, distinct from the live Heating Flex planner. */
+.thermal-analysis{margin-top:18px}
+.room-picker{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:17px}
+.room-picker label{font-weight:750;color:var(--text-secondary);font-size:13px}
+.room-picker select{min-width:220px;max-width:100%;padding:10px 13px;background:#fff;color:var(--text);font:inherit;border:1px solid var(--line);border-radius:10px}
+.chart-legend{display:flex;flex-wrap:wrap;gap:16px;margin:12px 0;font-size:12px;color:var(--text-secondary)}
+.chart-legend span::before{content:"";display:inline-block;width:16px;height:3px;vertical-align:middle;margin-right:7px;background:#2677c6}
+.chart-legend .legend-target::before{background:#129c75}
+.chart-legend .legend-outdoor::before{background:#d98939}
+.chart-legend .legend-heating::before{background:#f4c565;height:12px;border-radius:3px}
+.temperature-chart-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:#fcfdff}
+.temperature-chart-wrap svg{display:block;width:100%;min-width:720px;height:auto}
+.chart-hover{margin:9px 0;color:var(--text-secondary);min-height:1.5em;font-size:12px}
+.thermal-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0}
+.thermal-kpis article{display:grid;align-content:start;gap:8px;padding:15px;background:#f7fafc;border:1px solid var(--line);border-radius:14px}
+.thermal-kpis small{font-size:10px;font-weight:800;letter-spacing:.04em;color:var(--muted)}
+.thermal-kpis strong{font-size:20px;font-variant-numeric:tabular-nums}
+.thermal-kpis span{font-size:11px;color:var(--muted);line-height:1.45}
+@media(max-width:800px){.thermal-kpis{grid-template-columns:1fr}.room-picker{align-items:stretch;flex-direction:column}.room-picker select{width:100%}}
