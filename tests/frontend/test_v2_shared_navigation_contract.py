@@ -2,7 +2,7 @@
 """Contract checks for the shared Frontend V2 main navigation."""
 from pathlib import Path
 
-PAGES = ("live", "settings", "history", "planner", "pv-flex", "heating", "ai")
+PAGES = ("live", "settings", "history", "planner", "pv-flex", "heating", "heating-analysis", "ai")
 NAV = Path("frontend/shared/navigation.js")
 SHELL = Path("frontend/shared/styles/v2-shell.css")
 CADDY = Path("deploy/caddy/ems-frontend-v2.Caddyfile")
@@ -17,6 +17,7 @@ expected = (
     ("planner", "Planner"),
     ("pv-flex", "Evaluatie"),
     ("heating", "Verwarming"),
+    ("heating-analysis", "Analyse verwarming"),
     ("ai", "AI Analyse"),
     ("groups", "Groepen & fasen"),
 )
