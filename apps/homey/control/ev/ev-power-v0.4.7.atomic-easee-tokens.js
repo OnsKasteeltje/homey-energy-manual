@@ -455,7 +455,14 @@ const saveStatus=async(status,reason,stage,control,hw,originalCircuitA,extra={})
   const transition=transitionObject(stage,control,originalCircuitA,extra);
   // A hardware OFF/no-op is not proof of successful Easee authentication.
   // Retain the last alert across STABLE and OFF_ZERO_A_HOLD status writes.
-  const priorAlert=previous?.authAlert;
+  // Re-read at status commit: maintenance may have posted or resolved an
+  // alert after this actuator invocation captured its 'previous' snapshot.
+  let latestStatus=null;
+  try{
+    const latest=await Homey.logic.getVariable({id:IDS.status});
+    latestStatus=parse(latest?.value);
+  }catch(_){}
+  const priorAlert=latestStatus?.authAlert||previous?.authAlert;
   const stickyAlert=priorAlert?.active===true
     ? (easeeCloudAuthenticatedAt
         ? {...priorAlert,active:false,resolvedAt:easeeCloudAuthenticatedAt,

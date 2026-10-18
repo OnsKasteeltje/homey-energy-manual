@@ -103,3 +103,62 @@ test('refresh POST contract has both tokens, no Authorization Bearer',async()=>{
  assert.deepEqual(observed.body,{accessToken:'OLD_ACCESS',refreshToken:'OLD_REFRESH'});
  assert.equal(observed.headers.Authorization,undefined);
 });
+
+test('STABLE writer cannot erase auth alert published after writer start',async()=>{
+ const start=writer.indexOf('const saveStatus=async');
+ const end=writer.indexOf('const waitHardware=async',start);
+ assert.ok(start>=0&&end>start);
+ const submitted=[];
+ const liveStatus={status:'STABLE',authAlert:{
+   active:true,code:'EASEE_REFRESH_HTTP_401',delivered:true
+ }};
+ const context={
+   VERSION:'EM2_EV_ACTUATOR_V0.4.7_PHASE_WRITER',
+   PHASE_EXECUTION_ENABLED:true,
+   IDS:{status:'test-status'},
+   previous:{status:'STABLE'},
+   parse:s=>JSON.parse(s),
+   iso:()=>new Date().toISOString(),
+   easeeCloudAuthenticatedAt:null,
+   transitionObject:()=>({stage:'STABLE'}),
+   Homey:{logic:{
+     getVariable:async()=>({value:JSON.stringify(liveStatus)}),
+     updateVariable:async({variable})=>submitted.push(JSON.parse(variable.value))
+   }}
+ };
+ const fn=vm.runInNewContext(writer.slice(start,end)+'\n saveStatus',context);
+ await fn('STABLE','OFF_ZERO_A_HOLD','STABLE',
+   {controlRevision:'x',mode:'OFF',requestedA:0,targetW:0},
+   {confirmedMode:'OFF'},null,{live:true});
+ assert.equal(submitted.length,1);
+ assert.equal(submitted[0].authAlert.active,true);
+ assert.equal(submitted[0].authAlert.code,'EASEE_REFRESH_HTTP_401');
+});
+
+test('STABLE writer respects newer resolved alert after maintenance refresh',async()=>{
+ const start=writer.indexOf('const saveStatus=async');
+ const end=writer.indexOf('const waitHardware=async',start);
+ const submitted=[];
+ const current={authAlert:{active:false,code:'EASEE_REFRESH_HTTP_401',
+    resolution:'EASEE_REFRESH_HTTP_SUCCESS'}};
+ const context={
+   VERSION:'EM2_EV_ACTUATOR_V0.4.7_PHASE_WRITER',
+   PHASE_EXECUTION_ENABLED:true,
+   IDS:{status:'test-status'},
+   previous:{authAlert:{active:true,code:'EASEE_REFRESH_HTTP_401'}},
+   parse:s=>JSON.parse(s),
+   iso:()=>new Date().toISOString(),
+   easeeCloudAuthenticatedAt:null,
+   transitionObject:()=>({stage:'STABLE'}),
+   Homey:{logic:{
+     getVariable:async()=>({value:JSON.stringify(current)}),
+     updateVariable:async({variable})=>submitted.push(JSON.parse(variable.value))
+   }}
+ };
+ const fn=vm.runInNewContext(writer.slice(start,end)+'\n saveStatus',context);
+ await fn('STABLE','OFF_ZERO_A_HOLD','STABLE',
+   {controlRevision:'x',mode:'OFF',requestedA:0,targetW:0},
+   {confirmedMode:'OFF'},null,{live:true});
+ assert.equal(submitted[0].authAlert.active,false);
+ assert.equal(submitted[0].authAlert.resolution,'EASEE_REFRESH_HTTP_SUCCESS');
+});
