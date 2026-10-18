@@ -137,7 +137,7 @@ const postJson=async(url,body,accessToken,operation='EASEE')=>{
   });
   let payload=null;
   try{payload=await r.json();}catch(_){}
-  if(r.ok)easeeCloudAuthenticatedAt=iso();
+  if(r.ok)easeeCloudAuthenticatedAt=new Date().toISOString();
   if(!r.ok){
     const err=new Error(operation+'_HTTP_'+r.status);
     err.httpStatus=r.status;
@@ -157,6 +157,7 @@ const getJson=async(url,accessToken,operation='EASEE')=>{
   });
   let payload=null;
   try{payload=await r.json();}catch(_){}
+  if(r.ok)easeeCloudAuthenticatedAt=new Date().toISOString();
   if(!r.ok){
     const err=new Error(operation+'_HTTP_'+r.status);
     err.httpStatus=r.status;
