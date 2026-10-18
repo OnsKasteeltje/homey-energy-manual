@@ -34,4 +34,10 @@ for token in (
 ):
     assert token in archive, token
 
+# One intentional tuning value for both the active V1 and read-only V2 builders.
+# Guard against silently reverting to the former 85% sunny-day envelope.
+v1 = Path("src/pi/ems-runtime/planner/pv-forecast/fetch_pv_forecast.py").read_text()
+assert "HISTORICAL_WEIGHT = 0.20" in v1
+assert "HISTORICAL_WEIGHT = 0.20" in s
+
 print("PASS: PV Forecast V2 static contract")
