@@ -27,6 +27,30 @@ even when the three-hour schedule calls for a higher target. Demand in an
 unrelated room still blocks all extra preheat. The Douwe pair is a thermal
 adjacency rule, **not** a synchronization group in V0.4.
 
+The follow-up fixes use the *first UP switchpoint of a continuous
+non-decreasing Honeywell schedule episode* as stable opportunity identity.
+A later higher target entering the rolling horizon does not cause a spurious
+V0.4 progression reset or V0.5 hypothetical rollback. A real schedule
+setback still terminates the episode; synthetic paired-room opportunities
+use the receiving room's current Honeywell baseline interval as identity.
+
+A room with a flat/downcoming Honeywell schedule can now be a paired receiver
+with exactly one +0.5 C step above its current effective target. It still
+requires one and only one adjoining room with ordinary non-overridden
+baseline heating demand; unrelated normal demand, source unknown/stale,
+CV assist or lost central planner grant continue to block. V0.5 explicitly
+revalidates the paired status and the one adjacent demand room. Overrides
+remain room-local. The simulated paired target is **not** represented as
+a future scheduled Honeywell temperature.
+
+The V0.3 thermalAssessment is evidence-only: observed actual temperature,
+room's current setpoint and next step are compared, but the data feed does
+not contain an independently validated thermal-retention/cooling prediction.
+It therefore explicitly returns retentionEvidence=NOT_VALIDATED,
+usefulHeatShiftProven=false and promotionAllowedByThermalAssessment=false.
+This does NOT block exploration in SHADOW but MUST NOT be interpreted as a
+LIVE approval or a quantified energy saving.
+
 These changes retain Quatt/CV and planner-grant gating, P1 execution authority
 and zero physical writes. They do not add unrestricted preheat for rooms
 without a future schedule rise. No thermal cooling/retention prediction is

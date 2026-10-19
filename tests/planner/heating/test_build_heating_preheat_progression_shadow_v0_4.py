@@ -537,3 +537,34 @@ def test_policy_keeps_shadow_boundaries_explicit():
     assert policy["rollbackBehavior"] == "NOT_DEFINED_SHADOW_ONLY"
     assert policy["stepHistoryRetentionHours"] == 48
     assert policy["opportunityHistoryRetentionHours"] == 48
+
+
+def test_stable_episode_id_retains_active_shadow_step_when_target_grows():
+    first = room(actual=17.2, future=18.5, next_step=17.5)
+    first["baseline"]["opportunityId"] = "woonkamer|HONEYWELL_EPISODE|2026-09-26T12:30:00Z"
+    first_result = build(h=heating(first))
+    assert progression(first_result)["state"] == "STEP_WAIT"
+    changed = room(
+        actual=17.2, future=19.0, next_step=17.5,
+        close="2026-09-26T16:00:00Z",
+    )
+    changed["baseline"]["opportunityId"] = first["baseline"]["opportunityId"]
+    second = build(h=heating(changed), prev=first_result)
+    assert second["rooms"][0]["opportunityId"] == first_result["rooms"][0]["opportunityId"]
+    assert progression(second)["state"] == "STEP_WAIT"
+    assert progression(second)["activeStepTarget_C"] == 17.5
+    assert progression(second)["lastTransition"] != "ENDED"
+
+
+def test_paired_baseline_opportunity_records_one_bounded_step():
+    paired = room(actual=17.5, future=18.0, next_step=18.0)
+    paired["baseline"]["currentTargetTemperature_C"] = 17.5
+    paired["baseline"]["direction"] = "PAIRED_BASELINE"
+    paired["baseline"]["opportunityId"] = "woonkamer|PAIRED_BASELINE|eetkamer|2026-09-26T08:00:00Z"
+    paired["candidate"]["status"] = "ELIGIBLE_PAIRED_BASELINE"
+    paired["candidate"]["steps_C"] = [18.0]
+    result = build(h=heating(paired))
+    assert progression(result)["state"] == "STEP_WAIT"
+    assert progression(result)["activeStepTarget_C"] == 18.0
+    assert result["rooms"][0]["opportunityHistory"][0]["opportunityId"] == paired["baseline"]["opportunityId"]
+    assert result["physicalWriteAllowed"] is False

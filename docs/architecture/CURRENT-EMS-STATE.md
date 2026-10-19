@@ -8,6 +8,34 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### Heating preheat PR #287 follow-up — stable episode and adjacent flat-schedule receiver (19 October 2026)
+
+A subsequent DRAFT branch-only update avoids shadow resets when a higher
+Honeywell UP setpoint enters the rolling three-hour horizon: the canonical
+room-model exposes the first UP edge in the current monotone scheduled
+warming episode, and V0.2->V0.5 propagate/validate this optional
+stable opportunity ID. Legacy candidate fixtures still use the prior
+changeAt/target ID. A real scheduled DOWN transition is still a boundary.
+
+The paired-room +0.5 C exception now additionally supports a receiving
+room without an upcoming Honeywell UP transition, **only** when one and
+only one adjacent room has ordinary schedule-following baseline heat
+demand. Receiver target is capped to current effective target +0.5 C;
+manual room overrides, unrelated baseline demand, Quatt/CV safety, central
+priority/grant and P1 execution authority remain conservative. A paired
+target is explicitly labeled PAIRED_BASELINE (not a fabricated scheduled
+Honeywell UP), and V0.5 independently verifies paired demand evidence.
+No physical actor is enabled.
+
+Thermal evidence is deliberately not invented from a single temperature
+sample. Read-only V0.3 thermalAssessment records current room temperature,
+baseline and next step, reports retentionEvidence=NOT_VALIDATED and
+usefulHeatShiftProven=false, and prohibits LIVE promotion on the basis of
+this assessment. A validated heating/cooling history model is a subsequent
+prerequisite for LIVE design; historical scenario replay remains separate
+from measured counterfactual energy savings. PR remains DRAFT, not merged,
+not deployed.
+
 ### Heating preheat SHADOW: rolling 3-hour Honeywell lookahead + adjacent-room exception (PR #287; not deployed)
 
 The current Heating V0.2 candidate builder normally inspects only the next
