@@ -120,6 +120,39 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
             raise PlanError(f"invalid baseline direction for {key}: {direction}")
         change_dt = _aware_datetime(baseline.get("nextChangeAt"), f"{key}.baseline.nextChangeAt")
 
+        # Look beyond the first change, but never cross a scheduled setback:
+        # a later rise following a reduction is a separate heating episode.
+        # Legacy fixtures without lookahead keep the next-transition behavior.
+        horizon = room.get("lookahead")
+        lookahead_selected = False
+        if horizon is not None:
+            horizon = _require_dict(horizon, f"{key}.lookahead")
+            if horizon.get("windowMinutes") != 180:
+                raise PlanError(f"{key}.lookahead unexpected window")
+            points = horizon.get("switchpoints")
+            if not isinstance(points, list):
+                raise PlanError(f"{key}.lookahead.switchpoints must be an array")
+            previous_target = scheduled_current_target
+            highest_target = effective_target
+            selected_change = None
+            for point in points:
+                point = _require_dict(point, f"{key}.lookahead.switchpoint")
+                point_at = _aware_datetime(point.get("time"), f"{key}.lookahead.time")
+                point_target = _number(point.get("targetTemperature_C"), f"{key}.lookahead.target")
+                if not now < point_at <= now + MAX_ADVANCE:
+                    raise PlanError(f"{key}.lookahead switchpoint outside current window")
+                if point_target < previous_target - 1e-9:
+                    break
+                if point_target > highest_target + 1e-9:
+                    highest_target = point_target
+                    selected_change = point_at
+                previous_target = point_target
+            if selected_change is not None:
+                future_target = highest_target
+                change_dt = selected_change
+                direction = "UP"
+                lookahead_selected = True
+
         in_scope = key in SCOPED_ROOMS
         seconds_to_change = (change_dt - now).total_seconds()
         within_window = 0 <= seconds_to_change <= MAX_ADVANCE.total_seconds()
@@ -167,6 +200,9 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
                 "earliestStartAt": (change_dt - MAX_ADVANCE).isoformat(),
                 "startAt": None,
                 "targetTemperature_C": future_target,
+                "targetChangeAt": change_dt.isoformat(),
+                "targetDirection": direction,
+                "lookaheadSelected": lookahead_selected,
                 "steps_C": steps,
                 "reason": reason,
             },

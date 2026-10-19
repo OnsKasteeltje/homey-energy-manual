@@ -288,8 +288,30 @@ def build_model(schedule: dict[str, Any], state: dict[str, Any], *, generated_at
             preheat_advance_allowed = False
             effective_reason = "HONEYWELL_SETPOINT_MODE_UNSUPPORTED"
 
+        # Additive observation only: expose every schedule change in the next
+        # three hours. The original nextSwitchpoint remains Honeywell authority.
+        now_local = now.astimezone(HOME_TZ)
+        horizon_end = now_local + timedelta(hours=3)
+        lookahead_points = []
+        previous_target = current_baseline
+        for switch_at, switch_target in _weekly_switchpoints(sz, now, key):
+            if switch_at <= now_local:
+                continue
+            if switch_at > horizon_end:
+                break
+            lookahead_points.append({
+                "time": switch_at.isoformat(),
+                "targetTemperature_C": switch_target,
+                "direction": _transition(previous_target, switch_target),
+            })
+            previous_target = switch_target
+
         rooms.append({
             "key": key,
+            "lookahead": {
+                "windowMinutes": 180,
+                "switchpoints": lookahead_points,
+            },
             "displayName": sz.get("displayName") or st.get("displayName") or key,
             "valid": True,
             "current": {

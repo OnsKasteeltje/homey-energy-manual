@@ -196,3 +196,41 @@ def test_naive_baseline_timestamp_is_rejected():
     model = room_model([room(change_at="2026-09-16T17:30:00")])
     with pytest.raises(module.PlanError, match="offset-aware"):
         build(model)
+
+
+def test_three_hour_lookahead_selects_later_rise_and_uses_half_degree_steps():
+    model = room_model([room(
+        current_temp=18.0, current_target=15.5, target=18.0,
+        change_at="2026-09-16T17:30:00+02:00",
+    )])
+    model["rooms"][0]["lookahead"] = {
+        "windowMinutes": 180,
+        "switchpoints": [
+            {"time": "2026-09-16T17:30:00+02:00", "targetTemperature_C": 18.0},
+            {"time": "2026-09-16T18:30:00+02:00", "targetTemperature_C": 18.5},
+            {"time": "2026-09-16T19:30:00+02:00", "targetTemperature_C": 19.0},
+        ],
+    }
+    r = build(model, now=datetime(2026, 9, 16, 15, 0, tzinfo=timezone.utc))["rooms"][0]
+    assert r["baseline"]["targetTemperature_C"] == 19.0
+    assert r["candidate"]["targetChangeAt"] == "2026-09-16T19:30:00+02:00"
+    assert r["candidate"]["steps_C"] == [18.5, 19.0]
+    assert r["candidate"]["lookaheadSelected"] is True
+
+
+def test_lookahead_does_not_jump_over_a_setback():
+    model = room_model([room(
+        current_temp=17.5, current_target=15.5, target=18.0,
+        change_at="2026-09-16T17:30:00+02:00",
+    )])
+    model["rooms"][0]["lookahead"] = {
+        "windowMinutes": 180,
+        "switchpoints": [
+            {"time": "2026-09-16T17:30:00+02:00", "targetTemperature_C": 18.0},
+            {"time": "2026-09-16T18:30:00+02:00", "targetTemperature_C": 16.0},
+            {"time": "2026-09-16T19:30:00+02:00", "targetTemperature_C": 19.0},
+        ],
+    }
+    r = build(model, now=datetime(2026, 9, 16, 15, 0, tzinfo=timezone.utc))["rooms"][0]
+    assert r["candidate"]["targetTemperature_C"] == 18.0
+    assert r["candidate"]["targetChangeAt"] == "2026-09-16T17:30:00+02:00"

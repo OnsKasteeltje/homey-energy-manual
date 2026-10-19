@@ -6,6 +6,32 @@ The six scoped rooms are `woonkamer`, `eetkamer`, `keuken`, `serre`, `douwe_slaa
 
 `build_heating_preheat_plan.py` preserves Honeywell as comfort authority and exposes only upcoming Honeywell `UP` transitions as preheat candidates. An active `temporary_override` or `permanent_override` blocks preheat **only in that room**; this applies identically to all six rooms, with no hardcoded special cases. A non-`auto` Honeywell system mode blocks the full system, while a live-versus-scheduled target mismatch blocks the affected room. V0.3 continues to record **all effective Honeywell heat demand**, including rooms under override, but only demand from non-overridden rooms contributes to its existing shared baseline-heating guard. Thus a raised manual target cannot indirectly suppress PV preheat in unrelated rooms; ordinary scheduled heat demand retains its conservative shared heat-source guard. V0.3 derives baseline comfort demand from the effective Honeywell target rather than the hidden weekly schedule target. The planner does not consume a separate PV-opportunity schema and does not select a PV slot itself; only schedule-following demand may later enter the joint Dynamic Pi Planner when forecast PV-export potential exists.
 
+### Three-hour Honeywell lookahead and adjacent-room exception (shadow)
+
+The room model now exposes the upcoming switchpoints from Honeywell's weekly
+schedule within a rolling three-hour horizon. V0.2 selects the highest rising
+setpoint reachable **before any scheduled decrease** in that horizon. It does not
+look past a setback or invent a higher comfort target. The +0.5 C step remains
+an increment limit, not a limit on the entire scheduled preheat trajectory.
+V0.3 projects the selected target and its actual scheduled change time so V0.4
+can persist a shadow step through intermediate setpoint rises.
+
+The conservative shared baseline heat-demand guard remains the default.
+One narrow exception allows a schedule-following room to continue preheat if
+the **only** non-overridden room with ordinary heat demand is its adjacent peer:
+`woonkamer` / `eetkamer` or `douwe_slaapkamer` / `erker_douwe`.
+The receiving room must have **no own baseline demand**, no active Honeywell
+override and an independently valid upcoming Honeywell UP candidate. Its
+shadow target is capped at **its current effective Honeywell setpoint +0.5 C**,
+even when the three-hour schedule calls for a higher target. Demand in an
+unrelated room still blocks all extra preheat. The Douwe pair is a thermal
+adjacency rule, **not** a synchronization group in V0.4.
+
+These changes retain Quatt/CV and planner-grant gating, P1 execution authority
+and zero physical writes. They do not add unrestricted preheat for rooms
+without a future schedule rise. No thermal cooling/retention prediction is
+claimed at this stage; such an economic check must precede LIVE promotion.
+
 Heating Preheat V0.3 adds a second local-only safety/observability layer in `build_heating_preheat_shadow_v0_3.py`. It combines the room model, V0.2 candidate plan and fresh Quatt observer state to expose baseline-heating/CV guards and the next thermally legal step. It does not grant PV opportunity, choose a physical target or write devices.
 
 `run_heating_preheat_shadow_v0_3.py` composes the local derived artifacts for commissioning. Physical control remains outside this directory's current scope.
