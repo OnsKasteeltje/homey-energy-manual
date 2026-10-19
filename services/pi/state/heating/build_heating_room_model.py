@@ -293,6 +293,7 @@ def build_model(schedule: dict[str, Any], state: dict[str, Any], *, generated_at
         now_local = now.astimezone(HOME_TZ)
         horizon_end = now_local + timedelta(hours=3)
         lookahead_points = []
+        previous_target = current_baseline
         # Stable identity of a monotone Honeywell warming episode: unlike
         # the last target/change time, its FIRST UP edge does not move when
         # another higher switchpoint enters the rolling three-hour horizon.
