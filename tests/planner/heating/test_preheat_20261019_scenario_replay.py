@@ -6,7 +6,7 @@ No actual actuator commands, PV consumption, thermal savings or gas are inferred
 """
 
 import importlib.util
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -24,6 +24,8 @@ def load(tag, relative_path):
 ROOM_MODEL = load("replay_room_model", "services/pi/state/heating/build_heating_room_model.py")
 PLAN = load("replay_preheat_plan", "services/pi/planner/heating/build_heating_preheat_plan.py")
 SHADOW = load("replay_preheat_v03", "services/pi/planner/heating/build_heating_preheat_shadow_v0_3.py")
+PROGRESSION = load("replay_preheat_v04", "services/pi/planner/heating/build_heating_preheat_progression_shadow_v0_4.py")
+GATE = load("replay_preheat_v05", "services/pi/control/heating/build_heating_control_gate_shadow_v0_5.py")
 
 
 def _schedule():
@@ -198,3 +200,50 @@ def test_paired_dining_can_preheat_half_degree_without_future_schedule_up():
         schedule=flat_schedule,
     )
     assert rooms_no_peer["eetkamer"]["shadow"]["state"] == "NOT_ELIGIBLE"
+
+
+def test_paired_flat_schedule_reaches_v04_and_v05_with_no_writes():
+    schedule = _schedule()
+    schedule["zones"][1]["weeklySchedule"][0]["switchpoints"] = [
+        {"time_of_day": "06:00:00", "heat_setpoint": 17.5},
+        {"time_of_day": "22:00:00", "heat_setpoint": 16.5},
+    ]
+    rooms, heating = _snapshot(
+        18, 45, woonkamer_temp=18.0, woonkamer_setpoint=18.5,
+        eetkamer_temp=17.5, eetkamer_setpoint=17.5, schedule=schedule,
+    )
+    assert rooms["eetkamer"]["candidate"]["status"] == "ELIGIBLE_PAIRED_BASELINE"
+
+    now = datetime(2026, 10, 19, 16, 46, tzinfo=timezone.utc)
+    grant = {
+        "schema": "EMS_PI_DYNAMIC_HEATING_GRANT_V0.1",
+        "generatedAt": "2026-10-19T16:45:30Z",
+        "validUntil": "2026-10-19T16:50:00Z",
+        "mode": "PRODUCTION_PLANNER_GRANT",
+        "controlWrites": False,
+        "physicalWriteAllowed": False,
+        "allocationAuthority": "DYNAMIC_PI_PLANNER",
+        "baselineAuthority": "HONEYWELL",
+        "heating": {
+            "readyRooms": ["eetkamer"],
+            "grant": "PRODUCTION_GRANT",
+            "reason": "SHADOW_ONLY_TEST_GRANT",
+        },
+    }
+    progression = PROGRESSION.build_progression(heating, grant, generated_at=now)
+    dining_progression = next(r for r in progression["rooms"] if r["key"] == "eetkamer")
+    assert dining_progression["progression"]["state"] == "STEP_WAIT"
+    assert dining_progression["progression"]["activeStepTarget_C"] == 18.0
+    assert progression["physicalWriteAllowed"] is False
+
+    gate = GATE.build_gate(
+        heating, progression, generated_at=now + timedelta(seconds=15)
+    )
+    dining_gate = next(r for r in gate["rooms"] if r["key"] == "eetkamer")
+    assert dining_gate["command"]["action"] == "WOULD_SET_TEMP"
+    assert dining_gate["command"]["target_C"] == 18.0
+    assert dining_gate["command"]["physicalWrite"] is False
+    assert gate["physicalWriteAllowed"] is False
+
+    # This fabricated upstream grant proves CONTRACT behavior only: it does not
+    # prove that P1/Quatt conditions granted heating on 19 October in reality.
