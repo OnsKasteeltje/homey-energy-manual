@@ -281,7 +281,7 @@ def test_douwe_pair_is_adjoining_but_overrides_remain_room_local():
         actual=16.0, baseline=16.0, future=17.0, key="erker_douwe",
     )["rooms"][0])
     plan = candidate(key="douwe_slaapkamer")
-    plan["rooms"].append(candidate(key="erker_douwe")["rooms"][0])
+    plan["rooms"].append(candidate(key="erker_douwe", steps=[16.5, 17.0])["rooms"][0])
     result = build(model=model, plan=plan)
     rooms = {r["key"]: r for r in result["rooms"]}
     assert rooms["erker_douwe"]["shadow"]["pairedBaselineException"] is True
