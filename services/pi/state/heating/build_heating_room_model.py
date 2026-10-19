@@ -293,12 +293,23 @@ def build_model(schedule: dict[str, Any], state: dict[str, Any], *, generated_at
         now_local = now.astimezone(HOME_TZ)
         horizon_end = now_local + timedelta(hours=3)
         lookahead_points = []
-        previous_target = current_baseline
-        for switch_at, switch_target in _weekly_switchpoints(sz, now, key):
-            if switch_at <= now_local:
-                continue
+        # Stable identity of a monotone Honeywell warming episode: unlike
+        # the last target/change time, its FIRST UP edge does not move when
+        # another higher switchpoint enters the rolling three-hour horizon.
+        episode_start = None
+        last_schedule_target = None
+        schedule_points = _weekly_switchpoints(sz, now, key)
+        for switch_at, switch_target in schedule_points:
             if switch_at > horizon_end:
                 break
+            if last_schedule_target is not None:
+                if switch_target < last_schedule_target - 1e-9:
+                    episode_start = None
+                elif switch_target > last_schedule_target + 1e-9 and episode_start is None:
+                    episode_start = switch_at
+            last_schedule_target = switch_target
+            if switch_at <= now_local:
+                continue
             lookahead_points.append({
                 "time": switch_at.isoformat(),
                 "targetTemperature_C": switch_target,
@@ -310,6 +321,7 @@ def build_model(schedule: dict[str, Any], state: dict[str, Any], *, generated_at
             "key": key,
             "lookahead": {
                 "windowMinutes": 180,
+                "episodeStartAt": episode_start.isoformat() if episode_start else None,
                 "switchpoints": lookahead_points,
             },
             "displayName": sz.get("displayName") or st.get("displayName") or key,

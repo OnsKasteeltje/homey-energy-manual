@@ -311,8 +311,6 @@ def build_shadow(
         if not isinstance(steps, list):
             raise ShadowError(f"{key}.candidate.steps_C must be an array")
         steps = [_number(v, f"{key}.candidate.steps_C") for v in steps]
-        next_step = steps[0] if steps else None
-
         candidate_status = candidate.get("status")
 
         # Conservative shared baseline guard stays intact except for the one
@@ -321,7 +319,7 @@ def build_shadow(
         # never more than +0.5 C above that room's CURRENT Honeywell target.
         peer = ADJACENT_PEER.get(key)
         pair_exception = (
-            candidate_status == "ELIGIBLE_UP_TRANSITION"
+            candidate_status in {"ELIGIBLE_UP_TRANSITION", "ELIGIBLE_PAIRED_BASELINE"}
             and peer is not None
             and preheat_blocking_baseline_rooms == [peer]
             and effective.get("source") == "SCHEDULE"
@@ -340,7 +338,9 @@ def build_shadow(
             else:
                 pair_exception = False
 
-        if candidate_status != "ELIGIBLE_UP_TRANSITION":
+        if candidate_status not in {"ELIGIBLE_UP_TRANSITION", "ELIGIBLE_PAIRED_BASELINE"} or (
+            candidate_status == "ELIGIBLE_PAIRED_BASELINE" and not pair_exception
+        ):
             state = "NOT_ELIGIBLE"
             reason = candidate.get("reason") or "CANDIDATE_NOT_ELIGIBLE"
         elif preheat_blocking_baseline_present and not pair_exception:
@@ -382,6 +382,7 @@ def build_shadow(
                 "direction": selected_direction,
                 "scheduledNextChangeAt": baseline.get("nextChangeAt"),
                 "scheduledNextTarget_C": baseline.get("nextTarget_C"),
+                "opportunityId": candidate.get("opportunityId"),
             },
             "candidate": {
                 "status": candidate_status,
@@ -399,6 +400,19 @@ def build_shadow(
                 "nextStepTarget_C": steps[0] if steps else None,
                 "pairedBaselineException": pair_exception,
                 "pairedDemandRoom": peer if pair_exception else None,
+            },
+            # A simple evidence check, not a thermal model or a prediction.
+            # Without measured cooling/retention evidence no heat shift is
+            # certified as economically beneficial. This is SHADOW ONLY.
+            "thermalAssessment": {
+                "observedTemperature_C": actual,
+                "currentHoneywellTarget_C": effective_target,
+                "nextCandidateStep_C": steps[0] if steps else None,
+                "roomAlreadyAtStep": bool(steps and actual >= steps[0]),
+                "temperatureAboveBaseline_C": round(max(0.0, actual - effective_target), 2),
+                "retentionEvidence": "NOT_VALIDATED",
+                "usefulHeatShiftProven": False,
+                "promotionAllowedByThermalAssessment": False,
             },
         })
 

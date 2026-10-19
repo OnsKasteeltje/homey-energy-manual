@@ -115,6 +115,11 @@ def _opportunity_id(key: str, baseline: dict[str, Any]) -> str:
     close = baseline.get("changeAt")
     _aware(close, f"{key}.baseline.changeAt")
     target = _number(baseline.get("targetTemperature_C"), f"{key}.baseline.targetTemperature_C")
+    stable_id = baseline.get("opportunityId")
+    if stable_id is not None:
+        if not isinstance(stable_id, str) or not stable_id.startswith(f"{key}|"):
+            raise ControlGateError(f"{key}.baseline.opportunityId invalid")
+        return stable_id
     return f"{key}|{close}|{target:.3f}"
 
 
@@ -342,6 +347,21 @@ def build_gate(
             delta = target - previous_target
             step_bound = -1e-9 <= delta <= MAX_STEP_C + 1e-9
 
+        pair_peer = hstate.get("pairedDemandRoom")
+        house = heating.get("house")
+        house = house if isinstance(house, dict) else {}
+        paired_baseline_authorized = (
+            baseline.get("direction") == "PAIRED_BASELINE"
+            and _dict(hroom.get("candidate"), f"{key}.candidate").get("status") == "ELIGIBLE_PAIRED_BASELINE"
+            and hstate.get("pairedBaselineException") is True
+            and isinstance(pair_peer, str) and bool(pair_peer)
+            and house.get("preheatBlockingBaselineDemandRooms") == [pair_peer]
+            and effective.get("source") == "SCHEDULE"
+            and effective.get("preheatAdvanceAllowed") is True
+            and _dict(hroom.get("current"), f"{key}.current").get("baselineDemand") is False
+            and future_target <= baseline_current + MAX_STEP_C + 1e-9
+        )
+
         checks = {
             "sourcesFresh": sources_fresh,
             "sourceOrder": source_order,
@@ -350,7 +370,7 @@ def build_gate(
             "preheatScope": hroom.get("preheatScope") is True and proom.get("preheatScope") is True,
             "honeywellControlUncontested": not external_room_control,
             "opportunityAligned": isinstance(progression_opportunity_id, str) and progression_opportunity_id == opportunity_id,
-            "baselineUp": baseline.get("direction") == "UP",
+            "baselineUp": baseline.get("direction") == "UP" or paired_baseline_authorized,
             "cvSafe": cv_safe,
             "heatingReady": hstate.get("state") == "PREHEAT_READY_FOR_GRANT" and eligibility.get("state") == "PREHEAT_READY_FOR_GRANT",
             "plannerGrant": planner.get("domainGrant") == "SHADOW_GRANT",

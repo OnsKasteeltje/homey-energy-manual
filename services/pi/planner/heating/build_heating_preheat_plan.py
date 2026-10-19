@@ -18,6 +18,12 @@ MAX_ADVANCE = timedelta(hours=3)
 MAX_STEP_C = 0.5
 SCOPED_ROOMS = {"woonkamer", "eetkamer", "keuken", "serre", "douwe_slaapkamer", "erker_douwe"}
 ROOM_GROUPS = {"living_area": ["woonkamer", "eetkamer"]}
+ADJACENT_PEER = {
+    "woonkamer": "eetkamer",
+    "eetkamer": "woonkamer",
+    "douwe_slaapkamer": "erker_douwe",
+    "erker_douwe": "douwe_slaapkamer",
+}
 
 
 class PlanError(ValueError):
@@ -87,6 +93,10 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
 
     seen: set[str] = set()
     rooms: list[dict[str, Any]] = []
+    room_by_key = {
+        item.get("key"): item for item in rooms_source
+        if isinstance(item, dict) and isinstance(item.get("key"), str)
+    }
     for item in rooms_source:
         room = _require_dict(item, "room")
         key = room.get("key")
@@ -125,10 +135,13 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
         # Legacy fixtures without lookahead keep the next-transition behavior.
         horizon = room.get("lookahead")
         lookahead_selected = False
+        episode_start = None
         if horizon is not None:
             horizon = _require_dict(horizon, f"{key}.lookahead")
             if horizon.get("windowMinutes") != 180:
                 raise PlanError(f"{key}.lookahead unexpected window")
+            if horizon.get("episodeStartAt") is not None:
+                episode_start = _aware_datetime(horizon["episodeStartAt"], f"{key}.lookahead.episodeStartAt")
             points = horizon.get("switchpoints")
             if not isinstance(points, list):
                 raise PlanError(f"{key}.lookahead.switchpoints must be an array")
@@ -158,6 +171,34 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
         within_window = 0 <= seconds_to_change <= MAX_ADVANCE.total_seconds()
         heat_demand = actual < future_target - 1e-9
 
+        # Independent, temporary adjacency opportunity: the receiver may use
+        # one +0.5 C step even when Honeywell has no upcoming UP switchpoint.
+        # It requires exactly one other *scheduled* room with normal demand;
+        # V0.3 repeats the shared-heat-source check and retains Quatt/CV guards.
+        peer_key = ADJACENT_PEER.get(key)
+        peer_room = room_by_key.get(peer_key)
+        normal_demand_rooms = set()
+        for other_key, other_room in room_by_key.items():
+            if not isinstance(other_room, dict) or other_room.get("valid") is not True:
+                continue
+            other_effective = other_room.get("effective")
+            other_current = other_room.get("current")
+            if not isinstance(other_effective, dict) or not isinstance(other_current, dict):
+                continue
+            if other_effective.get("source") != "SCHEDULE" or other_effective.get("preheatAdvanceAllowed") is not True:
+                continue
+            other_actual = _number(other_current.get("temperature_C"), f"{other_key}.actual")
+            other_target = _number(other_effective.get("currentTarget_C"), f"{other_key}.target")
+            if other_actual < other_target:
+                normal_demand_rooms.add(other_key)
+        pair_target = round(effective_target + MAX_STEP_C, 2)
+        paired_only = (
+            in_scope and advance_allowed and effective.get("source") == "SCHEDULE"
+            and peer_room is not None and normal_demand_rooms == {peer_key}
+            and effective_target <= actual + 1e-9
+            and actual < pair_target - 1e-9
+        )
+
         if not in_scope:
             status, reason = "NOT_ELIGIBLE", "ROOM_OUT_OF_PREHEAT_SCOPE"
         elif not advance_allowed:
@@ -171,7 +212,25 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
         else:
             status, reason = "ELIGIBLE_UP_TRANSITION", "AWAITING_PV_OPPORTUNITY_EVALUATION"
 
-        steps = _candidate_steps(effective_target, future_target, actual) if status == "ELIGIBLE_UP_TRANSITION" else []
+        # A valid paired-room opportunity may not be suppressed just because
+        # its OWN future schedule is flat or moving DOWN.
+        if status == "NOT_ELIGIBLE" and paired_only and advance_allowed:
+            status, reason = "ELIGIBLE_PAIRED_BASELINE", "ADJACENT_NORMAL_BASELINE_DEMAND"
+            future_target = pair_target
+            direction = "PAIRED_BASELINE"
+            change_dt = _aware_datetime(baseline.get("nextChangeAt"), f"{key}.paired.nextChangeAt")
+
+        steps = (
+            _candidate_steps(effective_target, future_target, actual)
+            if status in {"ELIGIBLE_UP_TRANSITION", "ELIGIBLE_PAIRED_BASELINE"}
+            else []
+        )
+        opportunity_id = None
+        if status == "ELIGIBLE_UP_TRANSITION" and episode_start is not None:
+            opportunity_id = f"{key}|HONEYWELL_EPISODE|{episode_start.isoformat()}"
+        elif status == "ELIGIBLE_PAIRED_BASELINE":
+            current_since = _aware_datetime(baseline.get("currentSince"), f"{key}.paired.currentSince")
+            opportunity_id = f"{key}|PAIRED_BASELINE|{peer_key}|{current_since.isoformat()}"
         group = next((name for name, members in ROOM_GROUPS.items() if key in members), None)
         rooms.append({
             "key": key,
@@ -197,8 +256,12 @@ def build_plan(room_model: dict[str, Any], *, generated_at: datetime | None = No
             },
             "candidate": {
                 "status": status,
-                "earliestStartAt": (change_dt - MAX_ADVANCE).isoformat(),
+                "earliestStartAt": (
+                    now.isoformat() if status == "ELIGIBLE_PAIRED_BASELINE"
+                    else (change_dt - MAX_ADVANCE).isoformat()
+                ),
                 "startAt": None,
+                "opportunityId": opportunity_id,
                 "targetTemperature_C": future_target,
                 "targetChangeAt": change_dt.isoformat(),
                 "targetDirection": direction,
