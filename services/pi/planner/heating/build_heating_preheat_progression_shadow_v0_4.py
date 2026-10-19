@@ -84,6 +84,11 @@ def _opportunity_id(room: dict[str, Any]) -> str:
         raise ProgressionError("room key missing")
     _aware(close, f"{key}.baseline.changeAt")
     target_n = _number(target, f"{key}.baseline.targetTemperature_C")
+    stable_id = baseline.get("opportunityId")
+    if stable_id is not None:
+        if not isinstance(stable_id, str) or not stable_id.startswith(f"{key}|"):
+            raise ProgressionError(f"{key}.baseline.opportunityId invalid")
+        return stable_id
     return f"{key}|{close}|{target_n:.3f}"
 
 
@@ -240,7 +245,7 @@ def _filter_opportunity_history_for_effective_state(
 
 def _record_opportunity_window(history: list[dict[str, Any]], room: dict[str, Any]) -> None:
     baseline = _dict(room.get("baseline"), "room.baseline")
-    if baseline.get("direction") != "UP":
+    if baseline.get("direction") not in {"UP", "PAIRED_BASELINE"}:
         return
 
     # V0.3 may still expose the raw scheduled UP transition while Honeywell is

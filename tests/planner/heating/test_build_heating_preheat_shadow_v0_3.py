@@ -241,3 +241,48 @@ def test_policy_records_iteration_and_step_guards():
     assert policy["purePreheatCvAssistBlocksFurtherSteps"] is True
     assert policy["plannerGrantRequiredBeforeAnyFutureWrite"] is True
     assert policy["intentionalGridImportAllowed"] is False
+
+
+def test_adjoining_room_exception_is_limited_to_half_degree_above_own_baseline():
+    model = room_model(actual=17.0, baseline=18.0, key="woonkamer")
+    model["rooms"].append(room_model(
+        actual=17.5, baseline=17.5, future=19.0, key="eetkamer",
+    )["rooms"][0])
+    plan = candidate(key="woonkamer")
+    plan["rooms"].append(candidate(key="eetkamer")["rooms"][0])
+    result = build(model=model, plan=plan)
+    rooms = {r["key"]: r for r in result["rooms"]}
+    assert result["house"]["preheatBlockingBaselineDemandRooms"] == ["woonkamer"]
+    assert rooms["woonkamer"]["shadow"]["state"] == "BASELINE_HEATING"
+    dining = rooms["eetkamer"]
+    assert dining["shadow"]["state"] == "PREHEAT_READY_FOR_GRANT"
+    assert dining["shadow"]["pairedBaselineException"] is True
+    assert dining["shadow"]["pairedDemandRoom"] == "woonkamer"
+    assert dining["baseline"]["targetTemperature_C"] == 18.0
+    assert dining["shadow"]["nextStepTarget_C"] == 18.0
+
+
+def test_non_adjacent_room_baseline_demand_still_blocks_preheating():
+    model = room_model(actual=17.0, baseline=18.0, key="keuken")
+    model["rooms"].append(room_model(
+        actual=17.5, baseline=17.5, future=19.0, key="eetkamer",
+    )["rooms"][0])
+    plan = candidate(key="keuken")
+    plan["rooms"].append(candidate(key="eetkamer")["rooms"][0])
+    result = build(model=model, plan=plan)
+    rooms = {r["key"]: r for r in result["rooms"]}
+    assert rooms["eetkamer"]["shadow"]["state"] == "BASELINE_HEATING"
+    assert rooms["eetkamer"]["shadow"]["pairedBaselineException"] is False
+
+
+def test_douwe_pair_is_adjoining_but_overrides_remain_room_local():
+    model = room_model(actual=15.0, baseline=16.0, key="douwe_slaapkamer")
+    model["rooms"].append(room_model(
+        actual=16.0, baseline=16.0, future=17.0, key="erker_douwe",
+    )["rooms"][0])
+    plan = candidate(key="douwe_slaapkamer")
+    plan["rooms"].append(candidate(key="erker_douwe", steps=[16.5, 17.0])["rooms"][0])
+    result = build(model=model, plan=plan)
+    rooms = {r["key"]: r for r in result["rooms"]}
+    assert rooms["erker_douwe"]["shadow"]["pairedBaselineException"] is True
+    assert rooms["erker_douwe"]["baseline"]["targetTemperature_C"] == 16.5

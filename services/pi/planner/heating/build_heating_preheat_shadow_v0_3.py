@@ -28,6 +28,15 @@ MAX_QUATT_AGE_SECONDS = 600
 BASELINE_TOLERANCE_C = 0.0
 STEP_REACHED_TOLERANCE_C = 0.0
 
+# Paired zones share a heat source and thermal adjacency, but overrides remain
+# strictly room-local. This is NOT an additional V0.4 progression group.
+ADJACENT_PEER = {
+    "woonkamer": "eetkamer",
+    "eetkamer": "woonkamer",
+    "douwe_slaapkamer": "erker_douwe",
+    "erker_douwe": "douwe_slaapkamer",
+}
+
 
 class ShadowError(ValueError):
     pass
@@ -292,18 +301,49 @@ def build_shadow(
             baseline.get("currentTarget_C"),
             f"{key}.baseline.currentTarget_C",
         )
-        future_target = _number(baseline.get("nextTarget_C"), f"{key}.baseline.nextTarget_C")
+        future_target = _number(
+            candidate.get("targetTemperature_C", baseline.get("nextTarget_C")),
+            f"{key}.candidate.targetTemperature_C",
+        )
+        selected_change = candidate.get("targetChangeAt") or baseline.get("nextChangeAt")
+        selected_direction = candidate.get("targetDirection") or baseline.get("direction")
         steps = candidate.get("steps_C")
         if not isinstance(steps, list):
             raise ShadowError(f"{key}.candidate.steps_C must be an array")
         steps = [_number(v, f"{key}.candidate.steps_C") for v in steps]
-        next_step = steps[0] if steps else None
-
         candidate_status = candidate.get("status")
-        if candidate_status != "ELIGIBLE_UP_TRANSITION":
+
+        # Conservative shared baseline guard stays intact except for the one
+        # adjoining, schedule-following room without its own normal heat demand.
+        # This may only advance an already valid Honeywell UP candidate, and
+        # never more than +0.5 C above that room's CURRENT Honeywell target.
+        peer = ADJACENT_PEER.get(key)
+        pair_exception = (
+            candidate_status in {"ELIGIBLE_UP_TRANSITION", "ELIGIBLE_PAIRED_BASELINE"}
+            and peer is not None
+            and preheat_blocking_baseline_rooms == [peer]
+            and effective.get("source") == "SCHEDULE"
+            and actual >= effective_target - BASELINE_TOLERANCE_C
+        )
+        if pair_exception:
+            capped_target = min(future_target, round(effective_target + 0.5, 2))
+            capped_steps = [
+                step for step in steps
+                if effective_target + 1e-9 < step <= capped_target + 1e-9
+                and step > actual + STEP_REACHED_TOLERANCE_C
+            ]
+            if capped_steps:
+                future_target = capped_target
+                steps = capped_steps
+            else:
+                pair_exception = False
+
+        if candidate_status not in {"ELIGIBLE_UP_TRANSITION", "ELIGIBLE_PAIRED_BASELINE"} or (
+            candidate_status == "ELIGIBLE_PAIRED_BASELINE" and not pair_exception
+        ):
             state = "NOT_ELIGIBLE"
             reason = candidate.get("reason") or "CANDIDATE_NOT_ELIGIBLE"
-        elif preheat_blocking_baseline_present:
+        elif preheat_blocking_baseline_present and not pair_exception:
             state = "BASELINE_HEATING"
             reason = "BASELINE_HEATING_DEMAND_PRESENT"
         elif cv_guard["status"] != "OK":
@@ -337,15 +377,18 @@ def build_shadow(
             "baseline": {
                 "currentTargetTemperature_C": effective_target,
                 "scheduledCurrentTargetTemperature_C": scheduled_target,
-                "changeAt": baseline.get("nextChangeAt"),
+                "changeAt": selected_change,
                 "targetTemperature_C": future_target,
-                "direction": baseline.get("direction"),
+                "direction": selected_direction,
+                "scheduledNextChangeAt": baseline.get("nextChangeAt"),
+                "scheduledNextTarget_C": baseline.get("nextTarget_C"),
+                "opportunityId": candidate.get("opportunityId"),
             },
             "candidate": {
                 "status": candidate_status,
                 "reason": candidate.get("reason"),
                 "opportunityOpensAt": candidate.get("earliestStartAt"),
-                "opportunityClosesAt": baseline.get("nextChangeAt"),
+                "opportunityClosesAt": selected_change,
                 "steps_C": steps,
             },
             "shadow": {
@@ -354,7 +397,22 @@ def build_shadow(
                 "plannerGrant": "NOT_EVALUATED",
                 "activeStepTarget_C": None,
                 "activeStepReached": None,
-                "nextStepTarget_C": next_step,
+                "nextStepTarget_C": steps[0] if steps else None,
+                "pairedBaselineException": pair_exception,
+                "pairedDemandRoom": peer if pair_exception else None,
+            },
+            # A simple evidence check, not a thermal model or a prediction.
+            # Without measured cooling/retention evidence no heat shift is
+            # certified as economically beneficial. This is SHADOW ONLY.
+            "thermalAssessment": {
+                "observedTemperature_C": actual,
+                "currentHoneywellTarget_C": effective_target,
+                "nextCandidateStep_C": steps[0] if steps else None,
+                "roomAlreadyAtStep": bool(steps and actual >= steps[0]),
+                "temperatureAboveBaseline_C": round(max(0.0, actual - effective_target), 2),
+                "retentionEvidence": "NOT_VALIDATED",
+                "usefulHeatShiftProven": False,
+                "promotionAllowedByThermalAssessment": False,
             },
         })
 

@@ -162,3 +162,24 @@ def test_naive_temporary_override_until_is_rejected():
             mode="temporary_override",
             override_until="2026-09-15T22:30:00",
         ))
+
+
+def test_three_hour_lookahead_includes_all_upcoming_honeywell_changes():
+    weekly = schedule()
+    weekly["zones"][0]["weeklySchedule"][0]["switchpoints"] = [
+        {"time_of_day": "06:00:00", "heat_setpoint": 15.5},
+        {"time_of_day": "17:30:00", "heat_setpoint": 18.0},
+        {"time_of_day": "18:30:00", "heat_setpoint": 18.5},
+        {"time_of_day": "19:30:00", "heat_setpoint": 19.0},
+        {"time_of_day": "22:00:00", "heat_setpoint": 15.5},
+    ]
+    model = module.build_model(
+        weekly, state(actual_target=15.5),
+        generated_at=datetime(2026, 9, 15, 15, 0, tzinfo=timezone.utc),
+    )
+    room = model["rooms"][0]
+    assert room["baseline"]["nextTarget_C"] == 18.0
+    points = room["lookahead"]["switchpoints"]
+    assert [p["targetTemperature_C"] for p in points] == [18.0, 18.5, 19.0]
+    assert all(p["direction"] == "UP" for p in points)
+    assert points[-1]["time"] == "2026-09-15T19:30:00+02:00"

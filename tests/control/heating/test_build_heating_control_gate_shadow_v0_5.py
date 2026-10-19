@@ -189,3 +189,48 @@ def test_deploy_contract_is_shadow_only():
     assert 'cmd.get("physicalWrite") is False' in installer
     assert "ReadWritePaths=/home/jeroen/ems/data" in SERVICE.read_text()
     assert "OnCalendar=*-*-* *:*:30" in TIMER.read_text()
+
+
+def test_stable_episode_identity_does_not_trigger_spurious_reset():
+    h = heating()
+    stable = "woonkamer|HONEYWELL_EPISODE|2026-10-04T11:00:00+02:00"
+    h["rooms"][0]["baseline"]["opportunityId"] = stable
+    p = progression(opportunity=stable)
+    first = build(h=h, p=p)
+    assert room(first)["command"]["action"] == "WOULD_SET_TEMP"
+
+    later_h = heating()
+    later_h["rooms"][0]["baseline"].update({
+        "opportunityId": stable,
+        "changeAt": "2026-10-04T15:00:00+02:00",
+        "targetTemperature_C": 19.5,
+    })
+    later_p = progression(opportunity=stable)
+    second = build(h=later_h, p=later_p, previous=first, now=NOW+timedelta(seconds=30))
+    assert room(second)["command"]["action"] == "WOULD_KEEP_TEMP"
+    assert room(second)["shadowOwnership"]["simulatedRollback"] is False
+
+
+def test_paired_baseline_v05_requires_explicit_normal_demand_evidence():
+    h = heating()
+    r = h["rooms"][0]
+    r["baseline"].update({
+        "currentTargetTemperature_C": 17.5,
+        "targetTemperature_C": 18.0,
+        "direction": "PAIRED_BASELINE",
+    })
+    r["current"] = {"baselineDemand": False}
+    r["effective"] = {"source": "SCHEDULE", "preheatAdvanceAllowed": True}
+    r["candidate"] = {"status": "ELIGIBLE_PAIRED_BASELINE"}
+    r["shadow"]["pairedBaselineException"] = True
+    r["shadow"]["pairedDemandRoom"] = "eetkamer"
+    h["house"] = {"preheatBlockingBaselineDemandRooms": ["eetkamer"]}
+    pair_id = f"woonkamer|{CLOSE}|18.000"
+    result = build(h=h, p=progression(target=18.0, opportunity=pair_id))
+    assert room(result)["command"]["action"] == "WOULD_SET_TEMP"
+    assert result["physicalWriteAllowed"] is False
+
+    h["house"]["preheatBlockingBaselineDemandRooms"] = ["keuken"]
+    blocked = build(h=h, p=progression(target=18.0, opportunity=pair_id))
+    assert room(blocked)["command"]["action"] == "HOLD"
+    assert room(blocked)["checks"]["baselineUp"] is False
