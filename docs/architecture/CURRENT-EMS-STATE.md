@@ -4,9 +4,40 @@
 >
 > This file describes the intended current operational architecture and logic. Architecture-sensitive runtime, planner, systemd, contract-policy and Homey/Pi responsibility changes must update this document in the same release range.
 
-**Status date:** 2026-10-18
+**Status date:** 2026-10-19
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
+
+### Heating preheat SHADOW: rolling 3-hour Honeywell lookahead + adjacent-room exception (PR #287; not deployed)
+
+The current Heating V0.2 candidate builder normally inspects only the next
+Honeywell change. PR #287 adds an **additive read-only three-hour horizon** to
+the canonical room model, using the existing weekly Honeywell schedule as sole
+comfort authority. A candidate may choose the highest scheduled UP target
+within that horizon **only before any intervening DOWN switchpoint**.
+Successive steps remain at most 0.5 C, and actual measured temperature is
+required before the next shadow step. V0.3 publishes the selected scheduled
+target/time downstream; no future higher-than-Honeywell target is invented.
+
+The existing shared baseline-heating guard remains the default. The sole
+exception requires that exactly one non-overridden **ordinary baseline-demand**
+room is the adjacent peer of another schedule-following room without its own
+baseline demand, with a valid future Honeywell UP candidate. Pairs are
+woonkamer/eetkamer and douwe_slaapkamer/erker_douwe. In this case the receiving
+room's shadow candidate is capped to **its own current effective Honeywell
+target +0.5 C**, even if the three-hour horizon contains a larger rise.
+The Douwe adjacency pair is not a coupled V0.4 step-synchronization group.
+Any normal baseline heat demand in an unrelated room still retains the
+house-wide HOLD. Temporary/permanent Honeywell room overrides remain strictly
+room-local and never authorize their own preheat.
+
+Existing V0.3 Quatt CV guards, priority and production planner grants, V0.4
+measured progression checks, V0.5 control gate, P1 realtime execution
+authority and all physical-write prohibitions are unchanged. No new Homey
+writer, timer, control API, or automatic deployment is added. The PR is
+**DRAFT SHADOW ONLY** pending CI, replay and review. It does not implement
+preheating in a room with no future Honeywell UP transition, and it does
+not claim validated thermal retention, savings or comfort benefit.
 
 ### Historical room-temperature analysis — 15m evidence (18 October 2026)
 
