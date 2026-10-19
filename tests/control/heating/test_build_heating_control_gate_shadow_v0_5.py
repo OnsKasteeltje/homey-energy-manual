@@ -225,11 +225,12 @@ def test_paired_baseline_v05_requires_explicit_normal_demand_evidence():
     r["shadow"]["pairedBaselineException"] = True
     r["shadow"]["pairedDemandRoom"] = "eetkamer"
     h["house"] = {"preheatBlockingBaselineDemandRooms": ["eetkamer"]}
-    result = build(h=h, p=progression(target=18.0))
+    pair_id = f"woonkamer|{CLOSE}|18.000"
+    result = build(h=h, p=progression(target=18.0, opportunity=pair_id))
     assert room(result)["command"]["action"] == "WOULD_SET_TEMP"
     assert result["physicalWriteAllowed"] is False
 
     h["house"]["preheatBlockingBaselineDemandRooms"] = ["keuken"]
-    blocked = build(h=h, p=progression(target=18.0))
+    blocked = build(h=h, p=progression(target=18.0, opportunity=pair_id))
     assert room(blocked)["command"]["action"] == "HOLD"
     assert room(blocked)["checks"]["baselineUp"] is False
