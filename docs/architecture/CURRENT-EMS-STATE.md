@@ -826,7 +826,9 @@ Live 3P→1P validation on 2026-09-27 exposed a separate false pause-timeout bou
 
 ## 12. Battery boundary
 
-The planned battery architecture is Victron AC-coupled. When commissioned, Victron/DESS remains the primary realtime battery optimizer. Pi/Homey may provide forecasts, load intent and policy constraints but must not create a competing realtime battery optimizer.
+As of 23 October 2026 the selected battery is **1 x AlphaESS VitaPower 3600 AC (8 kWh) with 1 x AlphaESS P1 Meter**, replacing the earlier Victron/DESS design assumption. This is an **ordered, not yet commissioned** AC-coupled battery. AlphaESS retains autonomous realtime battery control and its built-in safety limits. The Pi may eventually provide bounded strategy/priorities after observed read-only integration and validation; Homey must not become a competing battery writer.
+
+Preparation only: `services/pi/integrations/alphaess/README.md` defines a proposed normalized battery observation boundary (`EMS_ALPHAESS_BATTERY_STATE_V0.1`) and future single-owner local Modbus TCP adapter. No register mapping, Pi polling service, active runtime state publisher, physical writer, systemd deployment, Homey flow, or planner change is included. The existing `targets.battery.target_W` is reserved architecture, **not a live battery command**. Read values must preserve provenance and freshness; unknown/stale power is never silently zero. P1 stays authoritative for grid import/export. Correct household accounting will require separately measured battery charge/discharge, and future physical policies must respect per-phase 3x25 A constraints and Tesla/WW priorities. Neither Modbus write capabilities nor VitaPower-specific register addresses are assumed until vendor documentation and commissioning confirm them.
 
 ## 13. Known technical debt / next validation
 

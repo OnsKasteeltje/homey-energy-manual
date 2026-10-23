@@ -490,7 +490,7 @@ Runtimecode en GitHub moeten aantoonbaar synchroon blijven. Architectuurgevoelig
 - verdere vereenvoudiging van WW ownership;
 - verwijderen van historische `deadline_requirement()` compatibiliteitscode;
 - blijvend bewaken van GitHub ↔ Pi runtime drift;
-- batterij-integratie pas na commissioning, met Victron/DESS als primaire realtime batterijoptimizer.
+- batterij-integratie pas na commissioning: gekozen hardware is AlphaESS VitaPower 3600 AC (8 kWh) + AlphaESS P1 Meter; AlphaESS bewaakt de eigen autonome realtime regeling en veiligheid, terwijl de Pi later begrensde strategie/prioriteiten kan adviseren. Nu alleen documentatie/read-only voorbereiding onder `services/pi/integrations/alphaess/`; nog geen actieve Modbus-poller, batterijwriter of planner-integratie.
 
 ---
 
