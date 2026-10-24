@@ -102,12 +102,16 @@ class GoodweDurableHistoryTest(unittest.TestCase):
 
     def archive_and_read(self, samples, date="2026-10-24"):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "goodwe.sqlite"
+            path = Path(tmp) / "ems-history.sqlite"
+            import sqlite3
+            with sqlite3.connect(path):
+                pass
+            path.chmod(0o600)
             inserted = self.collector.archive_goodwe_samples(path, samples)
             repeated = self.collector.archive_goodwe_samples(path, samples)
             self.assertEqual(repeated, 0, "Must not duplicate retried samples")
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-            with patch.dict("os.environ", {"EMS_GOODWE_COUNTER_ARCHIVE_DB": str(path)}):
+            with patch.object(server, "HISTORY_DB", str(path)):
                 current = server.goodwe_daily_counter_resource(date)
                 other = server.goodwe_daily_counter_resource("2026-10-24" if date == "2026-10-23" else "2026-10-23")
             return inserted, current, other
