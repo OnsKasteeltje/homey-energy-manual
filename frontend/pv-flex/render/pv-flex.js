@@ -1,4 +1,4 @@
-import {loadDailyPerformance,loadPvFlex,loadGoodweCloudEvidence,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
+import {loadDailyPerformance,loadPvFlex,loadGoodweCloudEvidence,loadGoodweDailyCounters,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
 const $=id=>document.getElementById(id); let day=todayAmsterdam();
 const pct=v=>typeof v==="number"&&Number.isFinite(v)?Math.round(v*100)+"%":"—";
 const time=x=>new Date(x).toLocaleTimeString("nl-NL",{timeZone:"Europe/Amsterdam",hour:"2-digit",minute:"2-digit"});
@@ -225,11 +225,31 @@ function renderDailyReport(report,selectedDay){
 }
 
 
-function renderGoodweEvidence(data){
+function renderGoodweEvidence(data,daily){
  const host=$("goodwe-evidence");host.replaceChildren();
  const line=message=>{
   const p=document.createElement("p");p.textContent=message;host.appendChild(p);
  };
+ // Durable day-counter source is independent of the 192-sample SHADOW ring.
+ if(daily && available(daily.reportedDayKWh)){
+  const amount=daily.reportedDayKWh.toLocaleString("nl-NL",{
+   minimumFractionDigits:1,maximumFractionDigits:2
+  });
+  line("GoodWe SEMS+ dagtellers: "+amount+" kWh"+
+       (daily.status==="LATE_DAY_COUNTER_OBSERVED"?
+       " (laat op de dag ontvangen, niet gegarandeerd definitief)":
+       " (voorlopig, tot laatste ontvangst)"));
+  for(const inv of daily.devices||[]){
+   line("Omvormer …"+inv.serialSuffix+": "+
+        inv.reportedDayKWh.toLocaleString("nl-NL",{maximumFractionDigits:2})+
+        " kWh dagteller");
+  }
+  line("Duurzaam opgeslagen tellerreeks; niet toegevoegd aan de kwartierbalken.");
+ }else{
+  line("Historische GoodWe-dagteller: "+
+       (daily?.status||"niet beschikbaar")+
+       ". Ontbrekende gegevens zijn onbekend, niet 0 kWh.");
+ }
  if(!data){
   line("SEMS+ SHADOW-historie niet beschikbaar. Dit betekent niet 0 kWh productie.");
   return;
@@ -266,11 +286,13 @@ async function refresh(){
  });
  $("next").disabled=selectedDay>=todayAmsterdam();
  $("quality").textContent="Laden…";
- const [main,daily,goodwe]=await Promise.allSettled([
-  loadPvFlex(selectedDay),loadDailyPerformance(selectedDay),loadGoodweCloudEvidence(selectedDay)
+ const [main,daily,goodwe,goodweHistory]=await Promise.allSettled([
+  loadPvFlex(selectedDay),loadDailyPerformance(selectedDay),
+  loadGoodweCloudEvidence(selectedDay),loadGoodweDailyCounters(selectedDay)
  ]);
  if(requestId!==refreshId)return; // Ignore stale requests after day navigation.
- renderGoodweEvidence(goodwe.status==="fulfilled"?goodwe.value:null);
+ renderGoodweEvidence(goodwe.status==="fulfilled"?goodwe.value:null,
+  goodweHistory.status==="fulfilled"?goodweHistory.value:null);
  if(main.status==="fulfilled"){
   try{summary(main.value);chart(main.value);}
   catch(e){$("quality").textContent="Analyse niet beschikbaar";$("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;}

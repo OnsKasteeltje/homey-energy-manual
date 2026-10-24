@@ -1295,6 +1295,111 @@ def provisional_daily_report_resource(value, series, paired_seconds_by_slot, now
 
 
 
+
+def goodwe_daily_counter_resource(value):
+    """Durable SEMS+ reported day counters, not 15m household accounting.
+
+    The two inverters are combined by pseudonymous identity, so a physical
+    4200/2000 mapping is not required for an aggregate daily counter reading.
+    """
+    start_local, end_local, _ = _history_period("day", value)
+    start = start_local.astimezone(timezone.utc).isoformat(timespec="microseconds")
+    end = end_local.astimezone(timezone.utc).isoformat(timespec="microseconds")
+    source_path = os.environ.get(
+        "EMS_GOODWE_COUNTER_ARCHIVE_DB",
+        "/home/jeroen/ems/runtime/state/goodwe-sems-counters.sqlite",
+    )
+    result = {
+        "schema": "EMS_WEB_GOODWE_DAILY_COUNTERS_V1",
+        "dateLocal": value,
+        "source": "GOODWE_SEMS_PLUS",
+        "authoritativeFor": "SEPARATE_GOODWE_REPORTED_DAY_COUNTERS_ONLY",
+        "controlWrites": False,
+        "eligibleForControl": False,
+        "eligibleForHouseBalance": False,
+        "timeBasis": "PI_FETCH_TIME_SOURCE_TIME_UNKNOWN",
+        "counterResolutionKWh": 0.1,
+        "status": "NO_ARCHIVE",
+        "samplePairs": 0,
+        "lastFetchedAt": None,
+        "reportedDayKWh": None,
+        "windowCounterGrowthKWh": None,
+        "devices": [],
+    }
+    if not os.path.isfile(source_path):
+        return result
+
+    with sqlite3.connect(f"file:{source_path}?mode=ro", uri=True, timeout=5) as db:
+        db.execute("PRAGMA query_only=ON")
+        rows = db.execute("""
+            SELECT fetched_at_utc,device_key,serial_suffix,today_kwh,
+                   lifetime_kwh,power_w,source_status
+            FROM goodwe_counter_observations
+            WHERE fetched_at_utc >= ? AND fetched_at_utc < ?
+            ORDER BY fetched_at_utc,device_key
+        """, (start, end)).fetchall()
+    if not rows:
+        result["status"] = "NO_SAMPLES"
+        return result
+
+    pairs = {}
+    for when, key, suffix, day, lifetime, power, status in rows:
+        pairs.setdefault(when, []).append((key, suffix, day, lifetime, power))
+    valid = [(at, readings) for at, readings in sorted(pairs.items())
+             if len(readings) == 2 and len({item[0] for item in readings}) == 2
+             and len({item[1] for item in readings}) == 2]
+    if not valid:
+        result["status"] = "INCOMPLETE"
+        return result
+
+    # Fail closed on identities changing during the day, any reset/decrease,
+    # missing meter updates, or contradictory samples. Never mix two sources.
+    keys = {entry[0] for entry in valid[0][1]}
+    if any({entry[0] for entry in pair} != keys for _, pair in valid):
+        result["status"] = "IDENTITY_CHANGED"
+        return result
+
+    by_key = {key: [] for key in keys}
+    for at, items in valid:
+        for key, suffix, today, lifetime, power in items:
+            if (not all(isinstance(v, (int, float)) and
+                        not isinstance(v, bool) and math.isfinite(v) and v >= 0
+                        for v in (today, lifetime))):
+                result["status"] = "INVALID_COUNTER"
+                return result
+            by_key[key].append((at, suffix, today, lifetime, power))
+    for values in by_key.values():
+        if any(current[2] < previous[2] - 1e-6 or
+               current[3] < previous[3] - 1e-6 or
+               current[1] != previous[1]
+               for previous, current in zip(values, values[1:])):
+            result["status"] = "COUNTER_DISCONTINUITY"
+            return result
+    latest_at, _ = valid[-1]
+    latest_local = parse_timestamp(latest_at).astimezone(LOCAL_TZ)
+    devices = [{
+        "deviceKey": key,
+        "serialSuffix": by_key[key][-1][1],
+        "reportedDayKWh": round(by_key[key][-1][2], 3),
+        "windowCounterGrowthKWh": round(
+            by_key[key][-1][3] - by_key[key][0][3], 3),
+        "lastPowerW": by_key[key][-1][4],
+    } for key in sorted(keys)]
+    result.update({
+        # A late-day SEMS+ counter is evidence of a near-final day value;
+        # it is still not guaranteed complete without source timestamps.
+        "status": "LATE_DAY_COUNTER_OBSERVED"
+                  if latest_local.hour >= 23 else "PARTIAL_DAY_COUNTER_OBSERVED",
+        "samplePairs": len(valid),
+        "lastFetchedAt": latest_at,
+        "reportedDayKWh": round(sum(item["reportedDayKWh"] for item in devices), 3),
+        "windowCounterGrowthKWh": round(
+            sum(item["windowCounterGrowthKWh"] for item in devices), 3),
+        "devices": devices,
+    })
+    return result
+
+
 def goodwe_cloud_evidence_resource(value):
     """Project SEMS+ meter growth by fetch window; never canonical PV energy.
 
@@ -2731,6 +2836,16 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 400, {"schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "INVALID_OR_OPEN_DAY"})
             except (OSError, RuntimeError, json.JSONDecodeError):
                 send_json(self, 503, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "REPORT_ARCHIVE_UNAVAILABLE"})
+            return
+
+        if len(parts) == 5 and parts[:4] == ["web", "analysis", "goodwe", "day"]:
+            try:
+                send_json(self, 200, goodwe_daily_counter_resource(parts[4]))
+            except ValueError:
+                send_json(self, 400, {"schema":"EMS_WEB_ERROR_V1","status":"ERROR","reason":"HISTORY_PERIOD_INVALID"})
+            except (sqlite3.Error, OSError):
+                logging.exception("GoodWe daily counter resource unavailable")
+                send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
             return
 
         if len(parts) == 5 and parts[:4] == ["web", "analysis", "pv-cloud", "day"]:

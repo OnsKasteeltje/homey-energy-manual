@@ -64,6 +64,29 @@ eligibleForControl=false and eligibleForHouseBalance=false boundaries.
 Confirm suffix-to-physical-inverter mapping and source time quality before
 a separate promotion of any historical accounting data.
 
+## Durable GoodWe day-counter history (V0.1)
+
+The existing SEMS+ 15-minute collector also archives two validated inverter
+day/lifetime counters to private mode-0600 local SQLite:
+
+    /home/jeroen/ems/runtime/state/goodwe-sems-counters.sqlite
+
+Observations are keyed by Pi fetch timestamp and hashed inverter identity.
+On first run the current 192-sample SHADOW ring is imported once. Subsequent
+valid samples append idempotently, including counter-only night observations.
+No extra cloud calls or timer, no legacy history rewriting, no fabricated zeros.
+
+Read-only API GET /web/analysis/goodwe/day/YYYY-MM-DD returns the SEMS+
+reported day-counter totals and, separately, the lifetime-counter change
+within the available observation window. Identity changes and counter
+decreases fail closed (no numeric day value). A late-day reported counter
+is not independently proven to be the final inverter-measured day value.
+
+The Evaluatie page shows this durable SEMS+ day source independently.
+Quarter-hour PV/Flex energy still derives from old Homey counters; do NOT
+redistribute quantized/late SEMS+ deltas into these slots or mix their
+absolute baseline with Homey. P1/SolarEdge, home energy accounting, EV
+and all control consumers are unchanged pending the source-timing gate.
 ## Optional setup (after draft PR review and merge only)
 
 **No git pull or standard EMS deploy starts this service.** Nothing in the
