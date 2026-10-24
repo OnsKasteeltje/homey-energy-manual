@@ -66,23 +66,27 @@ a separate promotion of any historical accounting data.
 
 ## Durable GoodWe day-counter history (V0.1)
 
-The existing SEMS+ 15-minute collector also archives two validated inverter
-day/lifetime counters to private mode-0600 local SQLite:
+The existing SEMS+ 15-minute collector archives two validated inverter
+day/lifetime counters to the one existing EMS SQLite history:
 
-    /home/jeroen/ems/runtime/state/goodwe-sems-counters.sqlite
+    /home/jeroen/ems/data/ems-history.sqlite (existing EMS history DB, dedicated goodwe_counter_observations table)
 
 Observations are keyed by Pi fetch timestamp and hashed inverter identity.
 On first run the current 192-sample SHADOW ring is imported once. Subsequent
 valid samples append idempotently, including counter-only night observations.
 No extra cloud calls or timer, no legacy history rewriting, no fabricated zeros.
+The collector's systemd unit needs a scoped data-directory write exception;
+no chmod of the existing EMS SQLite file is permitted.
 
-Read-only API GET /web/analysis/goodwe/day/YYYY-MM-DD returns the SEMS+
+The existing single read-only API GET /web/analysis/pv-cloud/day/YYYY-MM-DD now includes SEMS+
 reported day-counter totals and, separately, the lifetime-counter change
 within the available observation window. Identity changes and counter
 decreases fail closed (no numeric day value). A late-day reported counter
 is not independently proven to be the final inverter-measured day value.
 
-The Evaluatie page shows this durable SEMS+ day source independently.
+The Evaluatie page shows this durable SEMS+ day source in its existing GoodWe panel
+through the same single read-only API call. The bounded JSON history remains
+only diagnostic SHADOW state, not a second durable history store.
 Quarter-hour PV/Flex energy still derives from old Homey counters; do NOT
 redistribute quantized/late SEMS+ deltas into these slots or mix their
 absolute baseline with Homey. P1/SolarEdge, home energy accounting, EV
