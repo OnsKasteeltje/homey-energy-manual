@@ -1294,6 +1294,119 @@ def provisional_daily_report_resource(value, series, paired_seconds_by_slot, now
     }
 
 
+
+def goodwe_cloud_evidence_resource(value):
+    """Project SEMS+ meter growth by fetch window; never canonical PV energy.
+
+    Pi fetch time is not an inverter sample timestamp. Quantized counter growth
+    cannot be assigned to individual 15-minute energy slots.
+    """
+    start_local, end_local, _ = _history_period("day", value)
+    path = os.environ.get(
+        "EMS_PV_CLOUD_HISTORY_FILE",
+        "/home/jeroen/ems/runtime/state/pv-cloud-shadow-history-v0.1.json",
+    )
+    with open(path, encoding="utf-8") as handle:
+        history = json.load(handle)
+    if (not isinstance(history, dict)
+            or history.get("schema") != "EMS_PV_CLOUD_SHADOW_HISTORY_V0.1"
+            or not isinstance(history.get("samples"), list)):
+        raise RuntimeError("PV_CLOUD_HISTORY_INVALID")
+
+    def valid_number(value):
+        return (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and math.isfinite(value) and value >= 0)
+
+    grouped = {}
+    first_sample = last_sample = None
+    count = 0
+    for sample in history["samples"]:
+        if not isinstance(sample, dict):
+            continue
+        gw = sample.get("goodwe")
+        if (not isinstance(gw, dict)
+                or gw.get("status") != "RECEIVED_SOURCE_TIME_UNKNOWN"):
+            continue
+        when = parse_timestamp(gw.get("fetchedAt"))
+        if when is None or not start_local <= when.astimezone(LOCAL_TZ) < end_local:
+            continue
+        inverters = gw.get("inverters")
+        if not isinstance(inverters, list):
+            continue
+        found = {}
+        for inverter in inverters:
+            if not isinstance(inverter, dict):
+                continue
+            key = inverter.get("deviceKey")
+            suffix = inverter.get("serialSuffix")
+            if (not isinstance(key, str) or len(key) != 16
+                    or not all(ch in "0123456789abcdef" for ch in key)
+                    or not isinstance(suffix, str) or len(suffix) != 4
+                    or key in found):
+                continue
+            found[key] = (suffix, inverter)
+        if len(found) != 2:
+            continue
+        count += 1
+        first_sample = min(first_sample, when) if first_sample else when
+        last_sample = max(last_sample, when) if last_sample else when
+        for key, (suffix, inverter) in found.items():
+            lifetime = inverter.get("lifetimeKWh")
+            power = inverter.get("powerW")
+            if not valid_number(lifetime):
+                continue
+            grouped.setdefault(key, []).append({
+                "when": when,
+                "serialSuffix": suffix,
+                "lifetime": float(lifetime),
+                "power": float(power) if valid_number(power) else None,
+            })
+
+    devices = []
+    for key, observations in sorted(grouped.items()):
+        observations.sort(key=lambda entry: entry["when"])
+        first, last = observations[0], observations[-1]
+        monotonic = all(
+            b["lifetime"] + 1e-6 >= a["lifetime"]
+            for a, b in zip(observations, observations[1:])
+        )
+        delta = (round(last["lifetime"] - first["lifetime"], 3)
+                 if monotonic and len(observations) >= 2 else None)
+        devices.append({
+            "deviceKey": key,
+            "serialSuffix": last["serialSuffix"],
+            "firstFetchedAt": first["when"].isoformat(),
+            "lastFetchedAt": last["when"].isoformat(),
+            "observations": len(observations),
+            "lastPowerW": last["power"],
+            "lifetimeCounterDeltaKWh": delta,
+            "counterEvidence": ("NON_MONOTONIC" if not monotonic else
+                                "COUNTER_WINDOW_SOURCE_TIME_UNKNOWN"
+                                if delta is not None else "INSUFFICIENT_SAMPLES"),
+        })
+
+    age = (max(0, round((datetime.now(timezone.utc) - last_sample).total_seconds() / 60, 1))
+           if last_sample else None)
+    return {
+        "schema": "EMS_WEB_GOODWE_CLOUD_EVIDENCE_V1",
+        "dateLocal": value,
+        "mode": "READ_ONLY_SHADOW",
+        "readOnly": True,
+        "controlWrites": False,
+        "eligibleForControl": False,
+        "eligibleForHouseBalance": False,
+        "source": "SEMS_PLUS_WEB_API",
+        "timeBasis": "PI_FETCH_TIME_SOURCE_TIME_UNKNOWN",
+        "counterResolutionKWh": 0.1,
+        "status": "OBSERVED_UNVERIFIED_FRESHNESS" if devices else "NO_SAMPLES",
+        "sampleCount": count,
+        "firstFetchedAt": first_sample.isoformat() if first_sample else None,
+        "lastFetchedAt": last_sample.isoformat() if last_sample else None,
+        "ageMinutes": age,
+        "devices": devices,
+    }
+
+
 def pv_flex_analysis_resource(value):
     """Return read-only 15-minute PV/flex evidence for one Amsterdam calendar day.
 
@@ -2599,6 +2712,17 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 400, {"schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "INVALID_OR_OPEN_DAY"})
             except (OSError, RuntimeError, json.JSONDecodeError):
                 send_json(self, 503, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "REPORT_ARCHIVE_UNAVAILABLE"})
+            return
+
+        if len(parts) == 5 and parts[:4] == ["web", "analysis", "pv-cloud", "day"]:
+            try:
+                send_json(self, 200, goodwe_cloud_evidence_resource(parts[4]))
+            except json.JSONDecodeError:
+                send_json(self, 503, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "RESOURCE_UNAVAILABLE"})
+            except ValueError:
+                send_json(self, 400, {"schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "HISTORY_PERIOD_INVALID"})
+            except (OSError, RuntimeError):
+                send_json(self, 503, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "RESOURCE_UNAVAILABLE"})
             return
 
         if len(parts) == 5 and parts[:4] == ["web", "analysis", "pv-flex", "day"]:
