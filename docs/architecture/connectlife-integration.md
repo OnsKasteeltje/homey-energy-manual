@@ -37,3 +37,11 @@ bash services/pi/integrations/connectlife/install_systemd.sh
 ```
 
 This updates `WorkingDirectory` and `ExecStart` to the canonical target path while preserving the existing state-file, credentials and Python-environment locations.
+
+## Operational recovery (24 October 2026)
+
+An incomplete ConnectLife account registration caused login error `LifeConnectAuthError 206001: Account Pending Registration`. Although the cloud response listed missing terms/privacy consent fields, the observed recovery was to **complete the address in the official ConnectLife app**. Inspect the app for incomplete registration details or pending consent prompts; never grant consent programmatically.
+
+The service had an independent `226/NAMESPACE` startup failure because `/home/jeroen/ems/runtime/state` did not exist. Restore that directory with the expected ownership before starting the service. After recovery, verify a fresh `generatedAt` in `oven-state.json`; `systemctl is-active` alone is insufficient. The production EMS planner, safety ownership and read-only adapter contract are unchanged.
+
+See `services/pi/integrations/connectlife/README.md` for the focused troubleshooting steps.
