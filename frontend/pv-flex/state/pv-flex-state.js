@@ -91,3 +91,15 @@ export async function loadDailyPerformance(day){
     d.readOnly!==true||d.controlWrites!==false)throw new Error("Ongeldig dagrapport");
  return d;
 }
+
+export async function loadGoodweCloudEvidence(day){
+ const response=await fetch("/web/analysis/pv-cloud/day/"+encodeURIComponent(day),{cache:"no-store"});
+ if(!response.ok)throw new Error("GoodWe SEMS+ bron niet beschikbaar");
+ const data=await response.json();
+ if(data.schema!=="EMS_WEB_GOODWE_CLOUD_EVIDENCE_V1" ||
+    data.dateLocal!==day || data.readOnly!==true ||
+    data.controlWrites!==false || data.eligibleForControl!==false ||
+    data.eligibleForHouseBalance!==false)
+  throw new Error("Ongeldig GoodWe SHADOW-bewijs");
+ return data;
+}
