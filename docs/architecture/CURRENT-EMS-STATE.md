@@ -35,21 +35,22 @@ source-selection and accounting change is accepted.
 GoodWe SEMS+ is the selected independent historical source for *reported*
 GoodWe daily energy counters, separate from the stuck Homey GoodWe counters.
 The existing Pi-owned 15-minute cloud collector archives valid paired
-todayKWh/lifetimeKWh inverter observations in private mode-0600 SQLite
-/home/jeroen/ems/runtime/state/goodwe-sems-counters.sqlite, with idempotent
+todayKWh/lifetimeKWh inverter observations in the existing EMS SQLite history
+/home/jeroen/ems/data/ems-history.sqlite (existing EMS history DB, dedicated goodwe_counter_observations table), with idempotent
 (fetchedAt, deviceKey) keys. On first run the 192-sample SHADOW ring is seeded;
 subsequent valid paired observations persist beyond ring rollover. No older
 history is fabricated. Counter-only nighttime samples may be archived, while
 missing inverter AC power remains NULL and never turns into 0 W.
 
-The read-only /web/analysis/goodwe/day/YYYY-MM-DD API returns the two
+The existing read-only /web/analysis/pv-cloud/day/YYYY-MM-DD API now also returns the two
 anonymous inverter day counters and their aggregate (mapping serial tails
 0071/0285 to physical models is not yet established). It separately reports
 within-observation-window lifetime counter growth. Missing data or a
 counter reset/identity change suppresses the numerical daily total.
 Late-day counter evidence is not proof of physical sample timing or
 complete 24-hour generation. The Evaluatie page shows the GoodWe SEMS+
-daily source independently of the Homey-derived quarter-hour bars.
+daily source independently of the Homey-derived quarter-hour bars. No second
+GoodWe database or second frontend web request is required.
 
 IMPORTANT: SEMS+ is not promoted into canonical 15-minute
 house_energy_intervals. Those old GoodWe slots may still be stale. No
