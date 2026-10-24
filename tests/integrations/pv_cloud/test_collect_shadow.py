@@ -24,6 +24,31 @@ class PvCloudShadowTest(unittest.TestCase):
         self.assertTrue(all(len(x["deviceKey"]) == 16 for x in got["inverters"]))
         self.assertNotIn("sample-0071", json.dumps(got))
 
+    def test_counter_only_evening_is_not_degraded_or_zero_watts(self):
+        payload = {"inverter": [
+            {"sn": "sample-0071", "invert_full": {"eday": 6.8, "etotal": 24043.0}},
+            {"sn": "sample-0285", "invert_full": {"eday": 3.0, "etotal": 10828.1}},
+        ], "powerflow": {"pv": 0}}
+        sample = module.goodwe_projection(payload, "2026-10-24T18:45:00Z")
+        self.assertEqual(sample["status"], "COUNTER_ONLY_SOURCE_TIME_UNKNOWN")
+        self.assertEqual(sample["stationPowerW"], 0)
+        self.assertIsNone(sample["sumInverterPowerW"])
+        self.assertTrue(all(row["powerW"] is None for row in sample["inverters"]))
+        self.assertEqual(
+            sorted(row["lifetimeKWh"] for row in sample["inverters"]),
+            [10828.1, 24043.0],
+        )
+        result = module.collect({
+            "SEMSPLUS_STATION_ID": "station",
+            "SEMSPLUS_ACCOUNT": "account",
+            "SEMSPLUS_PASSWORD": "password",
+        }, goodwe_fetch=lambda _: sample,
+           solaredge_fetch=lambda _: self.fail("SolarEdge disabled"))
+        self.assertEqual(result["status"], "OBSERVED_COUNTER_ONLY_UNVERIFIED_FRESHNESS")
+        self.assertEqual(result["solaredge"]["status"], "UNCONFIGURED")
+        self.assertFalse(result["eligibleForControl"])
+        self.assertFalse(result["eligibleForHouseBalance"])
+
     def test_missing_goodwe_reading_remains_null(self):
         got = module.goodwe_projection({"inverter": [
             {"sn": "sample-0071", "invert_full": {"eday": .4}},
