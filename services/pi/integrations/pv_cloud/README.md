@@ -34,7 +34,21 @@ Private local files (mode 0600):
 - /home/jeroen/ems/runtime/state/pv-cloud-shadow-history-v0.1.json
   (last 192 observations, about 48 hours at the initial 15m schedule).
 
-## Independent read-only EMS evidence view
+## GoodWe partial-power / counter-only observations (24 October 2026)
+
+SEMS+ can omit both inverter `pac` fields after sunset while continuing to
+return valid `eday` and `etotal` counters. With both distinct inverters and
+both counters present, the Pi collector records
+`COUNTER_ONLY_SOURCE_TIME_UNKNOWN` instead of `INCOMPLETE` and the aggregate
+status becomes `OBSERVED_COUNTER_ONLY_UNVERIFIED_FRESHNESS` (not full power
+health). Individual `powerW` and `sumInverterPowerW` remain null, **never 0 W**.
+If identities or required counters are absent, the observation remains
+`INCOMPLETE`/`DEGRADED`. The read-only Evaluatie API accepts the counter-only
+samples as counter evidence, advances its latest Pi-fetch timestamp and displays
+unknown power explicitly. It never interpolates quarter-hour PV production,
+changes source authoritativeness or touches Homey/P1/SolarEdge control.
+
+
 
 The existing 192-sample rolling GoodWe SEMS+ history is projected by the
 Web Data API on GET /web/analysis/pv-cloud/day/YYYY-MM-DD into a separate
