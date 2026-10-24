@@ -1328,6 +1328,13 @@ def goodwe_daily_counter_resource(value):
 
     with sqlite3.connect(f"file:{source_path}?mode=ro", uri=True, timeout=5) as db:
         db.execute("PRAGMA query_only=ON")
+        # On first deployment, the collector may not have created the
+        # table yet. This is missing evidence, not a broken API.
+        if db.execute("""
+            SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='goodwe_counter_observations'
+        """).fetchone() is None:
+            return result
         rows = db.execute("""
             SELECT fetched_at_utc,device_key,serial_suffix,today_kwh,
                    lifetime_kwh,power_w,source_status
