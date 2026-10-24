@@ -242,6 +242,9 @@ function renderGoodweEvidence(data){
       (data.lastFetchedAt?time(data.lastFetchedAt):"—")+
       (data.ageMinutes>40&&data.dateLocal===todayAmsterdam()?" · mogelijk verouderd":"")+
       " · fysieke bronmeettijd onbekend");
+ if(data.status==="OBSERVED_COUNTER_ONLY_UNVERIFIED_FRESHNESS"){
+  line("SEMS+ levert alleen geldige energietellers; actueel omvormervermogen is onbekend, niet 0 W.");
+ }
  for(const device of data.devices){
   const watts=available(device.lastPowerW)?power(device.lastPowerW):"onbekend";
   const delta=available(device.lifetimeCounterDeltaKWh)?
