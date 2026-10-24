@@ -30,6 +30,33 @@ for serial tails 0071/0285 and bound the clock/source-freshness uncertainty.
 The existing original Homey GoodWe inputs remain stale until a separate
 source-selection and accounting change is accepted.
 
+### SEMS+ duurzame GoodWe-dagproductie — observatiebron V0.1
+
+GoodWe SEMS+ is the selected independent historical source for *reported*
+GoodWe daily energy counters, separate from the stuck Homey GoodWe counters.
+The existing Pi-owned 15-minute cloud collector archives valid paired
+todayKWh/lifetimeKWh inverter observations in private mode-0600 SQLite
+/home/jeroen/ems/runtime/state/goodwe-sems-counters.sqlite, with idempotent
+(fetchedAt, deviceKey) keys. On first run the 192-sample SHADOW ring is seeded;
+subsequent valid paired observations persist beyond ring rollover. No older
+history is fabricated. Counter-only nighttime samples may be archived, while
+missing inverter AC power remains NULL and never turns into 0 W.
+
+The read-only /web/analysis/goodwe/day/YYYY-MM-DD API returns the two
+anonymous inverter day counters and their aggregate (mapping serial tails
+0071/0285 to physical models is not yet established). It separately reports
+within-observation-window lifetime counter growth. Missing data or a
+counter reset/identity change suppresses the numerical daily total.
+Late-day counter evidence is not proof of physical sample timing or
+complete 24-hour generation. The Evaluatie page shows the GoodWe SEMS+
+daily source independently of the Homey-derived quarter-hour bars.
+
+IMPORTANT: SEMS+ is not promoted into canonical 15-minute
+house_energy_intervals. Those old GoodWe slots may still be stale. No
+back-allocation of a delayed, quantized SEMS+ counter increment; no changes
+to P1 authority, SolarEdge, planner, EV, heating, WW, Quooker, battery,
+Homey event ingest, or canonical self-consumption accounting. Final
+quarter-hour reconciliation requires independently verified source timing.
 ### SEMS+ avondmeetkwaliteit — counter-only in SHADOW (24 October 2026)
 
 Live diagnostic samples at 19:45–20:45 CEST reported both GoodWe lifetime/day
