@@ -1,0 +1,18 @@
+[Unit]
+Description=EMS PV cloud source observations (SHADOW, read-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeroen
+Group=jeroen
+WorkingDirectory=/home/jeroen/ems/repo/homey-energy-manual/services/pi/integrations/pv_cloud
+EnvironmentFile=/etc/ems/pv-cloud-shadow.env
+ExecStart=/home/jeroen/ems/tools/pv-cloud-shadow/.venv/bin/python /home/jeroen/ems/repo/homey-energy-manual/services/pi/integrations/pv_cloud/collect_shadow.py
+TimeoutStartSec=150
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jeroen/ems/runtime/state

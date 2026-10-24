@@ -8,6 +8,11 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### PV Cloud SHADOW — optional observation, not operational (24 October 2026)
+
+A draft, opt-in Pi integration under `services/pi/integrations/pv_cloud/` can observe two GoodWe SEMS+ and one SolarEdge Monitoring API source. It is **not deployed or enabled** by the canonical Pi deploy path; systemd one-shot/timer installation is explicit after acceptance. Its private, bounded JSON shadow history records receipt time separately from unknown inverter sample time. No existing Homey devices, control owners, P1-led EV budget, heating, WW, planner, canonical historical energy accounting, or PV self-consumption estimates change. See `docs/architecture/pv-cloud-shadow.md`.
+
+
 
 ### ConnectLife oven read-only service — operational recovery (24 October 2026)
 
