@@ -8,6 +8,28 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### GoodWe SEMS+ in V2 Evaluatie — separate read-only evidence
+
+GoodWe cloud observations from the existing 192-sample bounded private
+PV Cloud SHADOW history are exposed on the presentation-only Web Data API route
+GET /web/analysis/pv-cloud/day/YYYY-MM-DD. The Evaluatie page presents Pi
+fetch timestamps, latest received inverter power, and monotonic lifetime-counter
+deltas across the available same-day observation window per hashed inverter
+identity and serial suffix. This is a bounded rolling history: older missing
+samples are UNKNOWN, not zero PV. A fetch timestamp is not a verified source
+measurement timestamp; SEMS+ counters have 0.1 kWh resolution. Do not
+interpolate cloud counter growth onto canonical quarter-hour bars or splice
+SEMS+ absolute counters into Homey baselines.
+
+The API result is permanently labelled READ_ONLY_SHADOW, with
+eligibleForControl=false and eligibleForHouseBalance=false. No change to
+house_energy_intervals, Homey ingestion, P1 realtime control, EV, heating,
+WW, Quooker, SolarEdge, PV planner, or canonical self-consumption accounting.
+Before any future accounting promotion, confirm the physical inverter mapping
+for serial tails 0071/0285 and bound the clock/source-freshness uncertainty.
+The existing original Homey GoodWe inputs remain stale until a separate
+source-selection and accounting change is accepted.
+
 ### PV Cloud SHADOW — Pi running, GoodWe-only (24 October 2026)
 
 The Pi-owned read-only collector under `services/pi/integrations/pv_cloud/` is running on an explicitly enabled 15-minute timer. It reads both GoodWe SEMS+ inverters. SolarEdge V1 was deliberately disabled in the local config due to confirmed API deprecation HTTP 503; SolarEdge does not count toward the aggregate health status or receive API requests. Only configured sources participate: healthy GoodWe-only yields `OBSERVED_UNVERIFIED_FRESHNESS`, failed configured sources yield `DEGRADED`, and an empty active configuration yields `NO_ACTIVE_SOURCES`. The central Pi deploy script does not automatically enable this optional timer. Private bounded SHADOW history distinguishes Pi fetch time from the unknown inverter sample time; `eligibleForControl=false` and `eligibleForHouseBalance=false`. No changes to Homey devices, control owners, P1-led EV budget, heating, WW, planner or canonical historical energy accounting. See `docs/architecture/pv-cloud-shadow.md`.
