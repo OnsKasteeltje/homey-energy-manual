@@ -7,6 +7,7 @@ import json
 import logging
 import math
 import os
+from datetime import timedelta
 from pathlib import Path
 import tempfile
 from urllib.error import HTTPError, URLError
@@ -224,6 +225,103 @@ def update_history(path, state, *, limit=HISTORY_LIMIT):
     samples.append(state)
     atomic_write(path, {"schema": HISTORY_SCHEMA, "samples": samples[-limit:]})
 
+
+# Independent, durable SEMS+ daily-counter evidence; no canonical Homey/P1 writes.
+GOODWE_ARCHIVE = Path("/home/jeroen/ems/runtime/state/goodwe-sems-counters.sqlite")
+
+def archive_goodwe_samples(path, samples):
+    """Append validated paired SEMS+ counters; idempotent across restarts.
+
+    Physical inverter measurement time is NOT known. Database timestamps are
+    Pi-fetch timestamps, not synthetic source measurement timestamps.
+    """
+    import sqlite3
+    path = Path(path)
+    if not path.parent.is_dir():
+        raise FileNotFoundError("GOODWE_ARCHIVE_DIRECTORY_MISSING")
+    # Enforce private persisted history, including a newly created archive.
+    fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+    os.close(fd)
+    os.chmod(path, 0o600)
+    con = sqlite3.connect(str(path), timeout=5)
+    inserted = 0
+    try:
+        con.execute("PRAGMA busy_timeout=5000")
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS goodwe_counter_observations (
+                fetched_at_utc TEXT NOT NULL,
+                device_key TEXT NOT NULL,
+                serial_suffix TEXT NOT NULL,
+                today_kwh REAL NOT NULL,
+                lifetime_kwh REAL NOT NULL,
+                power_w REAL,
+                source_status TEXT NOT NULL,
+                PRIMARY KEY (fetched_at_utc, device_key)
+            )
+        """)
+        for sample in samples:
+            if not isinstance(sample, dict):
+                continue
+            goodwe = sample.get("goodwe")
+            if not isinstance(goodwe, dict) or goodwe.get("status") not in (
+                "RECEIVED_SOURCE_TIME_UNKNOWN",
+                "COUNTER_ONLY_SOURCE_TIME_UNKNOWN",
+            ):
+                continue
+            try:
+                when = datetime.fromisoformat(
+                    goodwe["fetchedAt"].replace("Z", "+00:00")
+                ).astimezone(timezone.utc)
+            except (KeyError, AttributeError, TypeError, ValueError):
+                continue
+            if when > datetime.now(timezone.utc) + timedelta(minutes=2):
+                continue
+            inverters = goodwe.get("inverters")
+            if not isinstance(inverters, list) or len(inverters) != 2:
+                continue
+            records = []
+            identities = set()
+            suffixes = set()
+            for inv in inverters:
+                if not isinstance(inv, dict):
+                    break
+                key, suffix = inv.get("deviceKey"), inv.get("serialSuffix")
+                today, lifetime = inv.get("todayKWh"), inv.get("lifetimeKWh")
+                if (not isinstance(key, str) or len(key) != 16 or
+                    not all(ch in "0123456789abcdef" for ch in key) or
+                    not isinstance(suffix, str) or len(suffix) != 4 or
+                    not all(ch.isalnum() for ch in suffix) or
+                    not isinstance(today, (int, float)) or isinstance(today, bool) or
+                    not isinstance(lifetime, (int, float)) or isinstance(lifetime, bool) or
+                    not math.isfinite(today) or not math.isfinite(lifetime) or
+                    today < 0 or lifetime < 0):
+                    break
+                power = inv.get("powerW")
+                power = power if (isinstance(power, (int, float)) and
+                                 not isinstance(power, bool) and
+                                 math.isfinite(power) and power >= 0) else None
+                identities.add(key)
+                suffixes.add(suffix)
+                records.append((
+                    when.isoformat(timespec="microseconds"), key, suffix,
+                    float(today), float(lifetime), power, goodwe["status"]
+                ))
+            if len(records) != 2 or len(identities) != 2 or len(suffixes) != 2:
+                continue
+            before = con.total_changes
+            con.executemany("""
+                INSERT OR IGNORE INTO goodwe_counter_observations
+                (fetched_at_utc, device_key, serial_suffix, today_kwh,
+                 lifetime_kwh, power_w, source_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, records)
+            inserted += con.total_changes - before
+        con.commit()
+        return inserted
+    finally:
+        con.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description="One-shot PV cloud SHADOW read-only collector")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -233,7 +331,15 @@ def main():
     logging.disable(logging.CRITICAL)
     state = collect(os.environ)
     atomic_write(args.output, state)
+    bootstrap_archive = not GOODWE_ARCHIVE.exists()
     update_history(args.history, state)
+    if bootstrap_archive:
+        # Seed the existing ~48-hour bounded history exactly once. Old missing
+        # periods remain unknown; later runs archive each new observation.
+        all_samples = json.loads(args.history.read_text(encoding="utf-8"))["samples"]
+        archive_goodwe_samples(GOODWE_ARCHIVE, all_samples)
+    else:
+        archive_goodwe_samples(GOODWE_ARCHIVE, [state])
     print(f"PV cloud SHADOW: {state['status']}; GoodWe={state['goodwe']['status']}; SolarEdge={state['solaredge']['status']}")
 
 if __name__ == "__main__":
