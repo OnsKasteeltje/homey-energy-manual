@@ -227,7 +227,7 @@ def update_history(path, state, *, limit=HISTORY_LIMIT):
 
 
 # Independent, durable SEMS+ daily-counter evidence; no canonical Homey/P1 writes.
-GOODWE_ARCHIVE = Path("/home/jeroen/ems/runtime/state/goodwe-sems-counters.sqlite")
+GOODWE_ARCHIVE = Path("/home/jeroen/ems/data/ems-history.sqlite")
 
 def archive_goodwe_samples(path, samples):
     """Append validated paired SEMS+ counters; idempotent across restarts.
@@ -237,12 +237,9 @@ def archive_goodwe_samples(path, samples):
     """
     import sqlite3
     path = Path(path)
-    if not path.parent.is_dir():
-        raise FileNotFoundError("GOODWE_ARCHIVE_DIRECTORY_MISSING")
-    # Enforce private persisted history, including a newly created archive.
-    fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
-    os.close(fd)
-    os.chmod(path, 0o600)
+    if not path.is_file():
+        raise FileNotFoundError("EXISTING_EMS_HISTORY_DATABASE_MISSING")
+    # Reuse canonical history. NEVER create/chmod/replace its database file.
     con = sqlite3.connect(str(path), timeout=5)
     inserted = 0
     try:
@@ -322,6 +319,16 @@ def archive_goodwe_samples(path, samples):
         con.close()
 
 
+def _archive_needs_seed(path):
+    """Seed the bounded JSON ring once when the dedicated table first appears."""
+    import sqlite3
+    with sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5) as db:
+        return db.execute("""
+            SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='goodwe_counter_observations'
+        """).fetchone() is None
+
+
 def main():
     parser = argparse.ArgumentParser(description="One-shot PV cloud SHADOW read-only collector")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -331,7 +338,7 @@ def main():
     logging.disable(logging.CRITICAL)
     state = collect(os.environ)
     atomic_write(args.output, state)
-    bootstrap_archive = not GOODWE_ARCHIVE.exists()
+    bootstrap_archive = _archive_needs_seed(GOODWE_ARCHIVE)
     update_history(args.history, state)
     if bootstrap_archive:
         # Seed the existing ~48-hour bounded history exactly once. Old missing

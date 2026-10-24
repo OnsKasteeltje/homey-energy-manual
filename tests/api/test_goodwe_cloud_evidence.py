@@ -63,6 +63,25 @@ class GoodweEvidenceTest(unittest.TestCase):
         self.assertTrue(all(dev["lifetimeCounterDeltaKWh"] == 0 for dev in d["devices"]))
         self.assertFalse(d["eligibleForHouseBalance"])
 
+
+    def test_single_evidence_api_before_first_archive_is_safe(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / "ems-history.sqlite"
+            sqlite3.connect(db).close()
+            shadow = Path(tmp) / "shadow.json"
+            shadow.write_text(json.dumps({
+                "schema": "EMS_PV_CLOUD_SHADOW_HISTORY_V0.1",
+                "samples": [self.observe("2026-10-24T09:30:00Z", (24036.8, 10825.5))]
+            }))
+            with patch.object(server, "HISTORY_DB", str(db)), patch.dict(
+                "os.environ", {"EMS_PV_CLOUD_HISTORY_FILE": str(shadow)}
+            ):
+                result = server.goodwe_cloud_evidence_resource("2026-10-24")
+            self.assertEqual(result["sampleCount"], 1)
+            self.assertEqual(result["dailyCounters"]["status"], "NO_ARCHIVE")
+            self.assertIsNone(result["dailyCounters"]["reportedDayKWh"])
+
     def test_counter_decrease_stays_unknown(self):
         d = self.resource([
             self.observe("2026-10-24T09:15:00Z", (24036.8, 10825.5)),
@@ -102,12 +121,16 @@ class GoodweDurableHistoryTest(unittest.TestCase):
 
     def archive_and_read(self, samples, date="2026-10-24"):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "goodwe.sqlite"
+            path = Path(tmp) / "ems-history.sqlite"
+            import sqlite3
+            with sqlite3.connect(path):
+                pass
+            path.chmod(0o600)
             inserted = self.collector.archive_goodwe_samples(path, samples)
             repeated = self.collector.archive_goodwe_samples(path, samples)
             self.assertEqual(repeated, 0, "Must not duplicate retried samples")
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-            with patch.dict("os.environ", {"EMS_GOODWE_COUNTER_ARCHIVE_DB": str(path)}):
+            with patch.object(server, "HISTORY_DB", str(path)):
                 current = server.goodwe_daily_counter_resource(date)
                 other = server.goodwe_daily_counter_resource("2026-10-24" if date == "2026-10-23" else "2026-10-23")
             return inserted, current, other

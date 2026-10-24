@@ -1305,10 +1305,7 @@ def goodwe_daily_counter_resource(value):
     start_local, end_local, _ = _history_period("day", value)
     start = start_local.astimezone(timezone.utc).isoformat(timespec="microseconds")
     end = end_local.astimezone(timezone.utc).isoformat(timespec="microseconds")
-    source_path = os.environ.get(
-        "EMS_GOODWE_COUNTER_ARCHIVE_DB",
-        "/home/jeroen/ems/runtime/state/goodwe-sems-counters.sqlite",
-    )
+    source_path = HISTORY_DB
     result = {
         "schema": "EMS_WEB_GOODWE_DAILY_COUNTERS_V1",
         "dateLocal": value,
@@ -1331,6 +1328,13 @@ def goodwe_daily_counter_resource(value):
 
     with sqlite3.connect(f"file:{source_path}?mode=ro", uri=True, timeout=5) as db:
         db.execute("PRAGMA query_only=ON")
+        # On first deployment, the collector may not have created the
+        # table yet. This is missing evidence, not a broken API.
+        if db.execute("""
+            SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='goodwe_counter_observations'
+        """).fetchone() is None:
+            return result
         rows = db.execute("""
             SELECT fetched_at_utc,device_key,serial_suffix,today_kwh,
                    lifetime_kwh,power_w,source_status
@@ -1528,6 +1532,7 @@ def goodwe_cloud_evidence_resource(value):
         "lastFetchedAt": last_sample.isoformat() if last_sample else None,
         "ageMinutes": age,
         "devices": devices,
+        "dailyCounters": goodwe_daily_counter_resource(value),
     }
 
 
@@ -2836,16 +2841,6 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 400, {"schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "INVALID_OR_OPEN_DAY"})
             except (OSError, RuntimeError, json.JSONDecodeError):
                 send_json(self, 503, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "REPORT_ARCHIVE_UNAVAILABLE"})
-            return
-
-        if len(parts) == 5 and parts[:4] == ["web", "analysis", "goodwe", "day"]:
-            try:
-                send_json(self, 200, goodwe_daily_counter_resource(parts[4]))
-            except ValueError:
-                send_json(self, 400, {"schema":"EMS_WEB_ERROR_V1","status":"ERROR","reason":"HISTORY_PERIOD_INVALID"})
-            except (sqlite3.Error, OSError):
-                logging.exception("GoodWe daily counter resource unavailable")
-                send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
             return
 
         if len(parts) == 5 and parts[:4] == ["web", "analysis", "pv-cloud", "day"]:

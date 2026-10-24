@@ -104,14 +104,3 @@ export async function loadGoodweCloudEvidence(day){
  return data;
 }
 
-export async function loadGoodweDailyCounters(day){
- const response=await fetch("/web/analysis/goodwe/day/"+encodeURIComponent(day),{cache:"no-store"});
- if(!response.ok)throw new Error("GoodWe dagtellers niet beschikbaar");
- const data=await response.json();
- if(data.schema!=="EMS_WEB_GOODWE_DAILY_COUNTERS_V1" ||
-    data.dateLocal!==day || data.source!=="GOODWE_SEMS_PLUS" ||
-    data.eligibleForControl!==false || data.eligibleForHouseBalance!==false ||
-    data.controlWrites!==false)
-  throw new Error("Ongeldige GoodWe-historie");
- return data;
-}
