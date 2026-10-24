@@ -48,6 +48,21 @@ class GoodweEvidenceTest(unittest.TestCase):
         self.assertNotIn("pvKWh", d)
         self.assertNotIn("houseKWh", d)
 
+    def test_counter_only_updates_last_fetch_without_inventing_power(self):
+        day = self.observe("2026-10-24T17:30:00Z", (24043.0, 10828.1))
+        night = self.observe("2026-10-24T18:45:00Z", (24043.0, 10828.1))
+        night["goodwe"]["status"] = "COUNTER_ONLY_SOURCE_TIME_UNKNOWN"
+        for inverter in night["goodwe"]["inverters"]:
+            inverter["powerW"] = None
+            inverter["todayKWh"] = 6.8 if inverter["serialSuffix"] == "0071" else 3.0
+        d = self.resource([day, night])
+        self.assertEqual(d["sampleCount"], 2)
+        self.assertEqual(d["status"], "OBSERVED_COUNTER_ONLY_UNVERIFIED_FRESHNESS")
+        self.assertEqual(d["lastFetchedAt"], "2026-10-24T18:45:00+00:00")
+        self.assertTrue(all(dev["lastPowerW"] is None for dev in d["devices"]))
+        self.assertTrue(all(dev["lifetimeCounterDeltaKWh"] == 0 for dev in d["devices"]))
+        self.assertFalse(d["eligibleForHouseBalance"])
+
     def test_counter_decrease_stays_unknown(self):
         d = self.resource([
             self.observe("2026-10-24T09:15:00Z", (24036.8, 10825.5)),
