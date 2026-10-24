@@ -18,6 +18,12 @@ publication, Homey writes, EV changes or battery interactions.
 - fetchedAt means **received by Pi**, not **measured by inverter**. Both
   sourcePowerMeasuredAt fields remain null in V0.1: true physical sample
   times are not established. Missing/invalid values remain null, not 0 W.
+- Overall status evaluates **only fully configured sources**. An omitted
+  SolarEdge key/site disables SolarEdge polling (source status UNCONFIGURED),
+  excludes it from activeSources and does not degrade healthy GoodWe observations.
+  With GoodWe alone healthy, status stays OBSERVED_UNVERIFIED_FRESHNESS.
+  A failed configured source results in DEGRADED; no configured sources yield
+  NO_ACTIVE_SOURCES (never a false healthy result).
 - eligibleForControl=false and eligibleForHouseBalance=false always.
   Do not join these cloud snapshots with P1 for realtime decisions.
 - SEMS+ is an undocumented web API; source errors and rate limits use
@@ -81,6 +87,7 @@ Offline tests (no provider calls, no secret access):
 
     python3 -m unittest discover -s tests/integrations/pv_cloud -v
 
-Six meaningful checks: per-device counter/units, no fabricated zeros,
-source-time honesty, sanitized failure isolation, private atomic state,
-and bounded history. No new CI workflow.
+Nine focused checks: per-device counter/units, no fabricated zeros,
+source-time honesty, sanitized failure isolation, source opt-out (GoodWe only
+and SolarEdge only), no-active-source protection, private atomic state and
+bounded history. No new CI workflow.

@@ -148,9 +148,21 @@ def collect(config, *, goodwe_fetch=fetch_goodwe, solaredge_fetch=fetch_solaredg
             result[name] = fetcher(config)
         except Exception as exc:
             result[name] = {"status": "FETCH_FAILED", "errorCode": error_code(exc)}
-    goodwe_ok = result["goodwe"].get("status") == "RECEIVED_SOURCE_TIME_UNKNOWN"
-    solaredge_ok = result["solaredge"].get("status") == "RECEIVED_SITE_TIME_ONLY"
-    result["status"] = "OBSERVED_UNVERIFIED_FRESHNESS" if goodwe_ok and solaredge_ok else "DEGRADED"
+    # A deliberately absent source is outside the active measurement chain.
+    # Keep per-source UNCONFIGURED for diagnostics, but never downgrade the
+    # overall status because of it. Do not call an empty chain healthy.
+    expected = {
+        "goodwe": "RECEIVED_SOURCE_TIME_UNKNOWN",
+        "solaredge": "RECEIVED_SITE_TIME_ONLY",
+    }
+    active = [name for name, keys, _ in sources if all(config.get(key) for key in keys)]
+    result["activeSources"] = active
+    if not active:
+        result["status"] = "NO_ACTIVE_SOURCES"
+    elif all(result[name]["status"] == expected[name] for name in active):
+        result["status"] = "OBSERVED_UNVERIFIED_FRESHNESS"
+    else:
+        result["status"] = "DEGRADED"
     return result
 
 def atomic_write(path, data):

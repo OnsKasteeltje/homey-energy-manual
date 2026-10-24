@@ -1,4 +1,4 @@
-"""Six focused offline PV shadow evidence tests, without actual API requests."""
+"""Focused offline PV shadow evidence tests, without actual API requests."""
 import importlib.util
 import json
 from pathlib import Path
@@ -59,6 +59,44 @@ class PvCloudShadowTest(unittest.TestCase):
         self.assertNotIn("secret", json.dumps(got))
         self.assertFalse(got["eligibleForControl"])
         self.assertFalse(got["eligibleForHouseBalance"])
+
+    def test_only_goodwe_configured_is_healthy_and_never_calls_solaredge(self):
+        config = {
+            "SEMSPLUS_STATION_ID": "station",
+            "SEMSPLUS_ACCOUNT": "account",
+            "SEMSPLUS_PASSWORD": "password",
+        }
+        def must_not_call(_):
+            raise AssertionError("Disabled SolarEdge was invoked")
+        def goodwe(_):
+            return {"status": "RECEIVED_SOURCE_TIME_UNKNOWN", "inverters": []}
+        got = module.collect(config, goodwe_fetch=goodwe, solaredge_fetch=must_not_call)
+        self.assertEqual(got["activeSources"], ["goodwe"])
+        self.assertEqual(got["status"], "OBSERVED_UNVERIFIED_FRESHNESS")
+        self.assertEqual(got["solaredge"], {"status": "UNCONFIGURED"})
+        self.assertFalse(got["eligibleForControl"])
+        self.assertFalse(got["eligibleForHouseBalance"])
+
+    def test_only_solaredge_configured_is_healthy(self):
+        config = {"SOLAREDGE_SITE_ID": "site", "SOLAREDGE_API_KEY": "secret"}
+        def must_not_call(_):
+            raise AssertionError("Disabled GoodWe was invoked")
+        def solaredge(_):
+            return {"status": "RECEIVED_SITE_TIME_ONLY", "powerW": 50}
+        got = module.collect(config, goodwe_fetch=must_not_call, solaredge_fetch=solaredge)
+        self.assertEqual(got["activeSources"], ["solaredge"])
+        self.assertEqual(got["status"], "OBSERVED_UNVERIFIED_FRESHNESS")
+        self.assertEqual(got["goodwe"], {"status": "UNCONFIGURED"})
+
+    def test_no_configured_sources_is_not_healthy(self):
+        def must_not_call(_):
+            raise AssertionError("No source should be invoked")
+        got = module.collect({}, goodwe_fetch=must_not_call, solaredge_fetch=must_not_call)
+        self.assertEqual(got["activeSources"], [])
+        self.assertEqual(got["status"], "NO_ACTIVE_SOURCES")
+        self.assertEqual(got["goodwe"]["status"], "UNCONFIGURED")
+        self.assertEqual(got["solaredge"]["status"], "UNCONFIGURED")
+        self.assertFalse(got["eligibleForControl"])
 
     def test_rolling_history_limit(self):
         with tempfile.TemporaryDirectory() as tmp:
