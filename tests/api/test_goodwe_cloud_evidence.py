@@ -100,7 +100,7 @@ class GoodweDurableHistoryTest(unittest.TestCase):
                  "powerW": None if "COUNTER_ONLY" in status else 200.0},
             ]}}
 
-    def archive_and_read(self, samples):
+    def archive_and_read(self, samples, date="2026-10-24"):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "goodwe.sqlite"
             inserted = self.collector.archive_goodwe_samples(path, samples)
@@ -108,19 +108,19 @@ class GoodweDurableHistoryTest(unittest.TestCase):
             self.assertEqual(repeated, 0, "Must not duplicate retried samples")
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             with patch.dict("os.environ", {"EMS_GOODWE_COUNTER_ARCHIVE_DB": str(path)}):
-                current = server.goodwe_daily_counter_resource("2026-10-24")
-                other = server.goodwe_daily_counter_resource("2026-10-23")
+                current = server.goodwe_daily_counter_resource(date)
+                other = server.goodwe_daily_counter_resource("2026-10-24" if date == "2026-10-23" else "2026-10-23")
             return inserted, current, other
 
     def test_reported_day_counters_not_confused_with_window_growth(self):
         rows = [
-            self.sample("2026-10-24T09:30:00Z", (0.6, 0.4), (24036.8, 10825.5)),
-            self.sample("2026-10-24T18:45:00Z", (6.8, 3.0), (24043.0, 10828.1),
+            self.sample("2026-10-23T09:30:00Z", (0.6, 0.4), (24036.8, 10825.5)),
+            self.sample("2026-10-23T18:45:00Z", (6.8, 3.0), (24043.0, 10828.1),
                         "COUNTER_ONLY_SOURCE_TIME_UNKNOWN"),
-            self.sample("2026-10-24T21:30:00Z", (6.8, 3.0), (24043.0, 10828.1),
+            self.sample("2026-10-23T21:30:00Z", (6.8, 3.0), (24043.0, 10828.1),
                         "COUNTER_ONLY_SOURCE_TIME_UNKNOWN"),
         ]
-        inserted, report, other = self.archive_and_read(rows)
+        inserted, report, other = self.archive_and_read(rows, date="2026-10-23")
         self.assertEqual(inserted, 6)
         self.assertEqual(report["reportedDayKWh"], 9.8)
         self.assertEqual(report["windowCounterGrowthKWh"], 8.8)
