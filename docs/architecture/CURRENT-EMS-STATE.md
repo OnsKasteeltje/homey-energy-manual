@@ -8,6 +8,12 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+
+### ConnectLife oven read-only service — operational recovery (24 October 2026)
+
+The ConnectLife oven integration remains a separate, read-only Pi adapter with no planner or actuator authority. On 24 October, `ems-connectlife-oven.service` recovered from a missing `/home/jeroen/ems/runtime/state` directory (`226/NAMESPACE`) and from an incomplete ConnectLife account registration (`206001`), resolved in the official app by completing the user's address. Successful subsequent oven reads produced fresh `EMS_OVEN_STATE_V0.1` output in `oven-state.json`. No Pi runtime logic or systemd code changed. See `docs/architecture/connectlife-integration.md` and `services/pi/integrations/connectlife/README.md` for recovery details.
+
+
 ### Historical room-temperature analysis — 15m evidence (18 October 2026)
 
 `/heating-analysis/` now presents a room-selectable archived
