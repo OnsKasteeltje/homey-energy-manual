@@ -115,6 +115,12 @@ journalctl -u ems-connectlife-oven.service --since "10 minutes ago" --no-pager
 cat /home/jeroen/ems/runtime/state/oven-state.json
 ```
 
+### Login error 206001 — account registration incomplete
+
+Observed on 24 October 2026: `LifeConnectAuthError` code `206001` (`Account Pending Registration`) prevented login. The API mentioned missing ConnectLife terms/privacy consent fields, but the user resolved this incident by **completing the address in the official ConnectLife app**. First open the app and check for incomplete profile/address fields and any pending terms or privacy prompts; do not attempt to grant consent programmatically or assume the EMS credentials are wrong.
+
+After completing the registration, restart **only** `ems-connectlife-oven.service` and verify a fresh `generatedAt` in `/home/jeroen/ems/runtime/state/oven-state.json`. `active (running)` alone does not prove a successful login or oven read. No EMS source-code change was needed for this incident.
+
 Consumers must use `generatedAt` to detect staleness. A failed poll deliberately leaves the last valid JSON file intact.
 
 ## Architecture boundary
