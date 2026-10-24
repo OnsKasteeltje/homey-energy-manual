@@ -1,4 +1,4 @@
-import {loadDailyPerformance,loadPvFlex,loadGoodweCloudEvidence,loadGoodweDailyCounters,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
+import {loadDailyPerformance,loadPvFlex,loadGoodweCloudEvidence,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
 const $=id=>document.getElementById(id); let day=todayAmsterdam();
 const pct=v=>typeof v==="number"&&Number.isFinite(v)?Math.round(v*100)+"%":"—";
 const time=x=>new Date(x).toLocaleTimeString("nl-NL",{timeZone:"Europe/Amsterdam",hour:"2-digit",minute:"2-digit"});
@@ -286,13 +286,13 @@ async function refresh(){
  });
  $("next").disabled=selectedDay>=todayAmsterdam();
  $("quality").textContent="Laden…";
- const [main,daily,goodwe,goodweHistory]=await Promise.allSettled([
+ const [main,daily,goodwe]=await Promise.allSettled([
   loadPvFlex(selectedDay),loadDailyPerformance(selectedDay),
-  loadGoodweCloudEvidence(selectedDay),loadGoodweDailyCounters(selectedDay)
+  loadGoodweCloudEvidence(selectedDay)
  ]);
  if(requestId!==refreshId)return; // Ignore stale requests after day navigation.
  renderGoodweEvidence(goodwe.status==="fulfilled"?goodwe.value:null,
-  goodweHistory.status==="fulfilled"?goodweHistory.value:null);
+  goodwe.status==="fulfilled"?goodwe.value.dailyCounters:null);
  if(main.status==="fulfilled"){
   try{summary(main.value);chart(main.value);}
   catch(e){$("quality").textContent="Analyse niet beschikbaar";$("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;}
