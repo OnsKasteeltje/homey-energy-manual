@@ -34,6 +34,22 @@ Private local files (mode 0600):
 - /home/jeroen/ems/runtime/state/pv-cloud-shadow-history-v0.1.json
   (last 192 observations, about 48 hours at the initial 15m schedule).
 
+## Independent read-only EMS evidence view
+
+The existing 192-sample rolling GoodWe SEMS+ history is projected by the
+Web Data API on GET /web/analysis/pv-cloud/day/YYYY-MM-DD into a separate
+Evaluatie panel. Each hashed inverter identity/serial suffix carries latest
+received power, Pi-fetch-time observation bounds and monotonic same-source
+lifetime counter delta. Missing data is unknown rather than zero. Source sample
+timestamps are unknown and cumulative values have 0.1 kWh resolution.
+The output is NOT per-quarter PV energy, and it is never added to the
+canonical Homey/P1 PV balance or used for EV, WW, heating, or control.
+
+The collector itself and its 15-minute timer stay unchanged, as do its
+eligibleForControl=false and eligibleForHouseBalance=false boundaries.
+Confirm suffix-to-physical-inverter mapping and source time quality before
+a separate promotion of any historical accounting data.
+
 ## Optional setup (after draft PR review and merge only)
 
 **No git pull or standard EMS deploy starts this service.** Nothing in the

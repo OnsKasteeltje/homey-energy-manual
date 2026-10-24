@@ -1,4 +1,4 @@
-import {loadDailyPerformance,loadPvFlex,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
+import {loadDailyPerformance,loadPvFlex,loadGoodweCloudEvidence,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
 const $=id=>document.getElementById(id); let day=todayAmsterdam();
 const pct=v=>typeof v==="number"&&Number.isFinite(v)?Math.round(v*100)+"%":"—";
 const time=x=>new Date(x).toLocaleTimeString("nl-NL",{timeZone:"Europe/Amsterdam",hour:"2-digit",minute:"2-digit"});
@@ -224,6 +224,36 @@ function renderDailyReport(report,selectedDay){
  }
 }
 
+
+function renderGoodweEvidence(data){
+ const host=$("goodwe-evidence");host.replaceChildren();
+ const line=message=>{
+  const p=document.createElement("p");p.textContent=message;host.appendChild(p);
+ };
+ if(!data){
+  line("SEMS+ SHADOW-historie niet beschikbaar. Dit betekent niet 0 kWh productie.");
+  return;
+ }
+ if(data.status==="NO_SAMPLES" || !data.devices?.length){
+  line("Geen SEMS+ observaties voor deze datum in de rolling historie (maximaal 192 samples).");
+  return;
+ }
+ line(data.sampleCount+" geldige SEMS+ observaties · laatste Pi-ontvangst "+
+      (data.lastFetchedAt?time(data.lastFetchedAt):"—")+
+      (data.ageMinutes>40&&data.dateLocal===todayAmsterdam()?" · mogelijk verouderd":"")+
+      " · fysieke bronmeettijd onbekend");
+ for(const device of data.devices){
+  const watts=available(device.lastPowerW)?power(device.lastPowerW):"onbekend";
+  const delta=available(device.lifetimeCounterDeltaKWh)?
+   device.lifetimeCounterDeltaKWh.toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:3})+" kWh":
+   "onbekend";
+  line("GoodWe …"+device.serialSuffix+" · laatste ontvangen vermogen "+watts+
+       " · tellerstijging "+delta+" over beschikbaar venster"+
+       " ("+device.observations+" samples; "+device.counterEvidence+")");
+ }
+ line("SEMS+ draagt nog niet bij aan de canonieke PV/P1-balans; geen kwartierproductie gereconstrueerd.");
+}
+
 let refreshId=0;
 async function refresh(){
  const selectedDay=day;
@@ -233,10 +263,11 @@ async function refresh(){
  });
  $("next").disabled=selectedDay>=todayAmsterdam();
  $("quality").textContent="Laden…";
- const [main,daily]=await Promise.allSettled([
-  loadPvFlex(selectedDay),loadDailyPerformance(selectedDay)
+ const [main,daily,goodwe]=await Promise.allSettled([
+  loadPvFlex(selectedDay),loadDailyPerformance(selectedDay),loadGoodweCloudEvidence(selectedDay)
  ]);
  if(requestId!==refreshId)return; // Ignore stale requests after day navigation.
+ renderGoodweEvidence(goodwe.status==="fulfilled"?goodwe.value:null);
  if(main.status==="fulfilled"){
   try{summary(main.value);chart(main.value);}
   catch(e){$("quality").textContent="Analyse niet beschikbaar";$("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;}
