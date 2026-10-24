@@ -30,6 +30,23 @@ for serial tails 0071/0285 and bound the clock/source-freshness uncertainty.
 The existing original Homey GoodWe inputs remain stale until a separate
 source-selection and accounting change is accepted.
 
+### SEMS+ avondmeetkwaliteit — counter-only in SHADOW (24 October 2026)
+
+Live diagnostic samples at 19:45–20:45 CEST reported both GoodWe lifetime/day
+counters unchanged and valid while inverter PAC was absent (`null`), after
+earlier valid 0 W readings. Neither P1 nor control failed; the Pi collector
+completed its timer executions. To avoid misleading DEGRADED/stale UI status,
+the collector now distinguishes `COUNTER_ONLY_SOURCE_TIME_UNKNOWN` from
+complete observed power and from genuinely INCOMPLETE payloads. Overall state
+`OBSERVED_COUNTER_ONLY_UNVERIFIED_FRESHNESS` is explicitly limited evidence,
+not full power-source health. No missing PAC is converted to a 0 W sample.
+The separate Evaluatie API may advance its last Pi fetch timestamp on these
+counter-only observations but cannot assign them to canonical 15-minute PV
+energy or actuator/control decisions. Insufficient inverter identity/counters
+continue to yield INCOMPLETE/DEGRADED. Physical source timestamps remain unknown.
+Collector and website changes are kept within existing SHADOW and read-only
+presentation boundaries.
+
 ### PV Cloud SHADOW — Pi running, GoodWe-only (24 October 2026)
 
 The Pi-owned read-only collector under `services/pi/integrations/pv_cloud/` is running on an explicitly enabled 15-minute timer. It reads both GoodWe SEMS+ inverters. SolarEdge V1 was deliberately disabled in the local config due to confirmed API deprecation HTTP 503; SolarEdge does not count toward the aggregate health status or receive API requests. Only configured sources participate: healthy GoodWe-only yields `OBSERVED_UNVERIFIED_FRESHNESS`, failed configured sources yield `DEGRADED`, and an empty active configuration yields `NO_ACTIVE_SOURCES`. The central Pi deploy script does not automatically enable this optional timer. Private bounded SHADOW history distinguishes Pi fetch time from the unknown inverter sample time; `eligibleForControl=false` and `eligibleForHouseBalance=false`. No changes to Homey devices, control owners, P1-led EV budget, heating, WW, planner or canonical historical energy accounting. See `docs/architecture/pv-cloud-shadow.md`.

@@ -1319,13 +1319,17 @@ def goodwe_cloud_evidence_resource(value):
 
     grouped = {}
     first_sample = last_sample = None
+    latest_goodwe_quality = None
     count = 0
     for sample in history["samples"]:
         if not isinstance(sample, dict):
             continue
         gw = sample.get("goodwe")
         if (not isinstance(gw, dict)
-                or gw.get("status") != "RECEIVED_SOURCE_TIME_UNKNOWN"):
+                or gw.get("status") not in {
+                    "RECEIVED_SOURCE_TIME_UNKNOWN",
+                    "COUNTER_ONLY_SOURCE_TIME_UNKNOWN",
+                }):
             continue
         when = parse_timestamp(gw.get("fetchedAt"))
         if when is None or not start_local <= when.astimezone(LOCAL_TZ) < end_local:
@@ -1347,9 +1351,19 @@ def goodwe_cloud_evidence_resource(value):
             found[key] = (suffix, inverter)
         if len(found) != 2:
             continue
+        # Counter-only evidence must provide both cumulative measures
+        # for both identified inverters, never a fabricated zero watt.
+        if gw["status"] == "COUNTER_ONLY_SOURCE_TIME_UNKNOWN" and any(
+            not valid_number(inv.get("todayKWh")) or
+            not valid_number(inv.get("lifetimeKWh"))
+            for _, inv in found.values()
+        ):
+            continue
         count += 1
         first_sample = min(first_sample, when) if first_sample else when
-        last_sample = max(last_sample, when) if last_sample else when
+        if last_sample is None or when >= last_sample:
+            last_sample = when
+            latest_goodwe_quality = gw["status"]
         for key, (suffix, inverter) in found.items():
             lifetime = inverter.get("lifetimeKWh")
             power = inverter.get("powerW")
@@ -1398,7 +1412,12 @@ def goodwe_cloud_evidence_resource(value):
         "source": "SEMS_PLUS_WEB_API",
         "timeBasis": "PI_FETCH_TIME_SOURCE_TIME_UNKNOWN",
         "counterResolutionKWh": 0.1,
-        "status": "OBSERVED_UNVERIFIED_FRESHNESS" if devices else "NO_SAMPLES",
+        "status": (
+            "NO_SAMPLES" if not devices else
+            "OBSERVED_COUNTER_ONLY_UNVERIFIED_FRESHNESS"
+            if latest_goodwe_quality == "COUNTER_ONLY_SOURCE_TIME_UNKNOWN" else
+            "OBSERVED_UNVERIFIED_FRESHNESS"
+        ),
         "sampleCount": count,
         "firstFetchedAt": first_sample.isoformat() if first_sample else None,
         "lastFetchedAt": last_sample.isoformat() if last_sample else None,

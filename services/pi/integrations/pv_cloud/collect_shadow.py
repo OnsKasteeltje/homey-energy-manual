@@ -66,22 +66,41 @@ def goodwe_projection(data, fetched_at):
         if not isinstance(values, dict):
             values = {}
         power = nonnegative_number(values.get("pac"))
+        today = nonnegative_number(values.get("eday"))
+        lifetime = nonnegative_number(values.get("etotal"))
+        # SEMS+ may omit pac after sunset while still returning valid
+        # cumulative counters. Keep missing watts unknown, never 0 W.
+        counter_only = power is None and today is not None and lifetime is not None
         records.append({
             "deviceKey": hashlib.sha256(serial.encode("utf-8")).hexdigest()[:16],
             "serialSuffix": suffix,
-            "status": "RECEIVED_SOURCE_TIME_UNKNOWN" if power is not None else "MISSING_POWER",
+            "status": (
+                "RECEIVED_SOURCE_TIME_UNKNOWN" if power is not None else
+                "COUNTER_ONLY_SOURCE_TIME_UNKNOWN" if counter_only else
+                "MISSING_POWER"
+            ),
             "fetchedAt": fetched_at,
             "sourcePowerMeasuredAt": None,
             "powerW": power,
-            "todayKWh": nonnegative_number(values.get("eday")),
-            "lifetimeKWh": nonnegative_number(values.get("etotal")),
+            "todayKWh": today,
+            "lifetimeKWh": lifetime,
         })
         suffixes.add(suffix)
     records.sort(key=lambda row: row["deviceKey"])
-    complete = len(records) == 2 and len(suffixes) == 2 and all(row["powerW"] is not None for row in records)
+    paired = len(records) == 2 and len(suffixes) == 2
+    complete = paired and all(row["powerW"] is not None for row in records)
+    counter_only = (
+        paired and not complete
+        and all(row["todayKWh"] is not None and row["lifetimeKWh"] is not None
+                for row in records)
+    )
     return {
         "source": "SEMS_PLUS_WEB_API",
-        "status": "RECEIVED_SOURCE_TIME_UNKNOWN" if complete else "INCOMPLETE",
+        "status": (
+            "RECEIVED_SOURCE_TIME_UNKNOWN" if complete else
+            "COUNTER_ONLY_SOURCE_TIME_UNKNOWN" if counter_only else
+            "INCOMPLETE"
+        ),
         "fetchedAt": fetched_at,
         "sourcePowerMeasuredAt": None,
         "stationPowerW": nonnegative_number((data.get("powerflow") or {}).get("pv")),
@@ -159,8 +178,18 @@ def collect(config, *, goodwe_fetch=fetch_goodwe, solaredge_fetch=fetch_solaredg
     result["activeSources"] = active
     if not active:
         result["status"] = "NO_ACTIVE_SOURCES"
-    elif all(result[name]["status"] == expected[name] for name in active):
-        result["status"] = "OBSERVED_UNVERIFIED_FRESHNESS"
+    elif all(
+        result[name]["status"] == expected[name] or
+        (name == "goodwe" and result[name]["status"] == "COUNTER_ONLY_SOURCE_TIME_UNKNOWN")
+        for name in active
+    ):
+        # Preserve a distinct, limited counter-only state; missing inverter
+        # power is not silently accepted as a complete live measurement.
+        result["status"] = (
+            "OBSERVED_COUNTER_ONLY_UNVERIFIED_FRESHNESS"
+            if result["goodwe"]["status"] == "COUNTER_ONLY_SOURCE_TIME_UNKNOWN"
+            else "OBSERVED_UNVERIFIED_FRESHNESS"
+        )
     else:
         result["status"] = "DEGRADED"
     return result
