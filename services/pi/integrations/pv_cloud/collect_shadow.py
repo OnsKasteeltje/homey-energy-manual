@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import logging
 import math
 import os
 from pathlib import Path
@@ -187,6 +188,8 @@ def main():
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--history", type=Path, default=DEFAULT_HISTORY)
     args = parser.parse_args()
+    # Fail closed on third-party diagnostics; exceptions are sanitized in collect().
+    logging.disable(logging.CRITICAL)
     state = collect(os.environ)
     atomic_write(args.output, state)
     update_history(args.history, state)
