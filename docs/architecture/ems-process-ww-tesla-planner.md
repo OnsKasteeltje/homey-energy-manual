@@ -112,7 +112,7 @@ flowchart TB
 - **Tesla:** deadline/target requirements are hard constraints. Opportunity charging uses residual PV. The active actuator uses START7/RUN6 semantics.
 - **Easee health:** the current capability-timestamp health heuristic is observability-only at EV Gate v0.2.5 and does not independently veto a coherent positive command.
 - **Execution is fail-safe.** EV/WW adapters and gates require coherent schemas/revisions and the actuators remain the only physical writers.
-- **Future battery:** Victron DESS remains the primary real-time battery optimiser; Pi/Homey must not create a competing real-time battery optimiser.
+- **Future battery (ordered, not commissioned):** AlphaESS VitaPower 3600 AC 8 kWh + P1 Meter replaces the earlier Victron assumption. The battery retains autonomous realtime control and safety. A future Pi-owned, single-writer strategy interface may influence bounded priorities only after read-only measurement, vendor register verification, per-phase safety checks, and shadow validation; Homey must not create a competing writer.
 
 ## Validated live command paths — 2026-09-12
 
