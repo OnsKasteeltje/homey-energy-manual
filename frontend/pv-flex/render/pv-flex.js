@@ -211,7 +211,9 @@ function renderDailyReport(report,selectedDay){
   report.status==="READY"?"Definitief · compleet":report.status==="PARTIAL"?
   "Definitief · gedeeltelijk":
   report.status==="INSUFFICIENT_EVIDENCE"&&isToday?
-  "Voorlopig · onvoldoende meetbewijs":"Onvoldoende meetbewijs"
+  (Object.values(accounting).some(available)?
+   "Voorlopig · gemeten deel":"Voorlopig · onvoldoende meetbewijs"):
+  "Onvoldoende meetbewijs"
  ):(isToday?"Dag in uitvoering":"Niet beschikbaar");
  const lines=valid&&Array.isArray(report.lines)?(
   isToday?report.lines:report.lines.slice(2)
@@ -236,7 +238,7 @@ function renderGoodweEvidence(data,daily){
   line("SEMS+ historische curve: "+curve.completeQuarters+
        " gedekte kwartieren · "+curve.coveredQuarterKWh.toLocaleString("nl-NL",{
          maximumFractionDigits:2
-       })+" kWh in die kwartieren (SHADOW, nog niet in huisbalans).");
+       })+" kWh in die kwartieren (SHADOW-bronbewijs; alleen 900/900 s kwartieren gelden voor historische huisbalans).");
  }
  // Durable day-counter source is independent of the 192-sample SHADOW ring.
  if(daily && available(daily.reportedDayKWh)){
@@ -252,7 +254,7 @@ function renderGoodweEvidence(data,daily){
         inv.reportedDayKWh.toLocaleString("nl-NL",{maximumFractionDigits:2})+
         " kWh dagteller");
   }
-  line("Duurzaam opgeslagen tellerreeks; niet toegevoegd aan de kwartierbalken.");
+  line("SEMS+ dagtellers zijn controlegegevens; kwartierbalken gebruiken de afzonderlijk gevalideerde historische SEMS+-curve.");
  }else{
   line("Historische GoodWe-dagteller: "+
        (daily?.status||"niet beschikbaar")+
@@ -282,7 +284,7 @@ function renderGoodweEvidence(data,daily){
        " · tellerstijging "+delta+" over beschikbaar venster"+
        " ("+device.observations+" samples; "+device.counterEvidence+")");
  }
- line("SEMS+ draagt nog niet bij aan de canonieke PV/P1-balans; geen kwartierproductie gereconstrueerd.");
+ line("Ruwe SEMS+-cloudobservaties zijn SHADOW; de opgeslagen volledig gedekte SEMS+-kwartieren tellen sinds 25 oktober 2026 wel mee in de historische huisbalans. Realtime P1/EMS-besturing blijft ongewijzigd.");
 }
 
 let refreshId=0;
