@@ -73,6 +73,13 @@ assert "renderDailyReport(" in render
 assert 'selectedDay>=todayAmsterdam()' in render
 assert 'accounting.gridExportKWh' in render
 assert 'report.lines.slice(2)' in render
+# UI regression: the read-only cloud ring remains SHADOW, but accepted
+# 900-second archived SEMS+ quarters have been live since 25 Oct.
+assert 'SEMS+ draagt nog niet bij' not in render
+assert 'SHADOW, nog niet in huisbalans' not in render
+assert 'opgeslagen volledig gedekte SEMS+-kwartieren' in render
+assert 'Voorlopig · gemeten deel' in render
+assert '["pvProducedKWh","gridImportKWh","gridExportKWh","pvSelfConsumedKWh"]' in render
 assert 'requestId!==refreshId' in render
 assert '.daily-report-kpis' in css and '.preheat-room' not in css
 
