@@ -123,6 +123,45 @@ class PvCloudShadowTest(unittest.TestCase):
         self.assertEqual(got["solaredge"]["status"], "UNCONFIGURED")
         self.assertFalse(got["eligibleForControl"])
 
+    def test_historical_curve_15m_energy_and_idempotent_archive(self):
+        from datetime import datetime, timezone
+        import sqlite3
+        now = datetime(2026, 10, 24, 12, tzinfo=timezone.utc)
+        curve = {"dataList": [{"item": "pSystem", "powerData": [
+            {"tp": f"2026-10-24 10:{m:02d}:00", "power": 1}
+            for m in range(16)
+        ]}]}
+        quarters = module.historical_curve_quarters(curve, "2026-10-24", now=now)
+        self.assertEqual(len(quarters), 1)
+        kwh, seconds = next(iter(quarters.values()))
+        self.assertAlmostEqual(kwh, 0.25)
+        self.assertEqual(seconds, 900)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "ems-history.sqlite"
+            with sqlite3.connect(path):
+                pass
+            self.assertEqual(module.archive_goodwe_curve(path, curve, "2026-10-24", now=now), 1)
+            self.assertEqual(module.archive_goodwe_curve(path, curve, "2026-10-24", now=now), 1)
+            with sqlite3.connect(path) as db:
+                rows = db.execute(
+                    "SELECT energy_kwh,coverage_seconds FROM goodwe_sems_curve_15m"
+                ).fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertAlmostEqual(rows[0][0], 0.25)
+            self.assertEqual(rows[0][1], 900)
+
+    def test_historical_curve_gaps_and_dst_ambiguity_fail_closed(self):
+        from datetime import datetime, timezone
+        now = datetime(2026, 10, 25, 11, tzinfo=timezone.utc)
+        curve = {"dataList": [{"item": "pSystem", "powerData": (
+            [{"tp": "2026-10-25 02:30:00", "power": 5}] +
+            [{"tp": f"2026-10-25 08:{m:02d}:00", "power": 1}
+             for m in range(0, 16, 5)]
+        )}]}
+        self.assertEqual(module.historical_curve_quarters(
+            curve, "2026-10-25", now=now
+        ), {}, "DST fold and missing quarter minutes must not be invented")
+
     def test_rolling_history_limit(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "history.json"

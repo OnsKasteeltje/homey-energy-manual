@@ -1404,6 +1404,49 @@ def goodwe_daily_counter_resource(value):
     return result
 
 
+
+def goodwe_curve_quarter_resource(value):
+    """Already archived, quality-gated SEMS+ PV quarters, evidence only."""
+    start_local, end_local, _ = _history_period("day", value)
+    start = start_local.astimezone(timezone.utc).isoformat(timespec="seconds")
+    end = end_local.astimezone(timezone.utc).isoformat(timespec="seconds")
+    result = {
+        "source": "GOODWE_SEMS_PLUS_HISTORICAL_P_SYSTEM",
+        "timeBasis": "SEMS_MINUTE_LOCAL_TP",
+        "status": "NO_DATA", "eligibleForControl": False,
+        "eligibleForHouseBalance": False,
+        "completeQuarters": 0, "coveredQuarterKWh": None,
+        "lastFetchedAt": None, "quarters": [],
+    }
+    if not os.path.isfile(HISTORY_DB):
+        return result
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True, timeout=5) as db:
+        db.execute("PRAGMA query_only=ON")
+        if db.execute("""
+            SELECT 1 FROM sqlite_master WHERE type='table'
+            AND name='goodwe_sems_curve_15m'
+        """).fetchone() is None:
+            return result
+        rows = db.execute("""
+            SELECT slot_start_utc, energy_kwh, coverage_seconds, fetched_at_utc
+            FROM goodwe_sems_curve_15m
+            WHERE slot_start_utc >= ? AND slot_start_utc < ?
+            ORDER BY slot_start_utc
+        """, (start, end)).fetchall()
+    if rows:
+        result.update({
+            "status": "OBSERVED_PARTIAL_DAY",
+            "completeQuarters": len(rows),
+            "coveredQuarterKWh": round(sum(row[1] for row in rows), 3),
+            "lastFetchedAt": max(row[3] for row in rows),
+            "quarters": [{
+                "startUtc": at, "energyKWh": round(energy, 6),
+                "coverageSeconds": coverage,
+            } for at, energy, coverage, _ in rows],
+        })
+    return result
+
+
 def goodwe_cloud_evidence_resource(value):
     """Project SEMS+ meter growth by fetch window; never canonical PV energy.
 
@@ -1533,6 +1576,7 @@ def goodwe_cloud_evidence_resource(value):
         "ageMinutes": age,
         "devices": devices,
         "dailyCounters": goodwe_daily_counter_resource(value),
+        "historicalQuarterEvidence": goodwe_curve_quarter_resource(value),
     }
 
 

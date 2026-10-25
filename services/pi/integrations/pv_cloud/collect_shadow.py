@@ -8,6 +8,7 @@ import logging
 import math
 import os
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 import tempfile
 from urllib.error import HTTPError, URLError
@@ -329,10 +330,150 @@ def _archive_needs_seed(path):
         """).fetchone() is None
 
 
+
+# The SEMS+ historical pSystem curve is the combined GoodWe station PV power,
+# in kW, with minute-local timestamps. It is evidence, NOT a control input.
+LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
+HISTORICAL_CURVE_ROUTE = "/sems-plant/api/v1/hems/power/statisticsAndPreV2"
+
+
+def fetch_goodwe_historical_curve(config, day, *, now=None):
+    """One read-only SEMS+ historical request; no new scheduler or credentials."""
+    from pygoodwe import API
+
+    now = now or datetime.now(LOCAL_TZ)
+    day_date = datetime.strptime(day, "%Y-%m-%d").date()
+    if day_date > now.date():
+        raise ValueError("FUTURE_CURVE_DAY")
+    day_noon = datetime.combine(day_date, datetime.min.time().replace(hour=12),
+                                tzinfo=LOCAL_TZ)
+    offset = -int(day_noon.utcoffset().total_seconds() / 3600)
+    end = (now.strftime("%Y-%m-%d %H:%M:%S") if day_date == now.date()
+           else day + " 23:59:59")
+    api = API(system_id=config["SEMSPLUS_STATION_ID"],
+              account=config["SEMSPLUS_ACCOUNT"],
+              password=config["SEMSPLUS_PASSWORD"],
+              skipload=True, log_level="WARNING")
+    try:
+        return api._web_client().request(
+            HISTORICAL_CURVE_ROUTE, method="POST", timeout=25,
+            payload={
+                "stationId": config["SEMSPLUS_STATION_ID"],
+                "items": ["pSystem"], "timeScale": 1, "timeZone": offset,
+                "startTime": day + " 00:00:00", "endTime": end,
+            })
+    finally:
+        api.session.close()
+
+
+def historical_curve_quarters(data, day, *, now=None):
+    """Integrate timestamped kW values; incomplete quarters remain unknown.
+
+    Reject ambiguous DST local timestamps rather than guessing their fold.
+    Only observed segments <=3 minutes contribute; no filling cloud gaps.
+    """
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    if not isinstance(data, dict) or not isinstance(data.get("dataList"), list):
+        return {}
+    series = [item for item in data["dataList"]
+              if isinstance(item, dict) and item.get("item") == "pSystem"]
+    if len(series) != 1 or not isinstance(series[0].get("powerData"), list):
+        return {}
+    readings = {}
+    for item in series[0]["powerData"]:
+        if not isinstance(item, dict):
+            continue
+        try:
+            raw = item["tp"]
+            value = item["power"]
+            if not isinstance(raw, str) or isinstance(value, bool):
+                continue
+            power_kw = float(value)
+            if not math.isfinite(power_kw) or not (0 <= power_kw <= 12):
+                continue
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                first = dt.replace(tzinfo=LOCAL_TZ, fold=0)
+                second = dt.replace(tzinfo=LOCAL_TZ, fold=1)
+                if first.utcoffset() != second.utcoffset():
+                    continue  # repeated/nonexistent local DST hour
+                dt = first
+            if dt.astimezone(LOCAL_TZ).date().isoformat() != day:
+                continue
+            instant = dt.astimezone(timezone.utc)
+            if instant <= now:
+                readings[instant] = power_kw
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+    points = sorted(readings.items())
+    slots = {}
+    for (start, w1), (end, w2) in zip(points, points[1:]):
+        seconds = (end - start).total_seconds()
+        if not 0 < seconds <= 180:
+            continue
+        cursor = start
+        while cursor < end:
+            slot = cursor.replace(minute=(cursor.minute // 15) * 15,
+                                  second=0, microsecond=0)
+            limit = min(end, slot + timedelta(minutes=15))
+            a = (cursor - start).total_seconds() / seconds
+            b = (limit - start).total_seconds() / seconds
+            p1 = w1 + (w2 - w1) * a
+            p2 = w1 + (w2 - w1) * b
+            coverage = (limit - cursor).total_seconds()
+            item = slots.setdefault(slot, [0.0, 0.0])
+            item[0] += (p1 + p2) / 2 * coverage / 3600  # kWh
+            item[1] += coverage
+            cursor = limit
+    # A finished quarter needs >=12 of 15 minutes of actual line coverage.
+    return {slot: (energy, round(coverage))
+            for slot, (energy, coverage) in slots.items()
+            if slot + timedelta(minutes=15) <= now and coverage >= 720}
+
+
+def archive_goodwe_curve(path, data, day, *, now=None):
+    """Persist only quality-gated 15m evidence in existing ems-history.sqlite."""
+    import sqlite3
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError("EXISTING_EMS_HISTORY_DATABASE_MISSING")
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    quarters = historical_curve_quarters(data, day, now=now)
+    if not quarters:
+        return 0
+    with sqlite3.connect(str(path), timeout=5) as con:
+        con.execute("PRAGMA busy_timeout=5000")
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS goodwe_sems_curve_15m (
+                slot_start_utc TEXT PRIMARY KEY,
+                source_day_local TEXT NOT NULL,
+                energy_kwh REAL NOT NULL,
+                coverage_seconds INTEGER NOT NULL,
+                fetched_at_utc TEXT NOT NULL
+            )
+        """)
+        for slot, (energy, coverage) in quarters.items():
+            con.execute("""
+                INSERT INTO goodwe_sems_curve_15m
+                (slot_start_utc, source_day_local, energy_kwh,
+                 coverage_seconds, fetched_at_utc)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(slot_start_utc) DO UPDATE SET
+                    energy_kwh=excluded.energy_kwh,
+                    coverage_seconds=excluded.coverage_seconds,
+                    fetched_at_utc=excluded.fetched_at_utc
+                WHERE excluded.coverage_seconds >= goodwe_sems_curve_15m.coverage_seconds
+                  AND excluded.fetched_at_utc > goodwe_sems_curve_15m.fetched_at_utc
+            """, (slot.isoformat(timespec="seconds"), day, energy, coverage,
+                  now.isoformat(timespec="seconds")))
+    return len(quarters)
+
+
 def main():
     parser = argparse.ArgumentParser(description="One-shot PV cloud SHADOW read-only collector")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--history", type=Path, default=DEFAULT_HISTORY)
+    parser.add_argument("--curve-day", help="Optional completed local date for a one-shot historical backfill")
     args = parser.parse_args()
     # Fail closed on third-party diagnostics; exceptions are sanitized in collect().
     logging.disable(logging.CRITICAL)
@@ -347,7 +488,20 @@ def main():
         archive_goodwe_samples(GOODWE_ARCHIVE, all_samples)
     else:
         archive_goodwe_samples(GOODWE_ARCHIVE, [state])
-    print(f"PV cloud SHADOW: {state['status']}; GoodWe={state['goodwe']['status']}; SolarEdge={state['solaredge']['status']}")
+    curve_status = "NOT_CONFIGURED"
+    if state["goodwe"]["status"] in (
+        "RECEIVED_SOURCE_TIME_UNKNOWN", "COUNTER_ONLY_SOURCE_TIME_UNKNOWN"
+    ):
+        try:
+            day = args.curve_day or datetime.now(LOCAL_TZ).date().isoformat()
+            curve = fetch_goodwe_historical_curve(os.environ, day)
+            count = archive_goodwe_curve(GOODWE_ARCHIVE, curve, day)
+            curve_status = f"QUARTERS_{count}" if count else "NO_COMPLETE_QUARTERS"
+        except Exception as exc:
+            # The historical SHADOW curve must never block the existing
+            # 15-minute GoodWe counter collector or any EMS control path.
+            curve_status = "UNAVAILABLE_" + error_code(exc)
+    print(f"PV cloud SHADOW: {state['status']}; GoodWe={state['goodwe']['status']}; SolarEdge={state['solaredge']['status']}; curve={curve_status}")
 
 if __name__ == "__main__":
     main()

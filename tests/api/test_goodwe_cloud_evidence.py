@@ -81,6 +81,35 @@ class GoodweEvidenceTest(unittest.TestCase):
             self.assertEqual(result["sampleCount"], 1)
             self.assertEqual(result["dailyCounters"]["status"], "NO_ARCHIVE")
             self.assertIsNone(result["dailyCounters"]["reportedDayKWh"])
+            self.assertEqual(result["historicalQuarterEvidence"]["status"], "NO_DATA")
+
+    def test_historical_quarters_are_observation_only(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "ems-history.sqlite"
+            with sqlite3.connect(db_path) as db:
+                db.execute("""
+                    CREATE TABLE goodwe_sems_curve_15m (
+                        slot_start_utc TEXT PRIMARY KEY,
+                        source_day_local TEXT NOT NULL,
+                        energy_kwh REAL NOT NULL,
+                        coverage_seconds INTEGER NOT NULL,
+                        fetched_at_utc TEXT NOT NULL
+                    )
+                """)
+                db.execute("""
+                    INSERT INTO goodwe_sems_curve_15m VALUES (
+                        '2026-10-24T08:00:00+00:00','2026-10-24',0.25,900,
+                        '2026-10-24T12:00:00+00:00'
+                    )
+                """)
+            with patch.object(server, "HISTORY_DB", str(db_path)):
+                result = server.goodwe_curve_quarter_resource("2026-10-24")
+            self.assertEqual(result["completeQuarters"], 1)
+            self.assertEqual(result["coveredQuarterKWh"], 0.25)
+            self.assertFalse(result["eligibleForControl"])
+            self.assertFalse(result["eligibleForHouseBalance"])
+            self.assertNotIn("houseKWh", result)
 
     def test_counter_decrease_stays_unknown(self):
         d = self.resource([
