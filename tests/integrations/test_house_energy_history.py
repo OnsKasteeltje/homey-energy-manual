@@ -475,3 +475,71 @@ def test_sems_cutover_missing_or_partial_quarter_never_falls_back(tmp_path):
         assert gw42 is None and gw20 is None and sems is None
         assert pv is None and house is None
         assert p1q == "observed" and pvq == "gap"
+
+
+def test_complete_quarter_survives_next_cloud_quarter_missing_at_p1_boundary(tmp_path):
+    """Risk: cross-quarter P1 sample hides a complete earlier SEMS+ quarter."""
+    db = tmp_path / "h.sqlite"
+    con = _db(db)
+    _snapshot(con, "2026-10-25T11:44:00.068Z",
+              100.0, 50.0, 1000.0, 2000.0, 3000.0)
+    _snapshot(con, "2026-10-25T11:46:00.072Z",
+              100.2, 50.04, 1000.02, 2000.0, 3000.0)
+    con.executescript("""
+        CREATE TABLE goodwe_sems_curve_15m (
+            slot_start_utc TEXT PRIMARY KEY, source_day_local TEXT NOT NULL,
+            energy_kwh REAL NOT NULL, coverage_seconds INTEGER NOT NULL,
+            fetched_at_utc TEXT NOT NULL
+        );
+        INSERT INTO goodwe_sems_curve_15m VALUES
+          ('2026-10-25T11:30:00+00:00','2026-10-25',0.18,900,
+           '2026-10-25T12:00:00+00:00');
+    """)
+    con.commit()
+    con.close()
+
+    def read():
+        with sqlite3.connect(db) as conn:
+            return conn.execute("""
+                SELECT start_ts_utc,end_ts_utc,import_kwh,export_kwh,
+                       pv_solaredge_kwh,pv_goodwe_sems_kwh,pv_total_kwh,
+                       house_kwh,p1_quality,pv_quality
+                FROM house_energy_intervals ORDER BY julianday(start_ts_utc)
+            """).fetchall()
+
+    assert _load().build(db)["rows"] == 2
+    first, last = read()
+    assert first[0] == "2026-10-25T11:44:00.068Z"
+    assert first[1] == last[0] == "2026-10-25T11:45:00.000Z"
+    assert last[1] == "2026-10-25T11:46:00.072Z"
+
+    # The first half only depends on its OWN fully observed quarter.
+    duration = 120.004
+    first_seconds = 59.932
+    second_seconds = duration - first_seconds
+    assert abs(first[5] - .18 * first_seconds / 900) < 1e-10
+    assert abs(first[2] - .2 * first_seconds / duration) < 1e-10
+    assert abs(first[4] - .02 * first_seconds / duration) < 1e-10
+    assert abs(first[6] - (first[4] + first[5])) < 1e-10
+    assert abs(first[7] - (first[2] + first[6] - first[3])) < 1e-10
+    assert first[8:] == ("observed", "estimated")
+    assert last[5] is None and last[6] is None and last[7] is None
+    assert last[8:] == ("observed", "gap")
+    assert abs(sum(row[2] for row in (first, last)) - .2) < 1e-10
+    assert abs(sum(row[3] for row in (first, last)) - .04) < 1e-10
+    assert abs(sum(row[4] for row in (first, last)) - .02) < 1e-10
+
+    # Once the next cloud quarter becomes complete, only that half fills in.
+    with sqlite3.connect(db) as conn:
+        conn.execute("""
+            INSERT INTO goodwe_sems_curve_15m VALUES
+            ('2026-10-25T11:45:00+00:00','2026-10-25',0.36,900,
+             '2026-10-25T12:15:00+00:00')
+        """)
+    assert _load().build(db)["rows"] == 2
+    first_updated, last_updated = read()
+    assert first_updated[5] == first[5]
+    assert abs(last_updated[5] - .36 * second_seconds / 900) < 1e-10
+    assert last_updated[6] is not None and last_updated[7] is not None
+    assert last_updated[8:] == ("observed", "estimated")
+    assert abs(sum(row[2] for row in (first_updated, last_updated)) - .2) < 1e-10

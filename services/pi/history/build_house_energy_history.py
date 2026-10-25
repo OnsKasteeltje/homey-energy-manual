@@ -349,62 +349,113 @@ def build(db_path=DB):
                 quality = "discontinuity"
                 output = (None,) * len(deltas)
 
-            imp, exp, se, gw42, gw20 = output
-            p1_quality = "discontinuity" if reason else "gap" if quality == "gap" else "observed"
-            pv_quality = (
-                "discontinuity" if reason else
-                "gap" if quality == "gap" else
-                "estimated" if quality == "estimated" else
-                "held" if quality == "held" else
-                "observed"
-            )
-            gw_sems = None
-            if sems_mode or begin < SEMS_CUTOVER_UTC < end:
-                # Never reuse obsolete Homey GoodWe readings after cutover.
-                gw42 = gw20 = None
-                if not reason and quality != "gap":
-                    gw_sems = _sems_interval_energy(begin, end, sems_quarters)
-                if reason:
-                    pv_quality = "discontinuity"
-                elif gw_sems is None:
-                    pv_quality = "gap"
-                else:
-                    pv_quality = "estimated"
-                    quality = "estimated" if quality == "observed" else quality
-            pv_total = (se + gw_sems if se is not None and gw_sems is not None
-                        else se + gw42 + gw20
-                        if not sems_mode and gw42 is not None and gw20 is not None
-                        and se is not None else None)
-            house = None if imp is None or exp is None or pv_total is None else imp + pv_total - exp
+            # The Homey/P1 snapshot cadence is independent of UTC quarter
+            # boundaries. Split only post-cutover, non-gap intervals: an
+            # available 12:30-12:45 SEMS+ quarter must not depend on 12:45-13:00.
+            # P1 and SolarEdge deltas are time-apportioned without duplication.
+            segments = [(begin, end, prev_ts, ts)]
+            if sems_mode and not reason and quality != "gap":
+                segments = []
+                cursor = begin
+                while cursor < end:
+                    quarter_end = (
+                        cursor.replace(minute=(cursor.minute // 15) * 15,
+                                       second=0, microsecond=0)
+                        + timedelta(minutes=15)
+                    )
+                    finish = min(end, quarter_end)
+                    # Retain original source timestamps at interval edges.
+                    # Synthetic boundaries use API-compatible millisecond Z.
+                    start_text = (prev_ts if cursor == begin else
+                                  cursor.isoformat(timespec="milliseconds")
+                                  .replace("+00:00", "Z"))
+                    end_text = (ts if finish == end else
+                                finish.isoformat(timespec="milliseconds")
+                                .replace("+00:00", "Z"))
+                    segments.append((cursor, finish, start_text, end_text))
+                    cursor = finish
 
-            con.execute("""
-                INSERT INTO house_energy_intervals (
-                    start_ts_utc, end_ts_utc, duration_seconds,
-                    import_kwh, export_kwh,
-                    pv_solaredge_kwh, pv_goodwe4200_kwh, pv_goodwe2000_kwh,
-                    pv_goodwe_sems_kwh, pv_total_kwh, house_kwh,
-                    quality, p1_quality, pv_quality, discontinuity_reason
+            for seg_start, seg_end, start_text, end_text in segments:
+                fraction = (
+                    (seg_end - seg_start).total_seconds() / elapsed_seconds
+                    if elapsed_seconds > 0 else 1.0
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(end_ts_utc) DO UPDATE SET
-                    start_ts_utc=excluded.start_ts_utc,
-                    duration_seconds=excluded.duration_seconds,
-                    import_kwh=excluded.import_kwh,
-                    export_kwh=excluded.export_kwh,
-                    pv_solaredge_kwh=excluded.pv_solaredge_kwh,
-                    pv_goodwe4200_kwh=excluded.pv_goodwe4200_kwh,
-                    pv_goodwe2000_kwh=excluded.pv_goodwe2000_kwh,
-                    pv_goodwe_sems_kwh=excluded.pv_goodwe_sems_kwh,
-                    pv_total_kwh=excluded.pv_total_kwh,
-                    house_kwh=excluded.house_kwh,
-                    quality=excluded.quality,
-                    p1_quality=excluded.p1_quality,
-                    pv_quality=excluded.pv_quality,
-                    discontinuity_reason=excluded.discontinuity_reason,
-                    updated_at_utc=CURRENT_TIMESTAMP
-            """, (prev_ts, ts, seconds, imp, exp, se, gw42, gw20,
-                  gw_sems, pv_total, house, quality, p1_quality, pv_quality, reason))
-            written += 1
+                imp, exp, se, gw42, gw20 = (
+                    None if value is None else value * fraction
+                    for value in output
+                )
+                segment_quality = quality
+                p1_quality = (
+                    "discontinuity" if reason else
+                    "gap" if quality == "gap" else "observed"
+                )
+                pv_quality = (
+                    "discontinuity" if reason else
+                    "gap" if quality == "gap" else
+                    "estimated" if quality == "estimated" else
+                    "held" if quality == "held" else "observed"
+                )
+                gw_sems = None
+                if sems_mode or begin < SEMS_CUTOVER_UTC < end:
+                    # No Homey GoodWe fallback, including for unavailable
+                    # next-quarter cloud evidence.
+                    gw42 = gw20 = None
+                    if not reason and quality != "gap":
+                        gw_sems = _sems_interval_energy(
+                            seg_start, seg_end, sems_quarters
+                        )
+                    if reason:
+                        pv_quality = "discontinuity"
+                    elif gw_sems is None:
+                        pv_quality = "gap"
+                    else:
+                        pv_quality = "estimated"
+                        if segment_quality == "observed":
+                            segment_quality = "estimated"
+                pv_total = (
+                    se + gw_sems
+                    if se is not None and gw_sems is not None else
+                    se + gw42 + gw20
+                    if not sems_mode and gw42 is not None
+                    and gw20 is not None and se is not None else None
+                )
+                house = (
+                    None if imp is None or exp is None or pv_total is None
+                    else imp + pv_total - exp
+                )
+                seg_seconds = (
+                    int((seg_end - seg_start).total_seconds())
+                    if elapsed_seconds > 0 else seconds
+                )
+                con.execute("""
+                    INSERT INTO house_energy_intervals (
+                        start_ts_utc, end_ts_utc, duration_seconds,
+                        import_kwh, export_kwh,
+                        pv_solaredge_kwh, pv_goodwe4200_kwh, pv_goodwe2000_kwh,
+                        pv_goodwe_sems_kwh, pv_total_kwh, house_kwh,
+                        quality, p1_quality, pv_quality, discontinuity_reason
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(end_ts_utc) DO UPDATE SET
+                        start_ts_utc=excluded.start_ts_utc,
+                        duration_seconds=excluded.duration_seconds,
+                        import_kwh=excluded.import_kwh,
+                        export_kwh=excluded.export_kwh,
+                        pv_solaredge_kwh=excluded.pv_solaredge_kwh,
+                        pv_goodwe4200_kwh=excluded.pv_goodwe4200_kwh,
+                        pv_goodwe2000_kwh=excluded.pv_goodwe2000_kwh,
+                        pv_goodwe_sems_kwh=excluded.pv_goodwe_sems_kwh,
+                        pv_total_kwh=excluded.pv_total_kwh,
+                        house_kwh=excluded.house_kwh,
+                        quality=excluded.quality,
+                        p1_quality=excluded.p1_quality,
+                        pv_quality=excluded.pv_quality,
+                        discontinuity_reason=excluded.discontinuity_reason,
+                        updated_at_utc=CURRENT_TIMESTAMP
+                """, (start_text, end_text, seg_seconds, imp, exp, se, gw42, gw20,
+                      gw_sems, pv_total, house, segment_quality, p1_quality,
+                      pv_quality, reason))
+                written += 1
             previous = (ts, source_resolution_seconds, bool(has_held_input),
                         bool(has_held_core), values)
 
