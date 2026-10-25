@@ -1,10 +1,18 @@
 # Warm water — post-goal opportunity
 
-**Status:** IMPLEMENTED / PURE SHADOW  
+**Status:** RETIRED / FLOW DISABLED (25 oktober 2026)  
 **Homey-flow:** `EM v2 | 50 Decision | WW Post-Goal Opportunity v0.2 SHADOW`  
 **Fysieke boilerwrite:** nee
 
-## Besluit
+> Historisch ontwerpdocument. De SHADOW-flow v0.4 is op 25 oktober 2026
+> uitgeschakeld, met bestaande Flow-kaarten als rollback; de afhankelijkheid
+> `EM2_WW_PostGoal_Opportunity` is uit de huidige Core-broncode verwijderd.
+> Bij `goalReachedToday=true` geldt weer **geen nieuwe boilerherverwarming**.
+> Heractiveer deze historische kandidaatflow niet als parallelle WW-planner.
+> Deze tekst hieronder beschrijft het voormalige experiment, niet de
+> actieve EMS-regelstrategie.
+
+## Historische ontwerpbeslissing
 
 `goalReachedToday=true` betekent dat het dagelijkse comfortdoel is gehaald. Daardoor vervalt voor de rest van die lokale kalenderdag de **verplichte** heropwarming (`MUST`). Het dagdoel/latch blijft staan en wordt niet gewist.
 
