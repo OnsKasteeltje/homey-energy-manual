@@ -87,10 +87,32 @@ is not independently proven to be the final inverter-measured day value.
 The Evaluatie page shows this durable SEMS+ day source in its existing GoodWe panel
 through the same single read-only API call. The bounded JSON history remains
 only diagnostic SHADOW state, not a second durable history store.
-Quarter-hour PV/Flex energy still derives from old Homey counters; do NOT
-redistribute quantized/late SEMS+ deltas into these slots or mix their
-absolute baseline with Homey. P1/SolarEdge, home energy accounting, EV
-and all control consumers are unchanged pending the source-timing gate.
+SEMS+ day/lifetime counters must NOT be redistributed into quarter-hour
+energy. Only fully covered timestamped pSystem power curves are used
+by the separate canonical history source selector. P1/SolarEdge
+and all physical control consumers stay unchanged.
+## Canonical house-history GoodWe source selection (25 October 2026)
+
+The existing history builder `services/pi/history/build_house_energy_history.py`
+now uses fully covered (900-second) SEMS+ station `pSystem` quarters
+from 2026-10-25 00:00 Europe/Amsterdam. The two Homey GoodWe counter
+feeds remain historical/rollback evidence only before this date,
+never a fallback after it. Within each complete cloud quarter the
+15-minute station kWh is divided across the existing, shorter P1
+intervals proportionally to time and marked `estimated`. The sum of
+these intervals preserves the original quarter kWh if P1 coverage
+is complete. Partial/missing cloud quarters are unknown, not zero;
+house and total PV kWh remain NULL while P1 import/export persists.
+The builder adds only one nullable combined GoodWe history column,
+`pv_goodwe_sems_kwh`; the two older per-inverter GoodWe columns
+remain NULL after cutover. No fake model-to-serial mapping.
+
+The cloud API's `eligibleForHouseBalance=false` applies to the
+raw SHADOW web payload, **not** to the independently validated,
+fully covered archived curve table selected by the canonical
+history builder. Control remains P1-led and does not use SEMS+.
+No additional SEMS+ polling, separate database or systemd service.
+
 ## Historical SEMS+ minute power curve (SHADOW, 25 October 2026)
 
 The **same** existing 15-minute collector queries the SEMS+ historical
@@ -106,10 +128,9 @@ physical write is required.
 
 Existing read-only Evaluatie GoodWe API returns a
 `historicalQuarterEvidence` object showing quality-gated quarters and
-the sum over **covered** quarters only. It does NOT alter
-`house_energy_intervals` or canonical PV/house balance yet. Only after
-Pi-side acceptance can a separate controlled accounting cutover replace
-the broken Homey GoodWe history; P1 control never uses this cloud source.
+the sum over **covered** quarters only. The SHADOW endpoint itself never writes `house_energy_intervals`.
+The separate history builder selects complete persisted quarters from
+the declared cutover; P1 control never uses this cloud source.
 An optional one-time `--curve-day YYYY-MM-DD` permits an explicit
 historic backfill with this same collector, with existing credentials.
 
