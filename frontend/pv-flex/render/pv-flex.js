@@ -211,7 +211,7 @@ function renderDailyReport(report,selectedDay){
   report.status==="READY"?"Definitief · compleet":report.status==="PARTIAL"?
   "Definitief · gedeeltelijk":
   report.status==="INSUFFICIENT_EVIDENCE"&&isToday?
-  (Object.values(accounting).some(available)?
+  (["pvProducedKWh","gridImportKWh","gridExportKWh","pvSelfConsumedKWh"].some(key=>available(accounting[key]))?
    "Voorlopig · gemeten deel":"Voorlopig · onvoldoende meetbewijs"):
   "Onvoldoende meetbewijs"
  ):(isToday?"Dag in uitvoering":"Niet beschikbaar");
