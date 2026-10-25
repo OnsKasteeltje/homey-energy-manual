@@ -8,6 +8,59 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### GoodWe historical source cutover — canonical accounting (25 October 2026)
+
+Following verified 2026-10-24 full-day (SEMS+ minute-curve 9.76 kWh vs
+paired inverter day counters 9.8 kWh) and 2026-10-25 partial-day Pi
+validation (18 quality-gated quarters and 1.466 kWh as at 12:01 CET),
+`services/pi/history/build_house_energy_history.py` now selects
+`goodwe_sems_curve_15m` for combined GoodWe station production **from
+2026-10-25 00:00 Europe/Amsterdam (2026-10-24T22:00Z)**. Earlier
+Homey-derived entries remain legacy (not retroactively verified). Only
+**900-second** fully measured UTC quarters are eligible for canonical
+accounting, stricter than the 720-second SHADOW archive criterion.
+
+The builder keeps its existing P1 and SolarEdge cumulative-counter
+pipeline; SEMS+ 15m kWh is apportioned to shorter P1 intervals only
+for complete covered quarters, explicitly marked `estimated` because
+there is no archived within-quarter minute shape. The combined result
+is `pv_total_kwh = pv_solaredge_kwh + pv_goodwe_sems_kwh`;
+`house_kwh = import_kwh + pv_total_kwh - export_kwh`.
+The two legacy per-inverter GoodWe columns are NULL, not zero or
+fictitiously apportioned, from cutover onward. No Homey fallback exists
+after cutover, including for missing Homey counters, counter resets
+or stale `held` quality.
+
+On absent/incomplete SEMS+ quarters or invalid P1/SolarEdge,
+the affected interval has NULL PV total and household energy,
+while independently valid P1 import/export remain available.
+Any period crossing the cutover boundary is a discontinuity.
+The existing historical Web API exposes optional
+`pvGoodWeSemsKWh` in its totals/series and keeps
+unknown PV/house values null where source evidence is missing;
+the existing PV/Flex quarter API also suppresses uncovered PV/house
+values. Older database layouts remain readable until the builder
+migrates the derived table in place. No extra database, service,
+collector, HTTP route, device operation or changes to P1 control,
+planner, Tesla/Easee, WW, heating or Quooker.
+
+The **PV cloud raw observation endpoint** still labels its evidence
+`eligibleForHouseBalance=false`, because the UI payload itself is not
+a source of authority. The **canonical history builder** independently
+selects the *persisted* fully covered historical curve table. The
+720–899-second SHADOW quarters are never promoted to canonical energy.
+The independent Pi runtime and frontend need a guarded deployment and
+post-run cross-check; GitHub green alone is not proof of physical Pi
+cutover.
+
+Placement (touch it/place it): implementation stays in its existing
+`services/pi/history` and read-only `services/pi/api/web-data`
+component directories; existing risk regression tests remain in
+`tests/integrations`. Moving the historic builder path would risk
+breaking the running history unit, so no unrelated relocation is made.
+The old GoodWe Homey counters remain readable only for explicitly
+historical/rollback periods, not as a runtime source after cutover.
+
 ### GoodWe SEMS+ historical 15-minute curve — SHADOW evidence (25 October 2026)
 
 The existing 15-minute `services/pi/integrations/pv_cloud/collect_shadow.py`
@@ -29,10 +82,11 @@ The **existing** GET `/web/analysis/pv-cloud/day/YYYY-MM-DD` response now
 includes `historicalQuarterEvidence` and the existing Evaluatie GoodWe panel
 shows the count of covered quarters and their summed, **partial** energy.
 This is SHADOW, **eligibleForControl=false**,
-**eligibleForHouseBalance=false**. It is NOT yet used by
-`house_energy_intervals` and cannot silently replace Homey GoodWe samples.
-The existing P1/SolarEdge/history consumers and EV/heating/WW/Quooker
-actuation remain unchanged. The time-stamped station curve matched the two
+**eligibleForHouseBalance=false**. The raw SHADOW payload is NOT itself used by
+`house_energy_intervals`; the separate, fully covered persisted minute-curve
+projection is the canonical combined GoodWe source from the explicit
+cutover above. P1/SolarEdge control and EV/heating/WW/Quooker actuation
+are unchanged. The time-stamped station curve matched the two
 SEMS+ day counters on 2026-10-24 (9.76 vs 9.8 kWh) and the 2026-10-25
 morning partial run (1.08 vs 1.0 kWh at different acquisition times);
 physical station membership, minute-data completeness and safe canonical
@@ -89,12 +143,12 @@ complete 24-hour generation. The Evaluatie page shows the GoodWe SEMS+
 daily source independently of the Homey-derived quarter-hour bars. No second
 GoodWe database or second frontend web request is required.
 
-IMPORTANT: SEMS+ is not promoted into canonical 15-minute
-house_energy_intervals. Those old GoodWe slots may still be stale. No
-back-allocation of a delayed, quantized SEMS+ counter increment; no changes
+IMPORTANT: quantized day/lifetime SEMS+ *counters* are never interpolated
+into house_energy_intervals. Only the separate, time-stamped historical
+`pSystem` curve with full-quarter coverage is used from the declared
+source cutover; earlier Homey GoodWe history remains legacy. No change
 to P1 authority, SolarEdge, planner, EV, heating, WW, Quooker, battery,
-Homey event ingest, or canonical self-consumption accounting. Final
-quarter-hour reconciliation requires independently verified source timing.
+or Homey ingest.
 ### SEMS+ avondmeetkwaliteit — counter-only in SHADOW (24 October 2026)
 
 Live diagnostic samples at 19:45–20:45 CEST reported both GoodWe lifetime/day
