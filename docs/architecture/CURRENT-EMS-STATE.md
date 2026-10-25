@@ -8,6 +8,43 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### GoodWe SEMS+ historical 15-minute curve — SHADOW evidence (25 October 2026)
+
+The existing 15-minute `services/pi/integrations/pv_cloud/collect_shadow.py`
+collector also makes one read-only SEMS+ historical `pSystem` request per
+run. This is combined *station PV* in kW, not per-inverter production.
+Historical minute-local `tp` timestamps are integrated across UTC quarter
+boundaries using trapezoids (segments no longer than three minutes).
+Completed quarters need >=720 seconds of actual measured-segment coverage.
+Missing values, API errors and DST-ambiguous local timestamps contribute
+nothing; missing quarters stay UNKNOWN rather than zero. The collector stores
+only completed, quality-gated quarters (not redundant per-minute raw history)
+in `ems-history.sqlite.goodwe_sems_curve_15m`. Re-fetching is idempotent
+and later equal/better-coverage evidence can refine a quarter. Optional
+`--curve-day YYYY-MM-DD` allows deliberate one-off backfill with the same
+script, not a new timer. Historic PV curve fetch failures do not block the
+pre-existing live counter archival path.
+
+The **existing** GET `/web/analysis/pv-cloud/day/YYYY-MM-DD` response now
+includes `historicalQuarterEvidence` and the existing Evaluatie GoodWe panel
+shows the count of covered quarters and their summed, **partial** energy.
+This is SHADOW, **eligibleForControl=false**,
+**eligibleForHouseBalance=false**. It is NOT yet used by
+`house_energy_intervals` and cannot silently replace Homey GoodWe samples.
+The existing P1/SolarEdge/history consumers and EV/heating/WW/Quooker
+actuation remain unchanged. The time-stamped station curve matched the two
+SEMS+ day counters on 2026-10-24 (9.76 vs 9.8 kWh) and the 2026-10-25
+morning partial run (1.08 vs 1.0 kWh at different acquisition times);
+physical station membership, minute-data completeness and safe canonical
+source cutover still require Pi acceptance before promotion.
+
+Placement decision (touch-it-place-it): Pi cloud integration, API and tests
+remain in their matching `services/pi/integrations`, `services/pi/api` and
+`tests` component directories. The existing `frontend/pv-flex` panel
+remains in its current legacy frontend path to avoid unrelated web import/
+deployment relocation in a SHADOW evidence change. No new service, route,
+database, CI workflow, control path, or permanent temporary file is added.
+
 ### GoodWe SEMS+ in V2 Evaluatie — separate read-only evidence
 
 GoodWe cloud observations from the existing 192-sample bounded private
