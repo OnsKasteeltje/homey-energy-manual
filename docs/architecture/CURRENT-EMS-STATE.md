@@ -8,6 +8,32 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### WW post-goal SHADOW retirement (25 oktober 2026)
+
+After reassessment of issue #4, the optional Homey flow
+`EM v2 | 50 Decision | WW Post-Goal Opportunity v0.4 SHADOW`
+(stable flow ID `5538f1c9-9a21-4328-9896-942952f5c55f`) was
+**disabled in place**, with all four cards unchanged and retained for
+rollback/traceability. The flow no longer publishes new advisory states;
+previous Homey Logic variables are historical inert values, not control authority.
+
+Homey Core v0.11p retains its existing sole Core flow ID, source mode
+(CV/BOILER) stop, 19:00 hard stop, normal pre-goal planner/catch-up,
+thermostat-verification checks and WW writer separation. Its obsolete
+`EM2_WW_PostGoal_Opportunity` read and after-goal `BOILER_ON/SHOULD`
+branch are removed. Once the new byte-exact Core script has been accepted
+on the existing Homey flow, `goalReachedToday=true` always stops an
+already-running boiler or holds it off, never initiates a new discretionary
+post-goal run. `postGoalPolicy=DISABLED`, `sameDayReheat=false`. No
+Pi planner, systemd, API, P1, EV or actuator change. Historical source
+and documentation remain for provenance, not as an active alternative policy.
+
+**Deployment boundary:** a GitHub commit or PR alone does not change the
+existing Homey Core HomeyScript. Confirm the active flow's script is
+byte-for-byte aligned with the merged source before claiming this final
+retirement in Homey production. The unrelated WW low-power timer issue #38
+remains open.
+
 ### Evaluatie dagrapport — bronafhankelijke dekking (25 oktober 2026)
 
 After production acceptance of GoodWe SEMS+ canonical history and quarter
