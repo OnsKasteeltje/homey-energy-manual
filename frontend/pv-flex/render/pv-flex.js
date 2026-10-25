@@ -230,6 +230,14 @@ function renderGoodweEvidence(data,daily){
  const line=message=>{
   const p=document.createElement("p");p.textContent=message;host.appendChild(p);
  };
+ // Time-stamped station PV curve is shadow evidence until accounting is validated.
+ const curve=data?.historicalQuarterEvidence;
+ if(curve?.status==="OBSERVED_PARTIAL_DAY"){
+  line("SEMS+ historische curve: "+curve.completeQuarters+
+       " gedekte kwartieren · "+curve.coveredQuarterKWh.toLocaleString("nl-NL",{
+         maximumFractionDigits:2
+       })+" kWh in die kwartieren (SHADOW, nog niet in huisbalans).");
+ }
  // Durable day-counter source is independent of the 192-sample SHADOW ring.
  if(daily && available(daily.reportedDayKWh)){
   const amount=daily.reportedDayKWh.toLocaleString("nl-NL",{
