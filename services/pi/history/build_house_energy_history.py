@@ -2,8 +2,9 @@
 """Build household-energy intervals from cumulative Homey Core counters."""
 
 import argparse
+import math
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -12,6 +13,10 @@ LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 MAX_NORMAL_GAP_SECONDS = 900
 COUNTER_DECREASE_EPSILON_KWH = 1e-6
 GAP_MULTIPLIER = 1.5
+# First verified SEMS+ day (25 Oct, Amsterdam); earlier intervals remain legacy.
+SEMS_CUTOVER_UTC = datetime(2026, 10, 24, 22, tzinfo=timezone.utc)
+# SHADOW needs 720 s; canonical balance requires a full 900 s.
+SEMS_REQUIRED_SECONDS = 900
 
 COUNTERS = (
     ("grid_p1", "energy_import_kwh", "import_kwh"),
@@ -49,7 +54,10 @@ def _counter_rows(con):
                MAX(x.source_resolution_seconds),
                MAX(CASE WHEN x.quality='held' THEN 1 ELSE 0 END) AS has_held_input,
                {", ".join(value_parts)},
-               {", ".join(quality_parts)}
+               {", ".join(quality_parts)},
+               MAX(CASE WHEN x.quality='held'
+                        AND d.device_key NOT IN ('pv_goodwe4200','pv_goodwe2000')
+                        THEN 1 ELSE 0 END) AS core_held_input
         FROM measurements x
         JOIN devices d ON d.id=x.device_id
         JOIN metrics m ON m.id=x.metric_id
@@ -91,15 +99,20 @@ def _prepare_counter_rows(rows):
         ts, source_resolution_seconds, has_held_input, *rest = row
         values = rest[:value_count]
         pv_held = rest[value_count:value_count + pv_count]
-        if any(value is None for value in values):
+        stamp = _parse_utc(ts)
+        if any(value is None for value in values[:3]):
+            continue
+        if stamp < SEMS_CUTOVER_UTC and any(value is None for value in values):
             continue
 
         prepared.append({
             "ts": ts,
             "source_resolution_seconds": source_resolution_seconds,
             "has_held_input": bool(has_held_input),
-            "values": [float(value) for value in values],
+            "values": [float(value) if value is not None else None
+                       for value in values],
             "pv_held": [bool(value) for value in pv_held],
+            "has_held_core": bool(rest[value_count + pv_count]),
             "pv_estimated_interval": False,
         })
 
@@ -111,6 +124,10 @@ def _prepare_counter_rows(rows):
         for index in range(1, len(prepared)):
             previous_value = raw_values[index - 1]
             current_value = raw_values[index]
+            if current_value is None or previous_value is None:
+                continue
+            if pv_offset and _parse_utc(prepared[index]["ts"]) >= SEMS_CUTOVER_UTC:
+                continue
             delta = current_value - previous_value
 
             if delta <= COUNTER_DECREASE_EPSILON_KWH:
@@ -120,10 +137,9 @@ def _prepare_counter_rows(rows):
             # preceding this positive step.
             plateau_start = index - 1
             while plateau_start > 0:
-                same_value = abs(
-                    raw_values[plateau_start]
-                    - raw_values[plateau_start - 1]
-                ) <= COUNTER_DECREASE_EPSILON_KWH
+                left, right = raw_values[plateau_start - 1:plateau_start + 1]
+                same_value = (left is not None and right is not None
+                              and abs(right - left) <= COUNTER_DECREASE_EPSILON_KWH)
                 sample_gap = (
                     _parse_utc(prepared[plateau_start]["ts"])
                     - _parse_utc(prepared[plateau_start - 1]["ts"])
@@ -152,6 +168,8 @@ def _prepare_counter_rows(rows):
             ):
                 continue
 
+            if pv_offset and start_time < SEMS_CUTOVER_UTC <= end_time:
+                continue
             elapsed = (end_time - start_time).total_seconds()
             if elapsed <= 0:
                 continue
@@ -172,6 +190,52 @@ def _prepare_counter_rows(rows):
                 fill["pv_estimated_interval"] = True
 
     return prepared
+
+
+
+def _sems_quarters(con):
+    """Eligible fully observed station PV quarters in the existing database."""
+    exists = con.execute("""
+        SELECT 1 FROM sqlite_master WHERE type='table'
+        AND name='goodwe_sems_curve_15m'
+    """).fetchone()
+    if not exists:
+        return {}
+    quarters = {}
+    for stamp, value, coverage in con.execute("""
+        SELECT slot_start_utc, energy_kwh, coverage_seconds
+        FROM goodwe_sems_curve_15m
+    """):
+        try:
+            start = _parse_utc(stamp)
+            energy = float(value)
+            if (start < SEMS_CUTOVER_UTC or start.minute % 15
+                    or start.second or start.microsecond
+                    or type(coverage) is not int or coverage != SEMS_REQUIRED_SECONDS
+                    or not math.isfinite(energy) or energy < 0):
+                continue
+            quarters[start] = energy
+        except (TypeError, ValueError, OverflowError):
+            continue
+    return quarters
+
+
+def _sems_interval_energy(start, end, quarters):
+    """Split trusted 15m energy across shorter P1 intervals (estimated)."""
+    if start < SEMS_CUTOVER_UTC or end <= start:
+        return None
+    total = 0.0
+    cursor = start
+    while cursor < end:
+        quarter = cursor.replace(minute=cursor.minute // 15 * 15,
+                                 second=0, microsecond=0)
+        energy = quarters.get(quarter)
+        if energy is None:
+            return None
+        limit = min(end, quarter + timedelta(minutes=15))
+        total += energy * (limit - cursor).total_seconds() / 900.0
+        cursor = limit
+    return total
 
 
 def build(db_path=DB):
