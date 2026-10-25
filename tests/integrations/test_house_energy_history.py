@@ -390,3 +390,88 @@ def test_sleeping_pv_counters_do_not_truncate_night_history(tmp_path):
     assert abs(rows[1][4]) < 1e-9
     assert abs(rows[1][5] - 0.3) < 1e-9
     assert rows[1][6] == "held"
+
+
+def test_sems_cutover_replaces_frozen_homey_goodwe_without_double_count(tmp_path):
+    """Risk: held Homey counters must never leak into the new PV total."""
+    db = tmp_path / "h.sqlite"
+    con = _db(db)
+    for index, minute in enumerate((0, 5, 10, 15)):
+        ts = f"2026-10-25T08:{minute:02d}:00Z"
+        _snapshot(con, ts, 100 + index * .1, 50 + index * .02,
+                  1000 + index * .01, 2000, 3000)
+        con.execute("""
+            UPDATE measurements SET quality='held'
+            WHERE ts_utc=? AND device_id IN (3,4)
+        """, (ts,))
+    con.execute("""
+        CREATE TABLE goodwe_sems_curve_15m (
+            slot_start_utc TEXT PRIMARY KEY, source_day_local TEXT NOT NULL,
+            energy_kwh REAL NOT NULL, coverage_seconds INTEGER NOT NULL,
+            fetched_at_utc TEXT NOT NULL
+        )
+    """)
+    con.execute("""
+        INSERT INTO goodwe_sems_curve_15m VALUES
+        ('2026-10-25T08:00:00+00:00','2026-10-25',0.45,900,
+         '2026-10-25T09:00:00+00:00')
+    """)
+    con.commit()
+    con.close()
+
+    result = _load().build(db)
+    assert result["rows"] == 3
+    with sqlite3.connect(db) as con:
+        rows = con.execute("""
+            SELECT import_kwh,export_kwh,pv_solaredge_kwh,
+                   pv_goodwe4200_kwh,pv_goodwe2000_kwh,
+                   pv_goodwe_sems_kwh,pv_total_kwh,house_kwh,pv_quality
+            FROM house_energy_intervals ORDER BY start_ts_utc
+        """).fetchall()
+    for imp, exp, solar, gw42, gw20, sems, pv, house, quality in rows:
+        assert gw42 is None and gw20 is None
+        assert abs(imp - .1) < 1e-8
+        assert abs(exp - .02) < 1e-8
+        assert abs(solar - .01) < 1e-8
+        assert abs(sems - .15) < 1e-8
+        assert abs(pv - .16) < 1e-8
+        assert abs(house - .24) < 1e-8
+        assert quality == "estimated"
+
+
+def test_sems_cutover_missing_or_partial_quarter_never_falls_back(tmp_path):
+    """Risk: cloud gaps and missing Homey values cannot fabricate PV or house."""
+    db = tmp_path / "h.sqlite"
+    con = _db(db)
+    for index, minute in enumerate((0, 5, 10, 15)):
+        ts = f"2026-10-25T08:{minute:02d}:00Z"
+        _snapshot(con, ts, 100 + index * .1, 50, 1000, 2000, 3000)
+        con.execute("DELETE FROM measurements WHERE ts_utc=? AND device_id IN (3,4)", (ts,))
+    con.execute("""
+        CREATE TABLE goodwe_sems_curve_15m (
+            slot_start_utc TEXT PRIMARY KEY, source_day_local TEXT NOT NULL,
+            energy_kwh REAL NOT NULL, coverage_seconds INTEGER NOT NULL,
+            fetched_at_utc TEXT NOT NULL
+        )
+    """)
+    con.execute("""
+        INSERT INTO goodwe_sems_curve_15m VALUES
+        ('2026-10-25T08:00:00+00:00','2026-10-25',0.45,720,
+         '2026-10-25T09:00:00+00:00')
+    """)
+    con.commit()
+    con.close()
+
+    assert _load().build(db)["rows"] == 3
+    with sqlite3.connect(db) as con:
+        rows = con.execute("""
+            SELECT import_kwh, pv_goodwe4200_kwh, pv_goodwe2000_kwh,
+                   pv_goodwe_sems_kwh, pv_total_kwh, house_kwh,
+                   p1_quality, pv_quality
+            FROM house_energy_intervals
+        """).fetchall()
+    for imp, gw42, gw20, sems, pv, house, p1q, pvq in rows:
+        assert abs(imp - .1) < 1e-8
+        assert gw42 is None and gw20 is None and sems is None
+        assert pv is None and house is None
+        assert p1q == "observed" and pvq == "gap"

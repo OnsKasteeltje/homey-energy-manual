@@ -876,11 +876,16 @@ def history_resource(kind, value):
     start_utc, end_utc = _utc_text(start_local), _utc_text(end_local)
 
     with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
+        columns = {row[1] for row in db.execute("PRAGMA table_info(house_energy_intervals)")}
+        # Read-only API remains compatible before the first builder migration.
+        sems_sql = ("pv_goodwe_sems_kwh" if "pv_goodwe_sems_kwh" in columns
+                    else "NULL AS pv_goodwe_sems_kwh")
         rows = db.execute(
-            """
+            f"""
             SELECT start_ts_utc,end_ts_utc,duration_seconds,import_kwh,export_kwh,
                    pv_solaredge_kwh,pv_goodwe4200_kwh,pv_goodwe2000_kwh,
-                   pv_total_kwh,house_kwh,quality,discontinuity_reason
+                   pv_total_kwh,house_kwh,quality,discontinuity_reason,
+                   {sems_sql}
             FROM house_energy_intervals
             WHERE end_ts_utc > ? AND start_ts_utc < ?
             ORDER BY end_ts_utc
@@ -890,7 +895,7 @@ def history_resource(kind, value):
 
     fields = (
         "importKWh", "exportKWh", "pvSolarEdgeKWh", "pvGoodWe4200KWh",
-        "pvGoodWe2000KWh", "pvKWh", "houseKWh",
+        "pvGoodWe2000KWh", "pvGoodWeSemsKWh", "pvKWh", "houseKWh",
     )
     buckets = {}
     if bucket_kind == "hour":
@@ -917,6 +922,8 @@ def history_resource(kind, value):
             }
             cursor = nxt
 
+    seen_by_bucket = {key: set() for key in buckets}
+    pv_unknown_buckets = set()
     valid_seconds = 0
     gaps = 0
     discontinuities = 0
@@ -926,7 +933,7 @@ def history_resource(kind, value):
     column_map = {
         "importKWh": 3, "exportKWh": 4, "pvSolarEdgeKWh": 5,
         "pvGoodWe4200KWh": 6, "pvGoodWe2000KWh": 7,
-        "pvKWh": 8, "houseKWh": 9,
+        "pvKWh": 8, "houseKWh": 9, "pvGoodWeSemsKWh": 12,
     }
 
     for row in rows:
@@ -960,6 +967,8 @@ def history_resource(kind, value):
             key = _utc_text(bucket_local)
             bucket = buckets.get(key)
             if bucket is not None:
+                if quality != "discontinuity" and (row[8] is None or row[9] is None):
+                    pv_unknown_buckets.add(key)
                 if quality == "gap":
                     bucket["gapCount"] += 1
                 if quality == "discontinuity":
@@ -973,14 +982,21 @@ def history_resource(kind, value):
                             amount = float(value_num) * fraction
                             bucket[name] += amount
                             totals[name] += amount
+                            seen_by_bucket[key].add(name)
             segment_start = segment_end
 
     requested_seconds = (end_local.astimezone(timezone.utc) - start_local.astimezone(timezone.utc)).total_seconds()
     series = []
-    for bucket in buckets.values():
+    for key, bucket in buckets.items():
         item = dict(bucket)
         for name in fields:
-            item[name] = round(item[name], 6)
+            if (name in ("pvGoodWe4200KWh", "pvGoodWe2000KWh",
+                         "pvGoodWeSemsKWh") and name not in seen_by_bucket[key]):
+                item[name] = None
+            elif name in ("pvKWh", "houseKWh") and key in pv_unknown_buckets:
+                item[name] = None
+            else:
+                item[name] = round(item[name], 6)
         bucket_start = datetime.fromisoformat(item["start"])
         bucket_end = datetime.fromisoformat(item["end"])
         bucket_seconds = (bucket_end.astimezone(timezone.utc) - bucket_start.astimezone(timezone.utc)).total_seconds()
@@ -994,7 +1010,15 @@ def history_resource(kind, value):
             "start": start_local.isoformat(), "end": end_local.isoformat(),
             "bucket": bucket_kind,
         },
-        "summary": {name: round(value_num, 6) for name, value_num in totals.items()},
+        "summary": {
+            name: (None if name in ("pvKWh", "houseKWh") and pv_unknown_buckets
+                   else None if name in ("pvGoodWe4200KWh",
+                                         "pvGoodWe2000KWh",
+                                         "pvGoodWeSemsKWh")
+                   and not any(name in seen for seen in seen_by_bucket.values())
+                   else round(value_num, 6))
+            for name, value_num in totals.items()
+        },
         "series": series,
         "quality": {
             "coverage": round(min(1.0, valid_seconds / requested_seconds), 6),
@@ -1710,10 +1734,20 @@ def pv_flex_analysis_resource(value):
 
     for key, item in slots.items():
         actual = item["actual"]
+        # Missing PV is not zero, even when P1 import/export is available.
+        if pv_covered_seconds[key] < 899.0:
+            actual["pvKWh"] = None
+            actual["houseKWh"] = None
+        if p1_covered_seconds[key] < 899.0:
+            actual["houseKWh"] = None
         # Energy-balance definition: PV production not exported in this slot.
         # Keep the signed balance here; clamp only the reported daily direct-use
         # KPI after aggregation so interval-level metering noise cannot inflate it.
-        actual["pvSelfConsumedKWh"] = actual["pvKWh"] - actual["exportKWh"] if pv_covered_seconds[key] >= 899.0 and p1_covered_seconds[key] >= 899.0 else None
+        actual["pvSelfConsumedKWh"] = (
+            actual["pvKWh"] - actual["exportKWh"]
+            if actual["pvKWh"] is not None and p1_covered_seconds[key] >= 899.0
+            else None
+        )
         actual["p1Coverage"] = min(1.0, p1_covered_seconds[key] / 900.0)
         actual["pvCoverage"] = min(1.0, pv_covered_seconds[key] / 900.0)
         actual["coverage"] = min(actual["p1Coverage"], actual["pvCoverage"])
@@ -1848,7 +1882,7 @@ def pv_flex_analysis_resource(value):
 
     series = list(slots.values())
     totals = {
-        name: round(sum(slot["actual"][name] for slot in series), 6)
+        name: round(sum(slot["actual"][name] or 0.0 for slot in series), 6)
         for name in ("pvKWh", "houseKWh", "importKWh", "exportKWh")
     }
     # Daily KPI is independent of historical planner availability and forecast.
