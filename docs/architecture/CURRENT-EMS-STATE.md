@@ -8,6 +8,35 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### Evaluatie dagrapport — bronafhankelijke dekking (25 oktober 2026)
+
+After production acceptance of GoodWe SEMS+ canonical history and quarter
+splitting, Evaluatie day-to-date KPIs previously remained all NULL because a
+single 95% *paired* P1/PV coverage threshold included unattended overnight
+PV evidence as unknown. The unchanged strict status
+`INSUFFICIENT_EVIDENCE` must never imply a whole-day total, but should not
+discard independently reliable data.
+
+The existing read-only provisional daily resource now gates closed P1
+import/export slots **independently** of PV coverage; P1 day-to-date values
+require >=95% of elapsed evidence and >=2 observed quarters. It exposes a
+clearly scoped partial PV-production sum from >=2 valid PV quarters even
+when overall coverage is below 95%. PV self-use and its percentage derive
+only from the same >=2 paired high-quality P1/PV quarters; they are
+explicitly labelled measured-subset figures, never whole-day values when
+paired coverage is incomplete. Unmeasured night PV remains UNKNOWN, not
+inferred 0. Separate P1, PV and paired coverage are reported, and
+`INSUFFICIENT_EVIDENCE` remains the response status when paired day-to-date
+coverage is under 95%. A one-quarter-only source cannot claim a subtotal.
+Archived completed-day evaluation remains unchanged.
+
+The GoodWe raw cloud endpoint remains independent SHADOW observation,
+`eligibleForHouseBalance=false`; only the separately validated and
+stored 900-second SEMS+ curve is canonical for historical P1/PV accounting
+from 25 Oct cutover. The old frontend texts claiming SEMS+ is not yet in
+house balance were stale and have been corrected. No impact on P1 control,
+the history source builder, EMS actions or planner.
+
 ### SEMS+ canonical history — UTC quarter boundary alignment (25 October 2026)
 
 The Pi production acceptance of the combined GoodWe SEMS+ source confirmed
