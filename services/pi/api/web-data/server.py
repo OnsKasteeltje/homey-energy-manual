@@ -876,12 +876,16 @@ def history_resource(kind, value):
     start_utc, end_utc = _utc_text(start_local), _utc_text(end_local)
 
     with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True) as db:
+        columns = {row[1] for row in db.execute("PRAGMA table_info(house_energy_intervals)")}
+        # Read-only API remains compatible before the first builder migration.
+        sems_sql = ("pv_goodwe_sems_kwh" if "pv_goodwe_sems_kwh" in columns
+                    else "NULL AS pv_goodwe_sems_kwh")
         rows = db.execute(
-            """
+            f"""
             SELECT start_ts_utc,end_ts_utc,duration_seconds,import_kwh,export_kwh,
                    pv_solaredge_kwh,pv_goodwe4200_kwh,pv_goodwe2000_kwh,
                    pv_total_kwh,house_kwh,quality,discontinuity_reason,
-                   pv_goodwe_sems_kwh
+                   {sems_sql}
             FROM house_energy_intervals
             WHERE end_ts_utc > ? AND start_ts_utc < ?
             ORDER BY end_ts_utc
