@@ -91,6 +91,32 @@ Quarter-hour PV/Flex energy still derives from old Homey counters; do NOT
 redistribute quantized/late SEMS+ deltas into these slots or mix their
 absolute baseline with Homey. P1/SolarEdge, home energy accounting, EV
 and all control consumers are unchanged pending the source-timing gate.
+## Historical SEMS+ minute power curve (SHADOW, 25 October 2026)
+
+The **same** existing 15-minute collector queries the SEMS+ historical
+`pSystem` station curve once per run. This is a separate source from the
+live `eday`/`etotal` counters. `pSystem` comes back in kW at local minute
+timestamps (`tp`), and the code integrates observed segments into UTC
+quarter-hour energy. Only completed quarters with at least 12 minutes of
+observed-segment coverage are retained, in the existing
+`ems-history.sqlite.goodwe_sems_curve_15m` table. Missing minutes or DST
+ambiguous local timestamps are never treated as zero. No local GoodWe
+connection, new database, timer, web endpoint, Python dependency or
+physical write is required.
+
+Existing read-only Evaluatie GoodWe API returns a
+`historicalQuarterEvidence` object showing quality-gated quarters and
+the sum over **covered** quarters only. It does NOT alter
+`house_energy_intervals` or canonical PV/house balance yet. Only after
+Pi-side acceptance can a separate controlled accounting cutover replace
+the broken Homey GoodWe history; P1 control never uses this cloud source.
+An optional one-time `--curve-day YYYY-MM-DD` permits an explicit
+historic backfill with this same collector, with existing credentials.
+
+The rate is one extra historical HTTP request + authentication per normal
+15-minute collector run. If SEMS+ rejects the request, the existing live
+counter path remains operational, and only historical evidence is missing.
+
 ## Optional setup (after draft PR review and merge only)
 
 **No git pull or standard EMS deploy starts this service.** Nothing in the
