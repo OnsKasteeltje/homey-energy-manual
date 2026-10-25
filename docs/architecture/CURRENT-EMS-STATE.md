@@ -8,6 +8,38 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### SEMS+ canonical history — UTC quarter boundary alignment (25 October 2026)
+
+The Pi production acceptance of the combined GoodWe SEMS+ source confirmed
+complete 12:30–12:45 local GoodWe evidence (900/900 seconds) but the existing
+P1 interval 12:44:00.068–12:46:00.072 crossed the 12:45 boundary into a
+cloud quarter not yet complete. Previously the entire interval was marked
+PV-unknown, causing only 93.34% PV coverage for 12:30–12:45 despite
+fully covered SEMS+ energy.
+
+The existing `build_house_energy_history.py` now splits **only** valid
+post-cutover cumulative-counter intervals crossing a UTC 15-minute
+boundary. It preserves the original raw endpoints; inserts a synthetic,
+millisecond-Z boundary into the same `house_energy_intervals` table;
+divides the existing P1 import/export and SolarEdge counter deltas by
+actual elapsed seconds (including subsecond fractions), preserving the
+total without duplication; and obtains each slice's GoodWe kWh from
+**its own** 900-second-complete SEMS+ quarter. A slice with no eligible
+GoodWe quarter has NULL PV/house but retains independently valid P1
+import/export. Once the missing subsequent quarter becomes complete,
+the next transactional rebuild fills only its own slice. Earlier Homey
+history, discontinuities, held/estimated and non-normal-gap handling
+remain unchanged. No backfill, second service, cloud requests,
+database or changes to real-time P1 control, Homey or actuators.
+
+Placement/validation: existing Pi history builder and its integration
+tests remain in their established architecture-owned paths.
+Relocating the active `ems-history-15m.service` entry point during
+this low-risk boundary bugfix would create unrelated deployment risk.
+One targeted regression exercises the actual boundary, conservation
+of P1/SolarEdge energy, the missing-next-quarter NULL invariant and
+the later idempotent rebuild.
+
 ### GoodWe historical source cutover — canonical accounting (25 October 2026)
 
 Following verified 2026-10-24 full-day (SEMS+ minute-curve 9.76 kWh vs
