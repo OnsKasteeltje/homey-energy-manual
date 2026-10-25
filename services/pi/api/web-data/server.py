@@ -1231,11 +1231,11 @@ def daily_pv_self_use_accounting(pv_kwh, export_kwh, paired_seconds, expected_se
 
 
 def provisional_daily_report_resource(value, series, paired_seconds_by_slot, now_utc=None):
-    """Read-only cumulative accounting through the last closed, paired 15m slot.
+    """Provisional *measured-window* accounting, independently quality-gated.
 
-    An open quarter, unpaired P1/PV interval or a gap in today's historical
-    evidence cannot silently contribute to the subtotal. Missing coverage is
-    reported rather than extrapolated. Completed-day archive is unchanged.
+    Today's P1 and PV subtotals have separate evidence scopes. Own use and
+    self-use percentage use only quarters with paired P1 + PV readings.
+    Unobserved overnight SEMS+ quarters never become invented zero PV.
     """
     now_utc = now_utc or datetime.now(timezone.utc)
     if value != now_utc.astimezone(LOCAL_TZ).date().isoformat():
@@ -1243,68 +1243,109 @@ def provisional_daily_report_resource(value, series, paired_seconds_by_slot, now
 
     local_start = datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=LOCAL_TZ)
     day_start = local_start.astimezone(timezone.utc)
-    valid_slots = []
+    p1_slots, pv_slots, paired_slots = [], [], []
+    latest_closed = None
+
+    def valid_energy(*values):
+        return all(
+            isinstance(x, (int, float)) and not isinstance(x, bool)
+            and math.isfinite(x) and x >= 0 for x in values
+        )
+
     for slot in series:
         start = parse_timestamp(slot.get("start"))
         end = parse_timestamp(slot.get("end"))
         if start is None or end is None or end <= start or end > now_utc:
             continue
         seconds = (end - start).total_seconds()
-        actual = slot.get("actual") or {}
-        values = (actual.get("pvKWh"), actual.get("importKWh"),
-                  actual.get("exportKWh"))
-        if not all(isinstance(x, (int, float)) and math.isfinite(x) and x >= 0
-                   for x in values):
+        if seconds < 899:
             continue
+        actual = slot.get("actual") or {}
         p1 = actual.get("p1Coverage")
         pv = actual.get("pvCoverage")
-        paired = max(0.0, min(seconds,
-                     paired_seconds_by_slot.get(_utc_text(start), 0.0)))
-        if (isinstance(p1, (int, float)) and p1 >= 0.95
-                and isinstance(pv, (int, float)) and pv >= 0.95
-                and paired >= seconds * 0.95):
-            valid_slots.append((slot, end, paired))
+        p1_ok = (
+            isinstance(p1, (int, float)) and not isinstance(p1, bool)
+            and p1 >= 0.95
+            and valid_energy(actual.get("importKWh"), actual.get("exportKWh"))
+        )
+        pv_ok = (
+            isinstance(pv, (int, float)) and not isinstance(pv, bool)
+            and pv >= 0.95 and valid_energy(actual.get("pvKWh"))
+        )
+        if p1_ok:
+            p1_slots.append((slot, end, seconds * min(1.0, p1)))
+        if pv_ok:
+            pv_slots.append((slot, end, seconds * min(1.0, pv)))
+        paired = max(0.0, min(seconds, paired_seconds_by_slot.get(_utc_text(start), 0.0)))
+        if p1_ok and pv_ok and paired >= seconds * 0.95:
+            paired_slots.append((slot, end, paired))
+        if p1_ok or pv_ok:
+            latest_closed = max(latest_closed, end) if latest_closed else end
 
-    through = max((end for _, end, _ in valid_slots), default=None)
-    selected = [entry for entry in valid_slots if entry[1] <= through] if through else []
+    through = latest_closed
     window_seconds = (through - day_start).total_seconds() if through else 0.0
-    paired_seconds = sum(entry[2] for entry in selected)
-    coverage = (min(1.0, paired_seconds / window_seconds)
+
+    def coverage(rows):
+        return (min(1.0, sum(entry[2] for entry in rows) / window_seconds)
                 if window_seconds > 0 else 0.0)
-    trustworthy = window_seconds >= 1800 and coverage >= 0.95
+
+    p1_coverage = coverage(p1_slots)
+    pv_coverage = coverage(pv_slots)
+    paired_coverage = coverage(paired_slots)
+    enough_time = window_seconds >= 1800
+    p1_trustworthy = enough_time and len(p1_slots) >= 2 and p1_coverage >= 0.95
+    pv_measured = enough_time and len(pv_slots) >= 2
+    paired_measured = enough_time and len(paired_slots) >= 2
+    # Full provisional status retains its old strict day-to-date meaning;
+    # partial *measured* values below do not inherit that claim.
+    trustworthy = enough_time and paired_coverage >= 0.95
+
     accounting = {
         "gridImportKWh": None, "gridExportKWh": None,
         "pvProducedKWh": None, "pvSelfConsumedKWh": None,
-        "pvSelfConsumptionRate": None, "pairedCoverage": round(coverage, 6),
+        "pvSelfConsumptionRate": None,
+        "pairedCoverage": round(paired_coverage, 6),
     }
-    notes = []
-    if trustworthy:
-        pv_kwh = round(sum(item["actual"]["pvKWh"] for item, _, _ in selected), 6)
-        import_kwh = round(sum(item["actual"]["importKWh"] for item, _, _ in selected), 6)
-        export_kwh = round(sum(item["actual"]["exportKWh"] for item, _, _ in selected), 6)
-        own_use = daily_pv_self_use_accounting(
-            pv_kwh, export_kwh, paired_seconds, window_seconds, False,
+    if p1_trustworthy:
+        accounting["gridImportKWh"] = round(
+            sum(s["actual"]["importKWh"] for s, _, _ in p1_slots), 6
         )
-        accounting.update({
-            "gridImportKWh": import_kwh,
-            "gridExportKWh": export_kwh,
-            "pvProducedKWh": pv_kwh,
-            "pvSelfConsumedKWh": own_use["selfConsumedKWh"],
-            "pvSelfConsumptionRate": own_use["rate"],
-        })
-        notes.append("Voorlopig subtotaal uit afgesloten kwartieren; geen schatting of prognose.")
-        if coverage < 1.0:
-            notes.append(f"Niet alle metingen volledig: {coverage:.1%} gekoppelde P1/PV-dekking.")
-        if own_use["status"] == "INVALID_ENERGY_BALANCE":
-            notes.append("PV-export overschrijdt de gemeten PV-productie; zelfverbruik niet berekend.")
-        elif own_use["status"] == "NO_PV_PRODUCTION":
-            notes.append("Nog geen aantoonbare PV-productie; zelfverbruikpercentage niet beschikbaar.")
-    else:
+        accounting["gridExportKWh"] = round(
+            sum(s["actual"]["exportKWh"] for s, _, _ in p1_slots), 6
+        )
+    if pv_measured:
+        accounting["pvProducedKWh"] = round(
+            sum(s["actual"]["pvKWh"] for s, _, _ in pv_slots), 6
+        )
+    if paired_measured:
+        paired_pv = sum(s["actual"]["pvKWh"] for s, _, _ in paired_slots)
+        paired_export = sum(s["actual"]["exportKWh"] for s, _, _ in paired_slots)
+        paired_seconds = sum(entry[2] for entry in paired_slots)
+        scoped = daily_pv_self_use_accounting(
+            paired_pv, paired_export, paired_seconds, paired_seconds, False
+        )
+        accounting["pvSelfConsumedKWh"] = scoped["selfConsumedKWh"]
+        accounting["pvSelfConsumptionRate"] = scoped["rate"]
+
+    notes = [
+        "Voorlopige cijfers over betrouwbaar gemeten kwartieren; "
+        "ontbrekende uren zijn onbekend, niet 0 kWh.",
+        f"P1-dekking: {p1_coverage:.1%}; PV-dekking: {pv_coverage:.1%}; "
+        f"gekoppeld P1/PV: {paired_coverage:.1%} van de verstreken dag.",
+    ]
+    if pv_measured and not trustworthy:
+        notes.append("PV-productie is alleen het gemeten deeltotaal, geen dagtotaal.")
+    if paired_measured:
         notes.append(
-            "Onvoldoende aaneengesloten P1/PV-meetbewijs tot het laatste berekende kwartier; "
-            "subtotaal verborgen om een onvolledig dagbeeld te voorkomen."
-            if through else "Nog geen afgesloten kwartier met voldoende P1- en PV-meetbewijs."
+            "Eigen PV-gebruik en zelfverbruikpercentage gelden uitsluitend "
+            "voor gekoppelde P1/PV-kwartieren, niet voor de hele dag."
         )
+    if not p1_trustworthy:
+        notes.append("P1-dagtotaal verborgen: minder dan 95% dekking van verstreken uren.")
+    if not pv_measured:
+        notes.append("PV-productie verborgen: nog minder dan twee betrouwbaar gemeten kwartieren.")
+    if not paired_measured:
+        notes.append("Eigen PV-gebruik verborgen: onvoldoende gekoppelde P1/PV-kwartieren.")
 
     return {
         "schema": DAILY_PERFORMANCE_API_SCHEMA,
@@ -1313,11 +1354,13 @@ def provisional_daily_report_resource(value, series, paired_seconds_by_slot, now
         "readOnly": True, "controlWrites": False,
         "throughLocal": through.astimezone(LOCAL_TZ).isoformat() if through else None,
         "accounting": accounting,
-        "quality": {"pairedCoverage": round(coverage, 6)},
+        "quality": {
+            "pairedCoverage": round(paired_coverage, 6),
+            "p1Coverage": round(p1_coverage, 6),
+            "pvCoverage": round(pv_coverage, 6),
+        },
         "lines": notes,
     }
-
-
 
 
 def goodwe_daily_counter_resource(value):
