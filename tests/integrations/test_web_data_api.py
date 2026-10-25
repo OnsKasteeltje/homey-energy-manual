@@ -270,6 +270,33 @@ class HistoryResourceTest(unittest.TestCase):
         self.assertEqual(result["quality"]["discontinuityCount"], 1)
         self.assertLess(result["quality"]["coverage"], 1.0)
 
+    def test_sems_source_is_combined_and_missing_pv_is_not_zero(self):
+        path = self.make_db([
+            ("2026-10-25T08:00:00Z", "2026-10-25T08:05:00Z", 300,
+             .1, 0, .01, None, None, .16, .26, "estimated", None),
+            ("2026-10-25T08:05:00Z", "2026-10-25T08:10:00Z", 300,
+             .1, 0, .01, None, None, None, None, "observed", None),
+        ])
+        with sqlite3.connect(path) as db:
+            db.execute("ALTER TABLE house_energy_intervals ADD COLUMN pv_goodwe_sems_kwh REAL")
+            db.execute("""
+                UPDATE house_energy_intervals SET pv_goodwe_sems_kwh=.15
+                WHERE end_ts_utc='2026-10-25T08:05:00Z'
+            """)
+        server.HISTORY_DB = path
+        result = server.history_resource("day", "2026-10-25")
+        matching = [x for x in result["series"]
+                    if x["start"].startswith("2026-10-25T09:00")]
+        assert len(matching) == 1
+        hour = matching[0]
+        self.assertAlmostEqual(hour["pvGoodWeSemsKWh"], .15)
+        self.assertIsNone(hour["pvGoodWe4200KWh"])
+        self.assertIsNone(hour["pvGoodWe2000KWh"])
+        self.assertIsNone(hour["pvKWh"])
+        self.assertIsNone(hour["houseKWh"])
+        self.assertAlmostEqual(hour["importKWh"], .2)
+        self.assertIsNone(result["summary"]["pvKWh"])
+
     def test_week_uses_monday_as_local_calendar_start(self):
         server.HISTORY_DB = self.make_db([])
         result = server.history_resource("week", "2026-09-19")
