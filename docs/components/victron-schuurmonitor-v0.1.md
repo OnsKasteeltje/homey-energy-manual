@@ -6,7 +6,7 @@ The Victron VM-3P75CT is attached to the Cerbo GX over LAN (Modbus/UDP);
 the Raspberry Pi reads the Cerbo GX **Modbus TCP server** only.
 
 ## Known physical quality issue (1 November 2026)
-L1 and L3 were checked and are useful; the L2 measurement is known faulty
+L1 and L3 power readings were checked and are useful; the L2 measurement is known faulty
 and will be physically inspected next weekend. Do not publish 3-phase
 total power, import/export, derived consumption, or any battery/EV control
 from this meter until L2 is corrected and the full phase/direction test passes.
@@ -25,9 +25,15 @@ The candidate does not access or change the Pi planner, P1, canonical
    authenticated/encrypted; do not expose TCP/502 to the internet.
 
 The AC-load map uses holding-register function 03, addresses 3900..3902
-for phase powers (signed W), 3903..3905 for signed phase currents
-(scale 0.1 A), subject to comparison with the current official Victron
-register list and a real-device readback. The meter's own Ethernet
+for signed phase powers (W). The original prototype interpreted 3903..3905
+as currents at scale 0.1 but a live read on 2026-11-01 returned clearly
+implausible 1851.3 A (L1) and 1336.3 A (L3). The GX device GUI itself
+shows plausible currents (L1 8.1 A, L2 2.5 A, L3 6.6 A); this is a
+**collector register/scale interpretation issue**, NOT evidence that the GX
+is showing excessive currents. Revision 2 therefore does not query currents
+or store their values. All currentA fields are null with quality UNVERIFIED
+except known-bad L2. Future work may validate against the official Victron
+register workbook and synchronized GUI samples; do not guess an alternate scale. The meter's own Ethernet
 connection is Modbus/UDP; don't accidentally target it on TCP port 502.
 
 ## Dry-run on the Pi (no writes anywhere)
@@ -42,8 +48,11 @@ python3 services/pi/integrations/victron/schuur_monitor.py \
   --host "$CERBO_IP" --unit-id "$ACLOAD_UNIT_ID"
 ```
 
-Compare L1 and L3 reported power/current with the Cerbo UI at the
-same instant. Check sign direction with EV charge and high shed PV.
+Compare L1 and L3 reported **power** with the Cerbo UI at the
+same instant. Phase currents are explicitly unknown until separately
+validated. The screenshot at ~15:13 local had L1=1876W/8.1A,
+L2=108W/2.5A/PF=0.182 (not accepted), L3=1531W/6.6A/PF=-0.995.
+The negative L3 PF should receive a dedicated sign/direction check. Check sign direction with EV charge and high shed PV.
 L2 remains unavailable even when a number comes back from the meter.
 
 ## Optional private shadow data collection (after successful dry-run)
@@ -54,8 +63,8 @@ python3 services/pi/integrations/victron/schuur_monitor.py \
   --json-out /home/jeroen/ems/data/victron-schuur-current.json
 ```
 
-This stores only L1/L3 power and current in an independent SQLite file
-and a private JSON snapshot. There is no L2 column and no valid total.
+This stores only L1/L3 **power** in an independent SQLite file
+and a private JSON snapshot. Currents remain explicitly null. There is no L2 column and no valid total.
 The script fails visibly if Modbus is unreachable; no stale snapshot is
 silently treated as fresh. A future consumer must gate on timestamp
 freshness, quality, and both eligibleFor... flags.
