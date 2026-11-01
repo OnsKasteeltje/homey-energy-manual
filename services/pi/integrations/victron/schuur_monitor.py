@@ -19,7 +19,7 @@ import tempfile
 
 
 REGISTER_START = 3900  # com.victronenergy.acload: L1/L2/L3 power
-REGISTER_COUNT = 3     # power only: L1/L2/L3; current mapping not commissioned
+REGISTER_COUNT = 16    # 3900..3915; includes serial 3903..3909 (never decoded as current)
 MODBUS_PORT = 502
 MAX_PDU_LENGTH = 253
 
@@ -35,7 +35,7 @@ def receive_exact(sock: socket.socket, count: int) -> bytes:
 
 
 def read_registers(host: str, unit_id: int, timeout: float = 3.0) -> tuple[int, ...]:
-    """Read only: function code 03, registers 3900..3905. No Modbus writes."""
+    """Read only: function code 03, registers 3900..3915. No Modbus writes."""
     request = struct.pack(">HHHBBHH", 1, 0, 6, unit_id, 3, REGISTER_START, REGISTER_COUNT)
     with socket.create_connection((host, MODBUS_PORT), timeout=timeout) as sock:
         sock.settimeout(timeout)
@@ -60,10 +60,16 @@ def signed16(raw: int) -> int:
 
 def snapshot(registers: tuple[int, ...], unit_id: int, observed_at: str | None = None) -> dict:
     if len(registers) != REGISTER_COUNT:
-        raise ValueError("Exactly three power registers are required")
+        raise ValueError("Exactly 16 AC-load registers are required")
     at = observed_at or datetime.now(timezone.utc).isoformat(timespec="milliseconds")
-    # Keep signed phase power. Never infer current from uncommissioned registers.
-    watts = [signed16(x) for x in registers]
+    # 3900..3902 = phase powers (W).
+    # 3903..3909 = 7 Modbus words of serial number ("HQ..." on this device).
+    # 3910, 3912, 3914 = voltage, scale 10.
+    # 3911, 3913, 3915 = signed current, scale 10.
+    # All current values are diagnostic only until compared with the GX UI.
+    watts = [signed16(x) for x in registers[0:3]]
+    volts = [registers[i] / 10 for i in (10, 12, 14)]
+    amps = [signed16(registers[i]) / 10 for i in (11, 13, 15)]
     return {
         "schema": "EMS_VICTRON_SCHUUR_SHADOW_V0.1",
         "observedAtUtc": at,
@@ -73,9 +79,9 @@ def snapshot(registers: tuple[int, ...], unit_id: int, observed_at: str | None =
         "eligibleForHouseBalance": False,
         "quality": "PARTIAL_L2_INVALID",
         "phases": {
-            "L1": {"powerW": watts[0], "currentA": None, "currentQuality": "UNVERIFIED", "quality": "OBSERVED"},
-            "L2": {"powerW": None, "currentA": None, "currentQuality": "INVALID_PENDING_REPAIR", "quality": "INVALID_PENDING_REPAIR"},
-            "L3": {"powerW": watts[2], "currentA": None, "currentQuality": "UNVERIFIED", "quality": "OBSERVED"},
+            "L1": {"powerW": watts[0], "voltageV": volts[0], "currentA": amps[0], "currentQuality": "PENDING_GUI_COMPARISON", "quality": "OBSERVED"},
+            "L2": {"powerW": None, "voltageV": None, "currentA": None, "currentQuality": "INVALID_PENDING_REPAIR", "quality": "INVALID_PENDING_REPAIR"},
+            "L3": {"powerW": watts[2], "voltageV": volts[2], "currentA": amps[2], "currentQuality": "PENDING_GUI_COMPARISON", "quality": "OBSERVED"},
         },
         "totals": {"powerW": None, "importKWh": None, "exportKWh": None,
                    "quality": "INVALID_INCOMPLETE_PHASES"},
