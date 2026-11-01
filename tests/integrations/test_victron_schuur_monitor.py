@@ -41,21 +41,23 @@ class FakeSocket:
 
 class SchuurMonitorTests(unittest.TestCase):
     def test_read_only_modbus_function_and_registers(self):
-        values = (250, 0xFF9C, 150, 30, 20, 10)
-        pdu = bytes((3, 12)) + struct.pack(">6H", *values)
+        values = (250, 0xFF9C, 150)
+        pdu = bytes((3, 6)) + struct.pack(">3H", *values)
         response = struct.pack(">HHHB", 1, 0, len(pdu) + 1, 40) + pdu
         fake = FakeSocket(response)
         with patch.object(module.socket, "create_connection", return_value=fake):
             self.assertEqual(module.read_registers("192.0.2.1", 40), values)
-        self.assertEqual(fake.request, struct.pack(">HHHBBHH", 1, 0, 6, 40, 3, 3900, 6))
-        self.assertNotIn(bytes((6,)), fake.request[7:9])  # never Modbus write FC06
+        self.assertEqual(fake.request, struct.pack(">HHHBBHH", 1, 0, 6, 40, 3, 3900, 3))
+        self.assertEqual(fake.request[7], 3)  # FC03 only, no Modbus write
 
     def test_l2_fail_closed_even_if_meter_reports_value(self):
         state = module.snapshot(
-            (250, 500, 150, 30, 70, 10), 40, "2026-11-01T13:00:00+00:00"
+            (250, 500, 150), 40, "2026-11-01T13:00:00+00:00"
         )
         self.assertEqual(state["phases"]["L1"]["powerW"], 250)
-        self.assertEqual(state["phases"]["L3"]["currentA"], 1.0)
+        self.assertIsNone(state["phases"]["L1"]["currentA"])
+        self.assertIsNone(state["phases"]["L3"]["currentA"])
+        self.assertEqual(state["phases"]["L1"]["currentQuality"], "UNVERIFIED")
         self.assertIsNone(state["phases"]["L2"]["powerW"])
         self.assertIsNone(state["phases"]["L2"]["currentA"])
         self.assertIsNone(state["totals"]["powerW"])
@@ -70,7 +72,7 @@ class SchuurMonitorTests(unittest.TestCase):
                 module.read_registers("192.0.2.1", 40)
 
     def test_sqlite_shadow_idempotent_and_no_l2_field(self):
-        state = module.snapshot((250, 500, 150, 30, 70, 10), 40,
+        state = module.snapshot((250, 500, 150), 40,
                                 "2026-11-01T13:00:00+00:00")
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "shadow.sqlite"
@@ -84,6 +86,7 @@ class SchuurMonitorTests(unittest.TestCase):
                     row[1] for row in db.execute("PRAGMA table_info(victron_schuur_samples)")
                 ]
                 self.assertFalse(any("l2" in col for col in columns))
+                self.assertFalse(any("current" in col for col in columns))
 
 
 if __name__ == "__main__":
