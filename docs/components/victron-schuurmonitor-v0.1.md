@@ -66,6 +66,30 @@ L2=108W/2.5A/PF=0.182 (not accepted), L3=1531W/6.6A/PF=-0.995.
 The negative L3 PF should receive a dedicated sign/direction check. Check sign direction with EV charge and high shed PV.
 L2 remains unavailable even when a number comes back from the meter.
 
+
+## Live GUI comparison — 2026-11-01 (mapping evidence)
+
+Pi sampled 15:25:42 CET: L1 232.2 V / 8.4 A / 1944 W,
+L3 232.3 V / 7.1 A / 1657 W. Cerbo GX screenshot approximately
+15:28:48 CET: L1 233 V / 8.1 A / 1885 W / PF +0.997,
+L2 232 V / 2.7 A / 115 W / PF +0.184 (INVALID_PENDING_REPAIR),
+L3 233 V / 7.2 A / 1676 W / PF -0.996.
+
+Interpretation: differences are consistent with several minutes of changing
+load and display rounding. The 3911/3915 current register decoding is
+plausible and matches the independent GX GUI scale; this is **not** a
+second-exact synchronized acceptance test. L1/L3 V, A, W mapping has
+sufficient evidence for manual diagnostics only; no automatic archiving
+or EMS promotion yet, pending the physical L2 correction and sign test.
+
+PF sign: Victron documents **IEEE** power-factor sign convention.
+Under that convention negative PF can describe **lagging/inductive**
+reactive behavior even when active power is positive. It is *not by
+itself* proof of CT reversal or export. Verify feeder direction from
+power and forward/reversed energy changes under known load/PV conditions.
+Refs: Victron VM-3P75CT Configuration & Monitoring; Schneider Electric
+FAQ FA212521 on IEEE/IEC PF sign conventions.
+
 ## Optional private shadow data collection (after successful dry-run)
 ```bash
 python3 services/pi/integrations/victron/schuur_monitor.py \
