@@ -39,30 +39,48 @@ class FakeSocket:
         return data
 
 
+def fake_registers():
+    # 3900..3902 power; 3903..3909 serial; 3910..3915 V/I alternating.
+    # Previous bug interpreted ASCII "HQ" (0x4851 = 18513) as 1851.3 A.
+    return (
+        1879, 108, 1480,
+        0x4851, 0x3235, 0x3433, 0x4652, 0x5546, 0x4100, 0,
+        2330, 81, 2310, 25, 2330, 66,
+    )
+
+
 class SchuurMonitorTests(unittest.TestCase):
     def test_read_only_modbus_function_and_registers(self):
-        values = (250, 0xFF9C, 150)
-        pdu = bytes((3, 6)) + struct.pack(">3H", *values)
+        values = fake_registers()
+        pdu = bytes((3, 32)) + struct.pack(">16H", *values)
         response = struct.pack(">HHHB", 1, 0, len(pdu) + 1, 40) + pdu
         fake = FakeSocket(response)
         with patch.object(module.socket, "create_connection", return_value=fake):
             self.assertEqual(module.read_registers("192.0.2.1", 40), values)
-        self.assertEqual(fake.request, struct.pack(">HHHBBHH", 1, 0, 6, 40, 3, 3900, 3))
+        self.assertEqual(fake.request, struct.pack(">HHHBBHH", 1, 0, 6, 40, 3, 3900, 16))
         self.assertEqual(fake.request[7], 3)  # FC03 only, no Modbus write
 
     def test_l2_fail_closed_even_if_meter_reports_value(self):
         state = module.snapshot(
-            (250, 500, 150), 40, "2026-11-01T13:00:00+00:00"
+            fake_registers(), 40, "2026-11-01T13:00:00+00:00"
         )
-        self.assertEqual(state["phases"]["L1"]["powerW"], 250)
-        self.assertIsNone(state["phases"]["L1"]["currentA"])
-        self.assertIsNone(state["phases"]["L3"]["currentA"])
-        self.assertEqual(state["phases"]["L1"]["currentQuality"], "UNVERIFIED")
+        self.assertEqual(state["phases"]["L1"]["powerW"], 1879)
+        self.assertEqual(state["phases"]["L1"]["voltageV"], 233.0)
+        self.assertEqual(state["phases"]["L1"]["currentA"], 8.1)
+        self.assertEqual(state["phases"]["L3"]["currentA"], 6.6)
+        self.assertEqual(state["phases"]["L1"]["currentQuality"], "PENDING_GUI_COMPARISON")
         self.assertIsNone(state["phases"]["L2"]["powerW"])
         self.assertIsNone(state["phases"]["L2"]["currentA"])
         self.assertIsNone(state["totals"]["powerW"])
         self.assertFalse(state["eligibleForControl"])
         self.assertFalse(state["eligibleForHouseBalance"])
+
+    def test_serial_bytes_cannot_be_misread_as_current(self):
+        sample = module.snapshot(fake_registers(), 40)
+        self.assertEqual(fake_registers()[3], 18513)  # ASCII HQ, not amps
+        self.assertEqual(sample["phases"]["L1"]["currentA"], 8.1)
+        self.assertEqual(sample["phases"]["L3"]["currentA"], 6.6)
+        self.assertLess(sample["phases"]["L1"]["currentA"], 16)
 
     def test_modbus_exception_rejected(self):
         pdu = bytes((0x83, 0x02))
@@ -72,7 +90,7 @@ class SchuurMonitorTests(unittest.TestCase):
                 module.read_registers("192.0.2.1", 40)
 
     def test_sqlite_shadow_idempotent_and_no_l2_field(self):
-        state = module.snapshot((250, 500, 150), 40,
+        state = module.snapshot(fake_registers(), 40,
                                 "2026-11-01T13:00:00+00:00")
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "shadow.sqlite"
