@@ -60,7 +60,7 @@ def signed16(raw: int) -> int:
 
 def snapshot(registers: tuple[int, ...], unit_id: int, observed_at: str | None = None) -> dict:
     if len(registers) != REGISTER_COUNT:
-        raise ValueError("Exactly six register values are required")
+        raise ValueError("Exactly three power registers are required")
     at = observed_at or datetime.now(timezone.utc).isoformat(timespec="milliseconds")
     # Keep signed phase power. Never infer current from uncommissioned registers.
     watts = [signed16(x) for x in registers]
