@@ -19,7 +19,7 @@ import tempfile
 
 
 REGISTER_START = 3900  # com.victronenergy.acload: L1/L2/L3 power
-REGISTER_COUNT = 6     # + L1/L2/L3 current (0.1 A per unit)
+REGISTER_COUNT = 3     # power only: L1/L2/L3; current mapping not commissioned
 MODBUS_PORT = 502
 MAX_PDU_LENGTH = 253
 
@@ -62,9 +62,8 @@ def snapshot(registers: tuple[int, ...], unit_id: int, observed_at: str | None =
     if len(registers) != REGISTER_COUNT:
         raise ValueError("Exactly six register values are required")
     at = observed_at or datetime.now(timezone.utc).isoformat(timespec="milliseconds")
-    # Keep the measured signed power; do not infer house import/export from it.
-    watts = [signed16(x) for x in registers[:3]]
-    amps = [signed16(x) / 10 for x in registers[3:]]
+    # Keep signed phase power. Never infer current from uncommissioned registers.
+    watts = [signed16(x) for x in registers]
     return {
         "schema": "EMS_VICTRON_SCHUUR_SHADOW_V0.1",
         "observedAtUtc": at,
@@ -74,9 +73,9 @@ def snapshot(registers: tuple[int, ...], unit_id: int, observed_at: str | None =
         "eligibleForHouseBalance": False,
         "quality": "PARTIAL_L2_INVALID",
         "phases": {
-            "L1": {"powerW": watts[0], "currentA": amps[0], "quality": "OBSERVED"},
-            "L2": {"powerW": None, "currentA": None, "quality": "INVALID_PENDING_REPAIR"},
-            "L3": {"powerW": watts[2], "currentA": amps[2], "quality": "OBSERVED"},
+            "L1": {"powerW": watts[0], "currentA": None, "currentQuality": "UNVERIFIED", "quality": "OBSERVED"},
+            "L2": {"powerW": None, "currentA": None, "currentQuality": "INVALID_PENDING_REPAIR", "quality": "INVALID_PENDING_REPAIR"},
+            "L3": {"powerW": watts[2], "currentA": None, "currentQuality": "UNVERIFIED", "quality": "OBSERVED"},
         },
         "totals": {"powerW": None, "importKWh": None, "exportKWh": None,
                    "quality": "INVALID_INCOMPLETE_PHASES"},
@@ -91,20 +90,20 @@ def save_shadow_db(db_path: Path, state: dict) -> None:
             CREATE TABLE IF NOT EXISTS victron_schuur_samples (
               observed_at_utc TEXT PRIMARY KEY,
               unit_id INTEGER NOT NULL,
-              l1_power_w INTEGER, l1_current_a REAL,
-              l3_power_w INTEGER, l3_current_a REAL,
+              l1_power_w INTEGER,
+              l3_power_w INTEGER,
               quality TEXT NOT NULL
             )
         """)
         con.execute("""
             INSERT OR IGNORE INTO victron_schuur_samples
-            (observed_at_utc, unit_id, l1_power_w, l1_current_a,
-             l3_power_w, l3_current_a, quality)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (observed_at_utc, unit_id, l1_power_w,
+             l3_power_w, quality)
+            VALUES (?, ?, ?, ?, ?)
         """, (
             state["observedAtUtc"], state["unitId"],
-            state["phases"]["L1"]["powerW"], state["phases"]["L1"]["currentA"],
-            state["phases"]["L3"]["powerW"], state["phases"]["L3"]["currentA"],
+            state["phases"]["L1"]["powerW"],
+            state["phases"]["L3"]["powerW"],
             state["quality"],
         ))
 
