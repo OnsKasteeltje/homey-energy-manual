@@ -24,16 +24,27 @@ The candidate does not access or change the Pi planner, P1, canonical
 5. Restrict access to trusted LAN hosts where possible. Modbus TCP is not
    authenticated/encrypted; do not expose TCP/502 to the internet.
 
-The AC-load map uses holding-register function 03, addresses 3900..3902
-for signed phase powers (W). The original prototype interpreted 3903..3905
-as currents at scale 0.1 but a live read on 2026-11-01 returned clearly
-implausible 1851.3 A (L1) and 1336.3 A (L3). The GX device GUI itself
-shows plausible currents (L1 8.1 A, L2 2.5 A, L3 6.6 A); this is a
-**collector register/scale interpretation issue**, NOT evidence that the GX
-is showing excessive currents. Revision 2 therefore does not query currents
-or store their values. All currentA fields are null with quality UNVERIFIED
-except known-bad L2. Future work may validate against the official Victron
-register workbook and synchronized GUI samples; do not guess an alternate scale. The meter's own Ethernet
+The AC-load map uses Modbus holding-register function FC03:
+- 3900..3902 = L1/L2/L3 power W
+- 3903..3909 = seven words of serial number, **NOT current**
+- 3910 / 3912 / 3914 = phase voltages, uint16 / 10 V
+- 3911 / 3913 / 3915 = phase currents, int16 / 10 A
+
+On 2026-11-01 the first prototype misread serial register 3903 as
+1851.3 A (ASCII "HQ" = 0x4851 = 18513), and 3905 as 1336.3 A
+(ASCII "43" = 0x3433 = 13363). Those bytes exactly match the VM-3P75CT
+serial prefix HQ2543. The GX UI displayed real plausible currents
+L1 8.1 A and L3 6.6 A. The revised candidate reads correct current
+registers and labels their quality PENDING_GUI_COMPARISON until a new
+simultaneous live comparison. Current values are NOT yet stored in
+SQLite; total power and L2 remain invalid.
+
+Register mappings cross-checked with Victron's official register-list
+documentation description and sfstar/hass-victron's published
+AC-load register declarations. The exact live values still require
+commissioning on this GX device.
+
+The meter's own Ethernet
 connection is Modbus/UDP; don't accidentally target it on TCP port 502.
 
 ## Dry-run on the Pi (no writes anywhere)
@@ -48,9 +59,9 @@ python3 services/pi/integrations/victron/schuur_monitor.py \
   --host "$CERBO_IP" --unit-id "$ACLOAD_UNIT_ID"
 ```
 
-Compare L1 and L3 reported **power** with the Cerbo UI at the
-same instant. Phase currents are explicitly unknown until separately
-validated. The screenshot at ~15:13 local had L1=1876W/8.1A,
+Compare L1 and L3 reported **power, voltage, and current** with the Cerbo UI
+at the same instant. Phase-current quality remains PENDING_GUI_COMPARISON
+until validated. The screenshot at ~15:13 local had L1=1876W/8.1A,
 L2=108W/2.5A/PF=0.182 (not accepted), L3=1531W/6.6A/PF=-0.995.
 The negative L3 PF should receive a dedicated sign/direction check. Check sign direction with EV charge and high shed PV.
 L2 remains unavailable even when a number comes back from the meter.
@@ -63,8 +74,10 @@ python3 services/pi/integrations/victron/schuur_monitor.py \
   --json-out /home/jeroen/ems/data/victron-schuur-current.json
 ```
 
-This stores only L1/L3 **power** in an independent SQLite file
-and a private JSON snapshot. Currents remain explicitly null. There is no L2 column and no valid total.
+This stores only L1/L3 **power** in an independent SQLite file; the
+private JSON includes unvalidated currents tagged PENDING_GUI_COMPARISON.
+Do not run this optional persistence command until the interactive readback
+has been checked against the Cerbo UI. There is no L2 column and no valid total.
 The script fails visibly if Modbus is unreachable; no stale snapshot is
 silently treated as fresh. A future consumer must gate on timestamp
 freshness, quality, and both eligibleFor... flags.
