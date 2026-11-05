@@ -27,8 +27,8 @@
   </section>
   <section class="panel">
     <header><div><small>15-MINUTEN · CANONIEKE PLANNER</small><h2>Besloten versus gemeten energie</h2></div>
-      <div class="legend"><span class="forecast">Historische PV-forecast (incl. ouder archief ≤45 min)</span><span class="forecast-current">PV-forecast actueel (alleen vandaag)</span><span class="planned-ev">Tesla gepland</span><span class="planned-ww">Warm water gepland</span><span class="planned-quooker">Quooker gepland</span><span class="ev">EV uit PV</span><span class="self">Overig eigen gebruik</span><span class="export">Export</span><span class="heating-opportunity">Heating opportunity</span><span class="heating-intent">Heating intent</span></div></header>
-    <div class="chart-wrap"><svg id="pv-chart" role="img" aria-label="Historische PV-forecast bij besluit (doorgetrokken) en actuele toekomstige PV-forecast (gestreept), naast gemeten PV en geplande EV, boiler, Quooker en export"></svg><div id="tooltip" class="tooltip" hidden></div></div>
+      <div class="legend"><span class="forecast">Historische PV-forecast (incl. ouder archief ≤45 min)</span><span class="forecast-current">PV-forecast actueel (alleen vandaag)</span><span class="planned-ev">Tesla gepland</span><span class="planned-ww">Warm water gepland</span><span class="planned-quooker">Quooker gepland</span><span class="quatt-actual">Quatt elektrisch werkelijk</span><span class="ev">EV uit PV</span><span class="self">Overig eigen gebruik</span><span class="export">Export</span><span class="heating-opportunity">Heating opportunity</span><span class="heating-intent">Heating intent</span></div></header>
+    <div class="chart-wrap"><svg id="pv-chart" role="img" aria-label="Historische PV-forecast bij besluit (doorgetrokken) en actuele toekomstige PV-forecast (gestreept), naast gemeten PV, Quatt elektriciteit en geplande EV, boiler, Quooker en export"></svg><div id="tooltip" class="tooltip" hidden></div></div>
     <p id="empty" class="empty" hidden>Geen meetdata of plannerbesluiten voor deze dag.</p>
   </section>
   <section class="panel" aria-labelledby="goodwe-shadow-title">
@@ -41,13 +41,14 @@
       <div><small>DAGELIJKSE EMS-EVALUATIE · GEMETEN EN GESCHAT</small><h2 id="daily-report-title">Dagrapport <span id="daily-report-date">—</span></h2></div>
       <span id="daily-report-status" class="daily-report-status">Laden…</span>
     </header>
-    <p class="allocation-note">Vandaag: voorlopig subtotaal tot het laatste betrouwbaar berekende kwartier uit P1- en PV-energiemeters. Afgesloten dagen: definitieve cijfers. EV-replay is indicatief, geen exacte besparing.</p>
+    <p class="allocation-note">P1/PV-cijfers volgen hun eigen kwaliteitsregels. Quatt elektrisch toont afzonderlijk het gemeten deel uit complete kwartieren, onafhankelijk van PV-dekking; het is geen PV-toerekening. EV-replay is indicatief, geen exacte besparing.</p>
     <div class="daily-report-kpis">
       <article><small>PV-PRODUCTIE</small><strong id="report-pv">—</strong></article>
       <article><small>EIGEN PV-GEBRUIK</small><strong id="report-self">—</strong></article>
       <article><small>PV-ZELFVERBRUIK</small><strong id="report-self-rate">—</strong></article>
       <article><small>P1-IMPORT</small><strong id="report-import">—</strong></article>
       <article><small>P1-EXPORT</small><strong id="report-export">—</strong></article>
+      <article><small>QUATT ELEKTRISCH · GEMETEN DEEL</small><strong id="report-quatt">—</strong><small id="report-quatt-coverage">—</small></article>
     </div>
     <div id="daily-report-notes" class="daily-report-notes" aria-live="polite"><p>Dagrapport laden…</p></div>
   </section>

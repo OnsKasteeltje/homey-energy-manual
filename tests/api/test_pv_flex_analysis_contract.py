@@ -18,6 +18,12 @@ required = [
     'heating_preheat_progression_resource()',
     'd.device_key=\'tesla\'',
     'd.device_key=\'boiler\'',
+    'd.device_key=\'quatt_cic\'',
+    '"quattPowerW"',
+    '"quattEnergyKWh"',
+    '"quattCompleteSlots"',
+    '"quattExpectedSlots"',
+    'quality == "complete"',
     '["web", "analysis", "pv-flex", "day"]',
 ]
 for token in required:

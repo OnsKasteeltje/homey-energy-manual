@@ -58,6 +58,22 @@ byte-for-byte aligned with the merged source before claiming this final
 retirement in Homey production. The unrelated WW low-power timer issue #38
 remains open.
 
+### Evaluatie — gemeten Quatt-elektriciteit (5 november 2026; GitHub voorbereid)
+
+The existing read-only `GET /web/analysis/pv-flex/day/YYYY-MM-DD` adds
+`measurements_15m:quatt_cic/electrical_power_w` as an independent observed
+Quatt power line. Only `quality=complete` quarters contribute to the line
+and to the sum of `energy_wh` (converted to kWh). The response includes
+`devices.quattPowerW`, `devices.quattEnergyKWh` and summary `quattElectricKWh`,
+`quattCompleteSlots`, `quattExpectedSlots`. The Evaluatie frontend displays
+the electrical line and measured subtotal plus count of covered quarters,
+without requiring PV/P1 coverage and without inferring PV attribution.
+Missing or partial Quatt evidence is not presented as measured zero.
+The feature is additive to existing API schema `EMS_WEB_PV_FLEX_ANALYSIS_V1`.
+No collector, historian, planner, controller, Homey flow, actuator or new
+runtime service is introduced. GitHub source alone does not certify a Pi
+runtime/frontend deployment; validate the separate existing deploy boundary.
+
 ### Evaluatie dagrapport — bronafhankelijke dekking (25 oktober 2026)
 
 After production acceptance of GoodWe SEMS+ canonical history and quarter
