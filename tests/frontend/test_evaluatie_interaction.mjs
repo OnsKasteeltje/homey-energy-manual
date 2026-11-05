@@ -28,6 +28,20 @@ test("archived PV display never turns an expired plan into decision evidence",()
  assert.equal(decision({...s,historicalPvDisplay:null},now),null);
  assert.equal(decision({...s,forecast:{pvForecastW:3200}},now),3200);
 });
+test("Quatt measured power is independent from missing PV and is closed-quarter only",()=>{
+ const get=vm.runInContext("quattActualW",scope);
+ const now=Date.parse("2026-10-10T08:50:00Z");
+ const s=slot({actual:{p1Coverage:0,pvCoverage:0},plan:null,forecast:null,
+  devices:{quattPowerW:850}});
+ assert.equal(evidence(s,now).pv,false);
+ assert.equal(get(s,now),850);
+ assert.equal(get(s,Date.parse("2026-10-10T08:36:00Z")),null);
+ assert.equal(get({...s,devices:{}},now),null);
+ const view={left:0,top:0,height:100,step:20,max:1000,radius:4};
+ const q=hover([s,s,s],[{actualKnown:false},{actualKnown:false},{actualKnown:false}],1,30,15,view,now);
+ assert.equal(q.label,"Quatt elektrisch werkelijk");
+ assert.equal(q.value,850);
+});
 test("running quarter is provisional even if device power was already recorded",()=>{
  const result=evidence(slot(),Date.parse("2026-10-10T08:36:00Z"));
  assert.equal(result.phase,"OPEN");
@@ -228,7 +242,9 @@ test("daily panel shows measured own PV kWh, and blanks unfinished day",()=>{
   },
   lines:["P1 counters","PV self-use","EV estimate","Timing diagnosis"]
  };
- render(report,"2026-10-13");
+ render(report,"2026-10-13",{quattElectricKWh:10.82,quattCompleteSlots:96,quattExpectedSlots:96});
+ assert.equal(nodes.get("report-quatt").textContent,"10,820 kWh");
+ assert.equal(nodes.get("report-quatt-coverage").textContent,"96/96 complete kwartieren");
  assert.equal(nodes.get("report-pv").textContent,"8,748 kWh");
  assert.equal(nodes.get("report-self").textContent,"5,401 kWh");
  assert.equal(nodes.get("report-self-rate").textContent,"61,7%");
@@ -244,5 +260,6 @@ test("daily panel shows measured own PV kWh, and blanks unfinished day",()=>{
  assert.equal(nodes.get("daily-report-status").textContent,"Voorlopig · t/m 12:30");
  render(null,"2026-10-14");
  assert.equal(nodes.get("report-self").textContent,"—");
+ assert.equal(nodes.get("report-quatt").textContent,"—");
  assert.equal(nodes.get("daily-report-status").textContent,"Dag in uitvoering");
 });

@@ -57,7 +57,12 @@ assert 'id="kpi-' not in index
 assert 'dailySelfUseEvidence' not in render
 assert 'accounting.pvSelfConsumedKWh' in render
 assert '$("report-self").textContent=decimal(accounting.pvSelfConsumedKWh)' in render
-assert 'grid-template-columns:repeat(5,minmax(0,1fr))' in css
+assert 'grid-template-columns:repeat(6,minmax(0,1fr))' in css
+assert 'id="report-quatt"' in index and 'id="report-quatt-coverage"' in index
+assert 'Quatt elektrisch werkelijk' in index
+assert 'quattActualW' in render and '"quatt-actual-line"' in render
+assert '.quatt-actual-line' in css and '.legend .quatt-actual' in css
+assert 'quattSummary?.quattElectricKWh' in render
 assert '.kpis{' not in css
 for metric in ("report-pv", "report-self", "report-self-rate", "report-import", "report-export", "daily-report-notes"):
     assert f'id="{metric}"' in index, metric

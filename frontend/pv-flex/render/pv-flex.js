@@ -34,6 +34,9 @@ const decisionPvW=(s,nowMs=Date.now())=>{
 };
 const currentFuturePvW=(s,nowMs=Date.now())=>
  slotEndMs(s)>nowMs&&available(s.currentPvForecastW)?s.currentPvForecastW:null;
+// Quatt is measured electricity, independent of PV/P1 quality or planning.
+const quattActualW=(s,nowMs=Date.now())=>
+ slotEndMs(s)<=nowMs&&available(s.devices?.quattPowerW)?Math.max(0,s.devices.quattPowerW):null;
 // Extend the dashed series by one actual archived point to make the seam
 // continuous; never interpolate across missing historical decision evidence.
 function joinedPvForecasts(slots,nowMs=Date.now()){
@@ -72,6 +75,7 @@ function closestEvaluationSeries(slots,allocated,index,px,py,view,nowMs=Date.now
  const lines=[
   ["pvForecastW","PV-forecast historisch",s=>decisionPvW(s,nowMs)],
   ["currentPvForecastW","PV-forecast actueel",s=>currentFuturePvW(s,nowMs)],
+  ["quattPowerW","Quatt elektrisch werkelijk",s=>quattActualW(s,nowMs)],
   ["evPlanW","Tesla gepland",s=>s.plan?.evPlanW],
   ["wwPlanW","Warm water gepland",s=>s.plan?.wwPlanW],
   ["quookerPlanW","Quooker gepland",s=>s.plan?.quookerPlanW]
@@ -106,13 +110,14 @@ function closestEvaluationSeries(slots,allocated,index,px,py,view,nowMs=Date.now
 function chart(d){
  const svg=$("pv-chart"),tip=$("tooltip"),a=d.series;svg.replaceChildren();
  const nowMs=Date.now();
- const has=a.some(x=>slotEvidence(x,nowMs).pv||x.plan||currentFuturePvW(x,nowMs)!==null);
+ const has=a.some(x=>slotEvidence(x,nowMs).pv||x.plan||currentFuturePvW(x,nowMs)!==null||quattActualW(x,nowMs)!==null);
  $("empty").hidden=has;svg.hidden=!has;
  if(!has){tip.hidden=true;return;}
  const W=1000,H=330,p={l:52,r:18,t:18,b:40},iw=W-p.l-p.r,ih=H-p.t-p.b,ns="http://www.w3.org/2000/svg";
  const allocated=a.map(s=>slotAllocation(s,nowMs));
  const max=Math.max(100,...a.flatMap((x,i)=>[
   allocated[i].pvW,decisionPvW(x,nowMs)||0,currentFuturePvW(x,nowMs)||0,
+  quattActualW(x,nowMs)||0,
   x.plan?.evPlanW||0,
   x.plan?.wwPlanW||0,x.plan?.quookerPlanW||0
  ]));
@@ -180,6 +185,10 @@ function chart(d){
  };
  plotSegments(points,"forecast-line");
  plotSegments(currentPoints,"forecast-current-line");
+ plotSegments(a.map((slot,i)=>{
+  const watts=quattActualW(slot,nowMs);
+  return watts===null?null:(p.l+(i+.5)*step)+","+(p.t+ih-watts/max*ih);
+ }),"quatt-actual-line");
  for(const [field,cls] of [
   ["evPlanW","planned-ev-line"],["wwPlanW","planned-ww-line"],["quookerPlanW","planned-quooker-line"]
  ]){
@@ -187,7 +196,7 @@ function chart(d){
    (p.l+(i+.5)*step)+","+(p.t+ih-slot.plan[field]/max*ih):null),cls);
  }
 }
-function renderDailyReport(report,selectedDay){
+function renderDailyReport(report,selectedDay,quattSummary=null){
  const labelDate=new Date(selectedDay+"T12:00:00Z").toLocaleDateString("nl-NL",{
   timeZone:"Europe/Amsterdam",day:"numeric",month:"long",year:"numeric"
  });
@@ -205,6 +214,9 @@ function renderDailyReport(report,selectedDay){
  $("report-self-rate").textContent=valid?dailyPct(accounting.pvSelfConsumptionRate):"—";
  $("report-import").textContent=decimal(accounting.gridImportKWh);
  $("report-export").textContent=decimal(accounting.gridExportKWh);
+ $("report-quatt").textContent=decimal(quattSummary?.quattElectricKWh);
+ $("report-quatt-coverage").textContent=quattSummary?.quattExpectedSlots>0?
+  quattSummary.quattCompleteSlots+"/"+quattSummary.quattExpectedSlots+" complete kwartieren":"Geen Quatt-kwartieren";
  status.textContent=valid?(
   report.status==="PROVISIONAL"&&report.throughLocal?
   "Voorlopig · t/m "+time(report.throughLocal):
@@ -313,7 +325,7 @@ async function refresh(){
  }
  const report=selectedDay===todayAmsterdam()&&main.status==="fulfilled"?
   main.value.provisionalDailyReport:(daily.status==="fulfilled"?daily.value:null);
- renderDailyReport(report,selectedDay);
+ renderDailyReport(report,selectedDay,main.status==="fulfilled"?main.value.summary:null);
 }
 $("prev").addEventListener("click",()=>{day=shiftDay(day,-1);refresh();});
 $("next").addEventListener("click",()=>{if(day<todayAmsterdam()){day=shiftDay(day,1);refresh();}});

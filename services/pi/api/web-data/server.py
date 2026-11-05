@@ -1670,7 +1670,8 @@ def pv_flex_analysis_resource(value):
                 "exportKWh": 0.0, "pvSelfConsumedKWh": 0.0,
                 "coverage": 0.0, "p1Coverage": 0.0, "pvCoverage": 0.0,
             },
-            "devices": {"evPowerW": None, "boilerPowerW": None},
+            "devices": {"evPowerW": None, "boilerPowerW": None,
+                        "quattPowerW": None, "quattEnergyKWh": None},
             "heatingFlex": {
                 "opportunity": False,
                 "intent": False,
@@ -1702,7 +1703,8 @@ def pv_flex_analysis_resource(value):
             WHERE m.slot_start_utc >= ? AND m.slot_start_utc < ?
               AND (
                 (d.device_key='tesla' AND k.metric_key='electrical_power_w') OR
-                (d.device_key='boiler' AND k.metric_key='electrical_power_w')
+                (d.device_key='boiler' AND k.metric_key='electrical_power_w') OR
+                (d.device_key='quatt_cic' AND k.metric_key='electrical_power_w')
               )
             ORDER BY m.slot_start_utc
             """,
@@ -1810,6 +1812,12 @@ def pv_flex_analysis_resource(value):
             item["devices"]["evPowerW"] = value_avg
         elif device_key == "boiler":
             item["devices"]["boilerPowerW"] = value_avg
+        elif device_key == "quatt_cic" and quality == "complete":
+            # Independent electrical observation; never infer PV attribution.
+            if isinstance(value_avg, (int, float)) and math.isfinite(value_avg) and value_avg >= 0:
+                item["devices"]["quattPowerW"] = round(float(value_avg), 3)
+            if isinstance(energy_wh, (int, float)) and math.isfinite(energy_wh) and energy_wh >= 0:
+                item["devices"]["quattEnergyKWh"] = round(float(energy_wh) / 1000.0, 6)
 
     for slot_start, forecast_w, confidence, model_basis, generated_at in forecast_rows:
         dt = parse_timestamp(slot_start)
@@ -1924,6 +1932,8 @@ def pv_flex_analysis_resource(value):
                 )
 
     series = list(slots.values())
+    quatt_quarters = [slot["devices"]["quattEnergyKWh"] for slot in series
+                      if slot["devices"]["quattEnergyKWh"] is not None]
     totals = {
         name: round(sum(slot["actual"][name] or 0.0 for slot in series), 6)
         for name in ("pvKWh", "houseKWh", "importKWh", "exportKWh")
@@ -1980,6 +1990,9 @@ def pv_flex_analysis_resource(value):
         },
         "summary": {
             **totals,
+            "quattElectricKWh": round(sum(quatt_quarters), 4) if quatt_quarters else None,
+            "quattCompleteSlots": len(quatt_quarters),
+            "quattExpectedSlots": len(series),
             "forecastKWh": round(forecast_energy, 6),
             "forecastSlots": forecast_slots,
         },
@@ -1993,6 +2006,8 @@ def pv_flex_analysis_resource(value):
         "resources": {
             "ev": {"actualSource": "measurements_15m:tesla/electrical_power_w"},
             "ww": {"actualSource": "measurements_15m:boiler/electrical_power_w"},
+            "quatt": {"actualSource": "measurements_15m:quatt_cic/electrical_power_w",
+                      "qualityRequired": "complete", "pvAttribution": False},
             "heatingFlex": {
                 "status": heating_history_status,
                 "actualSource": "heating-preheat-progression-shadow-v0.4:opportunityHistory+stepHistory",
