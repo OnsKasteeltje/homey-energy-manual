@@ -74,6 +74,27 @@ An operator separately creates private /etc/ems/alphaess-readonly.env with ALPHA
 
 **Commissioning gate:** perform one intentional service execution and confirm both output and actual SQLite row counts, then verify the existing history builder and Homey/P1 chain remain healthy. Only then can an operator separately choose to enable the five-minute timer. A failed Modbus connection or archive is never silently retried. The battery minimum SOC remains an autonomous AlphaESS setting (currently 10%).
 
+## V0.3 EMS Live battery presentation (separate observation only)
+
+The additional endpoint /web/live/battery is implemented in the already existing
+services/pi/api/web-data/server.py, not in the physical battery controller.
+It reads only the freshest complete eight-measurement AlphaESS record from the
+existing ems-history.sqlite, uses the collector's maximum 300-second validity,
+and returns explicit STALE/PARTIAL/UNAVAILABLE with null measurements otherwise.
+The private Live page adds a separate SOC / observed AC power / battery counter
+panel. No P1/PV/house figures or planner inputs are modified. Charging AC sign,
+usable AC capacity and net-grid energy attribution remain unverified.
+
+Installation is separate from battery-history collection and requires deliberately
+updating the existing read-only Web Data API and Live assets. The narrow installer
+`deploy/install/install_alphaess_live_v0_3.sh` runs in preflight-only mode by
+default; an operator must separately pass --apply after verifying deployed files
+match the prior Git source. It refuses divergent deployed files rather than
+overwriting them with a general rsync; it backs up touched files and restarts
+ONLY the read-only Web Data API, not Homey, Caddy or the AlphaESS timer.
+Verify /web/live/battery returns status FRESH or an honest non-fresh status
+and that the existing /web/state/current and P1/EV controls are unaffected.
+
 ## Controlled future commissioning
 
 1. Review this PR as one atomic change on main, run targeted tests, repository gate and architecture gate. No failed CI gate may be bypassed.

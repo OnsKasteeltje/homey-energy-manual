@@ -50,6 +50,7 @@ LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 API_SCHEMA = "EMS_WEB_WW_SEASONAL_ADVICE_V1"
 STATE_API_SCHEMA = "EMS_WEB_STATE_CURRENT_V1"
 LIVE_QUOOKER_API_SCHEMA = "EMS_WEB_LIVE_QUOOKER_V1"
+LIVE_BATTERY_API_SCHEMA = "EMS_WEB_LIVE_BATTERY_V1"
 COMMANDS_API_SCHEMA = "EMS_WEB_COMMANDS_CURRENT_V1"
 HISTORY_API_SCHEMA = "EMS_WEB_HISTORY_V1"
 PV_FLEX_API_SCHEMA = "EMS_WEB_PV_FLEX_ANALYSIS_V1"
@@ -682,6 +683,97 @@ def state_current_resource():
     result["diagnostics"] = {"dishwasher_l1_history": _live_l1_history()}
     return result
 
+
+
+BATTERY_LIVE_METRICS = {
+    "soc_pct": "socPct",
+    "module_count": "moduleCount",
+    "nominal_capacity_kwh": "nominalCapacityKWh",
+    "soh_pct": "sohPct",
+    "battery_dc_power_w": "dcPowerW",
+    "battery_ac_power_w": "acPowerW",
+    "battery_charge_total_kwh": "chargeTotalKWh",
+    "battery_discharge_total_kwh": "dischargeTotalKWh",
+}
+
+
+def live_battery_resource(*, now=None):
+    """Only fresh, complete, raw AlphaESS evidence; no house balance coupling."""
+    now = now or datetime.now(timezone.utc)
+    result = {
+        "schema": LIVE_BATTERY_API_SCHEMA,
+        "source": "EMS_HISTORY_SQLITE_ALPHAESS_READONLY",
+        "status": "UNAVAILABLE",
+        "sampledAtUtc": None,
+        "ageSec": None,
+        "maxAgeSec": 300,
+        "readOnly": True,
+        "eligibleForControl": False,
+        "eligibleForHouseBalance": False,
+        "measurements": {field: None for field in BATTERY_LIVE_METRICS.values()},
+        "caveats": {
+            "chargeAcSign": "NOT_YET_VERIFIED",
+            "batteryCounters": "DC_BATTERY_COUNTERS_NOT_AC_GRID_ENERGY",
+        },
+    }
+    with sqlite3.connect(f"file:{HISTORY_DB}?mode=ro", uri=True, timeout=2.0) as db:
+        row = db.execute("""
+            SELECT MAX(x.ts_utc)
+            FROM measurements x
+            JOIN devices d ON d.id = x.device_id
+            WHERE d.device_key = 'battery_alphaess'
+        """).fetchone()
+        if not row or not row[0]:
+            return result
+        sample_time = row[0]
+        rows = db.execute("""
+            SELECT m.metric_key, x.value_real, x.quality
+            FROM measurements x
+            JOIN devices d ON d.id = x.device_id
+            JOIN metrics m ON m.id = x.metric_id
+            WHERE d.device_key = 'battery_alphaess' AND x.ts_utc = ?
+        """, (sample_time,)).fetchall()
+
+    sample_dt = parse_timestamp(sample_time)
+    if sample_dt is None:
+        return result
+    age = (now - sample_dt).total_seconds()
+    result["sampledAtUtc"] = sample_dt.isoformat().replace("+00:00", "Z")
+    result["ageSec"] = round(age)
+    if age < 0:
+        return result
+    if age > result["maxAgeSec"]:
+        result["status"] = "STALE"
+        return result
+    observed = {}
+    for key, value, quality in rows:
+        if key not in BATTERY_LIVE_METRICS or key in observed or quality != "observed":
+            result["status"] = "PARTIAL"
+            return result
+        if not isinstance(value, (int, float)) or not math.isfinite(value):
+            result["status"] = "PARTIAL"
+            return result
+        observed[key] = value
+    if set(observed) != set(BATTERY_LIVE_METRICS):
+        result["status"] = "PARTIAL"
+        return result
+    if not (
+        0 <= observed["soc_pct"] <= 100
+        and 0 <= observed["soh_pct"] <= 100
+        and 1 <= observed["module_count"] <= 12
+        and 0 < observed["nominal_capacity_kwh"] <= 64
+        and abs(observed["battery_dc_power_w"]) <= 10000
+        and abs(observed["battery_ac_power_w"]) <= 10000
+        and observed["battery_charge_total_kwh"] >= 0
+        and observed["battery_discharge_total_kwh"] >= 0
+    ):
+        result["status"] = "PARTIAL"
+        return result
+    result["status"] = "FRESH"
+    result["measurements"] = {
+        field: observed[key] for key, field in BATTERY_LIVE_METRICS.items()
+    }
+    return result
 
 
 def live_quooker_resource():
@@ -3061,6 +3153,16 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 200, pv_forecast_resource())
             except (OSError, json.JSONDecodeError, ValueError):
                 send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
+            return
+
+        if path.path == "/web/live/battery":
+            try:
+                send_json(self, 200, live_battery_resource())
+            except (OSError, sqlite3.Error):
+                send_json(self, 503, {
+                    "schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE",
+                    "reason": "RESOURCE_UNAVAILABLE",
+                })
             return
 
         if path.path == "/web/live/quooker":
