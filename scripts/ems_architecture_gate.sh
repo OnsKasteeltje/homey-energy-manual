@@ -711,6 +711,7 @@ fi
 bash -n deploy/install/install_alphaess_readonly_v0_2.sh || fail "AlphaESS installer invalid"
 [[ -f deploy/install/install_alphaess_live_v0_3.sh ]] || fail "AlphaESS Live installer missing"
 bash -n deploy/install/install_alphaess_live_v0_3.sh || fail "AlphaESS Live installer shell syntax invalid"
+python3 tests/deploy/test_alphaess_live_http_readiness_contract.py || fail "AlphaESS Live installer HTTP readiness regression"
 python3 tests/api/test_alphaess_live_battery_resource.py || fail "AlphaESS Live API isolation failed"
 node tests/frontend/test_live_battery_v03.mjs || fail "AlphaESS Live display boundary failed"
 pass "AlphaESS V0.3 isolated Live read-only view"

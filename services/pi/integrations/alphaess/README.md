@@ -92,6 +92,15 @@ default; an operator must separately pass --apply after verifying deployed files
 match the prior Git source. It refuses divergent deployed files rather than
 overwriting them with a general rsync; it backs up touched files and restarts
 ONLY the read-only Web Data API, not Homey, Caddy or the AlphaESS timer.
+The 14 November 2026 Pi install was validated by HTTP 200 /web/state/current
+and FRESH /web/live/battery (10.8% SOC). An immediate post-restart curl
+previously returned connection refused while systemd already showed ACTIVE.
+The guarded installer now waits up to 20 bounded checks for HTTP readiness
+on both routes and validates the battery schema/status before reporting PASS.
+A missing HTTP listener or invalid API response triggers the existing targeted
+rollback, followed by verification that the restored core API is HTTP-responsive.
+It does not require battery status FRESH: stale/offline raw evidence is allowed
+to be honestly reported as a 200 with null measurements.
 Verify /web/live/battery returns status FRESH or an honest non-fresh status
 and that the existing /web/state/current and P1/EV controls are unaffected.
 
