@@ -1,0 +1,19 @@
+[Unit]
+Description=AlphaESS VitaPower read-only Modbus SHADOW history
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/home/jeroen/ems/data/ems-history.sqlite
+
+[Service]
+Type=oneshot
+User=jeroen
+Group=jeroen
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/ems/alphaess-readonly.env
+WorkingDirectory=/home/jeroen/ems/runtime/integrations/alphaess
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/integrations/alphaess/collect_readonly.py --host $ALPHAESS_HOST --archive-db /home/jeroen/ems/data/ems-history.sqlite --sample-validity-sec 300
+TimeoutStartSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/jeroen/ems/data

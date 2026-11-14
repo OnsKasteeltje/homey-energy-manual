@@ -1,0 +1,11 @@
+[Unit]
+Description=AlphaESS read-only polling every 5 minutes (opt-in only)
+
+[Timer]
+OnCalendar=*-*-* *:00/5:00
+AccuracySec=30s
+Persistent=false
+Unit=ems-alphaess-readonly.service
+
+[Install]
+WantedBy=timers.target

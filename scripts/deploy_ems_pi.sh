@@ -24,6 +24,8 @@ TARGET_ANALYSIS_SOURCE="$REPO/services/pi/api/analysis"
 TARGET_ANALYSIS_RUNTIME="$RUNTIME/analysis-api"
 TARGET_HEALTH_SOURCE="$REPO/services/pi/health"
 TARGET_HEALTH_RUNTIME="$RUNTIME/health"
+TARGET_ALPHAESS_SOURCE="$REPO/services/pi/integrations/alphaess"
+TARGET_ALPHAESS_RUNTIME="$RUNTIME/integrations/alphaess"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 CONSTRAINED_REPLAY_COMMAND="/usr/local/bin/ems-constrained-replay"
 HEALTH_COMMAND="/usr/local/bin/ems-health"
@@ -138,6 +140,7 @@ UNMANAGED="$(
             -not -path './web-data-api/*' \
             -not -path './analysis-api/*' \
             -not -path './health/*' \
+            -not -path './integrations/alphaess/*' \
             -not -path './tools/honeywell/*' \
             -not -path './homey-deploy/*' \
             -not -path '*/__pycache__/*' \
@@ -310,6 +313,20 @@ if echo "$HEALTH_UNMANAGED" | grep -E '^\+' | grep -v '^+++ ' >/dev/null; then
     exit 1
 fi
 
+# The source-managed AlphaESS subtree must not be erased by generic --delete.
+mkdir -p "$TARGET_ALPHAESS_RUNTIME"
+ALPHAESS_UNMANAGED="$(
+    diff -u \
+        <(cd "$TARGET_ALPHAESS_SOURCE" && find . -type f -printf '%P\n' | sort) \
+        <(cd "$TARGET_ALPHAESS_RUNTIME" && find . -type f \
+            -not -path '*/__pycache__/*' -not -name '*.pyc' \
+            -printf '%P\n' | sort) || true
+)"
+if echo "$ALPHAESS_UNMANAGED" | grep -E '^\+' | grep -v '^+++ ' >/dev/null; then
+    echo "ERROR: unmanaged files in runtime/integrations/alphaess"
+    echo "$ALPHAESS_UNMANAGED"
+    exit 1
+fi
 echo "PASS: runtime contains no unmanaged source files"
 
 echo
@@ -329,6 +346,7 @@ rsync -a --delete \
     --exclude='web-data-api/' \
     --exclude='analysis-api/' \
     --exclude='health/' \
+    --exclude='integrations/alphaess/' \
     --exclude='tools/' \
     --exclude='homey-deploy/' \
     --exclude='planner/warm-water/' \
@@ -406,6 +424,12 @@ rsync -a --delete \
     --exclude='__pycache__/' \
     --exclude='*.pyc' \
     "$TARGET_HEALTH_SOURCE/" "$TARGET_HEALTH_RUNTIME/"
+
+# AlphaESS is mapped explicitly, but no collector timer is enabled here.
+mkdir -p "$TARGET_ALPHAESS_RUNTIME"
+rsync -a --delete \
+    --exclude='__pycache__/' --exclude='*.pyc' \
+    "$TARGET_ALPHAESS_SOURCE/" "$TARGET_ALPHAESS_RUNTIME/"
 
 chmod 0755 "$TARGET_HISTORY_RUNTIME/ems_performance.py"
 ln -sfn "$TARGET_HISTORY_RUNTIME/ems_performance.py" "$PERFORMANCE_COMMAND"

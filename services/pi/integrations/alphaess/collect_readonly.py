@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """AlphaESS VitaPower Modbus TCP observation (FC03 only; no control path).
 
-Run manually from the repository checkout. Optional history archive requires an
-explicit --archive-db path to an EXISTING EMS history database. No timer/service
-or automatic deployment is part of V0.1.
+V0.2: a single read-only Modbus FC03 poll may optionally append source-isolated
+historical observations to an EXISTING EMS SQLite database. Scheduled polling
+is disabled by default and cannot change battery control or house balance.
 """
 
 import argparse
@@ -140,9 +140,11 @@ ARCHIVE_METRICS = {
 }
 
 
-def archive_snapshot(path, snapshot):
-    """Explicit opt-in. Append source-isolated rows to existing EMS history."""
-    if snapshot["quality"] != "OBSERVED_PI_POLL_TIME":
+def archive_snapshot(path, snapshot, sample_validity_sec=60):
+    """Explicit opt-in. Never manufacture samples or zero values during gaps."""
+    if sample_validity_sec not in (60, 300):
+        raise ValueError("INVALID_SAMPLE_VALIDITY")
+    if snapshot.get("quality") != "OBSERVED_PI_POLL_TIME" or not snapshot.get("measurements"):
         raise ValueError("REFUSE_ARCHIVE_INVALID_SAMPLE")
     db = Path(path)
     if not db.is_file():
@@ -168,9 +170,9 @@ def archive_snapshot(path, snapshot):
                 metric_id = con.execute("SELECT id FROM metrics WHERE metric_key=?", (key,)).fetchone()[0]
                 cur = con.execute("""INSERT OR IGNORE INTO measurements
                     (ts_utc, device_id, metric_id, value_real, quality, source_resolution_seconds)
-                    VALUES (?, ?, ?, ?, 'observed', 60)""", (
+                    VALUES (?, ?, ?, ?, 'observed', ?)""", (
                         snapshot["sampledAtUtc"], device_id, metric_id,
-                        float(snapshot["measurements"][field]),
+                        float(snapshot["measurements"][field]), sample_validity_sec,
                     ))
                 written += cur.rowcount
         return written
@@ -183,17 +185,23 @@ def main(argv=None):
     parser.add_argument("--host", required=True, help="Private LAN IP of VitaPower")
     parser.add_argument("--timeout", type=float, default=5.0)
     parser.add_argument("--archive-db", type=Path, help="Opt-in: append to existing EMS SQLite")
+    parser.add_argument("--sample-validity-sec", type=int, choices=(60, 300), default=60)
     args = parser.parse_args(argv)
     if not 0.5 <= args.timeout <= 20:
         parser.error("timeout must be between 0.5 and 20 seconds")
     result = collect(args.host, args.timeout)
     if args.archive_db and result["quality"] == "OBSERVED_PI_POLL_TIME":
         try:
-            result["archivedRows"] = archive_snapshot(args.archive_db, result)
+            result["archivedRows"] = archive_snapshot(
+                args.archive_db, result, sample_validity_sec=args.sample_validity_sec
+            )
+            result["archiveStatus"] = "OK"
         except (OSError, sqlite3.Error, ValueError):
             result["archiveStatus"] = "FAILED"
             result["archiveErrorCode"] = "ARCHIVE_UNAVAILABLE"
     print(json.dumps(result, indent=2, sort_keys=True))
+    if result.get("archiveStatus") == "FAILED":
+        return 2
     return 0 if result["quality"] == "OBSERVED_PI_POLL_TIME" else 1
 
 

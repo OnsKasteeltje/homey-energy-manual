@@ -24,6 +24,8 @@ TARGET_ANALYSIS_SOURCE="$REPO/services/pi/api/analysis"
 TARGET_ANALYSIS_RUNTIME="$RUNTIME/analysis-api"
 TARGET_HEALTH_SOURCE="$REPO/services/pi/health"
 TARGET_HEALTH_RUNTIME="$RUNTIME/health"
+TARGET_ALPHAESS_SOURCE="$REPO/services/pi/integrations/alphaess"
+TARGET_ALPHAESS_RUNTIME="$RUNTIME/integrations/alphaess"
 PERFORMANCE_COMMAND="/usr/local/bin/ems-performance"
 HEALTH_COMMAND="/usr/local/bin/ems-health"
 SYSTEMD="$REPO/deploy/systemd"
@@ -55,6 +57,7 @@ echo "Status API:$TARGET_STATUS_SOURCE"
 echo "Web API:   $TARGET_WEB_DATA_SOURCE"
 echo "AI API:    $TARGET_ANALYSIS_SOURCE"
 echo "Health:    $TARGET_HEALTH_SOURCE"
+echo "AlphaESS:  $TARGET_ALPHAESS_SOURCE"
 echo "Runtime:   $RUNTIME"
 echo
 
@@ -351,6 +354,24 @@ else
     )
 fi
 
+echo "=== TARGET-STRUCTURE ALPHAESS FILES ==="
+if [[ ! -d "$TARGET_ALPHAESS_RUNTIME" ]]; then
+    echo "MISSING: $TARGET_ALPHAESS_RUNTIME"
+    FAIL=1
+else
+    while IFS= read -r rel; do
+        src="$TARGET_ALPHAESS_SOURCE/$rel"
+        dst="$TARGET_ALPHAESS_RUNTIME/$rel"
+        if [[ ! -f "$dst" ]]; then
+            echo "MISSING: alphaess/$rel"
+            FAIL=1
+        elif ! cmp -s "$src" "$dst"; then
+            echo "DRIFT: alphaess/$rel"
+            FAIL=1
+        fi
+    done < <(cd "$TARGET_ALPHAESS_SOURCE" && find . -type f \
+        -not -path '*/__pycache__/*' -not -name '*.pyc' -printf '%P\n' | sort)
+fi
 echo "=== EMS PERFORMANCE COMMAND ==="
 if [[ ! -L "$PERFORMANCE_COMMAND" ]]; then
     echo "MISSING: $PERFORMANCE_COMMAND symlink"
