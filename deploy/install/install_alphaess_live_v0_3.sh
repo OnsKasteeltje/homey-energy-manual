@@ -24,8 +24,11 @@ echo "=== BATTERY LIVE SOURCE TESTS ==="
 (cd "$REPO" && node tests/frontend/test_live_battery_v03.mjs)
 (cd "$REPO" && node --check frontend/live/render/battery.mjs)
 
-# Fail closed on any unrelated local changes; prior source must match HEAD^.
-# This deliberately avoids broad rsync --delete or a complete EMS deployment.
+# Fail closed on unrelated deployed changes. Accept either the previous
+# V0.2 release or the current V0.3 source: do not infer a deployment baseline
+# from HEAD^ after later GitHub documentation/reliability-only commits.
+# This installer never invokes broad rsync --delete.
+BASELINE_COMMIT="c2ea047e53fe23bd12db1941c018cb5f0f9808c3"
 for rel in "$SOURCE_API" frontend/live/index.html frontend/live/styles/live.css; do
   if [[ "$rel" = "$SOURCE_API" ]]; then
     dest="$RUNTIME_API"
@@ -36,7 +39,7 @@ for rel in "$SOURCE_API" frontend/live/index.html frontend/live/styles/live.css;
     echo "STOP: deployed file missing: $dest"; exit 1
   fi
   if ! cmp -s "$REPO/$rel" "$dest" &&
-     ! cmp -s <(git -C "$REPO" show "HEAD^:$rel") "$dest"; then
+     ! cmp -s <(git -C "$REPO" show "$BASELINE_COMMIT:$rel") "$dest"; then
     echo "STOP: existing deployed source drift at $dest"; exit 1
   fi
 done
@@ -73,9 +76,41 @@ for rel in frontend/live/index.html frontend/live/styles/live.css \
   install -D -m 0644 "$REPO/$rel" "$dest"
 done
 
+# A Type=simple systemd ACTIVE result does not prove the TCP listener or
+# read-only endpoints are ready. Check both JSON-bearing routes with a bounded
+# wait; the battery may legitimately report STALE/UNAVAILABLE as a *200*.
+web_api_ready() {
+  local mode="$1" battery
+  systemctl is-active --quiet ems-web-data-api.service || return 1
+  curl --fail --silent --max-time 2 \
+    http://127.0.0.1:3200/web/state/current >/dev/null || return 1
+  if [[ "$mode" == "live" ]]; then
+    battery="$(curl --fail --silent --max-time 2 \
+      http://127.0.0.1:3200/web/live/battery)" || return 1
+    python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+assert data.get("schema") == "EMS_WEB_LIVE_BATTERY_V1"
+assert data.get("status") in ("FRESH", "STALE", "PARTIAL", "UNAVAILABLE")
+' <<< "$battery" || return 1
+  fi
+}
+
+wait_for_web_api() {
+  local mode="$1" attempt
+  for ((attempt=1; attempt<=20; attempt++)); do
+    if web_api_ready "$mode"; then
+      echo "PASS: read-only Web Data API HTTP ready (check $attempt/20)"
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 if ! systemctl restart ems-web-data-api.service ||
-   ! systemctl is-active --quiet ems-web-data-api.service; then
-  echo "ERROR: restarting Web Data API failed; restoring previous version"
+   ! wait_for_web_api live; then
+  echo "ERROR: read-only Web Data API HTTP health check failed; restoring previous version"
   cp -a "$BACKUP/server.py" "$RUNTIME_API"
   cp -a "$BACKUP/index.html" "$ROOT/live/index.html"
   cp -a "$BACKUP/live.css" "$ROOT/live/styles/live.css"
@@ -89,10 +124,15 @@ if ! systemctl restart ems-web-data-api.service ||
   else
     rm -f "$ROOT/live/state/battery-state.mjs"
   fi
-  systemctl restart ems-web-data-api.service || true
+  if systemctl restart ems-web-data-api.service &&
+     wait_for_web_api core; then
+    echo "PASS: previous Web Data API restored and HTTP-responsive"
+  else
+    echo "ERROR: rollback was attempted but original Web Data API is not HTTP-responsive"
+  fi
   exit 1
 fi
 cmp "$REPO/$SOURCE_API" "$RUNTIME_API"
-echo "PASS: Web Data API running and Live battery assets deployed"
+echo "PASS: Web Data API HTTP-ready and Live battery assets deployed"
 echo "No battery timer, P1, Homey or EMS control service was changed"
 echo "Backup: $BACKUP"
