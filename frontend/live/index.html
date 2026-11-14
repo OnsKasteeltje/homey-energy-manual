@@ -54,6 +54,21 @@
       </div>
     </section>
 
+    <section class="battery-panel" aria-label="AlphaESS batterij — uitsluitend monitoring">
+      <header class="battery-heading">
+        <div><small>ALPHAESS · READ-ONLY</small><h2>Thuisaccu</h2></div>
+        <span id="battery-quality" role="status">Laden…</span>
+      </header>
+      <div class="battery-metrics">
+        <div><small>Laadniveau</small><strong id="battery-soc">—</strong><span>Gemeten SOC</span></div>
+        <div><small>AC-vermogen</small><strong id="battery-ac-power">—</strong><span id="battery-power-detail">—</span></div>
+        <div><small>Totaal geladen</small><strong id="battery-charged">—</strong><span>Batterijteller · geen netenergie</span></div>
+        <div><small>Totaal ontladen</small><strong id="battery-discharged">—</strong><span>Batterijteller · geen AC-netenergie</span></div>
+      </div>
+      <p id="battery-freshness" class="battery-freshness">Wachten op AlphaESS-meetgegevens.</p>
+      <p class="battery-disclaimer">Afzonderlijke batterijobservatie via Pi-historie. Niet verwerkt in P1-, PV- of huisverbruikscijfers en geen batterijaansturing. Laadteken van AC-vermogen is nog niet afzonderlijk gevalideerd.</p>
+    </section>
+
     <section class="loads-panel" aria-label="Actieve verbruikers">
       <header class="loads-heading">
         <div><small>HOMEY + P1</small><h2>Actieve verbruikers</h2></div>
@@ -80,6 +95,7 @@
   </main>
 
   <script type="module" src="./render/live.js"></script>
+  <script type="module" src="./render/battery.mjs"></script>
   <script type="module" src="../shared/navigation.js"></script>
 </body>
 </html>

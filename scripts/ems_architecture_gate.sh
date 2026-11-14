@@ -709,7 +709,11 @@ if grep -Eq 'systemctl[[:space:]]+enable.*ems-alphaess-readonly' \
     fail "AlphaESS timer must not auto-enable"
 fi
 bash -n deploy/install/install_alphaess_readonly_v0_2.sh || fail "AlphaESS installer invalid"
-pass "AlphaESS V0.2 disabled-timer SHADOW history boundary"
+[[ -f deploy/install/install_alphaess_live_v0_3.sh ]] || fail "AlphaESS Live installer missing"
+bash -n deploy/install/install_alphaess_live_v0_3.sh || fail "AlphaESS Live installer shell syntax invalid"
+python3 tests/api/test_alphaess_live_battery_resource.py || fail "AlphaESS Live API isolation failed"
+node tests/frontend/test_live_battery_v03.mjs || fail "AlphaESS Live display boundary failed"
+pass "AlphaESS V0.3 isolated Live read-only view"
 
 # A single focused end-to-end contract for the read-only heating archive view.
 python3 tests/api/test_heating_daily_web_resource.py || fail "Heating Analysis API/page contract failed"
