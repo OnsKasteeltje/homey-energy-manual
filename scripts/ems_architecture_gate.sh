@@ -695,6 +695,12 @@ fi
 
 pass "canonical local derived-history pipeline present and isolated from legacy polling"
 
+# AlphaESS boundary is source-only, single-client FC03, fail-closed and SHADOW.
+[[ -f services/pi/integrations/alphaess/collect_readonly.py ]] || fail "AlphaESS read-only collector missing"
+[[ -f tests/integrations/alphaess/test_alphaess_readonly.py ]] || fail "AlphaESS read-only tests missing"
+python3 tests/integrations/alphaess/test_alphaess_readonly.py || fail "AlphaESS read-only interface safety regression failed"
+pass "AlphaESS Modbus read-only SHADOW boundary contract"
+
 # A single focused end-to-end contract for the read-only heating archive view.
 python3 tests/api/test_heating_daily_web_resource.py || fail "Heating Analysis API/page contract failed"
 python3 tests/api/test_heating_daily_temperature_series.py || fail "Heating Analysis 15m graph/response/cooling contract failed"

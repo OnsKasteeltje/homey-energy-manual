@@ -42,6 +42,7 @@ homey-energy-manual/
 │       │   ├── easee/
 │       │   ├── honeywell/
 │       │   ├── connectlife/
+│       │   ├── alphaess/
 │       │   └── energy-prices/
 │       └── history/
 │
