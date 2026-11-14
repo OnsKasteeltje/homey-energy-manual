@@ -699,7 +699,17 @@ pass "canonical local derived-history pipeline present and isolated from legacy 
 [[ -f services/pi/integrations/alphaess/collect_readonly.py ]] || fail "AlphaESS read-only collector missing"
 [[ -f tests/integrations/alphaess/test_alphaess_readonly.py ]] || fail "AlphaESS read-only tests missing"
 python3 tests/integrations/alphaess/test_alphaess_readonly.py || fail "AlphaESS read-only interface safety regression failed"
-pass "AlphaESS Modbus read-only SHADOW boundary contract"
+[[ -f deploy/systemd/ems-alphaess-readonly.service ]] || fail "AlphaESS service missing"
+[[ -f deploy/systemd/ems-alphaess-readonly.timer ]] || fail "AlphaESS timer missing"
+[[ -f deploy/install/install_alphaess_readonly_v0_2.sh ]] || fail "AlphaESS installer missing"
+grep -q 'TARGET_ALPHAESS_SOURCE' scripts/deploy_ems_pi.sh || fail "AlphaESS deploy mapping missing"
+grep -q 'TARGET-STRUCTURE ALPHAESS' scripts/ems_pi_drift_check.sh || fail "AlphaESS drift mapping missing"
+if grep -Eq 'systemctl[[:space:]]+enable.*ems-alphaess-readonly' \
+    scripts/deploy_ems_pi.sh deploy/install/install_alphaess_readonly_v0_2.sh; then
+    fail "AlphaESS timer must not auto-enable"
+fi
+bash -n deploy/install/install_alphaess_readonly_v0_2.sh || fail "AlphaESS installer invalid"
+pass "AlphaESS V0.2 disabled-timer SHADOW history boundary"
 
 # A single focused end-to-end contract for the read-only heating archive view.
 python3 tests/api/test_heating_daily_web_resource.py || fail "Heating Analysis API/page contract failed"

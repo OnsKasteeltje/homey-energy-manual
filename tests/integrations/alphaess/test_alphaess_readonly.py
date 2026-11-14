@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Focused safety/decoding checks; no hardware/network writes."""
 import importlib.util
+import contextlib
+import io
 from pathlib import Path
 import sqlite3
 import struct
@@ -119,12 +121,41 @@ class AlphaESSReadonlyTests(unittest.TestCase):
                     quality TEXT, source_resolution_seconds INTEGER,
                     UNIQUE(ts_utc, device_id, metric_id));
                 """)
-            self.assertEqual(alpha.archive_snapshot(path, snapshot), len(alpha.ARCHIVE_METRICS))
+            self.assertEqual(alpha.archive_snapshot(path, snapshot, sample_validity_sec=300), len(alpha.ARCHIVE_METRICS))
             self.assertEqual(alpha.archive_snapshot(path, snapshot), 0)
             with sqlite3.connect(path) as con:
                 self.assertEqual(con.execute("SELECT count(*) FROM devices").fetchone()[0], 1)
                 self.assertEqual(con.execute("SELECT count(*) FROM measurements").fetchone()[0], len(alpha.ARCHIVE_METRICS))
                 self.assertEqual(con.execute("SELECT count(*) FROM metrics WHERE metric_key LIKE 'battery_%'").fetchone()[0], 4)
+                self.assertEqual(con.execute("SELECT DISTINCT source_resolution_seconds FROM measurements").fetchone()[0], 300)
+            with self.assertRaisesRegex(ValueError, "INVALID_SAMPLE_VALIDITY"):
+                alpha.archive_snapshot(path, snapshot, sample_validity_sec=600)
+
+    def test_archive_failure_is_nonzero(self):
+        with patch.object(alpha.socket, "create_connection", return_value=self.fake()):
+            observed = alpha.collect("192.0.2.3")
+        with patch.object(alpha, "collect", return_value=observed), patch.object(
+            alpha, "archive_snapshot", side_effect=sqlite3.OperationalError("locked")
+        ), contextlib.redirect_stdout(io.StringIO()) as output:
+            code = alpha.main(["--host", "192.0.2.3", "--archive-db", "/nonexistent/db"])
+        self.assertEqual(code, 2)
+        self.assertIn('"archiveStatus": "FAILED"', output.getvalue())
+
+    def test_disabled_timer_and_deploy_boundaries(self):
+        root = SOURCE.parents[4]
+        service = (root / "deploy/systemd/ems-alphaess-readonly.service").read_text()
+        timer = (root / "deploy/systemd/ems-alphaess-readonly.timer").read_text()
+        installer = (root / "deploy/install/install_alphaess_readonly_v0_2.sh").read_text()
+        deploy = (root / "scripts/deploy_ems_pi.sh").read_text()
+        drift = (root / "scripts/ems_pi_drift_check.sh").read_text()
+        self.assertIn("EnvironmentFile=/etc/ems/alphaess-readonly.env", service)
+        self.assertIn("--sample-validity-sec 300", service)
+        self.assertIn("OnCalendar=*-*-* *:00/5:00", timer)
+        self.assertNotIn("systemctl enable", installer)
+        self.assertNotIn("enable --now ems-alphaess", deploy)
+        self.assertIn("TARGET_ALPHAESS_RUNTIME", installer + deploy + drift)
+        self.assertIn("TARGET-STRUCTURE ALPHAESS", drift)
+
 
 
 if __name__ == "__main__":
