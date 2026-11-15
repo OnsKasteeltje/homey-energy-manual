@@ -18,6 +18,13 @@ function render(raw) {
   set("battery-power-detail", acDirectionText(s.acPowerW));
   set("battery-charged", batteryValue(s.chargeTotalKWh, "kWh"));
   set("battery-discharged", batteryValue(s.dischargeTotalKWh, "kWh"));
+  // One independent AlphaESS reading drives both the read-only detail panel
+  // and the neutral topology node. No inferred charge/discharge direction.
+  set("battery-flow-power", batteryValue(s.acPowerW, "W", 0));
+  set("battery-flow-status", s.status === "FRESH"
+    ? "Richting onbevestigd" : "Niet actueel");
+  const link = document.getElementById("battery-flow-link");
+  if (link) link.textContent = "↕";
   const t = Date.parse(s.sampledAtUtc ?? "");
   const label = Number.isFinite(t) ? new Intl.DateTimeFormat("nl-NL", {
     timeZone: "Europe/Amsterdam", day: "2-digit", month: "2-digit",
