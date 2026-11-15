@@ -26,3 +26,8 @@
 @media (max-width:480px) {
   .ems-floating-popup {max-width:calc(100vw - 24px);}
 }
+
+/* Legacy hover selectors must not reveal a restored, explicitly closed tooltip. */
+.pv-node .pv-source-popover[hidden],
+.pv-node:hover .pv-source-popover[hidden],
+.pv-node:focus-within .pv-source-popover[hidden] {display:none!important;}
