@@ -715,6 +715,13 @@ python3 tests/deploy/test_alphaess_live_http_readiness_contract.py || fail "Alph
 python3 tests/api/test_alphaess_live_battery_resource.py || fail "AlphaESS Live API isolation failed"
 node tests/frontend/test_live_battery_v03.mjs || fail "AlphaESS Live display boundary failed"
 pass "AlphaESS V0.3 isolated Live read-only view"
+node --check frontend/live/render/live.js || fail "Live V0.4 renderer syntax invalid"
+node --check frontend/live/render/battery.mjs || fail "Live V0.4 battery renderer syntax invalid"
+node --check frontend/live/state/flow-v04.mjs || fail "Live V0.4 flow model syntax invalid"
+node tests/frontend/test_live_v04_flow.mjs || fail "Live V0.4 bidirectional and source isolation contract failed"
+bash -n deploy/install/install_live_v0_4.sh || fail "Live V0.4 installer shell syntax invalid"
+python3 tests/deploy/test_live_v04_release_contract.py || fail "Live V0.4 installation boundary failed"
+pass "Live V0.4 single-screen bidirectional presentation only"
 
 # A single focused end-to-end contract for the read-only heating archive view.
 python3 tests/api/test_heating_daily_web_resource.py || fail "Heating Analysis API/page contract failed"

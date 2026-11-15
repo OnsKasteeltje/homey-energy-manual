@@ -1,5 +1,6 @@
 import {loadState, formatPower, formatLocalTime} from "../state/energy-state.js";
 import {diagnoseDishwasher} from "../diagnostics/dishwasher-fingerprint.mjs";
+import {flowView} from "../state/flow-v04.mjs";
 
 const DISHWASHER_HISTORY_KEY = "ems-live-dishwasher-p1-only-l1-v2";
 function readDishwasherHistory() {
@@ -114,7 +115,14 @@ function consumerExplanation(s, dishwasher) {
 
 function render(s) {
   const dishwasher = dishwasherDiagnosis(s);
-  set("pv-power", formatPower(currentPvPower(s)));
+  const f = flowView(s);
+  set("pv-power", formatPower(f.pvPowerW));
+  const pvFlow = $("pv-flow");
+  if (pvFlow) {
+    pvFlow.textContent = f.pvArrow;
+    pvFlow.classList.toggle("available", f.pvArrow === "→");
+    pvFlow.classList.toggle("unknown", f.pvArrow !== "→");
+  }
   const pvByKey = Object.fromEntries(s.pvSources.map((source) => [source.key, source]));
   set("pv-source-summary", pvSourceSummary(s));
   set("pv-se", sourcePowerText(pvByKey.solarEdge));
@@ -125,18 +133,24 @@ function render(s) {
   set("pv-gw20-age", pvByKey.goodWe2000 ? pvAge(pvByKey.goodWe2000) : "—");
   set("pv-summary", pvQualityText(s));
 
-  set("grid-power", formatPower(s.grid === null ? null : Math.abs(s.grid)));
-  set("grid-direction", s.p1Valid ? s.gridDirection : "P1 niet actueel");
+  set("grid-power", formatPower(f.gridPowerW));
+  set("grid-direction", f.gridDirection);
+  set("flow-grid-summary", f.gridSummary);
+  set("flow-quality", f.qualityText);
+  set("phases-net-power", formatPower(f.gridPowerW));
+  set("phases-net-direction", f.gridDirection);
   const gridFlow = $("grid-flow");
   if (gridFlow) {
-    gridFlow.classList.toggle("export", s.grid !== null && s.grid < 0);
-    gridFlow.classList.toggle("balanced", s.grid === null || s.grid === 0);
+    gridFlow.textContent = f.gridArrow;
+    gridFlow.classList.toggle("import", f.gridDirection === "import");
+    gridFlow.classList.toggle("export", f.gridDirection === "export");
+    gridFlow.classList.toggle("unknown", !["import", "export"].includes(f.gridDirection));
   }
 
-  set("house-power", formatPower(s.house));
-  set("house-state", s.houseQuality === "DERIVED"
-    ? "berekend uit PV + P1"
-    : !s.p1Valid ? "P1 niet actueel" : "PV-data onvoldoende");
+  // V0.4 explicitly does not display old PV + P1 as household consumption:
+  // with AlphaESS installed, the independent battery AC contribution is unknown.
+  set("house-power", formatPower(f.housePowerW));
+  set("house-state", f.houseExplanation);
 
   set("tesla-power", formatPower(s.tesla));
   set("tesla-state", s.teslaCharging ? `laden${s.teslaRequestedA ? ` · ${s.teslaRequestedA} A` : ""}` : s.teslaConnected ? "aangesloten" : "niet aangesloten");
@@ -146,7 +160,8 @@ function render(s) {
   set("ww-state", s.wwOn ? "Boiler · verwarmen" : "Boiler");
   set("heat-power", formatPower(s.heat));
   set("heat-state", s.heatOn ? "warmtevraag" : "stand-by");
-  set("other-power", formatPower(s.other));
+  set("other-power", formatPower(f.otherPowerW));
+  set("other-state", "Residubepaling wacht op gevalideerde accubijdrage");
 
   set("loads-washer-status", applianceStatus(s.loads.washer.active));
   set("loads-washer-detail", applianceDetail(s.loads.washer));
@@ -165,6 +180,32 @@ function render(s) {
 }
 
 function renderError(error) {
+  // Reset source figures when the canonical state endpoint is unavailable.
+  const f = flowView({});
+  for (const id of ["pv-power", "grid-power", "house-power", "other-power",
+    "tesla-power", "heat-power", "ww-power", "phases-net-power",
+    "loads-phase-l1", "loads-phase-l2", "loads-phase-l3"]) set(id, "—");
+  for (const id of ["pv-summary", "pv-source-summary", "pv-se", "pv-gw42",
+    "pv-gw20", "pv-se-age", "pv-gw42-age", "pv-gw20-age",
+    "tesla-state", "ww-state", "heat-state"]) set(id, "Niet beschikbaar");
+  set("grid-direction", f.gridDirection);
+  set("phases-net-direction", f.gridDirection);
+  set("house-state", f.houseExplanation);
+  set("flow-grid-summary", f.gridSummary);
+  set("flow-quality", f.qualityText);
+  set("other-state", "Geen betrouwbare restpost");
+  const gridFlow = $("grid-flow");
+  if (gridFlow) {
+    gridFlow.textContent = f.gridArrow;
+    gridFlow.classList.remove("import", "export");
+    gridFlow.classList.add("unknown");
+  }
+  const pvFlow = $("pv-flow");
+  if (pvFlow) {
+    pvFlow.textContent = f.pvArrow;
+    pvFlow.classList.remove("available");
+    pvFlow.classList.add("unknown");
+  }
   set("loads-dishwasher-status", "Onbekend");
   set("loads-dishwasher-detail", "Geen actuele gegevens");
   set("loads-washer-status", "Onbekend");

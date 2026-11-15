@@ -1,0 +1,203 @@
+/* EMS Live V0.4 - single-screen observability layout, desktop first.
+   Render-only: no device writes, no battery participation in house accounting. */
+.live-dashboard{
+  --v4-ink:#14243d; --v4-blue:#346ea9; --v4-green:#199c76;
+  --v4-orange:#cc8133; --v4-muted:#627995;
+  display:grid;grid-template-columns:minmax(0, 1.82fr) minmax(340px,1fr);
+  grid-template-rows:minmax(0,1.26fr) minmax(0,1fr);
+  gap:12px;width:min(1570px,calc(100% - 36px));
+  height:calc(100dvh - 92px);min-height:0;margin:12px auto; padding:0;
+}
+.live-dashboard>section{min-width:0;min-height:0;margin:0;padding:16px 18px;
+  border:1px solid #dbe6f1;border-radius:20px;background:#fff;
+  box-shadow:0 5px 22px rgba(40,72,104,.055);}
+.live-dashboard .live-card-head{display:flex;align-items:center;justify-content:space-between;
+  gap:12px;min-width:0;margin-bottom:10px;}
+.live-dashboard .live-card-head h1,.live-dashboard .live-card-head h2{
+  font-size:clamp(16px,1.45vw,20px);line-height:1.16;margin:3px 0 0;color:var(--v4-ink);}
+.live-dashboard .live-card-head small{font-size:10px;letter-spacing:.12em;
+  font-weight:800;color:#68819e;}
+.live-dashboard .live-subtitle,.live-dashboard .loads-heading>span{
+  color:var(--v4-muted);font-size:11px;text-align:right;line-height:1.4;}
+
+/* Source / hub / consumers are a presentation graph, not a conserved Sankey. */
+.live-dashboard .flow-card{display:flex;flex-direction:column;}
+.energy-diagram{display:grid;grid-template-columns:minmax(140px,1fr) minmax(165px,1.15fr)
+  minmax(140px,1fr);gap:9px;align-items:center;flex:1;min-height:0;}
+.energy-sources{display:grid;gap:12px;align-content:center;}
+.energy-consumers{display:grid;gap:8px;align-content:center;}
+.energy-node{display:flex;gap:9px;align-items:center;min-width:0;min-height:66px;
+  padding:9px 10px;background:#f8fbfe;border:1px solid #dce8f4;border-radius:14px;}
+.energy-node>div{display:grid;gap:2px;min-width:0}
+.energy-node strong{font-size:clamp(16px,1.6vw,23px);font-weight:800;white-space:nowrap;
+  color:var(--v4-ink);font-variant-numeric:tabular-nums;}
+.energy-node small{font-size:10px;letter-spacing:.05em;font-weight:750;color:#637a97;}
+.energy-node em{font-size:10px;font-style:normal;color:var(--v4-muted);
+  line-height:1.25;overflow:hidden;text-overflow:ellipsis;}
+.energy-glyph{flex:0 0 30px;display:grid;place-items:center;width:30px;height:30px;
+  border-radius:10px;background:#e9f3ff;color:#356fa9;font-size:21px}
+.energy-consumer{min-height:61px;position:relative;}
+.energy-consumer:not([hidden])::before{content:"";position:absolute;left:-9px;
+  width:8px;border-top:2px solid #c3d7ec;}
+.energy-consumer[hidden]{display:none!important;}
+.energy-center{display:flex;position:relative;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;min-width:0;min-height:0;height:100%;}
+.home-node{display:flex;flex-direction:column;justify-content:center;align-items:center;
+  text-align:center;gap:5px;width:min(100%,171px);aspect-ratio:1;
+  padding:12px;border:1px solid #bcd7f0;border-radius:50%;
+  background:radial-gradient(circle at 35% 27%,white,#ecf5fc 85%);
+  box-shadow:0 0 0 7px #f1f7fc;}
+.home-node .hub-symbol{font-size:25px;line-height:1;color:#376a9e;}
+.home-node small{font-size:9px;letter-spacing:.11em;color:#6d829e;font-weight:800;}
+.home-node strong{font-size:clamp(18px,1.95vw,27px);line-height:1;font-variant-numeric:tabular-nums}
+.home-node span:last-child{font-size:9px;line-height:1.35;color:#637990;max-width:135px}
+.flow-arrows{position:absolute;left:0;top:32%;transform:translateX(-20%);display:grid;
+  gap:34px;z-index:2;pointer-events:none;}
+.energy-link{width:32px;height:22px;display:grid;place-items:center;
+  font-size:22px;font-weight:700;color:#8495aa}
+.energy-link-pv.available{color:var(--v4-green);}
+.energy-link-grid.import{color:var(--v4-blue);}
+.energy-link-grid.export{color:var(--v4-orange);}
+.energy-link.unknown{color:#98aabc;}
+.battery-flow{display:grid;justify-items:center;gap:3px;width:min(100%,190px)}
+.battery-flow-link{line-height:1;font-size:20px;color:#a1b1c1;}
+.battery-flow-node{display:grid;gap:2px;width:100%;text-align:center;
+  padding:6px 10px;border:1px dashed #b6c9dc;border-radius:12px;background:#f8fbfe}
+.battery-flow-node small{color:#687d99;font-size:9px;letter-spacing:.07em;font-weight:800}
+.battery-flow-node strong{font-size:17px;font-variant-numeric:tabular-nums}
+.battery-flow-node span{font-size:9px;color:#627b96;line-height:1.2}
+.flow-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding-top:7px;border-top:1px solid #e6eef6;font-size:10px;color:#647e98;}
+.flow-footer>span:last-child{text-align:right}
+.pv-node{position:relative;overflow:visible;cursor:help}
+.pv-source-summary{position:absolute;right:8px;top:5px;font-size:9px;
+  font-weight:750;color:#647f99;}
+.pv-node .pv-source-popover{display:none;position:absolute;top:calc(100% + 7px);
+  left:0;z-index:35;min-width:245px;max-width:340px;padding:12px;
+  border:1px solid #d5e4f1;border-radius:13px;background:#fff;
+  box-shadow:0 12px 30px rgba(36,63,92,.18)}
+.pv-node:hover .pv-source-popover,.pv-node:focus-within .pv-source-popover{display:grid!important;gap:6px;}
+.pv-source-popover>small{font-size:10px;font-weight:800;color:#6b819d;}
+.pv-source-row{display:grid!important;grid-template-columns:1fr auto;align-items:center;
+  gap:2px 10px;}
+.pv-source-row span{width:auto!important;height:auto!important;font-size:10px!important;
+  background:none!important;color:#334a64!important;white-space:nowrap;}
+.pv-source-row strong{font-size:11px!important}
+.pv-source-row em{grid-column:1/-1;font-size:9px!important;color:#69819d!important}
+
+/* Compact source-isolated AlphaESS card; all values are telemetry, not dispatch. */
+.battery-panel{display:flex;flex-direction:column;gap:0;}
+.battery-heading>span{font-size:10px!important;color:#5a7592!important;
+  background:#f0f7ff;border-radius:99px;padding:5px 9px;font-weight:750}
+.battery-primary{display:grid;grid-template-columns:52px minmax(0,1fr) minmax(0,1.05fr);
+  gap:9px;align-items:center;padding:10px;border:1px solid #dce8f4;
+  border-radius:14px;background:#f8fbfe;}
+.battery-graphic{height:60px;width:37px;margin:auto;display:grid;place-items:end center;
+  border:3px solid #6b88a7;border-radius:9px;position:relative;
+  background:linear-gradient(to top,#d6f4e6 18%,transparent 18%);}
+.battery-graphic::after{content:"";position:absolute;top:-7px;width:16px;height:5px;
+  border-radius:2px 2px 0 0;background:#6b88a7}
+.battery-graphic span{display:none}
+.battery-soc,.battery-ac{display:grid;align-content:center;gap:4px;min-width:0;}
+.battery-ac{border-left:1px solid #dce7f3;padding-left:9px}
+.battery-soc small,.battery-ac small,.battery-metrics small{
+  color:#647c99;font-size:10px}
+.battery-soc strong,.battery-ac strong{font-size:clamp(18px,2vw,28px);
+  font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.2}
+.battery-soc span,.battery-ac span{font-size:10px;color:#607996;line-height:1.25}
+.battery-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.battery-metrics>div{display:grid;gap:4px;padding:11px 12px;border-radius:13px;
+  background:#f8fbfe;border:1px solid #e0eaf4}
+.battery-metrics strong{font-size:clamp(18px,1.6vw,23px);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.battery-metrics span{font-size:10px;color:#627b98}
+.battery-freshness{font-size:10px;color:#506987;margin:11px 0 4px;}
+.evidence-details{margin-top:auto;color:#67809a;font-size:11px;}
+.evidence-details summary{cursor:pointer;list-style:revert;padding:3px 0;min-height:24px}
+.evidence-details:focus-within{outline-color:#8fbbea}
+.evidence-details p{margin:6px 0 0;line-height:1.45;font-size:10px;}
+
+/* Compact consumer list and independently grounded P1 phase display. */
+.loads-panel{display:flex;flex-direction:column}
+.loads-layout{display:block;min-height:0}
+.loads-devices{display:grid;gap:5px}
+.loads-device{display:flex;justify-content:space-between;align-items:center;
+  gap:9px;min-height:43px;padding:6px 10px;border:1px solid #e0eaf4;
+  border-radius:11px;background:#f8fbfe}
+.loads-device>div{min-width:0;display:grid;gap:1px}
+.loads-device strong{font-size:12px}
+.loads-device small{font-size:10px;color:#647b95;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:48vw}
+.loads-device>span{font-size:11px;font-weight:750;white-space:nowrap;
+  padding:5px 8px;border:1px solid #dbe7f2;border-radius:99px;background:#fff}
+.loads-panel .evidence-details{padding-top:6px}
+.loads-explanation,.loads-disclaimer{font-size:10px;color:#617b97;line-height:1.5}
+.phases-panel{display:flex;flex-direction:column;}
+.loads-phases{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.loads-phases>div{display:grid;align-content:center;gap:8px;min-height:100px;
+  border:1px solid #dce8f4;border-radius:13px;padding:11px;background:#f8fbfe}
+.loads-phases small{font-size:10px;color:#697f9b;font-weight:750}
+.loads-phases strong{font-size:clamp(16px,1.7vw,25px);font-variant-numeric:tabular-nums;
+  white-space:nowrap;color:#172b44}
+.phases-total{display:flex;align-items:center;justify-content:space-between;
+  margin-top:12px;border-top:1px solid #e0eaf3;padding:10px 3px 0;gap:10px}
+.phases-total>div{display:grid;gap:3px}
+.phases-total small{font-size:10px;color:#627b98}
+.phases-total strong{font-size:clamp(18px,1.7vw,23px)}
+.phases-total>span{font-size:11px;color:#5f7691;font-weight:750}
+.phases-note{margin:10px 0 0;font-size:10px;color:#6b839b;}
+@media (min-width:1051px) and (max-height:800px){
+  .live-dashboard{height:calc(100dvh - 84px);margin:8px auto;gap:9px}
+  .live-dashboard>section{padding:10px 13px;border-radius:16px}
+  .live-dashboard .live-card-head{margin-bottom:5px}
+  .energy-node{min-height:54px;padding:6px 8px}
+  .energy-sources{gap:7px}.energy-consumers{gap:5px}
+  .energy-consumer{min-height:53px}
+  .home-node{width:min(100%,143px);padding:8px}
+  .home-node .hub-symbol{font-size:20px}.home-node strong{font-size:19px}
+  .battery-flow{gap:0}.battery-flow-link{font-size:15px}
+  .battery-flow-node{padding:3px 7px}
+  .battery-primary{padding:7px}.battery-metrics{margin-top:7px}
+  .battery-metrics>div{padding:7px 9px}
+  .battery-freshness{margin:5px 0}
+  .loads-devices{gap:4px}.loads-device{min-height:38px;padding:4px 9px}
+  .loads-phases>div{min-height:73px}
+  .phases-total{margin-top:6px;padding-top:7px}
+  .phases-note{margin-top:6px}
+}
+@media (max-width:1050px){
+  .live-dashboard{display:grid;width:min(95%,1000px);height:auto;min-height:0;
+    grid-template-columns:minmax(0,1fr) minmax(250px,.75fr);grid-template-rows:auto;gap:12px}
+  .energy-diagram{min-height:310px}
+  .live-dashboard>section{min-height:0}
+}
+@media (max-width:760px){
+  .live-dashboard{grid-template-columns:minmax(0,1fr);width:calc(100% - 22px);margin:10px auto}
+  .energy-diagram{min-height:290px;gap:5px;
+    grid-template-columns:minmax(0,.95fr) minmax(0,1.1fr) minmax(0,.95fr)}
+  .energy-node{min-height:60px;padding:6px;gap:4px}
+  .energy-node strong{font-size:15px}
+  .energy-node small{font-size:9px}
+  .energy-node em{font-size:9px}
+  .energy-glyph{width:23px;flex-basis:23px;font-size:17px}
+  .home-node{width:min(100%,127px);padding:7px}
+  .home-node small{font-size:8px}.home-node strong{font-size:18px}
+  .flow-arrows{left:-7px}
+  .live-dashboard .live-subtitle,.live-dashboard .loads-heading>span{display:none}
+  .loads-device small{max-width:50vw}
+}
+@media(max-width:390px){
+  .energy-diagram{grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    grid-template-areas:"sources center" "consumers consumers";gap:10px}
+  .energy-sources{grid-area:sources}
+  .energy-center{grid-area:center;min-height:215px}
+  .energy-consumers{grid-area:consumers;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .energy-consumer::before{display:none}
+  .energy-consumer{min-height:54px}
+  .energy-node strong{font-size:14px}
+  .loads-phases>div{padding:7px}
+  .loads-phases strong{font-size:15px}
+}
+@media(prefers-reduced-motion:reduce){
+  .live-dashboard *{animation:none!important;transition:none!important}
+}

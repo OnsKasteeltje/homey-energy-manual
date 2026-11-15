@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="color-scheme" content="light">\n  <meta name="theme-color" content="#f4f8fc">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f4f8fc">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -12,6 +13,7 @@
   <title>EMS · Live</title>
   <link rel="stylesheet" href="../shared/styles/v2-shell.css">
   <link rel="stylesheet" href="./styles/live.css">
+  <link rel="stylesheet" href="./styles/live-v04.css">
 </head>
 <body>
   <header class="topbar">
@@ -19,58 +21,94 @@
     <nav data-ems-main-nav aria-label="Hoofdnavigatie"></nav>
     <div id="freshness" class="freshness">Laden…</div>
   </header>
-
-  <main>
+  <main class="live-dashboard" aria-label="EMS Live dashboard">
     <section class="flow-card" aria-label="Actuele energiestroom">
-      <article class="node grid-node"><div><small>Net · P1</small><strong id="grid-power">—</strong><em id="grid-direction">—</em></div></article>
-      <div id="grid-flow" class="flow-line grid-flow" aria-hidden="true"></div>
+      <header class="live-card-head">
+        <div><small>ENERGIESTROMEN</small><h1>Vermogen · live</h1></div>
+        <span class="live-subtitle">Net ↔ huis ↔ accu · alleen betrouwbare waarden</span>
+      </header>
+      <div class="energy-diagram">
+        <div class="energy-sources">
+          <article class="energy-node pv-node" tabindex="0" aria-describedby="pv-source-popover">
+            <span class="energy-glyph" aria-hidden="true">☀</span>
+            <div><small>PV · opwek</small><strong id="pv-power">—</strong><em id="pv-summary">—</em></div>
+            <span id="pv-source-summary" class="pv-source-summary">—</span>
+            <div id="pv-source-popover" class="pv-source-popover" role="tooltip" aria-label="Status PV-omvormers">
+              <small>Bronkwaliteit</small>
+              <div class="pv-source-row"><span>SolarEdge</span><strong id="pv-se">—</strong><em id="pv-se-age">—</em></div>
+              <div class="pv-source-row"><span>GoodWe 4200</span><strong id="pv-gw42">—</strong><em id="pv-gw42-age">—</em></div>
+              <div class="pv-source-row"><span>GoodWe 2000</span><strong id="pv-gw20">—</strong><em id="pv-gw20-age">—</em></div>
+            </div>
+          </article>
+          <article class="energy-node">
+            <span class="energy-glyph" aria-hidden="true">⌁</span>
+            <div><small>Net · HomeWizard P1</small><strong id="grid-power">—</strong><em id="grid-direction">—</em></div>
+          </article>
+        </div>
 
-      <div class="house-stack">
-        <article class="node pv-node" tabindex="0" aria-describedby="pv-source-popover">
-          <span>☀︎</span>
-          <div><small>PV</small><strong id="pv-power">—</strong><em id="pv-summary">—</em></div>
-          <b id="pv-source-summary" class="pv-source-summary">—</b>
-          <div id="pv-source-popover" class="pv-source-popover" role="tooltip" aria-label="Status PV-omvormers">
-            <small>PV-bronnen</small>
-            <div class="pv-source-row"><span>SolarEdge</span><strong id="pv-se">—</strong><em id="pv-se-age">—</em></div>
-            <div class="pv-source-row"><span>GoodWe 4200</span><strong id="pv-gw42">—</strong><em id="pv-gw42-age">—</em></div>
-            <div class="pv-source-row"><span>GoodWe 2000</span><strong id="pv-gw20">—</strong><em id="pv-gw20-age">—</em></div>
+        <div class="energy-center">
+          <div class="flow-arrows" aria-hidden="true">
+            <div id="pv-flow" class="energy-link energy-link-pv">→</div>
+            <div id="grid-flow" class="energy-link energy-link-grid">↔</div>
           </div>
-        </article>
-        <div class="pv-flow" aria-hidden="true"></div>
-        <article class="home-node">
-          <small>HUIS · BEREKEND</small>
-          <strong id="house-power">—</strong>
-          <span id="house-state">—</span>
-        </article>
-      </div>
+          <article class="home-node">
+            <span class="hub-symbol" aria-hidden="true">⌂</span>
+            <small>ENERGIEHUB · HUIS</small>
+            <strong id="house-power">—</strong>
+            <span id="house-state">Batterijbalans niet gevalideerd</span>
+          </article>
+          <div class="battery-flow" aria-label="Batterijverbinding; richting niet bevestigd">
+            <div id="battery-flow-link" class="battery-flow-link" aria-hidden="true">↕</div>
+            <div class="battery-flow-node">
+              <small>THUISACCU · READ-ONLY</small>
+              <strong id="battery-flow-power">—</strong>
+              <span id="battery-flow-status">Richting niet bevestigd</span>
+            </div>
+          </div>
+        </div>
 
-      <div class="flow-line load-flow" aria-hidden="true"></div>
-      <div class="load-stack">
-        <article class="node"><span>⚡</span><div><small>Tesla</small><strong id="tesla-power">—</strong><em id="tesla-state">—</em></div></article>
-        <article id="ww-flow-node" class="node" hidden><span>◉</span><div><small>Warm water</small><strong id="ww-power">—</strong><em id="ww-state">—</em></div></article>
-        <article class="node"><span>⌂</span><div><small>Ruimteverwarming</small><strong id="heat-power">—</strong><em id="heat-state">—</em></div></article>
-        <article class="node"><span>•••</span><div><small>Overig</small><strong id="other-power">—</strong><em>residu</em></div></article>
+        <div class="energy-consumers">
+          <article class="energy-node energy-consumer"><span class="energy-glyph" aria-hidden="true">⚡</span><div><small>Tesla</small><strong id="tesla-power">—</strong><em id="tesla-state">—</em></div></article>
+          <article id="ww-flow-node" class="energy-node energy-consumer" hidden><span class="energy-glyph" aria-hidden="true">◉</span><div><small>Warm water</small><strong id="ww-power">—</strong><em id="ww-state">—</em></div></article>
+          <article class="energy-node energy-consumer"><span class="energy-glyph" aria-hidden="true">♨</span><div><small>Ruimteverwarming</small><strong id="heat-power">—</strong><em id="heat-state">—</em></div></article>
+          <article class="energy-node energy-consumer"><span class="energy-glyph" aria-hidden="true">•••</span><div><small>Overig</small><strong id="other-power">—</strong><em id="other-state">Niet betrouwbaar te bepalen</em></div></article>
+        </div>
       </div>
+      <footer class="flow-footer">
+        <span id="flow-grid-summary">Net: —</span>
+        <span id="flow-quality">Huisverbruik niet gevalideerd met actieve thuisaccu</span>
+      </footer>
     </section>
 
     <section class="battery-panel" aria-label="AlphaESS batterij — uitsluitend monitoring">
-      <header class="battery-heading">
+      <header class="live-card-head battery-heading">
         <div><small>ALPHAESS · READ-ONLY</small><h2>Thuisaccu</h2></div>
         <span id="battery-quality" role="status">Laden…</span>
       </header>
+      <div class="battery-primary">
+        <div class="battery-graphic" aria-hidden="true"><span>▰</span></div>
+        <div class="battery-soc">
+          <small>Laadniveau</small><strong id="battery-soc">—</strong>
+          <span>SOC · gemeten</span>
+        </div>
+        <div class="battery-ac">
+          <small>AC-vermogen</small><strong id="battery-ac-power">—</strong>
+          <span id="battery-power-detail">—</span>
+        </div>
+      </div>
       <div class="battery-metrics">
-        <div><small>Laadniveau</small><strong id="battery-soc">—</strong><span>Gemeten SOC</span></div>
-        <div><small>AC-vermogen</small><strong id="battery-ac-power">—</strong><span id="battery-power-detail">—</span></div>
-        <div><small>Totaal geladen</small><strong id="battery-charged">—</strong><span>Batterijteller · geen netenergie</span></div>
-        <div><small>Totaal ontladen</small><strong id="battery-discharged">—</strong><span>Batterijteller · geen AC-netenergie</span></div>
+        <div><small>Totaal geladen</small><strong id="battery-charged">—</strong><span>Batterijteller</span></div>
+        <div><small>Totaal ontladen</small><strong id="battery-discharged">—</strong><span>Batterijteller</span></div>
       </div>
       <p id="battery-freshness" class="battery-freshness">Wachten op AlphaESS-meetgegevens.</p>
-      <p class="battery-disclaimer">Afzonderlijke batterijobservatie via Pi-historie. Niet verwerkt in P1-, PV- of huisverbruikscijfers en geen batterijaansturing. Laadteken van AC-vermogen is nog niet afzonderlijk gevalideerd.</p>
+      <details class="evidence-details">
+        <summary>Meetuitleg</summary>
+        <p class="battery-disclaimer">Afzonderlijke batterijobservatie via Pi-historie. Niet verwerkt in P1-, PV- of huisverbruikscijfers en geen batterijaansturing. Laadteken van AC-vermogen is nog niet afzonderlijk gevalideerd. Batterijtellers zijn geen AC-netenergie.</p>
+      </details>
     </section>
 
     <section class="loads-panel" aria-label="Actieve verbruikers">
-      <header class="loads-heading">
+      <header class="live-card-head loads-heading">
         <div><small>HOMEY + P1</small><h2>Actieve verbruikers</h2></div>
         <span>Directe status + indicatieve herkenning</span>
       </header>
@@ -81,19 +119,30 @@
           <div class="loads-device"><div><strong>Vaatwasser</strong><small id="loads-dishwasher-detail">—</small></div><span id="loads-dishwasher-status">—</span></div>
           <div class="loads-device loads-device-quooker"><div><strong>Quooker</strong><small id="loads-quooker-mode">EMS-modus: —</small><small id="loads-quooker-last-heated">Laatst verwarmd: —</small></div><span id="loads-quooker-status">—</span></div>
         </div>
-        <div class="loads-phases" aria-label="Netvermogen per P1-fase">
-          <div><small>P1 · L1</small><strong id="loads-phase-l1">—</strong></div>
-          <div><small>P1 · L2</small><strong id="loads-phase-l2">—</strong></div>
-          <div><small>P1 · L3</small><strong id="loads-phase-l3">—</strong></div>
-        </div>
       </div>
-      <p id="loads-explanation" class="loads-explanation">Laden…</p>
-      <p class="loads-disclaimer">Fasevermogen is netto P1-vermogen, geen apparaatverbruik. Wasmachine en droger leveren directe programmastatus; de vaatwasser is een fasebewuste kandidaatdetectie op basis van eerdere P1-samples in deze browser. Geen fingerprint-vermogen wordt uit Overig afgetrokken. Quooker toont de laatst geregistreerde verwarmingscyclus en een recente schakelstand; het is geen directe vermogensmeter.</p>
+      <details class="evidence-details">
+        <summary>Herkenning en meetuitleg</summary>
+        <p id="loads-explanation" class="loads-explanation">Laden…</p>
+        <p class="loads-disclaimer">Fasevermogen is netto P1-vermogen, geen apparaatverbruik. Wasmachine en droger leveren directe programmastatus; de vaatwasser is een fasebewuste kandidaatdetectie op basis van eerdere P1-samples in deze browser. Geen fingerprint-vermogen wordt uit Overig afgetrokken. Quooker toont de laatst geregistreerde verwarmingscyclus en een recente schakelstand; het is geen directe vermogensmeter.</p>
+      </details>
     </section>
 
-    <p class="preview-note">EMS productie · Live</p>
+    <section class="phases-panel" aria-label="Fasen en netdetails">
+      <header class="live-card-head">
+        <div><small>HOMEWIZARD P1</small><h2>Fasen / netdetails</h2></div>
+      </header>
+      <div class="loads-phases" aria-label="Netvermogen per P1-fase">
+        <div><small>P1 · L1</small><strong id="loads-phase-l1">—</strong></div>
+        <div><small>P1 · L2</small><strong id="loads-phase-l2">—</strong></div>
+        <div><small>P1 · L3</small><strong id="loads-phase-l3">—</strong></div>
+      </div>
+      <div class="phases-total">
+        <div><small>Netto netvermogen</small><strong id="phases-net-power">—</strong></div>
+        <span id="phases-net-direction">—</span>
+      </div>
+      <p class="phases-note">Netto P1-fasevermogen, geen verbruik per apparaat.</p>
+    </section>
   </main>
-
   <script type="module" src="./render/live.js"></script>
   <script type="module" src="./render/battery.mjs"></script>
   <script type="module" src="../shared/navigation.js"></script>
