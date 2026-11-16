@@ -81,6 +81,8 @@ def decode(battery, ac):
         "chargeTotalKWh": unsigned32(reg(0x0120), reg(0x0121)) / 10,
         "dischargeTotalKWh": unsigned32(reg(0x0122), reg(0x0123)) / 10,
         "gridChargeReportedKWh": unsigned32(reg(0x0124), reg(0x0125)) / 10,
+        "cellTempMinC": signed16(reg(0x010D)) / 10,
+        "cellTempMaxC": signed16(reg(0x0110)) / 10,
         "batteryDcPowerW": signed16(reg(0x0126)),
         "inverterAcPowerW": signed32(*ac),
     }
@@ -90,6 +92,9 @@ def decode(battery, ac):
         raise ValueError("INVALID_BATTERY_IDENTITY")
     if abs(data["batteryDcPowerW"]) > 10000 or abs(data["inverterAcPowerW"]) > 10000:
         raise ValueError("INVALID_POWER")
+    # Accept only physically plausible cell-temperature evidence; never invent values.
+    if not (-40 <= data["cellTempMinC"] <= data["cellTempMaxC"] <= 100):
+        raise ValueError("INVALID_CELL_TEMPERATURE")
     # The source's grid-charge counter was 49.3 kWh with total charge 44.4;
     # keep it observable but NEVER treat it as a validated source of energy.
     return data
@@ -130,6 +135,8 @@ def collect(host, timeout=5):
 
 ARCHIVE_METRICS = {
     "soc_pct": ("socPct", "%"),
+    "battery_cell_temp_min_c": ("cellTempMinC", "°C"),
+    "battery_cell_temp_max_c": ("cellTempMaxC", "°C"),
     "module_count": ("moduleCount", None),
     "nominal_capacity_kwh": ("nominalCapacityKWh", "kWh"),
     "soh_pct": ("sohPct", "%"),
