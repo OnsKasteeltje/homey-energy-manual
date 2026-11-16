@@ -26,6 +26,8 @@ def battery_words():
     def put(addr, value):
         words[addr - 0x0102] = value
     put(0x0102, 576)       # 57.6%
+    put(0x010D, 160)       # 16.0 C min cell temperature
+    put(0x0110, 200)       # 20.0 C max cell temperature
     put(0x0118, 2)
     put(0x0119, 80)        # 8.0 kWh
     put(0x011B, 1000)
@@ -74,6 +76,8 @@ class AlphaESSReadonlyTests(unittest.TestCase):
         m = output["measurements"]
         self.assertEqual(m["socPct"], 57.6)
         self.assertEqual(m["moduleCount"], 2)
+        self.assertEqual(m["cellTempMinC"], 16.0)
+        self.assertEqual(m["cellTempMaxC"], 20.0)
         self.assertEqual(m["nominalCapacityKWh"], 8)
         self.assertEqual(m["sohPct"], 100)
         self.assertEqual(m["chargeTotalKWh"], 44.4)
@@ -91,6 +95,16 @@ class AlphaESSReadonlyTests(unittest.TestCase):
             unavailable = alpha.collect("192.0.2.2")
         self.assertEqual(unavailable["quality"], "UNAVAILABLE")
         self.assertIsNone(unavailable["measurements"])
+
+    def test_invalid_cell_temperature_fail_closed(self):
+        words = battery_words()
+        words[0x010D - 0x0102] = 300  # Min 30 C > Max 20 C
+        with self.assertRaisesRegex(ValueError, "INVALID_CELL_TEMPERATURE"):
+            alpha.decode(words, [0, 798])
+        words = battery_words()
+        words[0x010D - 0x0102] = 65536 - 410  # -41 C
+        with self.assertRaisesRegex(ValueError, "INVALID_CELL_TEMPERATURE"):
+            alpha.decode(words, [0, 798])
 
     def test_bad_reply_and_implausible_soc_fail_closed(self):
         invalid = self.fake()
@@ -126,7 +140,7 @@ class AlphaESSReadonlyTests(unittest.TestCase):
             with sqlite3.connect(path) as con:
                 self.assertEqual(con.execute("SELECT count(*) FROM devices").fetchone()[0], 1)
                 self.assertEqual(con.execute("SELECT count(*) FROM measurements").fetchone()[0], len(alpha.ARCHIVE_METRICS))
-                self.assertEqual(con.execute("SELECT count(*) FROM metrics WHERE metric_key LIKE 'battery_%'").fetchone()[0], 4)
+                self.assertEqual(con.execute("SELECT count(*) FROM metrics WHERE metric_key LIKE 'battery_%'").fetchone()[0], 6)
                 self.assertEqual(con.execute("SELECT DISTINCT source_resolution_seconds FROM measurements").fetchone()[0], 300)
             with self.assertRaisesRegex(ValueError, "INVALID_SAMPLE_VALIDITY"):
                 alpha.archive_snapshot(path, snapshot, sample_validity_sec=600)
