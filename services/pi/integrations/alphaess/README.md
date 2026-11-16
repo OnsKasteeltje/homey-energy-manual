@@ -119,3 +119,9 @@ and that the existing /web/state/current and P1/EV controls are unaffected.
 - docs/architecture/repository-structure.md — touch-it/place-it.
 - docs/architecture/diagnostic-source-of-truth.md — diagnostic authority.
 - CONTRIBUTING.md — atomic release + risk-driven regression.
+
+## V0.2 cell temperature history extension (16 November 2026; proposed)
+
+The existing 37-register FC03 battery block already includes 0x010D (minimum cell temperature) and 0x0110 (maximum cell temperature), both signed 16-bit, 0.1 °C per unit. Add `cellTempMinC` and `cellTempMaxC` to the existing read-only decode and archive them as `battery_cell_temp_min_c` and `battery_cell_temp_max_c` in the same `ems-history.sqlite` / `battery_alphaess` source. No new Modbus request, timer, service, connection, control path or additional database. Implausible or inverted temperatures fail closed; no backfill. Tests cover decoding, bounds and idempotent archiving.
+
+The user's 2026-11-16 read-only manual reading returned 16.0 °C min, 20.0 °C max at 10.8% SOC. These readings do not retrospectively establish cell temperature during prior charge pulses. Minimum-SOC reserve recharge is a hypothesis supported by an external owner report, not a confirmed diagnosis for this unit; the monitored temperature series allows future analysis. Keep AlphaESS sole battery-control authority.
