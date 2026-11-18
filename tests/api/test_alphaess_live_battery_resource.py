@@ -57,6 +57,23 @@ with tempfile.TemporaryDirectory() as d:
     assert current["eligibleForHouseBalance"] is False
     assert set(current["measurements"]) == set(ctx["BATTERY_LIVE_METRICS"].values())
     assert "gridChargeReportedKWh" not in current["measurements"]
+    # Regression 2026-11-18: the collector now archives 10 metrics, while the
+    # Live contract intentionally exposes only the original eight. Extra valid
+    # temperature records must not turn a complete, fresh sample into PARTIAL.
+    with sqlite3.connect(path) as db:
+        for metric_id, metric_key, value in (
+            (9, "battery_cell_temp_min_c", 12.0),
+            (10, "battery_cell_temp_max_c", 18.0),
+        ):
+            db.execute("INSERT INTO metrics VALUES (?, ?)", (metric_id, metric_key))
+            db.execute(
+                "INSERT INTO measurements VALUES (?, 1, ?, ?, 'observed')",
+                (at, metric_id, value),
+            )
+    with_temps = resource(now=now)
+    assert with_temps["status"] == "FRESH", with_temps
+    assert with_temps["measurements"] == current["measurements"]
+    assert set(with_temps["measurements"]) == set(ctx["BATTERY_LIVE_METRICS"].values())
     stale = resource(now=now + timedelta(seconds=260))
     assert stale["status"] == "STALE"
     assert all(v is None for v in stale["measurements"].values())

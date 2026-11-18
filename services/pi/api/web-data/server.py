@@ -747,7 +747,11 @@ def live_battery_resource(*, now=None):
         return result
     observed = {}
     for key, value, quality in rows:
-        if key not in BATTERY_LIVE_METRICS or key in observed or quality != "observed":
+        # The archive may contain newer observations (e.g. cell temperatures).
+        # Only the eight contract fields govern this Live projection's quality.
+        if key not in BATTERY_LIVE_METRICS:
+            continue
+        if key in observed or quality != "observed":
             result["status"] = "PARTIAL"
             return result
         if not isinstance(value, (int, float)) or not math.isfinite(value):
