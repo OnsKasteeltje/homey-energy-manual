@@ -593,6 +593,21 @@ FRONTEND_ASSET_TEST="tests/frontend/test_v2_local_assets_contract.py"
 [[ -f "$FRONTEND_ASSET_TEST" ]] || fail "Frontend V2 local asset contract test missing"
 python3 "$FRONTEND_NAV_TEST" || fail "Frontend V2 shared navigation contract failed"
 pass "Frontend V2 uses one shared main-navigation source"
+
+# Shared frontend popup architecture: no per-card positioning forks.
+POPUP_DOC="docs/architecture/frontend-universal-popup-positioning.md"
+POPUP_MODULE="frontend/shared/popup-manager.mjs"
+POPUP_CSS="frontend/shared/styles/popup-manager.css"
+POPUP_TEST="tests/frontend/test_universal_popup_positioning.mjs"
+for required in "$POPUP_DOC" "$POPUP_MODULE" "$POPUP_CSS" "$POPUP_TEST"; do
+  [[ -f "$required" ]] || fail "Frontend popup architecture asset missing: $required"
+done
+grep -q 'data-ems-popup-anchor="pv-source-popover"' frontend/live/index.html || fail "Live PV tooltip not registered with universal popup manager"
+grep -q 'shared/popup-manager.mjs' frontend/live/index.html || fail "Live popup manager module not loaded"
+grep -q 'shared/styles/popup-manager.css' frontend/live/index.html || fail "Live popup stylesheet not loaded"
+node --check "$POPUP_MODULE" || fail "Frontend popup manager syntax invalid"
+node --test "$POPUP_TEST" || fail "Frontend popup positioning contract failed"
+pass "Frontend V2 shared popup positioning guardrail"
 python3 "$FRONTEND_ASSET_TEST" || fail "Frontend V2 local asset contract failed"
 pass "Frontend V2 local CSS/JS references resolve"
 # Daily PV self-use must be proven at the backend energy-accounting boundary,

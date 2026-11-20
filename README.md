@@ -22,6 +22,7 @@ Tesla-deadlines gaan **lokaal**: private Invoer V2 → Caddy / Tailscale → Pi 
 - [Diagnostische bronhiërarchie](docs/architecture/diagnostic-source-of-truth.md)
 - [Actuele bron- en rollbackpolicy](docs/architecture/current-runtime-source-policy.md)
 - [Repositorystructuur en touch-it-place-it](docs/architecture/repository-structure.md)
+- [Frontend V2 universele popup-positionering — verplicht contract](docs/architecture/frontend-universal-popup-positioning.md)
 - [Publieke-data-inventaris en uitzonderingen](docs/architecture/public-data-boundary.md)
 
 Historische baselines, cutover-verslagen en oude `docs/javascripts/` zijn geen bewijs van de huidige Homey- of Pi-runtime. Vergelijk bij productievragen altijd de live Homey-flow, de Pi-runtime en de actuele `main`.
