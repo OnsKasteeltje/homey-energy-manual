@@ -40,22 +40,23 @@ assert.equal(battery.acPowerW,-601);
 assert.equal(batteryFlowView(battery).direction,"charging");
 assert.equal(batteryFlowView(battery).arrow,"↓");
 assert.match(batteryFlowView(battery).status,/indicatie/); // negative AC sign still unvalidated
-const discharge = batteryView({
+const dischargeRaw = {
   schema:"EMS_WEB_LIVE_BATTERY_V1",status:"FRESH",readOnly:true,
   eligibleForControl:false,eligibleForHouseBalance:false,
   measurements:{acPowerW:800}
-});
+};
+const discharge = batteryView(dischargeRaw);
 assert.deepEqual(
   [batteryFlowView(discharge).direction,batteryFlowView(discharge).arrow,batteryFlowView(discharge).status],
   ["discharging","↑","Naar huis"]
 );
-const idle = batteryView({...discharge,measurements:{acPowerW:0}});
+const idle = batteryView({...dischargeRaw,measurements:{acPowerW:0}});
 assert.equal(batteryFlowView(idle).direction,"idle");
 assert.equal(batteryFlowView(idle).arrow,"—");
 assert.equal(batteryFlowView({...discharge,status:"STALE"}).direction,"unknown");
-assert.equal(batteryFlowView(batteryView({...discharge,eligibleForHouseBalance:true})).direction,"unknown");
-assert.equal(batteryFlowView(batteryView({...discharge,measurements:{acPowerW:101}})).direction,"discharging");
-assert.equal(batteryFlowView(batteryView({...discharge,measurements:{acPowerW:100}})).direction,"idle");
+assert.equal(batteryFlowView(batteryView({...dischargeRaw,eligibleForHouseBalance:true})).direction,"unknown");
+assert.equal(batteryFlowView(batteryView({...dischargeRaw,measurements:{acPowerW:101}})).direction,"discharging");
+assert.equal(batteryFlowView(batteryView({...dischargeRaw,measurements:{acPowerW:100}})).direction,"idle");
 assert.equal(flowView(measured).housePowerW,null);
 const html=readFileSync("frontend/live/index.html","utf8");
 const js=readFileSync("frontend/live/render/live.js","utf8");
