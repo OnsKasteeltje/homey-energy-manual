@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {flowView} from "../../frontend/live/state/flow-v04.mjs";
-import {batteryView} from "../../frontend/live/state/battery-state.mjs";
+import {batteryView, batteryFlowView} from "../../frontend/live/state/battery-state.mjs";
 import {readFileSync} from "node:fs";
 const measured = {p1Valid:true, grid:331, pvQuality:"MEASURED",pv:2800, house:3131, other:1900};
 let f=flowView(measured);
@@ -37,6 +37,26 @@ const battery = batteryView({
   measurements:{socPct:12.8,acPowerW:-601,chargeTotalKWh:45.9,dischargeTotalKWh:42.3}
 });
 assert.equal(battery.acPowerW,-601);
+assert.equal(batteryFlowView(battery).direction,"charging");
+assert.equal(batteryFlowView(battery).arrow,"↓");
+assert.match(batteryFlowView(battery).status,/indicatie/); // negative AC sign still unvalidated
+const dischargeRaw = {
+  schema:"EMS_WEB_LIVE_BATTERY_V1",status:"FRESH",readOnly:true,
+  eligibleForControl:false,eligibleForHouseBalance:false,
+  measurements:{acPowerW:800}
+};
+const discharge = batteryView(dischargeRaw);
+assert.deepEqual(
+  [batteryFlowView(discharge).direction,batteryFlowView(discharge).arrow,batteryFlowView(discharge).status],
+  ["discharging","↑","Naar huis"]
+);
+const idle = batteryView({...dischargeRaw,measurements:{acPowerW:0}});
+assert.equal(batteryFlowView(idle).direction,"idle");
+assert.equal(batteryFlowView(idle).arrow,"—");
+assert.equal(batteryFlowView({...discharge,status:"STALE"}).direction,"unknown");
+assert.equal(batteryFlowView(batteryView({...dischargeRaw,eligibleForHouseBalance:true})).direction,"unknown");
+assert.equal(batteryFlowView(batteryView({...dischargeRaw,measurements:{acPowerW:101}})).direction,"discharging");
+assert.equal(batteryFlowView(batteryView({...dischargeRaw,measurements:{acPowerW:100}})).direction,"idle");
 assert.equal(flowView(measured).housePowerW,null);
 const html=readFileSync("frontend/live/index.html","utf8");
 const js=readFileSync("frontend/live/render/live.js","utf8");
@@ -60,6 +80,8 @@ assert.ok(js.includes("f.otherPowerW"));
 assert.ok(js.includes("f.gridDirection"));
 assert.ok(batteryJs.includes('"battery-flow-power"'));
 assert.ok(batteryJs.includes('"battery-flow-status"'));
+assert.ok(batteryJs.includes("batteryFlowView(s)"));
+assert.ok(batteryJs.includes("link.dataset.direction"));
 assert.ok(!batteryJs.includes("eligibleForHouseBalance: true"));
 assert.ok(energyJs.includes("pv + grid")); // existing module untouched; not used in V0.4 presentation
 assert.ok(css.includes("grid-template-rows:minmax(0,1.26fr)"));

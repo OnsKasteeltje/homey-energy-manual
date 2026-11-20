@@ -33,10 +33,18 @@ in the separate right-side panel from the same API, never double counted.
   Other —. No battery correction, invented residual, PV self-consumption
   percentage, per-appliance power or flow conservation is claimed.
 - AlphaESS /web/live/battery is separate and read-only; only a complete
-  fresh 300-second-validity raw record is live. Display the signed observed
-  AC wattage with neutral ↕ link (direction unverified), SOC and cumulative
-  battery counters with caveats. Never use it as an EMS controller, grid
-  correction, household balance or net AC-energy counter.
+  fresh 300-second-validity raw record is live. Present the signed observed
+  AC wattage, SOC and cumulative counters with caveats. The independent
+  energy connector uses the same quality-gated reading: above +100 W the
+  verified discharge sign gives ↑ from battery to house; below -100 W
+  an inferred charging sign gives ↓ toward the battery, explicitly labelled
+  indicative until a direct charging snapshot validates the sign. Between
+  -100 and +100 W show no active arrow (noise/idle); missing, stale or
+  rejected evidence shows unknown direction without an active arrow.
+  A positive battery AC value can coexist with P1 net import. Do not infer
+  its share of house load, PV source, individual phase, or a balanced Sankey.
+  Never use battery observation as an EMS controller, grid correction,
+  household balance or net AC-energy counter.
 - Tesla/heat/WW retain their independent allowed current-state evidence;
   appliance statuses remain direct or fingerprinted, not measured device W.
 - Detailed data warnings stay accessible by keyboard through native disclosure
@@ -49,8 +57,9 @@ in the separate right-side panel from the same API, never double counted.
 - New frontend/live/state/flow-v04.mjs pure presentation projection.
 - Existing frontend/live/render/live.js uses the new projection, preserving
   P1, inverter provenance, phase and appliance diagnostics.
-- Existing frontend/live/render/battery.mjs populates the neutral flow node
-  from the same independent battery API response.
+- Existing frontend/live/state/battery-state.mjs owns the pure direction
+  projection; frontend/live/render/battery.mjs renders panel, connector,
+  aria label and direction class from the same independent API response.
 - No Web Data API change, no Homey/EMS controller/BMS/AlphaESS timer change,
   no Caddy change, no new public listener. Caddy static content is no-store.
 - A narrow frontend-only installer defaults to preflight, requires clean synced
