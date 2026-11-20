@@ -11,7 +11,7 @@ const raw = {
 assert.equal(batteryView(raw).socPct, 10.8);
 assert.equal(batteryView(raw).acPowerW, -13);
 assert.equal(acDirectionText(-13), "Rust / laag vermogen");
-assert.match(acDirectionText(-800), /onbevestigd/);
+assert.match(acDirectionText(-800), /Laden · indicatie.*niet gevalideerd/);
 assert.equal(acDirectionText(800), "Ontladen · indicatie");
 assert.equal(batteryView({...raw, status: "STALE"}).acPowerW, null);
 assert.equal(batteryView({...raw, eligibleForControl: true}).acPowerW, null);

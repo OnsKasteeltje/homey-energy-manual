@@ -5,12 +5,13 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ROOT="/var/www/ems-frontend-v2"
-BASELINE_COMMIT="0236a046bc9efebfb7c32d68e5c71e1393911dd3"
+BASELINE_COMMIT="a63f2f001de65eaaaf05fe01c2cc2e815fbd3acd"
 BACKUP="/home/jeroen/ems/backup/live-v0.4-$(date +%Y%m%d-%H%M%S)"
 FILES=(
   frontend/live/index.html
   frontend/live/render/live.js
   frontend/live/render/battery.mjs
+  frontend/live/state/battery-state.mjs
   frontend/live/state/flow-v04.mjs
   frontend/live/styles/live-v04.css
 )
@@ -24,9 +25,10 @@ if [[ "$(git -C "$REPO" branch --show-current)" != "main" ]] ||
   echo "STOP: requires clean main matching origin/main"; exit 1
 fi
 
-echo "=== LIVE V0.4 OFFLINE TESTS ==="
+echo "=== LIVE V0.4 BATTERY FLOW OFFLINE TESTS ==="
 (cd "$REPO" && node --check frontend/live/render/live.js)
 (cd "$REPO" && node --check frontend/live/render/battery.mjs)
+(cd "$REPO" && node --check frontend/live/state/battery-state.mjs)
 (cd "$REPO" && node --check frontend/live/state/flow-v04.mjs)
 (cd "$REPO" && node tests/frontend/test_live_v04_flow.mjs)
 (cd "$REPO" && node tests/frontend/test_live_battery_v03.mjs)
