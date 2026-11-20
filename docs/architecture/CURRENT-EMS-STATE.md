@@ -8,6 +8,34 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### Victron Schuurmonitor V0.1 — commissioning-only candidate (1 November 2026)
+
+The VM-3P75CT measures the three-phase connection between house and shed and is
+visible on a Cerbo GX as `com.victronenergy.acload`. A new **candidate only**
+Pi integration lives in `services/pi/integrations/victron/schuur_monitor.py`.
+It uses read-only Modbus TCP function 03 against the GX (no writes).
+The register map is phase power 3900–3902, serial number 3903–3909
+(**not currents**), phase voltages 3910/3912/3914 and phase currents
+3911/3913/3915. The original development error decoding serial bytes as
+currents was repaired; targeted offline regressions and a manual GX/Pi
+comparison established plausible L1/L3 voltage/current/power scaling.
+
+**Lifecycle / production boundary:** this is manual commissioning SHADOW
+evidence, **not installed in Pi runtime, not scheduled and not merged**.
+L2 has a separately identified physical metering defect pending inspection,
+so L2's values and all three-phase totals/import/export metrics are
+explicitly unavailable. The L1/L3 current field carries a
+`PENDING_GUI_COMPARISON` qualifier pending a closer synchronized comparison.
+The optional local, standalone shadow SQLite stores only L1/L3 power;
+automatic collection is **not authorized** by this candidate.
+`eligibleForControl=false` and `eligibleForHouseBalance=false` throughout.
+It cannot affect the canonical HomeWizard P1 house balance, existing
+`ems-history.sqlite`, Homey execution, EV/Easee control, WW, Heating,
+planner, PV history, or future AlphaESS autonomous safety controls.
+Further promotion requires the L2 physical fix, signed power/energy-direction
+validation, quality/freshness acceptance, reviewed deployment and explicit
+runtime verification. See `docs/components/victron-schuurmonitor-v0.1.md`.
+
 ### WW low-power completion confirmation correction (25 oktober 2026, issue #38)
 
 The active Homey Core v0.11p originally credited the entire last Core tick
