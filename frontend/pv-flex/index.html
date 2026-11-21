@@ -31,11 +31,6 @@
     <div class="chart-wrap"><svg id="pv-chart" role="img" aria-label="Historische PV-forecast bij besluit (doorgetrokken) en actuele toekomstige PV-forecast (gestreept), naast gemeten PV, Quatt elektriciteit en geplande EV, boiler, Quooker en export"></svg><div id="tooltip" class="tooltip" hidden></div></div>
     <p id="empty" class="empty" hidden>Geen meetdata of plannerbesluiten voor deze dag.</p>
   </section>
-  <section class="panel" aria-labelledby="goodwe-shadow-title">
-    <header><div><small>GOODWE SEMS+ · READ-ONLY</small><h2 id="goodwe-shadow-title">Nieuwe GoodWe-meetbron</h2></div></header>
-    <div id="goodwe-evidence" class="daily-report-notes" aria-live="polite"><p>SEMS+ waarnemingen laden…</p></div>
-    <p class="allocation-note">Afzonderlijke cloudobservaties, niet opgeteld bij de PV-balken of eigenverbruikscijfers. Pi-ontvangsttijd is geen bewezen omvormermeettijd (0,1 kWh tellerresolutie). Geen invloed op P1 of EMS-besturing.</p>
-  </section>
   <section id="daily-report-panel" class="panel daily-report-panel" aria-labelledby="daily-report-title">
     <header>
       <div><small>DAGELIJKSE EMS-EVALUATIE · GEMETEN EN GESCHAT</small><h2 id="daily-report-title">Dagrapport <span id="daily-report-date">—</span></h2></div>
@@ -50,6 +45,17 @@
       <article><small>P1-EXPORT</small><strong id="report-export">—</strong></article>
       <article><small>QUATT ELEKTRISCH · GEMETEN DEEL</small><strong id="report-quatt">—</strong><small id="report-quatt-coverage">—</small></article>
     </div>
+    <section class="financial-report" aria-labelledby="financial-report-title">
+      <h3 id="financial-report-title">Financieel · ENGIE</h3>
+      <p id="financial-status" class="financial-status" aria-live="polite">Financiële evaluatie laden…</p>
+      <div id="financial-values" class="financial-values" hidden>
+        <article><small>VARIABEL LEVERANCIERSSUBTOTAAL</small><strong id="financial-net">—</strong></article>
+        <article><small>STROOMLEVERING (EXCL. OVERHEIDSHEFFINGEN)</small><strong id="financial-import">—</strong></article>
+        <article><small>TERUGLEVERVERGOEDING</small><strong id="financial-export-credit">—</strong></article>
+        <article><small>TERUGLEVERKOSTEN</small><strong id="financial-export-charge">—</strong></article>
+      </div>
+      <p class="allocation-note">Vanaf 2027: variabele leverancierskosten op basis van P1-tellers en het vaste ENGIE-contract. Exclusief energiebelasting 2027, vaste kosten, netbeheer en batterijslijtage. Geen factuur of berekende batterijbesparing.</p>
+    </section>
     <div id="daily-report-notes" class="daily-report-notes" aria-live="polite"><p>Dagrapport laden…</p></div>
   </section>
   <p class="preview-note">EMS productie · Read-only observability</p>

@@ -1,4 +1,4 @@
-import {loadDailyPerformance,loadPvFlex,loadGoodweCloudEvidence,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
+import {loadDailyPerformance,loadPvFlex,loadFinancialDay,shiftDay,todayAmsterdam} from "../state/pv-flex-state.js";
 const $=id=>document.getElementById(id); let day=todayAmsterdam();
 const pct=v=>typeof v==="number"&&Number.isFinite(v)?Math.round(v*100)+"%":"—";
 const time=x=>new Date(x).toLocaleTimeString("nl-NL",{timeZone:"Europe/Amsterdam",hour:"2-digit",minute:"2-digit"});
@@ -239,64 +239,46 @@ function renderDailyReport(report,selectedDay,quattSummary=null){
 }
 
 
-function renderGoodweEvidence(data,daily){
- const host=$("goodwe-evidence");host.replaceChildren();
- const line=message=>{
-  const p=document.createElement("p");p.textContent=message;host.appendChild(p);
- };
- // Time-stamped station PV curve is shadow evidence until accounting is validated.
- const curve=data?.historicalQuarterEvidence;
- if(curve?.status==="OBSERVED_PARTIAL_DAY"){
-  line("SEMS+ historische curve: "+curve.completeQuarters+
-       " gedekte kwartieren · "+curve.coveredQuarterKWh.toLocaleString("nl-NL",{
-         maximumFractionDigits:2
-       })+" kWh in die kwartieren (SHADOW-bronbewijs; alleen 900/900 s kwartieren gelden voor historische huisbalans).");
+function renderFinancialDay(data,selectedDay){
+ const status=$("financial-status"),values=$("financial-values");
+ values.hidden=true;
+ for(const id of ["financial-net","financial-import","financial-export-credit","financial-export-charge"])
+   $(id).textContent="—";
+ if(selectedDay>=todayAmsterdam()){
+   status.textContent="Lopende dag: financiële afrekening volgt na dagafsluiting.";
+   return;
  }
- // Durable day-counter source is independent of the 192-sample SHADOW ring.
- if(daily && available(daily.reportedDayKWh)){
-  const amount=daily.reportedDayKWh.toLocaleString("nl-NL",{
-   minimumFractionDigits:1,maximumFractionDigits:2
-  });
-  line("GoodWe SEMS+ dagtellers: "+amount+" kWh"+
-       (daily.status==="LATE_DAY_COUNTER_OBSERVED"?
-       " (laat op de dag ontvangen, niet gegarandeerd definitief)":
-       " (voorlopig, tot laatste ontvangst)"));
-  for(const inv of daily.devices||[]){
-   line("Omvormer …"+inv.serialSuffix+": "+
-        inv.reportedDayKWh.toLocaleString("nl-NL",{maximumFractionDigits:2})+
-        " kWh dagteller");
-  }
-  line("SEMS+ dagtellers zijn controlegegevens; kwartierbalken gebruiken de afzonderlijk gevalideerde historische SEMS+-curve.");
- }else{
-  line("Historische GoodWe-dagteller: "+
-       (daily?.status||"niet beschikbaar")+
-       ". Ontbrekende gegevens zijn onbekend, niet 0 kWh.");
+ const f=data?.financialAccounting;
+ if(!data||data.dateLocal!==selectedDay||data.readOnly!==true||
+    data.controlWrites!==false||!f){
+   status.textContent="Financiële dagrapportage niet beschikbaar.";
+   return;
  }
- if(!data){
-  line("SEMS+ SHADOW-historie niet beschikbaar. Dit betekent niet 0 kWh productie.");
-  return;
+ if(f.status==="ANNUAL_SALDERING_NO_DAILY_SETTLEMENT"){
+   status.textContent="2026: geen afzonderlijke dagafrekening vanwege jaarlijkse saldering. Vanaf 2027 volgt het variabele leverancierssubtotaal.";
+   return;
  }
- if(data.status==="NO_SAMPLES" || !data.devices?.length){
-  line("Geen SEMS+ observaties voor deze datum in de rolling historie (maximaal 192 samples).");
-  return;
+ if(f.status==="INSUFFICIENT_P1_COUNTER_COVERAGE"){
+   status.textContent="Onvoldoende P1-tellerdekking; kosten blijven onbekend.";
+   return;
  }
- line(data.sampleCount+" geldige SEMS+ observaties · laatste Pi-ontvangst "+
-      (data.lastFetchedAt?time(data.lastFetchedAt):"—")+
-      (data.ageMinutes>40&&data.dateLocal===todayAmsterdam()?" · mogelijk verouderd":"")+
-      " · fysieke bronmeettijd onbekend");
- if(data.status==="OBSERVED_COUNTER_ONLY_UNVERIFIED_FRESHNESS"){
-  line("SEMS+ levert alleen geldige energietellers; actueel omvormervermogen is onbekend, niet 0 W.");
+ if(f.status==="OUTSIDE_VERIFIED_CONTRACT_TERM"){
+   status.textContent="Geen geverifieerde ENGIE-tarieven voor deze datum.";
+   return;
  }
- for(const device of data.devices){
-  const watts=available(device.lastPowerW)?power(device.lastPowerW):"onbekend";
-  const delta=available(device.lifetimeCounterDeltaKWh)?
-   device.lifetimeCounterDeltaKWh.toLocaleString("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:3})+" kWh":
-   "onbekend";
-  line("GoodWe …"+device.serialSuffix+" · laatste ontvangen vermogen "+watts+
-       " · tellerstijging "+delta+" over beschikbaar venster"+
-       " ("+device.observations+" samples; "+device.counterEvidence+")");
+ if(f.status!=="SUPPLIER_VARIABLE_SUBTOTAL_ONLY"||
+    ![f.netVariableSupplierCostEur,f.supplyCostEur,f.exportCompensationEur,
+      f.exportChargesEur].every(v=>typeof v==="number"&&Number.isFinite(v))){
+   status.textContent="Kosten niet vast te stellen uit de beschikbare gegevens.";
+   return;
  }
- line("Ruwe SEMS+-cloudobservaties zijn SHADOW; de opgeslagen volledig gedekte SEMS+-kwartieren tellen sinds 25 oktober 2026 wel mee in de historische huisbalans. Realtime P1/EMS-besturing blijft ongewijzigd.");
+ const euro=v=>new Intl.NumberFormat("nl-NL",{style:"currency",currency:"EUR"}).format(v);
+ $("financial-net").textContent=euro(f.netVariableSupplierCostEur);
+ $("financial-import").textContent=euro(f.supplyCostEur);
+ $("financial-export-credit").textContent=euro(f.exportCompensationEur);
+ $("financial-export-charge").textContent=euro(f.exportChargesEur);
+ status.textContent="Afgeronde dag · variabel leverancierssubtotaal (excl. energiebelasting)";
+ values.hidden=false;
 }
 
 let refreshId=0;
@@ -308,13 +290,11 @@ async function refresh(){
  });
  $("next").disabled=selectedDay>=todayAmsterdam();
  $("quality").textContent="Laden…";
- const [main,daily,goodwe]=await Promise.allSettled([
+ const [main,daily,financial]=await Promise.allSettled([
   loadPvFlex(selectedDay),loadDailyPerformance(selectedDay),
-  loadGoodweCloudEvidence(selectedDay)
+  loadFinancialDay(selectedDay)
  ]);
  if(requestId!==refreshId)return; // Ignore stale requests after day navigation.
- renderGoodweEvidence(goodwe.status==="fulfilled"?goodwe.value:null,
-  goodwe.status==="fulfilled"?goodwe.value.dailyCounters:null);
  if(main.status==="fulfilled"){
   try{summary(main.value);chart(main.value);}
   catch(e){$("quality").textContent="Analyse niet beschikbaar";$("empty").hidden=false;$("empty").textContent=e.message;$("pv-chart").hidden=true;}
@@ -326,6 +306,7 @@ async function refresh(){
  const report=selectedDay===todayAmsterdam()&&main.status==="fulfilled"?
   main.value.provisionalDailyReport:(daily.status==="fulfilled"?daily.value:null);
  renderDailyReport(report,selectedDay,main.status==="fulfilled"?main.value.summary:null);
+ renderFinancialDay(financial.status==="fulfilled"?financial.value:null,selectedDay);
 }
 $("prev").addEventListener("click",()=>{day=shiftDay(day,-1);refresh();});
 $("next").addEventListener("click",()=>{if(day<todayAmsterdam()){day=shiftDay(day,1);refresh();}});

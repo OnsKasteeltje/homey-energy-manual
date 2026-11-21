@@ -92,15 +92,15 @@ export async function loadDailyPerformance(day){
  return d;
 }
 
-export async function loadGoodweCloudEvidence(day){
- const response=await fetch("/web/analysis/pv-cloud/day/"+encodeURIComponent(day),{cache:"no-store"});
- if(!response.ok)throw new Error("GoodWe SEMS+ bron niet beschikbaar");
+export async function loadFinancialDay(day){
+ if(day>=todayAmsterdam())return null; // Completed Amsterdam day only.
+ const response=await fetch("/web/analysis/financial/day/"+encodeURIComponent(day),{cache:"no-store"});
+ if(response.status===404)return null;
+ if(!response.ok)throw new Error("Financiële dagrapportage API "+response.status);
  const data=await response.json();
- if(data.schema!=="EMS_WEB_GOODWE_CLOUD_EVIDENCE_V1" ||
-    data.dateLocal!==day || data.readOnly!==true ||
-    data.controlWrites!==false || data.eligibleForControl!==false ||
-    data.eligibleForHouseBalance!==false)
-  throw new Error("Ongeldig GoodWe SHADOW-bewijs");
+ if(data.schema!=="EMS_WEB_FINANCIAL_DAY_V1"||data.dateLocal!==day||
+    data.readOnly!==true||data.controlWrites!==false||
+    data.financialAccounting?.contractId!=="ENGIE_3Y_2026_2029")
+   throw new Error("Ongeldige financiële rapportage");
  return data;
 }
-
