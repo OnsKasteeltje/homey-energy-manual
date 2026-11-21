@@ -1825,3 +1825,46 @@ A manual read on 16 November 2026 at SoC 10.8% found min 16.0 °C and max 20.0 �
 5. Preserve fixed ENGIE production policy (`ENGIE_3Y_2026_2029`). Study post-saldering economic choices separately, using actual contract terms; do not promote dynamic-price behavior from SHADOW.
 
 **No deployment in this PR.** This is architecture/documentation only: no control threshold, Homey flow, Pi timer, API, collector, database, physical writer, source-of-truth boundary or runtime contract is changed. A GitHub architecture-gate PASS is not evidence of production promotion.
+
+### 2026-11-21 — Step 7: fixed ENGIE 2027 economics, one canonical architecture and manual Easee backup
+
+**Contract evidence (read-only economic evaluation; not production control):**
+The three-year fixed ENGIE Opgewekt contract covers 2026-10-10 through 2029-10-10.
+Contract price schedule, pages 4–5, supplies these electricity values:
+- Electricity delivery excluding government levies, **including VAT**: EUR 0.14768/kWh (equal normal and off-peak).
+- From 2027-01-01 export compensation **VAT not applicable**: EUR 0.12205/kWh.
+- Variable export charge **including VAT**: EUR 0.11666/kWh.
+- Net contracted export credit: EUR 0.00539/kWh (before any later lawful contract changes).
+- 2026 grid purchase including 2026 government levies: EUR 0.25853/kWh. **Not** a confirmed 2027 total grid price.
+No customer agreement PDF, address, account details or identifying contract reference is committed to GitHub.
+
+The existing `ems-performance` report may expose additive
+`financialAccounting` only as a read-only grid supplier *variable subtotal*
+from canonical P1 cumulative-counter-derived `house_energy_intervals`.
+Day coverage below 95%, missing/invalid import or export, outside the verified
+contract period, and annual 2026 saldering fail closed to **unknown** financial
+figures. From 2027, the supplier subtotal excludes **2027 government energy
+taxes**, fixed charges, network cost, gas, depreciation, battery degradation
+and other invoice items. Do not claim bill totals, realised AlphaESS battery
+savings, exact PV self-use, grid-to-battery causality or Tesla/PV energy
+provenance from the subtotal. Do not integrate 5-minute AlphaESS pulse power
+as a metered energy source or turn financial evidence into planner authority.
+No new timer, database, network integration, Homey flow, web API, or control
+threshold is introduced. Pi code deployment requires a separate runtime
+acceptance after GitHub review, despite this read-only extension.
+
+**Architecture documentation authority:** `CURRENT-EMS-STATE.md` is canonical
+current state; `ems-software-architecture-live.md` is a dated code synopsis,
+not a competing canonical baseline. `ems-architecture-governance.md` agrees
+with README and the live architecture synopsis on this distinction.
+
+**Manual Easee operator backup:** The two enabled, programmatically triggered
+standard Homey flows `Start laden Tesla 16A` and
+`Handmatig laden starten (10A)` are **intentional emergency/manual overrides**,
+not a second unattended EMS planner. During the November 2026 audit the
+flow labels did not reflect observed assigned current (respectively 8 A and
+16 A); actual intended fallback amperage should be verified before use.
+Retain both flows; do not disable, rename, rewrite or automatically invoke
+them in an EMS cleanup. Explicit operator return to normal EMS ownership and
+the pre-existing Easee writer/gate safety protections remain required.
+No override change is approved by this documentation.
