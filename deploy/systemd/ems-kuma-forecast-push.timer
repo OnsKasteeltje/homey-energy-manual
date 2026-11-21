@@ -1,0 +1,11 @@
+[Unit]
+Description=Publish EMS forecast health to Kuma every 5 minutes (opt-in)
+
+[Timer]
+OnCalendar=*-*-* *:00/5:00
+AccuracySec=30s
+Persistent=false
+Unit=ems-kuma-forecast-push.service
+
+[Install]
+WantedBy=timers.target

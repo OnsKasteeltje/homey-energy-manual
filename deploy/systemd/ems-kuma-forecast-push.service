@@ -1,0 +1,15 @@
+[Unit]
+Description=EMS read-only forecast health to local Uptime Kuma (opt-in)
+After=network.target
+
+[Service]
+Type=oneshot
+User=jeroen
+Group=jeroen
+EnvironmentFile=/etc/ems/kuma-forecast.env
+ExecStart=/usr/bin/python3 /home/jeroen/ems/runtime/health/push_kuma_forecast.py
+TimeoutStartSec=40
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
