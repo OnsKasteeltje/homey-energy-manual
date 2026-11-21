@@ -8,6 +8,35 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### Uptime Kuma observability — opt-in source proposal (21 November 2026)
+
+The existing local Docker Uptime Kuma deployment was upgraded to 2.5.12 and
+verified healthy on 21 November 2026. The five existing monitors remain the
+baseline; their individual post-upgrade readback is still pending. Notification
+destinations are deliberately not configured. The old 2.5.3 container and
+pre-upgrade volume backup remain for rollback.
+
+A **source-only, disabled-by-default** read-only forecast push adapter is
+introduced in `services/pi/health/push_kuma_forecast.py`, with opt-in
+systemd service/timer definitions under `deploy/systemd/`. Its only source
+is the already existing Pi `/usr/local/bin/ems-health` JSON; it evaluates
+`emsFunctions.forecastChain`, `emsData.dynamicPlan`, and `emsData.wwPlan`.
+All three must report OK for a five-minute local Kuma UP push. Missing,
+failed, or stale evidence yields an explicit DOWN code; a stopped sender is
+distinguishable by Kuma's missing heartbeat. It does not call Homey, poll
+devices, change physical control, publish planning data, add a public API,
+or alter the sole existing forecast generator. The secret push token stays
+host-local under `/etc/ems/kuma-forecast.env` (0600), never in GitHub.
+
+No source commit or standard Pi deployment automatically enables this
+monitor. Require an independently created Kuma Push monitor, a controlled
+Pi opt-in installation, and runtime verification before claiming it live.
+See `docs/architecture/uptime-kuma-monitoring.md` and
+`docs/operations/uptime-kuma.md` for contracts, guardrails, tests and
+rollback. The 20:18 Homey WW-fetch timeout and successful 20:33 recovery
+are operational motivation only; they require no forecast/actuator changes.
+
+
 ### WW low-power completion confirmation correction (25 oktober 2026, issue #38)
 
 The active Homey Core v0.11p originally credited the entire last Core tick
