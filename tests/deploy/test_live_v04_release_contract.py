@@ -3,7 +3,7 @@
 from pathlib import Path
 
 installer = Path("deploy/install/install_live_v0_4.sh").read_text()
-assert 'BASELINE_COMMIT="0236a046bc9efebfb7c32d68e5c71e1393911dd3"' in installer
+assert 'BASELINE_COMMIT="a63f2f001de65eaaaf05fe01c2cc2e815fbd3acd"' in installer
 assert 'if [[ "$#" -ne 1 || "$1" != "--apply" ]]' in installer
 assert "source/runtime preflight; no changes applied" in installer
 assert "cmp -s" in installer and "trap rollback ERR" in installer
@@ -14,6 +14,7 @@ for path in (
     "frontend/live/index.html",
     "frontend/live/render/live.js",
     "frontend/live/render/battery.mjs",
+    "frontend/live/state/battery-state.mjs",
     "frontend/live/state/flow-v04.mjs",
     "frontend/live/styles/live-v04.css",
 ):

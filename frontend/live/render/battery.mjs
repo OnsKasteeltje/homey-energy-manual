@@ -1,4 +1,4 @@
-import {batteryView, acDirectionText, batteryValue} from "../state/battery-state.mjs";
+import {batteryView, batteryFlowView, acDirectionText, batteryValue} from "../state/battery-state.mjs";
 const SOURCE = "/web/live/battery";
 const set = (id, value) => {
   const el = document.getElementById(id);
@@ -18,13 +18,18 @@ function render(raw) {
   set("battery-power-detail", acDirectionText(s.acPowerW));
   set("battery-charged", batteryValue(s.chargeTotalKWh, "kWh"));
   set("battery-discharged", batteryValue(s.dischargeTotalKWh, "kWh"));
-  // One independent AlphaESS reading drives both the read-only detail panel
-  // and the neutral topology node. No inferred charge/discharge direction.
+  // The same validated read-only sample drives panel and connector.
+  // Direction is visual evidence only; never change P1, PV or house totals.
+  const flow = batteryFlowView(s);
   set("battery-flow-power", batteryValue(s.acPowerW, "W", 0));
-  set("battery-flow-status", s.status === "FRESH"
-    ? "Richting onbevestigd" : "Niet actueel");
+  set("battery-flow-status", flow.status);
   const link = document.getElementById("battery-flow-link");
-  if (link) link.textContent = "↕";
+  if (link) {
+    link.textContent = flow.arrow;
+    link.dataset.direction = flow.direction;
+  }
+  const connection = document.querySelector(".battery-flow");
+  if (connection) connection.setAttribute("aria-label", flow.ariaLabel);
   const t = Date.parse(s.sampledAtUtc ?? "");
   const label = Number.isFinite(t) ? new Intl.DateTimeFormat("nl-NL", {
     timeZone: "Europe/Amsterdam", day: "2-digit", month: "2-digit",
