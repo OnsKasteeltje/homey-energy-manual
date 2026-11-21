@@ -15,6 +15,7 @@ insufficient or the dedicated constrained replay optimiser is not available.
 
 import argparse
 import json
+import math
 import sqlite3
 import sys
 import zlib
@@ -284,6 +285,100 @@ def load_energy_interval_accounting(day, db_path=MEASUREMENTS_DB, now_utc=None):
         ),
     }
 
+
+
+# Contract facts: ENGIE Opgewekt agreement 2026-09-01, price schedule
+# pp. 4-5. Only tariff facts are stored; no customer PDF or identifiers.
+# Supply price includes VAT but excludes government energy taxes.
+ENGIE_FIXED_ELECTRICITY = {
+    "contractId": "ENGIE_3Y_2026_2029",
+    "validFrom": "2026-10-10",
+    "validUntilExclusive": "2029-10-10",
+    "postSalderingFrom": "2027-01-01",
+    "supplyExGovernmentTaxInclVatEurPerKWh": 0.14768,
+    "exportCompensationNoVatEurPerKWh": 0.12205,
+    "exportChargeInclVatEurPerKWh": 0.11666,
+}
+
+
+def financial_accounting(day, energy_accounting, *, day_in_progress=False):
+    """Read-only grid-cost evidence; never infer PV or battery savings.
+
+    P1 cumulative-counter intervals, not instantaneous sampled powers, are
+    the only day-energy input. The 2027 energy tax is NOT known from this
+    contract, so the output cannot be a full electricity bill.
+    """
+    c = ENGIE_FIXED_ELECTRICITY
+    result = {
+        "schema": "EMS_PI_FINANCIAL_ACCOUNTING_V0.1",
+        "readOnly": True,
+        "controlWrites": False,
+        "contractId": c["contractId"],
+        "tariffSource": "ENGIE Opgewekt contract 2026-09-01, price schedule pp. 4-5",
+        "period": day.isoformat(),
+        "status": "UNAVAILABLE",
+        "source": "ems-history.sqlite/house_energy_intervals, P1 cumulative counters",
+        "p1Coverage": energy_accounting.get("p1Coverage"),
+        "tariffs": {
+            "supplyExGovernmentTaxInclVatEurPerKWh": c["supplyExGovernmentTaxInclVatEurPerKWh"],
+            "exportCompensationNoVatEurPerKWh": c["exportCompensationNoVatEurPerKWh"],
+            "exportChargeInclVatEurPerKWh": c["exportChargeInclVatEurPerKWh"],
+            "netExportCreditEurPerKWh": round(
+                c["exportCompensationNoVatEurPerKWh"]
+                - c["exportChargeInclVatEurPerKWh"], 5
+            ),
+        },
+        "importKWh": None,
+        "exportKWh": None,
+        "supplyCostEur": None,
+        "exportCompensationEur": None,
+        "exportChargesEur": None,
+        "netVariableSupplierCostEur": None,
+        "avoidedCostDirectPvEurPerKWhExGovTax": None,
+        "batterySavingsEur": None,
+        "fullBillAvailable": False,
+        "governmentTaxes2027Included": False,
+        "fixedChargesIncluded": False,
+        "interpretation": "Not a settlement bill; battery savings and source attribution are unknown.",
+    }
+    if day < date(2026, 10, 10) or day >= date(2029, 10, 10):
+        result["status"] = "OUTSIDE_VERIFIED_CONTRACT_TERM"
+        return result
+    if day < date(2027, 1, 1):
+        result["status"] = "ANNUAL_SALDERING_NO_DAILY_SETTLEMENT"
+        return result
+
+    coverage = energy_accounting.get("p1Coverage")
+    imp = energy_accounting.get("importKWh")
+    exp = energy_accounting.get("exportKWh")
+    if (not isinstance(coverage, (int, float)) or not math.isfinite(coverage)
+            or coverage < 0.95 or not all(
+                isinstance(v, (int, float)) and not isinstance(v, bool)
+                and math.isfinite(v) and v >= 0 for v in (imp, exp)
+            )):
+        result["status"] = "INSUFFICIENT_P1_COUNTER_COVERAGE"
+        return result
+
+    supply = c["supplyExGovernmentTaxInclVatEurPerKWh"]
+    credit = c["exportCompensationNoVatEurPerKWh"]
+    charge = c["exportChargeInclVatEurPerKWh"]
+    result.update({
+        "status": "PROVISIONAL_TODAY" if day_in_progress else "SUPPLIER_VARIABLE_SUBTOTAL_ONLY",
+        "importKWh": round(imp, 6),
+        "exportKWh": round(exp, 6),
+        "supplyCostEur": round(imp * supply, 2),
+        "exportCompensationEur": round(exp * credit, 2),
+        "exportChargesEur": round(exp * charge, 2),
+        "netVariableSupplierCostEur": round(imp * supply - exp * (credit - charge), 2),
+        "avoidedCostDirectPvEurPerKWhExGovTax": round(supply - (credit - charge), 5),
+        "interpretation": (
+            "Observed P1 intervals have >=95% coverage; missing intervals are not filled. "
+            "Supplier variable subtotal only: excludes 2027 government energy tax, "
+            "fixed costs, net management, gas, battery degradation and exact "
+            "battery/PV energy-source attribution. Not a savings estimate or invoice."
+        ),
+    })
+    return result
 
 def integrate(rows):
     totals = {
@@ -664,6 +759,9 @@ def build_report(
         },
         "metrics": metrics,
         "energyAccounting": energy_accounting,
+        "financialAccounting": financial_accounting(
+            day, energy_accounting, day_in_progress=(day == today)
+        ),
         "sampledPowerMetrics": power_sample_metrics,
         "powerSampleQuality": {
             "status": (
@@ -740,6 +838,7 @@ def build_report(
             "tesla_kwh is a sampled-power integral, not the authoritative Easee cumulative energy-meter delta",
             "flex_pv_capture_kwh and flex_grid_energy_kwh are derived combined-flex allocations, not directly measured EV source energy",
             "daily PV self-consumption KPI requires sufficient paired archived energy-interval coverage",
+            "financialAccounting is read-only P1 supplier subtotal, not a full 2027 bill or battery savings",
             "sampledPowerMetrics and powerSampleQuality expose instantaneous PV/P1 mismatch without changing P1 authority",
         ],
     }

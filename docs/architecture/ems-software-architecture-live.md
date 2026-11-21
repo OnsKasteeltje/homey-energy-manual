@@ -1,5 +1,10 @@
 # EMS Software Architecture - Live As-Is
 
+> **Dated As-Is synopsis only.** The canonical current-state architecture is
+> [CURRENT-EMS-STATE.md](CURRENT-EMS-STATE.md). Later commissioning facts,
+> including the scheduled read-only AlphaESS collector, supersede older
+> forward-looking statements in this historical synopsis.
+
 **Datum:** 6 oktober 2026
 **Status:** Live-code synopsis  
 **Scope:** Raspberry Pi runtime + actieve Homey flows + actuele GitHub-architectuur  

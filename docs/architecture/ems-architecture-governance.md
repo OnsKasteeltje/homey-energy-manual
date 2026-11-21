@@ -2,11 +2,11 @@
 
 **Status:** Verplicht architectuurbeleid  
 **Geldig vanaf:** 13 september 2026  
-**Canonical architecture baseline:** `docs/architecture/ems-software-architecture-live.md`
+**Canonical architecture baseline:** `docs/architecture/CURRENT-EMS-STATE.md`
 
 ## Regel
 
-Het document `ems-software-architecture-live.md` is de canonical architectural baseline voor het EMS.
+Het document `CURRENT-EMS-STATE.md` is de actuele canonical architectural baseline voor het EMS. `ems-software-architecture-live.md` is een gedateerde As-Is-synopsis en geen tweede bron van actuele runtimewaarheid.
 
 ### 1. Probleemanalyse begint bij de architectuurbaseline
 
@@ -28,13 +28,13 @@ Oude projectdocumentatie, historische flows, shadowimplementaties of eerdere arc
 
 ### 2. Wijzigingen aan EMS-logica vereisen documentatie-update
 
-Iedere wijziging die de EMS-architectuur, verantwoordelijkheden, control flow, planning, safety, interfaces of ownership beïnvloedt, moet ook in `ems-software-architecture-live.md` worden verwerkt.
+Iedere wijziging die de EMS-architectuur, verantwoordelijkheden, control flow, planning, safety, interfaces of ownership beïnvloedt, moet ook in `CURRENT-EMS-STATE.md` worden verwerkt.
 
 Een logica-wijziging is architectonisch pas afgerond wanneer:
 
 1. de implementatie is aangepast en gevalideerd;
 2. de canonical software source in GitHub overeenkomt met de gevalideerde productie-implementatie;
-3. `ems-software-architecture-live.md` de nieuwe situatie correct beschrijft.
+3. `CURRENT-EMS-STATE.md` de nieuwe situatie correct beschrijft.
 
 ### 3. Geen dubbele ownership
 
