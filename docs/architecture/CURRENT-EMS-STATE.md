@@ -1868,3 +1868,29 @@ Retain both flows; do not disable, rename, rewrite or automatically invoke
 them in an EMS cleanup. Explicit operator return to normal EMS ownership and
 the pre-existing Easee writer/gate safety protections remain required.
 No override change is approved by this documentation.
+
+### 2026-11-21 — Evaluatie: ENGIE financial read-only day report; GoodWe card retired
+
+The private Evaluatie view at `frontend/pv-flex/` now exposes a small
+`Financieel · ENGIE` subsection within the existing daily report, with
+a read-only, P1 cumulative-counter-derived supplier variable subtotal
+for completed days from 2027 onward. The GoodWe `Nieuwe GoodWe-meetbron`
+card and the page's corresponding SHADOW evidence fetch are removed; all
+existing SEMS+ collectors, archived complete PV quarters and the independent
+read-only `/web/analysis/pv-cloud/day` resource remain intact.
+
+The allowlisted `GET /web/analysis/financial/day/YYYY-MM-DD` Web Data API
+reuses the installed Pi `runtime/history/ems_performance.py` functions
+`load_energy_interval_accounting` and `financial_accounting`. It does
+not maintain a second copy of tariff settings or introduce a new database,
+scheduler, Homey integration, planner or actuator. Only completed
+Europe/Amsterdam dates are accepted, and P1 coverage below 95% is UNKNOWN,
+not zero. For pre-2027 periods with annual saldering no daily cost is claimed.
+2027 output excludes government energy taxes, fixed charges, grid/network
+fees, battery degradation and unproven battery-to-EV or PV source savings.
+Existing archived daily-report and provisional-today contracts remain unchanged.
+
+Production acceptance is separate from GitHub merge: test source, install only
+the updated Web Data API Python file and four Evaluatie frontend assets on
+the Pi, restart only read-only `ems-web-data-api.service` and validate
+private HTTP resources. No Homey, Caddy or control-chain restart is needed.

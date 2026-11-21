@@ -78,11 +78,22 @@ assert "renderDailyReport(" in render
 assert 'selectedDay>=todayAmsterdam()' in render
 assert 'accounting.gridExportKWh' in render
 assert 'report.lines.slice(2)' in render
-# UI regression: the read-only cloud ring remains SHADOW, but accepted
-# 900-second archived SEMS+ quarters have been live since 25 Oct.
-assert 'SEMS+ draagt nog niet bij' not in render
-assert 'SHADOW, nog niet in huisbalans' not in render
-assert 'opgeslagen volledig gedekte SEMS+-kwartieren' in render
+# Remove only the redundant SEMS+ card from Evaluatie, not its data pipeline.
+assert 'goodwe-shadow-title' not in index
+assert 'goodwe-evidence' not in index
+assert 'Nieuwe GoodWe-meetbron' not in index
+assert 'loadGoodweCloudEvidence' not in render and 'loadGoodweCloudEvidence' not in state
+assert 'renderGoodweEvidence' not in render
+assert '"/web/analysis/pv-cloud/day/"' not in state
+for key in ("financial-report-title","financial-status","financial-values",
+            "financial-net","financial-import","financial-export-credit",
+            "financial-export-charge"):
+    assert f'id="{key}"' in index
+assert "loadFinancialDay(selectedDay)" in render
+assert "renderFinancialDay(" in render
+assert '"/web/analysis/financial/day/"' in state
+assert "EMS_WEB_FINANCIAL_DAY_V1" in state
+assert ".financial-values[hidden]{display:none}" in css
 assert 'Voorlopig · gemeten deel' in render
 assert '["pvProducedKWh","gridImportKWh","gridExportKWh","pvSelfConsumedKWh"]' in render
 assert 'requestId!==refreshId' in render

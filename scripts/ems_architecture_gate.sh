@@ -598,6 +598,7 @@ pass "Frontend V2 local CSS/JS references resolve"
 # Daily PV self-use must be proven at the backend energy-accounting boundary,
 # and in the read-only Evaluatie view (including no-data fail-closed paths).
 python3 tests/api/test_pv_flex_analysis_contract.py || fail "PV/Flex API boundary contract failed"
+python3 tests/api/test_financial_evaluatie_resource.py || fail "ENGIE read-only financial Evaluatie contract failed"
 python3 tests/api/test_pv_flex_daily_self_use.py || fail "daily PV self-use energy contract failed"
 python3 tests/api/test_pv_flex_provisional_day_report.py || fail "Evaluatie provisional day subtotal contract failed"
 python3 tests/frontend/test_pv_flex_v2_contract.py || fail "Evaluatie frontend contract failed"

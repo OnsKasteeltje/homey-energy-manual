@@ -4,6 +4,7 @@ This service is presentation transport only. It contains no EMS policy and no
 control/device write path.
 """
 
+import importlib.util
 import json
 import logging
 import math
@@ -13,6 +14,7 @@ import zlib
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import urlsplit
 
 HOST = os.environ.get("EMS_WEB_DATA_HOST", "127.0.0.1")
@@ -44,6 +46,7 @@ EMS_SETTINGS_COMMAND_FILE = os.environ.get(
 HISTORY_DB = os.environ.get("EMS_HISTORY_DB", "/home/jeroen/ems/data/ems-history.sqlite")
 PLANNER_HISTORY_DB = os.environ.get("EMS_PLANNER_HISTORY_DB", "/home/jeroen/ems/data/planner-history.sqlite")
 DAILY_PERFORMANCE_ARCHIVE_FILE = os.environ.get("EMS_DAILY_PERFORMANCE_ARCHIVE_FILE", "/home/jeroen/ems/data/daily-performance-archive.json")
+FINANCIAL_PERFORMANCE_MODULE = "/home/jeroen/ems/runtime/history/ems_performance.py"
 HEATING_DAILY_ARCHIVE_FILE = os.environ.get("EMS_HEATING_DAILY_ARCHIVE_FILE", "/home/jeroen/ems/data/heating-daily-archive.json")
 LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
@@ -55,6 +58,7 @@ COMMANDS_API_SCHEMA = "EMS_WEB_COMMANDS_CURRENT_V1"
 HISTORY_API_SCHEMA = "EMS_WEB_HISTORY_V1"
 PV_FLEX_API_SCHEMA = "EMS_WEB_PV_FLEX_ANALYSIS_V1"
 DAILY_PERFORMANCE_API_SCHEMA = "EMS_WEB_DAILY_PERFORMANCE_V1"
+FINANCIAL_DAY_API_SCHEMA = "EMS_WEB_FINANCIAL_DAY_V1"
 HEATING_DAILY_API_SCHEMA = "EMS_WEB_HEATING_DAILY_V1"
 PLANNER_EVALUATION_API_SCHEMA = "EMS_WEB_PLANNER_EVALUATION_V2"
 PV_FORECAST_API_SCHEMA = "EMS_WEB_PV_FORECAST_V2"
@@ -183,6 +187,56 @@ def _live_l1_history():
     # No cross-source completeness gate: the P1 observation stands alone.
     return [item for item in grouped.values() if "l1_net_w" in item][-30:]
 
+
+
+def financial_day_resource(value, *, now=None):
+    """Allowlisted read-only financial projection using the existing Pi report.
+
+    A completed Amsterdam day and P1 cumulative-counter history are required.
+    This does not introduce a second price model, controller or database.
+    """
+    try:
+        day = datetime.strptime(value, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        raise ValueError("FINANCIAL_DAY_INVALID")
+    now = now or datetime.now(LOCAL_TZ)
+    if day.isoformat() != value or day >= now.astimezone(LOCAL_TZ).date():
+        raise ValueError("FINANCIAL_DAY_NOT_COMPLETE")
+
+    source = Path(FINANCIAL_PERFORMANCE_MODULE)
+    if not source.is_file():
+        raise RuntimeError("FINANCIAL_PERFORMANCE_SOURCE_UNAVAILABLE")
+    spec = importlib.util.spec_from_file_location("ems_financial_readonly", source)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("FINANCIAL_PERFORMANCE_SOURCE_INVALID")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    p1 = module.load_energy_interval_accounting(
+        day, db_path=Path(HISTORY_DB), now_utc=now.astimezone(timezone.utc)
+    )
+    financial = module.financial_accounting(day, p1)
+    if (not isinstance(financial, dict)
+            or financial.get("schema") != "EMS_PI_FINANCIAL_ACCOUNTING_V0.1"
+            or financial.get("readOnly") is not True
+            or financial.get("controlWrites") is not False
+            or financial.get("contractId") != "ENGIE_3Y_2026_2029"
+            or financial.get("fullBillAvailable") is not False
+            or financial.get("batterySavingsEur") is not None):
+        raise RuntimeError("FINANCIAL_PERFORMANCE_CONTRACT_INVALID")
+    keys = (
+        "status", "contractId", "p1Coverage", "importKWh", "exportKWh",
+        "supplyCostEur", "exportCompensationEur", "exportChargesEur",
+        "netVariableSupplierCostEur", "fullBillAvailable",
+        "batterySavingsEur", "governmentTaxes2027Included",
+        "fixedChargesIncluded",
+    )
+    return {
+        "schema": FINANCIAL_DAY_API_SCHEMA,
+        "dateLocal": value,
+        "readOnly": True,
+        "controlWrites": False,
+        "financialAccounting": {key: financial.get(key) for key in keys},
+    }
 
 
 def daily_performance_resource(value):
@@ -3033,6 +3087,16 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 400, {"schema":"EMS_WEB_ERROR_V1","status":"ERROR","reason":"HISTORY_PERIOD_INVALID"})
             except (OSError, sqlite3.Error):
                 send_json(self, 503, {"schema":"EMS_WEB_ERROR_V1","status":"UNAVAILABLE","reason":"RESOURCE_UNAVAILABLE"})
+            return
+
+        if len(parts) == 5 and parts[:4] == ["web", "analysis", "financial", "day"]:
+            try:
+                send_json(self, 200, financial_day_resource(parts[4]))
+            except ValueError:
+                send_json(self, 400, {"schema": "EMS_WEB_ERROR_V1", "status": "ERROR", "reason": "INVALID_OR_OPEN_DAY"})
+            except (OSError, RuntimeError, sqlite3.Error, ImportError):
+                logging.exception("Read-only financial day unavailable")
+                send_json(self, 503, {"schema": "EMS_WEB_ERROR_V1", "status": "UNAVAILABLE", "reason": "FINANCIAL_REPORT_UNAVAILABLE"})
             return
 
         if len(parts) == 5 and parts[:4] == ["web", "analysis", "performance", "day"]:
