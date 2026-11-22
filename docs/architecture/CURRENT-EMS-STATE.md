@@ -8,6 +8,33 @@
 **Verified against:** GitHub `main`, current Pi control architecture, 2026-09-13 Homey/Pi production validation, 2026-09-14 history-chain incident analysis, 2026-09-15 Honeywell read-only recovery/validation and Heating Preheat V0.2 shadow consolidation, 2026-09-17 energy-state website publication recovery, and 2026-09-18 WW BOILER→CV manual-source validation / seasonal-advisor cadence alignment, and 2026-09-19 Homey Core v0.11p schema 2.13 state-contract cutover, plus 2026-10-02 EV Bridge v1.5.4 phase/current cutover, 2026-10-03 v1.5.7 predictive-current promotion, 2026-10-04 historical EV-control reason validation, and 2026-10-04 v1.5.8 production PV-capture tuning, plus 2026-10-06 forecast transport/cadence hardening, and 2026-10-13 private iPhone web-app cutover  
 **Repository:** `OnsKasteeltje/homey-energy-manual`  
 
+### EV deadline charge-duration fallback — proposal (22 November 2026, DRAFT PR #315)
+
+The LIVE Pi deadline state still computes the latest start from an ideal 3-phase
+maximum-power duration, without an empirical reserve. A Tesla observation
+(35%→95% at 3×11 A) predicted 6h05 vs roughly 4h57 in the EMS; the deadline
+guard did start physical charging after its calculated latest start and the
+Easee writer applied 3×11 A, but the Tesla ETA indicated finishing after
+the requested 19:00 deadline.
+
+In the **unmerged, undeployed PR #315 branch only**, the read-only Tesla website
+estimate and Pi deadline-state builder apply a conservative provisional 1.30
+factor to the minimum duration, moving the planned start earlier. This does
+not alter the user command, stored SoC calibration, maximum current, Homey EV
+adapter/gate/writer, or physical Easee control. New regression tests exercise
+both the Pi and UI estimate.
+
+**Release blocker:** The Pi currently integrates *AC energy delivered by Easee*
+into `deliveredKWh` while `goalKWh` is estimated from the requested vehicle
+SoC change (0.62 kWh/%). An added time buffer alone does **not** validate
+these energy domains or guarantee stopping at 95%; `GOAL_COMPLETE` may still
+be triggered too early if AC losses are significant. Verify or explicitly
+reconcile AC-vs-battery progress, preferably against real SoC and completed
+sessions, before promoting the draft. Do not deploy this during the currently
+running Tesla deadline. The Pi remains sole deadline authority and Homey the
+sole guarded EV writer.
+
+
 ### Uptime Kuma observability — opt-in source proposal (21 November 2026)
 
 The existing local Docker Uptime Kuma deployment was upgraded to 2.5.12 and
