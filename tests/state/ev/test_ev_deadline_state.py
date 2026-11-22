@@ -39,6 +39,25 @@ class TestEvDeadlineShadowState(unittest.TestCase):
         self.assertEqual(out["baselineMeterKWh"], 100.0)
         self.assertEqual(out["deliveredKWh"], 0.0)
 
+    def test_latest_start_uses_duration_buffer_without_inflating_energy_goal(self):
+        out = m.build(CMD, state("2026-09-20T00:00:00Z"), {}, NOW)
+        self.assertEqual(out["durationSafetyFactor"], 1.30)
+        self.assertEqual(out["goalKWh"], CMD["goalKWh"])
+        self.assertEqual(out["remainingKWh"], CMD["goalKWh"])
+        deadline = m.parse_deadline_local(CMD["deadline"])
+        ideal_hours = CMD["goalKWh"] / (CMD["maxA"] * m.EV_W_PER_A / 1000)
+        expected_latest_ts = deadline.timestamp() - ideal_hours * 1.30 * 3600
+        actual_latest = m.parse_utc(out["latestStartAt"])
+        self.assertAlmostEqual(actual_latest.timestamp(), expected_latest_ts, places=2)
+        self.assertAlmostEqual(out["plannedChargeMinutes"], out["idealChargeMinutes"] * 1.30, delta=0.02)
+
+    def test_tesla_35_to_95_at_11a_starts_sufficiently_early(self):
+        cmd = dict(CMD, goalKWh=37.2, maxA=11)
+        out = m.build(cmd, state("2026-09-20T00:00:00Z"), {}, NOW)
+        self.assertGreater(out["plannedChargeMinutes"], 365)
+        self.assertLess(m.parse_utc(out["latestStartAt"]), m.parse_deadline_local(cmd["deadline"]))
+        self.assertEqual(out["remainingKWh"], 37.2)
+
     def test_one_minute_at_5579w_integrates_about_0093kwh(self):
         first = m.build(CMD, state("2026-09-20T00:00:00Z", power=5579, charging=True), {}, NOW)
         out = m.build(CMD, state("2026-09-20T00:01:00Z", power=5579, charging=True), first, NOW)
