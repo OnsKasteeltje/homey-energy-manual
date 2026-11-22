@@ -22,6 +22,9 @@ ENERGY_STATE_FILE = Path("/home/jeroen/ems/data/energy-state-v2.json")
 STATE_FILE = Path("/home/jeroen/ems/data/ev-deadline-shadow-state.json")
 TZ = ZoneInfo("Europe/Amsterdam")
 EV_W_PER_A = 690
+# Conservative fallback pending empirical calibration from completed Tesla sessions.
+# Extend required charging TIME only; do not inflate goalKWh or delivered energy.
+DEADLINE_DURATION_SAFETY_FACTOR = 1.30
 MIN_A = 6
 MAX_A = 16
 MAX_INTEGRATION_GAP_S = 420
@@ -100,6 +103,7 @@ def build(command, energy_state, previous, now_utc=None):
         "calibrationKWhPerPercent": command.get("calibrationKWhPerPercent"),
         "goalKWh": finite_number(command.get("goalKWh")),
         "maxA": finite_number(command.get("maxA")),
+        "durationSafetyFactor": DEADLINE_DURATION_SAFETY_FACTOR,
         "charging": charging,
         "powerW": power_w,
         "telemetryAt": telemetry_at.isoformat().replace("+00:00", "Z") if telemetry_at else None,
@@ -206,7 +210,10 @@ def build(command, energy_state, previous, now_utc=None):
         out["status"] = "FAIL_CLOSED"
         return out
 
-    latest = deadline.timestamp() - hours_needed * 3600
+    planned_hours = hours_needed * DEADLINE_DURATION_SAFETY_FACTOR
+    out["idealChargeMinutes"] = round(hours_needed * 60, 2)
+    out["plannedChargeMinutes"] = round(planned_hours * 60, 2)
+    latest = deadline.timestamp() - planned_hours * 3600
     out["latestStartAt"] = datetime.fromtimestamp(latest, timezone.utc).isoformat().replace("+00:00", "Z")
 
     if remaining <= 1e-9:
