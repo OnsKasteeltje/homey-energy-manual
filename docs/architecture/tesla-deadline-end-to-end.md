@@ -89,6 +89,8 @@ latestStart =
     - (remainingKWh / availableDeadlinePowerKW) × 1.30
 ```
 
+Openstaande release-blocker: de huidige voortgang telt AC-energie aan de Easee op, terwijl `goalKWh` uit SoC × 0,62 kWh/% is afgeleid. Zonder gevalideerde omzetting naar één energiedomein (of betrouwbare live Tesla-SoC) kan het EMS ondanks een vroegere start nog vóór 95% de status `GOAL_COMPLETE` bereiken. Dit moet vóór een productierelease aantoonbaar worden opgelost of veilig begrensd.
+
 Een deadline zonder expliciete offset wordt door de Pi canoniek geïnterpreteerd in `Europe/Amsterdam`.
 
 **Tijdsbuffer (voorlopige kalibratie, 22 november 2026):** de eerdere deling was een ideaal minimum en leidde bij een Tesla Model 3 RWD (35%→95%, 3×11 A) tot circa 68 minuten te late start ten opzichte van de Tesla-voorspelling. Daarom gebruiken zowel de Pi (`build_deadline_state.py`) als de read-only UI (`tesla-deadline-estimate.mjs`) tijdelijk een factor 1,30 op de *tijdsduur*. Dit beïnvloedt uitsluitend de geplande starttijd en preview/haalbaarheidsmelding; `goalKWh`, `remainingKWh`, de voortgangsintegratie en de maximaal ingestelde stroom blijven ongewijzigd. De factor is conservatief en moet worden gekalibreerd op basis van afgeronde sessies met werkelijke SoC. Eén Tesla-voorspelling bewijst geen constante efficiëntieafwijking. Productie-uitrol pas na regressietests en gerichte runtimevalidatie; Easee/Honeywell/andere actuatorroutes blijven onveranderd.
