@@ -1,11 +1,13 @@
 // Read-only UI guidance; never an EMS planner, telemetry source, or command writer.
 // Must match the Pi's 0.62 kWh/SOC-% calibration for newly submitted commands.
 export const KWH_PER_SOC_PERCENT=0.62;
+// Same conservative fallback as Pi deadline state; until validated by charge-session history.
+export const DEADLINE_DURATION_SAFETY_FACTOR=1.30;
 const VOLTS=230;
 const PHASES=3;
 const DEFAULT_PREVIEW_AMPS=10;
 
-// Returns an ideal minimum at continuous 3-phase charging; real charging may take longer.
+// Provides both the ideal minimum and a buffered planning duration at 3-phase charging.
 export function estimateCharge(currentSoc,targetSoc,maxA){
   if(!Number.isInteger(currentSoc)||currentSoc<0||currentSoc>99||
      !Number.isInteger(targetSoc)||targetSoc<=currentSoc||targetSoc>100)return null;
@@ -15,7 +17,9 @@ export function estimateCharge(currentSoc,targetSoc,maxA){
   const amps=assumedAmps?DEFAULT_PREVIEW_AMPS:maxA;
   if(!Number.isInteger(amps)||amps<6||amps>16)return null;
   const kw=PHASES*VOLTS*amps/1000;
-  return {kwh,kw,amps,assumedAmps,minutes:Math.ceil(60*kwh/kw)};
+  const idealMinutes=Math.ceil(60*kwh/kw);
+  const minutes=Math.ceil((60*kwh/kw)*DEADLINE_DURATION_SAFETY_FACTOR);
+  return {kwh,kw,amps,assumedAmps,idealMinutes,minutes,durationSafetyFactor:DEADLINE_DURATION_SAFETY_FACTOR};
 }
 
 export function formatDuration(minutes){
@@ -59,8 +63,8 @@ export function deadlineFeedback(estimate,deadline,nowMs=Date.now()){
   const availableRounded=Math.max(0,Math.floor(available));
   if(available<estimate.minutes)return {
     level:"warning",text:"Deadline te krap: "+formatDuration(availableRounded)+" beschikbaar, "+
-      formatDuration(estimate.minutes)+" theoretisch nodig."
+      formatDuration(estimate.minutes)+" inclusief voorlopige tijdreserve nodig."
   };
   return {level:"info",text:"Tot deadline: "+formatDuration(availableRounded)+
-    " beschikbaar. Theoretisch voldoende, zonder laadverliezen of reserve."};
+    " beschikbaar. Volgens schatting voldoende met 30% tijdreserve; werkelijke laadtijd kan afwijken."};
 }
