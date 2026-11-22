@@ -37,7 +37,7 @@ function renderEstimate(){
   duration.textContent=formatDuration(estimate.minutes);
   const amperage=estimate.assumedAmps?"voorlopig 3×10 A":"3×"+estimate.amps+" A";
   details.textContent=estimate.kwh.toFixed(1).replace(".",",")+" kWh · "+amperage+" · circa "+
-    estimate.kw.toFixed(1).replace(".",",")+" kW";
+    estimate.kw.toFixed(1).replace(".",",")+" kW · laadtijd incl. 30% tijdreserve";
   const verdict=deadlineFeedback(estimate,v.deadline,Date.now());
   feedback.textContent=verdict.text;
   feedback.dataset.level=verdict.level;
