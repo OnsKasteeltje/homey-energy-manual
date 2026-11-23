@@ -1,0 +1,33 @@
+/* EMS V2 global popup layer: does not inherit card overflow or stacking contexts. */
+.ems-floating-popup {
+  position:fixed!important;
+  z-index:10000!important;
+  box-sizing:border-box;
+  display:none!important;
+  overflow:auto;
+  overscroll-behavior:contain;
+  max-width:calc(100vw - 24px);
+  max-height:calc(100dvh - 24px);
+}
+.ems-floating-popup[data-open="true"] { display:grid!important; }
+.ems-floating-popup.pv-source-popover {
+  width:max-content;
+  min-width:min(245px,calc(100vw - 24px));
+  max-width:min(340px,calc(100vw - 24px));
+  gap:6px;
+  padding:12px;
+  background:white;
+  border:1px solid #d5e4f1;
+  border-radius:13px;
+  box-shadow:0 12px 30px rgba(36,63,92,.18);
+  transform:none!important;
+}
+.ems-floating-popup.pv-source-popover::before {display:none;}
+@media (max-width:480px) {
+  .ems-floating-popup {max-width:calc(100vw - 24px);}
+}
+
+/* Legacy hover selectors must not reveal a restored, explicitly closed tooltip. */
+.pv-node .pv-source-popover[hidden],
+.pv-node:hover .pv-source-popover[hidden],
+.pv-node:focus-within .pv-source-popover[hidden] {display:none!important;}

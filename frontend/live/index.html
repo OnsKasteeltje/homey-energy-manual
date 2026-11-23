@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="../shared/styles/v2-shell.css">
   <link rel="stylesheet" href="./styles/live.css">
   <link rel="stylesheet" href="./styles/live-v04.css">
+  <link rel="stylesheet" href="../shared/styles/popup-manager.css">
 </head>
 <body>
   <header class="topbar">
@@ -29,7 +30,7 @@
       </header>
       <div class="energy-diagram">
         <div class="energy-sources">
-          <article class="energy-node pv-node" tabindex="0" aria-describedby="pv-source-popover">
+          <article class="energy-node pv-node" tabindex="0" aria-describedby="pv-source-popover" data-ems-popup-anchor="pv-source-popover">
             <span class="energy-glyph" aria-hidden="true">☀</span>
             <div><small>PV · opwek</small><strong id="pv-power">—</strong><em id="pv-summary">—</em></div>
             <span id="pv-source-summary" class="pv-source-summary">—</span>
@@ -143,6 +144,7 @@
       <p class="phases-note">Netto P1-fasevermogen, geen verbruik per apparaat.</p>
     </section>
   </main>
+  <script type="module" src="../shared/popup-manager.mjs"></script>
   <script type="module" src="./render/live.js"></script>
   <script type="module" src="./render/battery.mjs"></script>
   <script type="module" src="../shared/navigation.js"></script>
